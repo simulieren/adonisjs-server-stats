@@ -2,9 +2,7 @@
 
 Real-time server monitoring for AdonisJS v6. Collects process, system, HTTP, database, Redis, queue, and log metrics via a pluggable collector architecture, then broadcasts them over SSE for live dashboard display.
 
-Ships with two rendering options:
-- **Edge tag** (`@serverStats()`) -- self-contained HTML/CSS/JS, no build step needed
-- **React components** -- `<ServerStatsBar />` and `useServerStats()` hook
+Ships with an **Edge tag** (`@serverStats()`) -- self-contained HTML/CSS/JS, no build step needed.
 
 ## Installation
 
@@ -121,21 +119,6 @@ export default class ServerStatsController {
 
 ```edge
 @serverStats()
-```
-
-**React** (alternative):
-
-```tsx
-import { ServerStatsBar } from 'adonisjs-server-stats/react'
-
-function AdminLayout({ children }) {
-  return (
-    <div>
-      {children}
-      <ServerStatsBar />
-    </div>
-  )
-}
 ```
 
 ---
@@ -296,76 +279,6 @@ Features:
 - Auto-hides for non-admin users (403 detection)
 - Scoped CSS (`.ss-` prefix)
 - Stale connection indicator (amber dot after 10s)
-
----
-
-## React Components
-
-### `<ServerStatsBar />`
-
-Drop-in stats bar with all metrics, sparklines, and tooltips.
-
-```tsx
-import { ServerStatsBar } from 'adonisjs-server-stats/react'
-
-<ServerStatsBar />
-<ServerStatsBar endpoint="/custom/stats" channel="custom-channel" />
-```
-
-| Prop           | Type     | Default                     | Description                          |
-|----------------|----------|-----------------------------|--------------------------------------|
-| `endpoint`     | `string` | `'/admin/api/server-stats'` | HTTP endpoint for initial fetch      |
-| `channel`      | `string` | `'admin/server-stats'`      | Transmit SSE channel                 |
-| `maxHistory`   | `number` | `60`                        | History length for sparklines        |
-| `staleTimeout` | `number` | `10000`                     | Ms before marking connection stale   |
-
-### `useServerStats(opts?)`
-
-Hook for building custom stats UIs. Manages HTTP fetch, SSE subscription, history, and stale detection.
-
-```tsx
-import { useServerStats } from 'adonisjs-server-stats/react'
-
-function Dashboard() {
-  const { stats, stale, history } = useServerStats()
-
-  if (!stats) return <div>Loading...</div>
-
-  return (
-    <div>
-      <p>CPU: {stats.cpuPercent.toFixed(1)}%</p>
-      <p>Memory: {formatBytes(stats.memRss)}</p>
-      {stale && <p>Connection stale</p>}
-    </div>
-  )
-}
-```
-
-### Individual Components
-
-```tsx
-import {
-  StatBadge,
-  Sparkline,
-  TooltipPopup,
-  Separator,
-} from 'adonisjs-server-stats/react'
-
-import {
-  formatUptime,
-  formatBytes,
-  formatMb,
-  formatCount,
-  cpuColor,
-  cpuHex,
-  latencyColor,
-  latencyHex,
-  errorRateColor,
-  ratioColor,
-  hitRateColor,
-  warnIfPositive,
-} from 'adonisjs-server-stats/react'
-```
 
 ---
 
@@ -567,14 +480,6 @@ import type {
   LogCollectorOptions,
 } from 'adonisjs-server-stats/collectors'
 
-// React types
-import type {
-  UseServerStatsOptions,
-  ServerStatsBarProps,
-  SparklineProps,
-  StatBadgeProps,
-  TooltipPopupProps,
-} from 'adonisjs-server-stats/react'
 ```
 
 ---
@@ -589,11 +494,8 @@ All integrations use lazy `import()` -- missing peer deps won't crash the app. T
 | `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector` |
 | `@adonisjs/redis`           | `redisCollector`                  |
 | `@adonisjs/transmit`        | Provider (SSE broadcast)          |
-| `@adonisjs/transmit-client` | `useServerStats` hook             |
 | `@julr/adonisjs-prometheus` | `serverStatsCollector`            |
 | `bullmq`                    | `queueCollector`                  |
-| `react`                     | React components                  |
-| `axios`                     | `useServerStats` initial fetch    |
 | `edge.js`                   | Edge tag                          |
 
 ## License

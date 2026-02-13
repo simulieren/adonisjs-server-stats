@@ -54,10 +54,6 @@
       "types": "./dist/src/log_stream/log_stream_provider.d.ts",
       "import": "./dist/src/log_stream/log_stream_provider.js"
     },
-    "./react": {
-      "types": "./dist/src/react/index.d.ts",
-      "import": "./dist/src/react/index.js"
-    },
     "./edge": {
       "types": "./dist/src/edge/plugin.d.ts",
       "import": "./dist/src/edge/plugin.js"
@@ -93,9 +89,6 @@
     "@adonisjs/core": "^6.0.0"
   },
   "peerDependenciesMeta": {
-    "react": {
-      "optional": true
-    },
     "@adonisjs/lucid": {
       "optional": true
     },
@@ -105,16 +98,10 @@
     "@adonisjs/transmit": {
       "optional": true
     },
-    "@adonisjs/transmit-client": {
-      "optional": true
-    },
     "@julr/adonisjs-prometheus": {
       "optional": true
     },
     "bullmq": {
-      "optional": true
-    },
-    "axios": {
       "optional": true
     },
     "edge.js": {
@@ -126,14 +113,10 @@
     "@adonisjs/lucid": "^21.0.0",
     "@adonisjs/redis": "^9.0.0",
     "@adonisjs/transmit": "^1.0.0",
-    "@adonisjs/transmit-client": "^1.0.0",
     "@julr/adonisjs-prometheus": "^1.4.0",
     "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "axios": "^1.0.0",
     "bullmq": "^5.0.0",
     "edge.js": "^6.0.0",
-    "react": "^19.0.0",
     "typescript": "^5.9.0"
   }
 }

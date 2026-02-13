@@ -12,8 +12,7 @@
     "outDir": "./dist",
     "rootDir": ".",
     "declaration": true,
-    "declarationMap": true,
-    "jsx": "react-jsx"
+    "declarationMap": true
   },
   "include": ["src/**/*", "configure.ts"],
   "exclude": ["node_modules", "dist"]
