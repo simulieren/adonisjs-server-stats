@@ -6,11 +6,9 @@ Drop a single Edge tag into your layout and get a live stats bar showing CPU, me
 
 Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 
+![adonisjs-server-stats](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/hero.png)
+
 ## Screenshots
-
-**Stats bar** -- always-on metrics strip at the bottom of every page:
-
-![Stats bar with live server metrics](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/debug-queries.png)
 
 **Debug toolbar** -- expandable panels for deep inspection:
 
