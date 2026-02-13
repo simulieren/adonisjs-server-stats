@@ -4,6 +4,18 @@ Real-time server monitoring for AdonisJS v6. Collects process, system, HTTP, dat
 
 Ships with an **Edge tag** (`@serverStats()`) -- self-contained HTML/CSS/JS, no build step needed.
 
+### Stats Bar
+
+![Stats bar with server metrics](screenshots/debug-queries.png)
+
+### Dev Toolbar
+
+![Queries panel](screenshots/debug-queries.png)
+![Events panel](screenshots/debug-events.png)
+![Routes panel](screenshots/debug-routes.png)
+![Logs panel](screenshots/debug-logs.png)
+![Emails panel](screenshots/debug-emails.png)
+
 ## Installation
 
 ```bash
