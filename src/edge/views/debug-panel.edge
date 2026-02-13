@@ -1,0 +1,69 @@
+<div id="ss-dbg-panel" class="ss-dbg-panel" data-logs-endpoint="{{ logsEndpoint }}">
+  <div class="ss-dbg-tabs">
+    <button type="button" class="ss-dbg-tab ss-dbg-active" data-ss-dbg-tab="queries">Queries</button>
+    <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="events">Events</button>
+    <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="routes">Routes</button>
+    <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="logs">Logs</button>
+    @each(pane in customPanes)
+      <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="{{ pane.id }}">{{ pane.label }}</button>
+    @end
+    <div class="ss-dbg-tabs-right">
+      <span id="ss-dbg-query-badge" class="ss-dbg-summary"></span>
+      <button type="button" class="ss-dbg-close" id="ss-dbg-close" title="Close debug panel">&times;</button>
+    </div>
+  </div>
+  <div class="ss-dbg-content">
+    <div id="ss-dbg-pane-queries" class="ss-dbg-pane ss-dbg-active">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-queries" placeholder="Filter queries by SQL, model, or method..." />
+        <span id="ss-dbg-queries-summary" class="ss-dbg-summary"></span>
+        <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-queries-clear">Clear</button>
+      </div>
+      <div id="ss-dbg-queries-body"><div class="ss-dbg-empty">Loading queries...</div></div>
+    </div>
+    <div id="ss-dbg-pane-events" class="ss-dbg-pane">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-events" placeholder="Filter events by name..." />
+        <span id="ss-dbg-events-summary" class="ss-dbg-summary"></span>
+        <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-events-clear">Clear</button>
+      </div>
+      <div id="ss-dbg-events-body"><div class="ss-dbg-empty">Loading events...</div></div>
+    </div>
+    <div id="ss-dbg-pane-routes" class="ss-dbg-pane">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-routes" placeholder="Filter routes by path, name, or handler..." />
+        <span id="ss-dbg-routes-summary" class="ss-dbg-summary"></span>
+      </div>
+      <div id="ss-dbg-routes-body"><div class="ss-dbg-empty">Loading routes...</div></div>
+    </div>
+    <div id="ss-dbg-pane-logs" class="ss-dbg-pane">
+      <div class="ss-dbg-log-filters">
+        <button type="button" class="ss-dbg-log-filter ss-dbg-active" data-ss-dbg-level="all">All</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="error">Error</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="warn">Warn</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="info">Info</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="debug">Debug</button>
+        <input type="text" class="ss-dbg-search ss-dbg-reqid-input" id="ss-dbg-log-reqid" placeholder="Filter by request ID..." />
+        <button type="button" class="ss-dbg-btn-clear ss-dbg-reqid-clear" id="ss-dbg-log-reqid-clear" style="display:none">Clear</button>
+      </div>
+      <div id="ss-dbg-logs-body"><div class="ss-dbg-empty">Loading logs...</div></div>
+    </div>
+    @each(pane in customPanes)
+      <div id="ss-dbg-pane-{{ pane.id }}" class="ss-dbg-pane">
+        @if(pane.search || pane.clearable)
+          <div class="ss-dbg-search-bar">
+            @if(pane.search)
+              <input type="text" class="ss-dbg-search" id="ss-dbg-search-{{ pane.id }}" placeholder="{{ pane.search.placeholder || 'Filter...' }}" />
+            @end
+            <span id="ss-dbg-{{ pane.id }}-summary" class="ss-dbg-summary"></span>
+            @if(pane.clearable)
+              <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-{{ pane.id }}-clear">Clear</button>
+            @end
+          </div>
+        @end
+        <div id="ss-dbg-{{ pane.id }}-body"><div class="ss-dbg-empty">Loading {{ pane.label }}...</div></div>
+      </div>
+    @end
+  </div>
+</div>
+<script type="application/json" id="ss-dbg-custom-panes-config">{{{ JSON.stringify(customPanes) }}}</script>

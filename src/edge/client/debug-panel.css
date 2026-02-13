@@ -1,0 +1,332 @@
+/* Scoped CSS for the debug panel overlay.
+ * All classes use the `.ss-dbg-` prefix to avoid conflicts.
+ */
+
+.ss-dbg-panel {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 28px;
+  z-index: 49;
+  height: 50vh;
+  display: none;
+  flex-direction: column;
+  background: #0f0f0f;
+  border-top: 1px solid #333;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #d4d4d4;
+  box-shadow: 0 -8px 24px rgb(0 0 0 / 0.4);
+}
+.ss-dbg-panel.ss-dbg-open { display: flex; }
+
+/* Tab bar */
+.ss-dbg-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid #333;
+  background: #171717;
+  flex-shrink: 0;
+  padding: 0 8px;
+}
+.ss-dbg-tab {
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: #737373;
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  text-transform: uppercase;
+}
+.ss-dbg-tab:hover { color: #a3a3a3; }
+.ss-dbg-tab.ss-dbg-active {
+  color: #34d399;
+  border-bottom-color: #34d399;
+}
+.ss-dbg-tabs-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ss-dbg-close {
+  padding: 4px 8px;
+  font-size: 14px;
+  color: #737373;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+.ss-dbg-close:hover { color: #e5e5e5; }
+
+/* Tab content */
+.ss-dbg-content {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+}
+.ss-dbg-pane {
+  display: none;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ss-dbg-pane::-webkit-scrollbar { display: none; }
+.ss-dbg-pane.ss-dbg-active { display: block; }
+
+/* Search */
+.ss-dbg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #262626;
+  background: #141414;
+}
+.ss-dbg-search {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  color: #d4d4d4;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  outline: none;
+}
+.ss-dbg-search:focus { border-color: #34d399; }
+.ss-dbg-search::placeholder { color: #525252; }
+.ss-dbg-summary {
+  font-size: 11px;
+  color: #737373;
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.ss-dbg-btn-clear {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-family: inherit;
+  color: #737373;
+  background: #262626;
+  border: 1px solid #404040;
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.ss-dbg-btn-clear:hover { color: #d4d4d4; border-color: #525252; }
+
+/* Table */
+.ss-dbg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.ss-dbg-table th {
+  position: sticky;
+  top: 0;
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #737373;
+  background: #171717;
+  border-bottom: 1px solid #333;
+  white-space: nowrap;
+}
+.ss-dbg-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid #1f1f1f;
+  vertical-align: top;
+  max-width: 0;
+}
+.ss-dbg-table tr:hover td { background: rgba(38, 38, 38, 0.4); }
+
+/* Query-specific styles */
+.ss-dbg-sql {
+  font-size: 11px;
+  color: #93c5fd;
+  word-break: break-all;
+  cursor: pointer;
+  max-width: 500px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ss-dbg-sql.ss-dbg-expanded {
+  white-space: pre-wrap;
+  max-width: none;
+}
+.ss-dbg-duration { font-variant-numeric: tabular-nums; }
+.ss-dbg-slow { color: #fbbf24; }
+.ss-dbg-very-slow { color: #f87171; }
+.ss-dbg-dup { color: #c084fc; font-size: 10px; }
+
+/* Method badges */
+.ss-dbg-method {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.ss-dbg-method-get { background: #064e3b; color: #34d399; }
+.ss-dbg-method-post { background: #1e3a5f; color: #60a5fa; }
+.ss-dbg-method-put, .ss-dbg-method-patch { background: #422006; color: #fbbf24; }
+.ss-dbg-method-delete { background: #450a0a; color: #f87171; }
+
+/* Route highlight */
+.ss-dbg-current-route td { background: rgba(52, 211, 153, 0.08) !important; }
+
+/* Event list */
+.ss-dbg-event-name { color: #93c5fd; }
+.ss-dbg-event-data { color: #737373; font-size: 10px; position: relative; }
+.ss-dbg-event-time { color: #525252; font-size: 10px; font-variant-numeric: tabular-nums; }
+.ss-dbg-data-preview {
+  cursor: pointer;
+  color: #a3a3a3;
+  border-bottom: 1px dashed #525252;
+}
+.ss-dbg-data-preview:hover { color: #d4d4d4; }
+.ss-dbg-data-full {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: #a3a3a3;
+  font-size: 10px;
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow: auto;
+  cursor: pointer;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ss-dbg-data-full::-webkit-scrollbar { display: none; }
+.ss-dbg-copy-btn {
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: #525252;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  vertical-align: middle;
+}
+.ss-dbg-copy-btn:hover { color: #a3a3a3; border-color: #404040; }
+
+/* Logs */
+.ss-dbg-log-filters {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #262626;
+  background: #141414;
+}
+.ss-dbg-log-filter {
+  padding: 3px 10px;
+  font-size: 10px;
+  font-family: inherit;
+  border: 1px solid #333;
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  color: #737373;
+  text-transform: uppercase;
+}
+.ss-dbg-log-filter:hover { border-color: #525252; color: #a3a3a3; }
+.ss-dbg-log-filter.ss-dbg-active { border-color: #34d399; color: #34d399; }
+
+.ss-dbg-log-entry {
+  padding: 4px 12px;
+  font-size: 11px;
+  border-bottom: 1px solid #1a1a1a;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.ss-dbg-log-level {
+  font-size: 10px;
+  font-weight: 600;
+  width: 42px;
+  text-align: center;
+  flex-shrink: 0;
+  padding: 1px 0;
+  border-radius: 3px;
+}
+.ss-dbg-log-level-info { background: #064e3b; color: #34d399; }
+.ss-dbg-log-level-warn { background: #422006; color: #fbbf24; }
+.ss-dbg-log-level-error, .ss-dbg-log-level-fatal { background: #450a0a; color: #f87171; }
+.ss-dbg-log-level-debug { background: #1e1e1e; color: #737373; }
+.ss-dbg-log-level-trace { background: #1e1e1e; color: #525252; }
+.ss-dbg-log-time { color: #525252; font-size: 10px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.ss-dbg-log-reqid {
+  font-size: 10px;
+  color: #6d28d9;
+  background: #1e1b2e;
+  padding: 1px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+}
+.ss-dbg-log-reqid:hover { color: #a78bfa; background: #2e2644; }
+.ss-dbg-log-reqid-empty { font-size: 10px; color: #333; flex-shrink: 0; width: 58px; text-align: center; }
+.ss-dbg-reqid-input { max-width: 200px; margin-left: auto; }
+.ss-dbg-log-msg { color: #d4d4d4; word-break: break-word; }
+
+/* Empty state */
+.ss-dbg-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 120px;
+  color: #525252;
+  font-size: 12px;
+}
+
+/* Badge format */
+.ss-dbg-badge { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+.ss-dbg-badge-green { background: #064e3b; color: #34d399; }
+.ss-dbg-badge-amber { background: #422006; color: #fbbf24; }
+.ss-dbg-badge-red { background: #450a0a; color: #f87171; }
+.ss-dbg-badge-blue { background: #1e3a5f; color: #60a5fa; }
+.ss-dbg-badge-purple { background: #2e1065; color: #c084fc; }
+.ss-dbg-badge-muted { background: #262626; color: #737373; }
+
+/* Filterable cell */
+.ss-dbg-filterable:hover { background: rgba(52, 211, 153, 0.08); }
+
+/* Wrench button in stats bar */
+.ss-dbg-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  color: #737373;
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.ss-dbg-btn:hover { color: #d4d4d4; background: rgba(38, 38, 38, 0.6); }
+.ss-dbg-btn.ss-dbg-active { color: #34d399; }

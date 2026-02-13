@@ -1,0 +1,127 @@
+{
+  "name": "adonisjs-server-stats",
+  "version": "1.0.0",
+  "description": "Real-time server monitoring for AdonisJS v6 applications",
+  "type": "module",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "import": "./dist/src/index.js"
+    },
+    "./types": {
+      "types": "./dist/src/types.d.ts",
+      "import": "./dist/src/types.js"
+    },
+    "./provider": {
+      "types": "./dist/src/provider/server_stats_provider.d.ts",
+      "import": "./dist/src/provider/server_stats_provider.js"
+    },
+    "./collectors": {
+      "types": "./dist/src/collectors/index.d.ts",
+      "import": "./dist/src/collectors/index.js"
+    },
+    "./collectors/*": {
+      "types": "./dist/src/collectors/*_collector.d.ts",
+      "import": "./dist/src/collectors/*_collector.js"
+    },
+    "./middleware": {
+      "types": "./dist/src/middleware/request_tracking_middleware.d.ts",
+      "import": "./dist/src/middleware/request_tracking_middleware.js"
+    },
+    "./controller": {
+      "types": "./dist/src/controller/server_stats_controller.d.ts",
+      "import": "./dist/src/controller/server_stats_controller.js"
+    },
+    "./debug": {
+      "types": "./dist/src/debug/debug_store.d.ts",
+      "import": "./dist/src/debug/debug_store.js"
+    },
+    "./debug/controller": {
+      "types": "./dist/src/controller/debug_controller.d.ts",
+      "import": "./dist/src/controller/debug_controller.js"
+    },
+    "./prometheus": {
+      "types": "./dist/src/prometheus/prometheus_collector.d.ts",
+      "import": "./dist/src/prometheus/prometheus_collector.js"
+    },
+    "./log-stream": {
+      "types": "./dist/src/log_stream/log_stream_service.d.ts",
+      "import": "./dist/src/log_stream/log_stream_service.js"
+    },
+    "./log-stream/provider": {
+      "types": "./dist/src/log_stream/log_stream_provider.d.ts",
+      "import": "./dist/src/log_stream/log_stream_provider.js"
+    },
+    "./react": {
+      "types": "./dist/src/react/index.d.ts",
+      "import": "./dist/src/react/index.js"
+    },
+    "./edge": {
+      "types": "./dist/src/edge/plugin.d.ts",
+      "import": "./dist/src/edge/plugin.js"
+    },
+    "./configure": {
+      "types": "./dist/configure.d.ts",
+      "import": "./dist/configure.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "adonisjs",
+    "server-stats",
+    "monitoring",
+    "metrics",
+    "debug",
+    "devtools"
+  ],
+  "author": "",
+  "license": "MIT",
+  "peerDependencies": {
+    "@adonisjs/core": "^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@adonisjs/lucid": {
+      "optional": true
+    },
+    "@adonisjs/redis": {
+      "optional": true
+    },
+    "@adonisjs/transmit": {
+      "optional": true
+    },
+    "@adonisjs/transmit-client": {
+      "optional": true
+    },
+    "@julr/adonisjs-prometheus": {
+      "optional": true
+    },
+    "bullmq": {
+      "optional": true
+    },
+    "axios": {
+      "optional": true
+    },
+    "edge.js": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@adonisjs/core": "^6.0.0",
+    "typescript": "^5.9.0"
+  }
+}
