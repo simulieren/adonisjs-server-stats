@@ -1,5 +1,8 @@
+import { writeFile, readFile, rename, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
 import { QueryCollector } from "./query_collector.js";
 import { EventCollector } from "./event_collector.js";
+import { EmailCollector } from "./email_collector.js";
 import { RouteInspector } from "./route_inspector.js";
 import type { DevToolbarConfig } from "./types.js";
 
@@ -10,6 +13,7 @@ import type { DevToolbarConfig } from "./types.js";
 export class DebugStore {
   readonly queries: QueryCollector;
   readonly events: EventCollector;
+  readonly emails: EmailCollector;
   readonly routes: RouteInspector;
 
   constructor(config: DevToolbarConfig) {
@@ -18,17 +22,56 @@ export class DebugStore {
       config.slowQueryThresholdMs,
     );
     this.events = new EventCollector(config.maxEvents);
+    this.emails = new EmailCollector(config.maxEmails);
     this.routes = new RouteInspector();
   }
 
   async start(emitter: any, router: any): Promise<void> {
     await this.queries.start(emitter);
     this.events.start(emitter);
+    await this.emails.start(emitter);
     this.routes.inspect(router);
   }
 
   stop(): void {
     this.queries.stop();
     this.events.stop();
+    this.emails.stop();
+  }
+
+  /** Serialize all collector data to a JSON file (atomic write). */
+  async saveToDisk(filePath: string): Promise<void> {
+    const data = {
+      queries: this.queries.getQueries(),
+      events: this.events.getEvents(),
+      emails: this.emails.getEmails(),
+    };
+    const json = JSON.stringify(data);
+    const tmpPath = filePath + ".tmp";
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(tmpPath, json, "utf-8");
+    await rename(tmpPath, filePath);
+  }
+
+  /** Restore collector data from a JSON file on disk. */
+  async loadFromDisk(filePath: string): Promise<void> {
+    let raw: string;
+    try {
+      raw = await readFile(filePath, "utf-8");
+    } catch {
+      return; // file doesn't exist yet
+    }
+
+    const data = JSON.parse(raw);
+
+    if (Array.isArray(data.queries) && data.queries.length > 0) {
+      this.queries.loadRecords(data.queries);
+    }
+    if (Array.isArray(data.events) && data.events.length > 0) {
+      this.events.loadRecords(data.events);
+    }
+    if (Array.isArray(data.emails) && data.emails.length > 0) {
+      this.emails.loadRecords(data.emails);
+    }
   }
 }

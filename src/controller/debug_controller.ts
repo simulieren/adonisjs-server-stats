@@ -19,4 +19,20 @@ export default class DebugController {
     const routes = this.store.routes.getRoutes();
     return response.json({ routes, total: this.store.routes.getRouteCount() });
   }
+
+  async emails({ response }: HttpContext) {
+    const emails = this.store.emails.getLatest(100);
+    // Strip html/text from list response to keep it lightweight
+    const stripped = emails.map(({ html, text, ...rest }) => rest);
+    return response.json({ emails: stripped, total: this.store.emails.getTotalCount() });
+  }
+
+  async emailPreview({ params, response }: HttpContext) {
+    const id = Number(params.id);
+    const html = this.store.emails.getEmailHtml(id);
+    if (!html) {
+      return response.notFound({ error: 'Email not found' });
+    }
+    return response.header('Content-Type', 'text/html; charset=utf-8').send(html);
+  }
 }

@@ -310,6 +310,56 @@
 .ss-dbg-badge-purple { background: #2e1065; color: #c084fc; }
 .ss-dbg-badge-muted { background: #262626; color: #737373; }
 
+/* Email preview overlay */
+.ss-dbg-email-preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #0f0f0f;
+  z-index: 10;
+}
+.ss-dbg-email-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #262626;
+  background: #141414;
+  flex-shrink: 0;
+}
+.ss-dbg-email-preview-meta {
+  font-size: 11px;
+  color: #a3a3a3;
+  line-height: 1.6;
+  overflow: hidden;
+}
+.ss-dbg-email-preview-meta strong { color: #d4d4d4; font-weight: 600; }
+.ss-dbg-email-iframe {
+  flex: 1;
+  border: none;
+  background: #fff;
+}
+
+/* Email row */
+.ss-dbg-email-row { cursor: pointer; }
+.ss-dbg-email-row:hover td { background: rgba(52, 211, 153, 0.06) !important; }
+
+/* Email status badges */
+.ss-dbg-email-status {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.ss-dbg-email-status-sent { background: #064e3b; color: #34d399; }
+.ss-dbg-email-status-sending { background: #422006; color: #fbbf24; }
+.ss-dbg-email-status-queued { background: #1e3a5f; color: #60a5fa; }
+.ss-dbg-email-status-failed { background: #450a0a; color: #f87171; }
+
 /* Filterable cell */
 .ss-dbg-filterable:hover { background: rgba(52, 211, 153, 0.08); }
 

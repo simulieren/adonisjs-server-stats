@@ -11,6 +11,7 @@ export type {
   BadgeColor,
   QueryRecord,
   EventRecord,
+  EmailRecord,
   RouteRecord,
   DevToolbarConfig,
 } from './debug/types.js'

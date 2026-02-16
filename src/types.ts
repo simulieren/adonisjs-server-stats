@@ -276,6 +276,12 @@ export interface DevToolbarOptions {
   maxEvents?: number
 
   /**
+   * Maximum number of captured emails to keep in the ring buffer.
+   * @default 100
+   */
+  maxEmails?: number
+
+  /**
    * Queries slower than this threshold (in **milliseconds**) are
    * highlighted in the toolbar.
    * @default 100
@@ -291,6 +297,14 @@ export interface DevToolbarOptions {
    * @see {@link DebugPane}
    */
   panes?: DebugPane[]
+
+  /**
+   * Persist debug data (queries, events, emails) to disk so it
+   * survives server restarts. Data is saved to `tmp/debug-data.json`.
+   *
+   * @default false
+   */
+  persistDebugData?: boolean
 }
 
 // ---------------------------------------------------------------------------

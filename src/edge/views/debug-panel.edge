@@ -4,6 +4,7 @@
     <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="events">Events</button>
     <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="routes">Routes</button>
     <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="logs">Logs</button>
+    <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="emails">Emails</button>
     @each(pane in customPanes)
       <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="{{ pane.id }}">{{ pane.label }}</button>
     @end
@@ -47,6 +48,21 @@
         <button type="button" class="ss-dbg-btn-clear ss-dbg-reqid-clear" id="ss-dbg-log-reqid-clear" style="display:none">Clear</button>
       </div>
       <div id="ss-dbg-logs-body"><div class="ss-dbg-empty">Loading logs...</div></div>
+    </div>
+    <div id="ss-dbg-pane-emails" class="ss-dbg-pane" style="position:relative">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-emails" placeholder="Filter emails by from, to, subject, or mailer..." />
+        <span id="ss-dbg-emails-summary" class="ss-dbg-summary"></span>
+        <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-emails-clear">Clear</button>
+      </div>
+      <div id="ss-dbg-emails-body"><div class="ss-dbg-empty">Loading emails...</div></div>
+      <div id="ss-dbg-email-preview" class="ss-dbg-email-preview" style="display:none">
+        <div class="ss-dbg-email-preview-header">
+          <div id="ss-dbg-email-preview-meta" class="ss-dbg-email-preview-meta"></div>
+          <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-email-preview-close">Close</button>
+        </div>
+        <iframe id="ss-dbg-email-iframe" class="ss-dbg-email-iframe" sandbox="allow-same-origin" src="about:blank"></iframe>
+      </div>
     </div>
     @each(pane in customPanes)
       <div id="ss-dbg-pane-{{ pane.id }}" class="ss-dbg-pane">

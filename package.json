@@ -1,6 +1,6 @@
 {
   "name": "adonisjs-server-stats",
-  "version": "1.0.4",
+  "version": "1.1.1",
   "description": "Real-time server monitoring for AdonisJS v6 applications",
   "type": "module",
   "main": "./dist/src/index.js",
@@ -65,7 +65,6 @@
   },
   "files": [
     "dist",
-    "screenshots",
     "README.md",
     "LICENSE"
   ],
