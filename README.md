@@ -13,7 +13,7 @@ Drop a single Edge tag into your layout and get a live stats bar showing CPU, me
 
 Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 
-![adonisjs-server-stats](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/hero.png)
+![adonisjs-server-stats demo](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/demo.gif)
 
 ## Screenshots
 
@@ -34,7 +34,7 @@ Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 ## Features
 
 - **Live stats bar** -- CPU, memory, event loop lag, HTTP throughput, DB pool, Redis, queues, logs
-- **Debug toolbar** -- SQL queries, events, routes, logs with search and filtering
+- **Debug toolbar** -- SQL queries, events, emails, routes, logs with search and filtering
 - **Custom panes** -- add your own tabs (webhooks, emails, cache, anything) with a simple config
 - **Pluggable collectors** -- use built-in collectors or write your own
 - **Visibility control** -- show only to admins, specific roles, or in dev mode
@@ -89,6 +89,23 @@ server.use([
 ```ts
 // config/server_stats.ts
 import { defineConfig } from 'adonisjs-server-stats'
+import { processCollector, systemCollector, httpCollector } from 'adonisjs-server-stats/collectors'
+
+export default defineConfig({
+  collectors: [
+    processCollector(),
+    systemCollector(),
+    httpCollector(),
+  ],
+})
+```
+
+That's it -- this gives you CPU, memory, event loop lag, and HTTP throughput out of the box. All other options have sensible defaults. Add more collectors as needed:
+
+```ts
+// config/server_stats.ts
+import env from '#start/env'
+import { defineConfig } from 'adonisjs-server-stats'
 import {
   processCollector,
   systemCollector,
@@ -99,20 +116,41 @@ import {
   logCollector,
   appCollector,
 } from 'adonisjs-server-stats/collectors'
-import env from '#start/env'
 
 export default defineConfig({
+  // How often to collect and broadcast stats (in milliseconds)
   intervalMs: 3000,
+
+  // Real-time transport: 'transmit' for SSE via @adonisjs/transmit, 'none' for polling only
   transport: 'transmit',
+
+  // Transmit channel name clients subscribe to
   channelName: 'admin/server-stats',
+
+  // HTTP endpoint that serves the latest stats snapshot (set to false to disable)
   endpoint: '/admin/api/server-stats',
-  shouldShow: (ctx) => !!ctx.auth?.user?.isAdmin,
+
   collectors: [
+    // CPU usage, event loop lag, heap/RSS memory, uptime, Node.js version
     processCollector(),
+
+    // OS load averages, total/free system memory, system uptime
     systemCollector(),
+
+    // Requests/sec, avg response time, error rate, active connections
+    // maxRecords: size of the circular buffer for request tracking
     httpCollector({ maxRecords: 10_000 }),
+
+    // Lucid connection pool: used/free/pending/max connections
+    // Requires @adonisjs/lucid
     dbPoolCollector({ connectionName: 'postgres' }),
+
+    // Redis server stats: memory, connected clients, keys, hit rate
+    // Requires @adonisjs/redis
     redisCollector(),
+
+    // BullMQ queue stats: active/waiting/delayed/failed jobs
+    // Requires bullmq -- connects directly to Redis (not via @adonisjs/redis)
     queueCollector({
       queueName: 'default',
       connection: {
@@ -121,7 +159,12 @@ export default defineConfig({
         password: env.get('QUEUE_REDIS_PASSWORD'),
       },
     }),
+
+    // Log file stats: errors/warnings in a 5-minute window, entries/minute
     logCollector({ logPath: 'logs/adonisjs.log' }),
+
+    // App-level metrics: online users, pending webhooks, pending emails
+    // Requires @adonisjs/lucid
     appCollector(),
   ],
 })
@@ -133,7 +176,7 @@ export default defineConfig({
 // start/routes.ts
 router
   .get('/admin/api/server-stats', '#controllers/admin/server_stats_controller.index')
-  .use(middleware.superadmin())
+  .use(middleware.superadmin()) // Replace with your own middleware
 ```
 
 ### 5. Create the controller
@@ -180,13 +223,15 @@ export default class ServerStatsController {
 
 ### `DevToolbarOptions`
 
-| Option                 | Type            | Default | Description                        |
-|------------------------|-----------------|---------|------------------------------------|
-| `enabled`              | `boolean`       | `false` | Enable the dev toolbar             |
-| `maxQueries`           | `number`        | `500`   | Max SQL queries to buffer          |
-| `maxEvents`            | `number`        | `200`   | Max events to buffer               |
-| `slowQueryThresholdMs` | `number`        | `100`   | Slow query threshold (ms)          |
-| `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs            |
+| Option                 | Type            | Default | Description                                    |
+|------------------------|-----------------|---------|------------------------------------------------|
+| `enabled`              | `boolean`       | `false` | Enable the dev toolbar                         |
+| `maxQueries`           | `number`        | `500`   | Max SQL queries to buffer                      |
+| `maxEvents`            | `number`        | `200`   | Max events to buffer                           |
+| `maxEmails`            | `number`        | `100`   | Max emails to buffer                           |
+| `slowQueryThresholdMs` | `number`        | `100`   | Slow query threshold (ms)                      |
+| `persistDebugData`     | `boolean`       | `false` | Persist debug data to disk across restarts     |
+| `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs                        |
 
 ---
 
@@ -278,23 +323,35 @@ interface MetricCollector {
 
 ## Visibility Control (`shouldShow`)
 
-Control who sees the stats bar via the `shouldShow` config callback. It receives the AdonisJS `HttpContext` and returns `true` to render.
+By default the stats bar renders for every request. Use `shouldShow` to restrict it. The callback receives the AdonisJS `HttpContext` and should return `true` to show the bar, `false` to hide it.
+
+Because `shouldShow` runs **after** middleware (including auth), you have full access to `ctx.auth`.
 
 ```ts
 export default defineConfig({
-  // Only admin users
-  shouldShow: (ctx) => !!ctx.auth?.user?.isAdmin,
-
-  // Only in development
-  shouldShow: () => process.env.NODE_ENV === 'development',
-
-  // Multiple roles
-  shouldShow: (ctx) =>
-    ctx.auth?.user?.role === 'admin' || ctx.auth?.user?.role === 'superadmin',
+  // Only show in development
+  shouldShow: () => env.get('NODE_ENV'),
 })
 ```
 
-When `shouldShow` is not set, the stats bar always renders.
+```ts
+export default defineConfig({
+  // Only show for logged-in admin users
+  shouldShow: (ctx) => ctx.auth?.user?.isAdmin === true,
+})
+```
+
+```ts
+export default defineConfig({
+  // Only show for specific roles
+  shouldShow: (ctx) => {
+    const role = ctx.auth?.user?.role
+    return role === 'admin' || role === 'superadmin'
+  },
+})
+```
+
+> **Tip:** When `shouldShow` is not set, the bar renders for everyone. In production you almost always want to set this.
 
 ---
 
@@ -323,7 +380,7 @@ Features:
 
 ## Dev Toolbar
 
-Adds a debug panel with SQL query inspection, event tracking, route table, and live logs. Only active in non-production environments.
+Adds a debug panel with SQL query inspection, event tracking, email capture with HTML preview, route table, and live logs. Only active in non-production environments.
 
 ```ts
 export default defineConfig({
@@ -331,7 +388,9 @@ export default defineConfig({
     enabled: true,
     maxQueries: 500,
     maxEvents: 200,
+    maxEmails: 100,
     slowQueryThresholdMs: 100,
+    persistDebugData: true,  // survive server restarts
   },
 })
 ```
@@ -345,10 +404,23 @@ router
     router.get('queries', '#controllers/admin/debug_controller.queries')
     router.get('events', '#controllers/admin/debug_controller.events')
     router.get('routes', '#controllers/admin/debug_controller.routes')
+    router.get('emails', '#controllers/admin/debug_controller.emails')
+    router.get('emails/:id/preview', '#controllers/admin/debug_controller.emailPreview')
   })
   .prefix('/admin/api/debug')
   .use(middleware.admin())
 ```
+
+### Built-in Emails Tab
+
+The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `mail:sent`, `mail:queued`, `queued:mail:error` events). Click any email row to preview its HTML in an iframe.
+
+### Persistent Debug Data
+
+Enable `persistDebugData: true` to save queries, events, and emails to `tmp/debug-data.json`. Data is:
+- **Loaded** on server startup (before collectors start)
+- **Flushed** every 30 seconds (handles crashes)
+- **Saved** on graceful shutdown
 
 ### Custom Debug Panes
 
@@ -507,6 +579,7 @@ import type {
   BadgeColor,
   QueryRecord,
   EventRecord,
+  EmailRecord,
   RouteRecord,
 } from 'adonisjs-server-stats'
 

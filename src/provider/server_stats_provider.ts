@@ -10,6 +10,8 @@ export default class ServerStatsProvider {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private engine: StatsEngine | null = null;
   private debugStore: DebugStore | null = null;
+  private persistPath: string | null = null;
+  private flushTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(protected app: ApplicationService) {}
 
@@ -56,7 +58,9 @@ export default class ServerStatsProvider {
         enabled: true,
         maxQueries: toolbarConfig.maxQueries ?? 500,
         maxEvents: toolbarConfig.maxEvents ?? 200,
+        maxEmails: toolbarConfig.maxEmails ?? 100,
         slowQueryThresholdMs: toolbarConfig.slowQueryThresholdMs ?? 100,
+        persistDebugData: toolbarConfig.persistDebugData ?? false,
       });
     }
 
@@ -108,6 +112,12 @@ export default class ServerStatsProvider {
       () => this.debugStore!,
     );
 
+    // Load persisted data before starting collectors
+    if (toolbarConfig.persistDebugData) {
+      this.persistPath = this.app.makePath("tmp", "debug-data.json");
+      await this.debugStore.loadFromDisk(this.persistPath);
+    }
+
     // Get the emitter
     let emitter: any = null;
     try {
@@ -125,12 +135,37 @@ export default class ServerStatsProvider {
     }
 
     await this.debugStore.start(emitter, router);
+
+    // Periodic flush every 30 seconds (handles crashes)
+    if (this.persistPath) {
+      this.flushTimer = setInterval(async () => {
+        try {
+          await this.debugStore?.saveToDisk(this.persistPath!);
+        } catch {
+          // Silently ignore flush errors
+        }
+      }, 30_000);
+    }
   }
 
   async shutdown() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+    }
+
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+
+    // Save debug data before stopping collectors
+    if (this.persistPath && this.debugStore) {
+      try {
+        await this.debugStore.saveToDisk(this.persistPath);
+      } catch {
+        // Silently ignore save errors during shutdown
+      }
     }
 
     this.debugStore?.stop();

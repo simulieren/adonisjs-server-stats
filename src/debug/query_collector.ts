@@ -101,4 +101,11 @@ export class QueryCollector {
   clear(): void {
     this.buffer.clear();
   }
+
+  /** Restore persisted records into the buffer and reset the ID counter. */
+  loadRecords(records: QueryRecord[]): void {
+    this.buffer.load(records);
+    const maxId = records.reduce((m, r) => Math.max(m, r.id), 0);
+    this.buffer.setNextId(maxId + 1);
+  }
 }

@@ -58,6 +58,53 @@ export interface EventRecord {
 }
 
 /**
+ * A captured email sent via AdonisJS mail.
+ *
+ * Stored in a {@link RingBuffer} by the {@link EmailCollector} and
+ * served via the debug API endpoint.
+ */
+export interface EmailRecord {
+  /** Auto-incrementing sequence number. */
+  id: number
+
+  /** Sender address (e.g. `"noreply@example.com"`). */
+  from: string
+
+  /** Comma-separated recipient addresses. */
+  to: string
+
+  /** CC recipients, or `null` if none. */
+  cc: string | null
+
+  /** BCC recipients, or `null` if none. */
+  bcc: string | null
+
+  /** Email subject line. */
+  subject: string
+
+  /** Full HTML body for iframe preview, or `null`. */
+  html: string | null
+
+  /** Plain-text body, or `null`. */
+  text: string | null
+
+  /** Mailer name (e.g. `"smtp"`, `"ses"`). */
+  mailer: string
+
+  /** Current delivery status. */
+  status: 'sending' | 'sent' | 'queued' | 'failed'
+
+  /** Message ID from the mail transport response, or `null`. */
+  messageId: string | null
+
+  /** Number of file attachments. */
+  attachmentCount: number
+
+  /** Unix timestamp in **milliseconds** when the email was captured. */
+  timestamp: number
+}
+
+/**
  * A registered route extracted from the AdonisJS router.
  *
  * Cached at boot by the {@link RouteInspector} and served via
@@ -104,8 +151,14 @@ export interface DevToolbarConfig {
   /** Maximum events to buffer. */
   maxEvents: number
 
+  /** Maximum emails to buffer. */
+  maxEmails: number
+
   /** Slow query highlight threshold in **milliseconds**. */
   slowQueryThresholdMs: number
+
+  /** Whether to persist debug data to disk across restarts. */
+  persistDebugData: boolean
 }
 
 // ---------------------------------------------------------------------------
