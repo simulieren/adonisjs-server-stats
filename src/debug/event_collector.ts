@@ -25,8 +25,13 @@ export class EventCollector {
       // Resolve event name: class-based events use the class name, string events are used as-is
       const eventName = typeof event === "string" ? event : event?.name || "unknown";
 
-      // Skip internal/noisy events
-      if (!eventName.startsWith("__") && eventName !== "db:query") {
+      // Skip internal/noisy events and mail events (handled by EmailCollector)
+      if (
+        !eventName.startsWith("__") &&
+        eventName !== "db:query" &&
+        !eventName.startsWith("mail:") &&
+        eventName !== "queued:mail:error"
+      ) {
         const record: EventRecord = {
           id: self.buffer.getNextId(),
           event: eventName,
@@ -91,5 +96,12 @@ export class EventCollector {
 
   clear(): void {
     this.buffer.clear();
+  }
+
+  /** Restore persisted records into the buffer and reset the ID counter. */
+  loadRecords(records: EventRecord[]): void {
+    this.buffer.load(records);
+    const maxId = records.reduce((m, r) => Math.max(m, r.id), 0);
+    this.buffer.setNextId(maxId + 1);
   }
 }

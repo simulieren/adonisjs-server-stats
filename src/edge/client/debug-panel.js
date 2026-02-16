@@ -189,6 +189,7 @@
     else if (name === 'events') fetchEvents();
     else if (name === 'routes' && !fetched.routes) fetchRoutes();
     else if (name === 'logs') fetchLogs();
+    else if (name === 'emails') fetchEmails();
     else {
       const cp = customPanes.find((p) => p.id === name);
       if (cp) {
@@ -579,6 +580,122 @@
       renderLogs();
     });
   });
+
+  // ── Emails Tab ─────────────────────────────────────────────────
+  const emailSearchInput = document.getElementById('ss-dbg-search-emails');
+  const emailSummaryEl = document.getElementById('ss-dbg-emails-summary');
+  const emailBodyEl = document.getElementById('ss-dbg-emails-body');
+  const emailClearBtn = document.getElementById('ss-dbg-emails-clear');
+  const emailPreviewEl = document.getElementById('ss-dbg-email-preview');
+  const emailPreviewMeta = document.getElementById('ss-dbg-email-preview-meta');
+  const emailPreviewClose = document.getElementById('ss-dbg-email-preview-close');
+  const emailIframe = document.getElementById('ss-dbg-email-iframe');
+  let cachedEmails = { emails: [], total: 0 };
+
+  const fetchEmails = () => {
+    fetchJSON(BASE + '/emails')
+      .then((data) => {
+        cachedEmails = data;
+        renderEmails();
+      })
+      .catch(() => {
+        if (emailBodyEl) emailBodyEl.innerHTML = '<div class="ss-dbg-empty">Failed to load emails</div>';
+      });
+  };
+
+  const renderEmails = () => {
+    if (!emailBodyEl) return;
+    const filter = (emailSearchInput ? emailSearchInput.value : '').toLowerCase();
+    const emails = cachedEmails.emails || [];
+
+    if (emailSummaryEl) {
+      emailSummaryEl.textContent = cachedEmails.total + ' emails';
+    }
+
+    let filtered = emails;
+    if (filter) {
+      filtered = emails.filter((e) =>
+        (e.from || '').toLowerCase().indexOf(filter) !== -1
+        || (e.to || '').toLowerCase().indexOf(filter) !== -1
+        || (e.subject || '').toLowerCase().indexOf(filter) !== -1
+        || (e.mailer || '').toLowerCase().indexOf(filter) !== -1
+      );
+    }
+
+    if (filtered.length === 0) {
+      emailBodyEl.innerHTML = '<div class="ss-dbg-empty">' + (filter ? 'No matching emails' : 'No emails captured yet') + '</div>';
+      return;
+    }
+
+    let html = '<table class="ss-dbg-table"><thead><tr>'
+      + '<th style="width:40px">#</th>'
+      + '<th style="width:160px">From</th>'
+      + '<th style="width:160px">To</th>'
+      + '<th>Subject</th>'
+      + '<th style="width:60px">Status</th>'
+      + '<th style="width:60px">Mailer</th>'
+      + '<th style="width:30px" title="Attachments">&#x1F4CE;</th>'
+      + '<th style="width:70px">Time</th>'
+      + '</tr></thead><tbody>';
+
+    for (let i = 0; i < filtered.length; i++) {
+      const e = filtered[i];
+      html += '<tr class="ss-dbg-email-row" data-email-id="' + e.id + '">'
+        + '<td style="color:#525252">' + e.id + '</td>'
+        + '<td style="color:#a3a3a3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="' + esc(e.from) + '">' + esc(e.from) + '</td>'
+        + '<td style="color:#a3a3a3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="' + esc(e.to) + '">' + esc(e.to) + '</td>'
+        + '<td style="color:#93c5fd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.subject) + '</td>'
+        + '<td><span class="ss-dbg-email-status ss-dbg-email-status-' + esc(e.status) + '">' + esc(e.status) + '</span></td>'
+        + '<td style="color:#737373">' + esc(e.mailer) + '</td>'
+        + '<td style="color:#525252;text-align:center">' + (e.attachmentCount > 0 ? e.attachmentCount : '-') + '</td>'
+        + '<td class="ss-dbg-event-time">' + timeAgo(e.timestamp) + '</td>'
+        + '</tr>';
+    }
+
+    html += '</tbody></table>';
+    emailBodyEl.innerHTML = html;
+
+    // Click row to open preview
+    emailBodyEl.querySelectorAll('.ss-dbg-email-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const id = row.getAttribute('data-email-id');
+        showEmailPreview(id, filtered);
+      });
+    });
+  };
+
+  const showEmailPreview = (id, emails) => {
+    if (!emailPreviewEl || !emailIframe || !emailPreviewMeta) return;
+    const email = emails.find((e) => String(e.id) === String(id));
+
+    if (emailPreviewMeta && email) {
+      emailPreviewMeta.innerHTML =
+        '<strong>Subject:</strong> ' + esc(email.subject)
+        + '&nbsp;&nbsp;|&nbsp;&nbsp;<strong>From:</strong> ' + esc(email.from)
+        + '&nbsp;&nbsp;|&nbsp;&nbsp;<strong>To:</strong> ' + esc(email.to)
+        + (email.cc ? '&nbsp;&nbsp;|&nbsp;&nbsp;<strong>CC:</strong> ' + esc(email.cc) : '')
+        + '&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Status:</strong> <span class="ss-dbg-email-status ss-dbg-email-status-' + esc(email.status) + '">' + esc(email.status) + '</span>'
+        + '&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Mailer:</strong> ' + esc(email.mailer);
+    }
+
+    emailIframe.src = BASE + '/emails/' + id + '/preview';
+    emailPreviewEl.style.display = 'flex';
+  };
+
+  if (emailPreviewClose) {
+    emailPreviewClose.addEventListener('click', () => {
+      if (emailPreviewEl) emailPreviewEl.style.display = 'none';
+      if (emailIframe) emailIframe.src = 'about:blank';
+    });
+  }
+
+  if (emailSearchInput) emailSearchInput.addEventListener('input', renderEmails);
+  if (emailClearBtn) {
+    emailClearBtn.addEventListener('click', () => {
+      cachedEmails = { emails: [], total: 0 };
+      renderEmails();
+    });
+  }
 
   // ── Custom panes: fetch, render, bind ───────────────────────────
   const getNestedValue = (obj, path) => {
