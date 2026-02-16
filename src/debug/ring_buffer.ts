@@ -54,4 +54,16 @@ export class RingBuffer<T> {
     this.head = 0;
     this.count = 0;
   }
+
+  /** Bulk-load items (e.g. from disk). Pushes each in order, respecting capacity. */
+  load(items: T[]): void {
+    for (const item of items) {
+      this.push(item);
+    }
+  }
+
+  /** Restore the auto-increment counter (e.g. after loading persisted data). */
+  setNextId(id: number): void {
+    this.nextId = id;
+  }
 }

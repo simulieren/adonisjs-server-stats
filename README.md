@@ -34,7 +34,7 @@ Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 ## Features
 
 - **Live stats bar** -- CPU, memory, event loop lag, HTTP throughput, DB pool, Redis, queues, logs
-- **Debug toolbar** -- SQL queries, events, routes, logs with search and filtering
+- **Debug toolbar** -- SQL queries, events, emails, routes, logs with search and filtering
 - **Custom panes** -- add your own tabs (webhooks, emails, cache, anything) with a simple config
 - **Pluggable collectors** -- use built-in collectors or write your own
 - **Visibility control** -- show only to admins, specific roles, or in dev mode
@@ -223,13 +223,15 @@ export default class ServerStatsController {
 
 ### `DevToolbarOptions`
 
-| Option                 | Type            | Default | Description                        |
-|------------------------|-----------------|---------|------------------------------------|
-| `enabled`              | `boolean`       | `false` | Enable the dev toolbar             |
-| `maxQueries`           | `number`        | `500`   | Max SQL queries to buffer          |
-| `maxEvents`            | `number`        | `200`   | Max events to buffer               |
-| `slowQueryThresholdMs` | `number`        | `100`   | Slow query threshold (ms)          |
-| `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs            |
+| Option                 | Type            | Default | Description                                    |
+|------------------------|-----------------|---------|------------------------------------------------|
+| `enabled`              | `boolean`       | `false` | Enable the dev toolbar                         |
+| `maxQueries`           | `number`        | `500`   | Max SQL queries to buffer                      |
+| `maxEvents`            | `number`        | `200`   | Max events to buffer                           |
+| `maxEmails`            | `number`        | `100`   | Max emails to buffer                           |
+| `slowQueryThresholdMs` | `number`        | `100`   | Slow query threshold (ms)                      |
+| `persistDebugData`     | `boolean`       | `false` | Persist debug data to disk across restarts     |
+| `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs                        |
 
 ---
 
@@ -378,7 +380,7 @@ Features:
 
 ## Dev Toolbar
 
-Adds a debug panel with SQL query inspection, event tracking, route table, and live logs. Only active in non-production environments.
+Adds a debug panel with SQL query inspection, event tracking, email capture with HTML preview, route table, and live logs. Only active in non-production environments.
 
 ```ts
 export default defineConfig({
@@ -386,7 +388,9 @@ export default defineConfig({
     enabled: true,
     maxQueries: 500,
     maxEvents: 200,
+    maxEmails: 100,
     slowQueryThresholdMs: 100,
+    persistDebugData: true,  // survive server restarts
   },
 })
 ```
@@ -400,10 +404,23 @@ router
     router.get('queries', '#controllers/admin/debug_controller.queries')
     router.get('events', '#controllers/admin/debug_controller.events')
     router.get('routes', '#controllers/admin/debug_controller.routes')
+    router.get('emails', '#controllers/admin/debug_controller.emails')
+    router.get('emails/:id/preview', '#controllers/admin/debug_controller.emailPreview')
   })
   .prefix('/admin/api/debug')
   .use(middleware.admin())
 ```
+
+### Built-in Emails Tab
+
+The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `mail:sent`, `mail:queued`, `queued:mail:error` events). Click any email row to preview its HTML in an iframe.
+
+### Persistent Debug Data
+
+Enable `persistDebugData: true` to save queries, events, and emails to `tmp/debug-data.json`. Data is:
+- **Loaded** on server startup (before collectors start)
+- **Flushed** every 30 seconds (handles crashes)
+- **Saved** on graceful shutdown
 
 ### Custom Debug Panes
 
@@ -562,6 +579,7 @@ import type {
   BadgeColor,
   QueryRecord,
   EventRecord,
+  EmailRecord,
   RouteRecord,
 } from 'adonisjs-server-stats'
 
