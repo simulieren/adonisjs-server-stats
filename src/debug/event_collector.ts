@@ -21,12 +21,15 @@ export class EventCollector {
     this.originalEmit = emitter.emit.bind(emitter);
 
     const self = this;
-    emitter.emit = function (event: string, data?: any) {
+    emitter.emit = function (event: string | Function, data?: any) {
+      // Resolve event name: class-based events use the class name, string events are used as-is
+      const eventName = typeof event === "string" ? event : event?.name || "unknown";
+
       // Skip internal/noisy events
-      if (!event.startsWith("__") && event !== "db:query") {
+      if (!eventName.startsWith("__") && eventName !== "db:query") {
         const record: EventRecord = {
           id: self.buffer.getNextId(),
-          event,
+          event: eventName,
           data: self.summarizeData(data),
           timestamp: Date.now(),
         };
