@@ -230,7 +230,7 @@ export default class ServerStatsController {
 | `maxEvents`            | `number`        | `200`   | Max events to buffer                           |
 | `maxEmails`            | `number`        | `100`   | Max emails to buffer                           |
 | `slowQueryThresholdMs` | `number`        | `100`   | Slow query threshold (ms)                      |
-| `persistDebugData`     | `boolean`       | `false` | Persist debug data to disk across restarts     |
+| `persistDebugData`     | `boolean \| string` | `false` | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path. |
 | `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs                        |
 
 ---
@@ -390,7 +390,7 @@ export default defineConfig({
     maxEvents: 200,
     maxEmails: 100,
     slowQueryThresholdMs: 100,
-    persistDebugData: true,  // survive server restarts
+    persistDebugData: true,  // or a custom path: 'custom/debug.json'
   },
 })
 ```
@@ -417,7 +417,7 @@ The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `m
 
 ### Persistent Debug Data
 
-Enable `persistDebugData: true` to save queries, events, and emails to `tmp/debug-data.json`. Data is:
+Enable `persistDebugData: true` to save queries, events, and emails to `.adonisjs/server-stats/debug-data.json`. You can also pass a custom path (relative to app root) like `persistDebugData: 'custom/debug.json'`. Data is:
 - **Loaded** on server startup (before collectors start)
 - **Flushed** every 30 seconds (handles crashes)
 - **Saved** on graceful shutdown
