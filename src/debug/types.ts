@@ -157,8 +157,8 @@ export interface DevToolbarConfig {
   /** Slow query highlight threshold in **milliseconds**. */
   slowQueryThresholdMs: number
 
-  /** Whether to persist debug data to disk across restarts. */
-  persistDebugData: boolean
+  /** Whether/where to persist debug data to disk across restarts. */
+  persistDebugData: boolean | string
 }
 
 // ---------------------------------------------------------------------------

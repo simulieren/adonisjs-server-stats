@@ -300,11 +300,15 @@ export interface DevToolbarOptions {
 
   /**
    * Persist debug data (queries, events, emails) to disk so it
-   * survives server restarts. Data is saved to `tmp/debug-data.json`.
+   * survives server restarts.
+   *
+   * - `false` — no persistence
+   * - `true` — persist to `.adonisjs/server-stats/debug-data.json`
+   * - `string` — persist to the given path (relative to app root)
    *
    * @default false
    */
-  persistDebugData?: boolean
+  persistDebugData?: boolean | string
 }
 
 // ---------------------------------------------------------------------------

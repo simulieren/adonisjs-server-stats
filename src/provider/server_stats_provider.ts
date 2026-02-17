@@ -114,7 +114,9 @@ export default class ServerStatsProvider {
 
     // Load persisted data before starting collectors
     if (toolbarConfig.persistDebugData) {
-      this.persistPath = this.app.makePath("tmp", "debug-data.json");
+      this.persistPath = typeof toolbarConfig.persistDebugData === 'string'
+        ? this.app.makePath(toolbarConfig.persistDebugData)
+        : this.app.makePath('.adonisjs', 'server-stats', 'debug-data.json');
       await this.debugStore.loadFromDisk(this.persistPath);
     }
 
