@@ -46,14 +46,6 @@ Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 ## Installation
 
 ```bash
-node ace configure adonisjs-server-stats
-```
-
-This publishes `config/server_stats.ts` and registers the providers in `adonisrc.ts`.
-
-Or install manually:
-
-```bash
 npm install adonisjs-server-stats
 ```
 
