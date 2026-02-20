@@ -35,4 +35,29 @@ export default class DebugController {
     }
     return response.header('Content-Type', 'text/html; charset=utf-8').send(html);
   }
+
+  async traces({ response }: HttpContext) {
+    if (!this.store.traces) {
+      return response.json({ traces: [], total: 0 });
+    }
+    const traces = this.store.traces.getLatest(100);
+    // Strip spans from list view to keep it lightweight
+    const list = traces.map(({ spans, warnings, ...rest }) => ({
+      ...rest,
+      warningCount: warnings.length,
+    }));
+    return response.json({ traces: list, total: this.store.traces.getTotalCount() });
+  }
+
+  async traceDetail({ params, response }: HttpContext) {
+    if (!this.store.traces) {
+      return response.notFound({ error: 'Tracing not enabled' });
+    }
+    const id = Number(params.id);
+    const trace = this.store.traces.getTrace(id);
+    if (!trace) {
+      return response.notFound({ error: 'Trace not found' });
+    }
+    return response.json(trace);
+  }
 }

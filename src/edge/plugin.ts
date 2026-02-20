@@ -108,6 +108,7 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
       state.debugJs = read("client/debug-panel.js");
       state.logsEndpoint = "/admin/api/debug/logs";
       state.customPanes = config.devToolbar?.panes || [];
+      state.showTracing = !!config.devToolbar?.tracing;
     }
 
     // Pre-render via Template directly — bypasses edge.createRenderer() which

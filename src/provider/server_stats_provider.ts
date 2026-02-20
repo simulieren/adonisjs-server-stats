@@ -1,6 +1,6 @@
 import { StatsEngine } from "../engine/stats_engine.js";
 import { DebugStore } from "../debug/debug_store.js";
-import { setShouldShow } from "../middleware/request_tracking_middleware.js";
+import { setShouldShow, setTraceCollector } from "../middleware/request_tracking_middleware.js";
 
 import type { ApplicationService } from "@adonisjs/core/types";
 import type { ServerStatsConfig } from "../types.js";
@@ -61,6 +61,8 @@ export default class ServerStatsProvider {
         maxEmails: toolbarConfig.maxEmails ?? 100,
         slowQueryThresholdMs: toolbarConfig.slowQueryThresholdMs ?? 100,
         persistDebugData: toolbarConfig.persistDebugData ?? false,
+        tracing: toolbarConfig.tracing ?? false,
+        maxTraces: toolbarConfig.maxTraces ?? 200,
       });
     }
 
@@ -137,6 +139,11 @@ export default class ServerStatsProvider {
     }
 
     await this.debugStore.start(emitter, router);
+
+    // Wire trace collector into the request tracking middleware
+    if (this.debugStore.traces) {
+      setTraceCollector(this.debugStore.traces);
+    }
 
     // Periodic flush every 30 seconds (handles crashes)
     if (this.persistPath) {

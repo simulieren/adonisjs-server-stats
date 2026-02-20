@@ -4,6 +4,7 @@ import { getRequestMetrics } from "../collectors/http_collector.js";
 
 import type { HttpContext } from "@adonisjs/core/http";
 import type { NextFn } from "@adonisjs/core/types/http";
+import type { TraceCollector } from "../debug/trace_collector.js";
 
 /**
  * Module-level `shouldShow` callback, set by the provider at boot.
@@ -12,6 +13,15 @@ let shouldShowFn: ((ctx: any) => boolean) | null = null;
 
 export function setShouldShow(fn: ((ctx: any) => boolean) | null) {
   shouldShowFn = fn;
+}
+
+/**
+ * Module-level trace collector, set by the provider when tracing is enabled.
+ */
+let traceCollector: TraceCollector | null = null;
+
+export function setTraceCollector(collector: TraceCollector | null) {
+  traceCollector = collector;
 }
 
 export default class RequestTrackingMiddleware {
@@ -37,12 +47,26 @@ export default class RequestTrackingMiddleware {
       });
     }
 
-    try {
-      await next();
-    } finally {
-      const duration = performance.now() - start;
-      metrics.decrementActiveConnections();
-      metrics.recordRequest(duration, ctx.response.getStatus());
+    const runRequest = async () => {
+      try {
+        await next();
+      } finally {
+        const duration = performance.now() - start;
+        metrics.decrementActiveConnections();
+        metrics.recordRequest(duration, ctx.response.getStatus());
+
+        traceCollector?.finishTrace(
+          ctx.request.method(),
+          ctx.request.url(true),
+          ctx.response.getStatus()
+        );
+      }
+    };
+
+    if (traceCollector) {
+      await traceCollector.startTrace(runRequest);
+    } else {
+      await runRequest();
     }
   }
 }

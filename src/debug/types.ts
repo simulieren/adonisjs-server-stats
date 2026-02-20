@@ -132,6 +132,74 @@ export interface RouteRecord {
 }
 
 // ---------------------------------------------------------------------------
+// Request tracing
+// ---------------------------------------------------------------------------
+
+/**
+ * A single span within a request trace.
+ *
+ * Represents a timed operation (DB query, middleware, custom code block)
+ * that occurred during an HTTP request. Spans can be nested via `parentId`.
+ */
+export interface TraceSpan {
+  /** Unique span ID within the trace. */
+  id: string
+
+  /** Parent span ID, or `null` for root-level spans. */
+  parentId: string | null
+
+  /** Human-readable label (e.g. `"SELECT * FROM users"`, `"auth middleware"`). */
+  label: string
+
+  /** Category for color-coding and grouping in the timeline. */
+  category: 'request' | 'middleware' | 'db' | 'view' | 'mail' | 'event' | 'custom'
+
+  /** Milliseconds from request start to span start. */
+  startOffset: number
+
+  /** Span duration in milliseconds. */
+  duration: number
+
+  /** Optional metadata (query bindings, status code, etc.). */
+  metadata?: Record<string, any>
+}
+
+/**
+ * A complete trace for a single HTTP request.
+ *
+ * Contains all spans captured during the request lifecycle,
+ * stored in a {@link RingBuffer} by the {@link TraceCollector}.
+ */
+export interface TraceRecord {
+  /** Auto-incrementing sequence number. */
+  id: number
+
+  /** HTTP method (e.g. `'GET'`, `'POST'`). */
+  method: string
+
+  /** Request URL including query string. */
+  url: string
+
+  /** HTTP response status code. */
+  statusCode: number
+
+  /** Total request duration in milliseconds. */
+  totalDuration: number
+
+  /** Number of spans captured. */
+  spanCount: number
+
+  /** All spans captured during this request. */
+  spans: TraceSpan[]
+
+  /** Warnings captured via `console.warn` during this request. */
+  warnings: string[]
+
+  /** Unix timestamp in **milliseconds** when the request started. */
+  timestamp: number
+}
+
+// ---------------------------------------------------------------------------
 // Dev toolbar internal config (resolved defaults)
 // ---------------------------------------------------------------------------
 
@@ -159,6 +227,12 @@ export interface DevToolbarConfig {
 
   /** Whether/where to persist debug data to disk across restarts. */
   persistDebugData: boolean | string
+
+  /** Whether per-request tracing is enabled. */
+  tracing: boolean
+
+  /** Maximum traces to keep in the ring buffer. */
+  maxTraces: number
 }
 
 // ---------------------------------------------------------------------------

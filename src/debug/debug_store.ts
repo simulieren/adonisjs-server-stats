@@ -4,6 +4,7 @@ import { QueryCollector } from "./query_collector.js";
 import { EventCollector } from "./event_collector.js";
 import { EmailCollector } from "./email_collector.js";
 import { RouteInspector } from "./route_inspector.js";
+import { TraceCollector } from "./trace_collector.js";
 import type { DevToolbarConfig } from "./types.js";
 
 /**
@@ -15,6 +16,7 @@ export class DebugStore {
   readonly events: EventCollector;
   readonly emails: EmailCollector;
   readonly routes: RouteInspector;
+  readonly traces: TraceCollector | null;
 
   constructor(config: DevToolbarConfig) {
     this.queries = new QueryCollector(
@@ -24,6 +26,7 @@ export class DebugStore {
     this.events = new EventCollector(config.maxEvents);
     this.emails = new EmailCollector(config.maxEmails);
     this.routes = new RouteInspector();
+    this.traces = config.tracing ? new TraceCollector(config.maxTraces) : null;
   }
 
   async start(emitter: any, router: any): Promise<void> {
@@ -31,21 +34,26 @@ export class DebugStore {
     this.events.start(emitter);
     await this.emails.start(emitter);
     this.routes.inspect(router);
+    this.traces?.start(emitter);
   }
 
   stop(): void {
     this.queries.stop();
     this.events.stop();
     this.emails.stop();
+    this.traces?.stop();
   }
 
   /** Serialize all collector data to a JSON file (atomic write). */
   async saveToDisk(filePath: string): Promise<void> {
-    const data = {
+    const data: Record<string, any> = {
       queries: this.queries.getQueries(),
       events: this.events.getEvents(),
       emails: this.emails.getEmails(),
     };
+    if (this.traces) {
+      data.traces = this.traces.getTraces();
+    }
     const json = JSON.stringify(data);
     const tmpPath = filePath + ".tmp";
     await mkdir(dirname(filePath), { recursive: true });
@@ -72,6 +80,9 @@ export class DebugStore {
     }
     if (Array.isArray(data.emails) && data.emails.length > 0) {
       this.emails.loadRecords(data.emails);
+    }
+    if (this.traces && Array.isArray(data.traces) && data.traces.length > 0) {
+      this.traces.loadRecords(data.traces);
     }
   }
 }

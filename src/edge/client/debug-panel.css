@@ -363,6 +363,124 @@
 /* Filterable cell */
 .ss-dbg-filterable:hover { background: rgba(52, 211, 153, 0.08); }
 
+/* Timeline */
+.ss-dbg-tl-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #262626;
+  background: #141414;
+  flex-shrink: 0;
+}
+#ss-dbg-tl-waterfall {
+  padding: 8px 12px;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+#ss-dbg-tl-waterfall::-webkit-scrollbar { display: none; }
+
+.ss-dbg-tl-row {
+  display: flex;
+  align-items: center;
+  height: 24px;
+  font-size: 11px;
+  border-bottom: 1px solid #1a1a1a;
+}
+.ss-dbg-tl-row:hover { background: rgba(38, 38, 38, 0.4); }
+.ss-dbg-tl-label {
+  width: 280px;
+  min-width: 280px;
+  padding-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a3a3a3;
+  font-size: 10px;
+}
+.ss-dbg-tl-track {
+  flex: 1;
+  position: relative;
+  height: 16px;
+}
+.ss-dbg-tl-bar {
+  position: absolute;
+  height: 12px;
+  top: 2px;
+  border-radius: 2px;
+  min-width: 2px;
+  cursor: default;
+}
+.ss-dbg-tl-bar-request { background: #1e3a5f; }
+.ss-dbg-tl-bar-middleware { background: #1e3a5f; opacity: 0.7; }
+.ss-dbg-tl-bar-db { background: #6d28d9; }
+.ss-dbg-tl-bar-view { background: #0e7490; }
+.ss-dbg-tl-bar-mail { background: #059669; }
+.ss-dbg-tl-bar-event { background: #b45309; }
+.ss-dbg-tl-bar-custom { background: #525252; }
+
+.ss-dbg-tl-dur {
+  font-size: 10px;
+  color: #525252;
+  margin-left: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.ss-dbg-tl-legend {
+  display: flex;
+  gap: 12px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #262626;
+  background: #141414;
+  font-size: 10px;
+  color: #737373;
+}
+.ss-dbg-tl-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ss-dbg-tl-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.ss-dbg-tl-warnings {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-top: 1px solid #262626;
+}
+.ss-dbg-tl-warnings-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.ss-dbg-tl-warning {
+  font-size: 11px;
+  color: #fbbf24;
+  padding: 2px 0;
+}
+
+.ss-dbg-tl-meta {
+  font-size: 10px;
+  color: #525252;
+  margin-left: 8px;
+}
+
+/* Status code badges */
+.ss-dbg-status { font-size: 10px; font-weight: 600; padding: 1px 5px; border-radius: 3px; }
+.ss-dbg-status-2xx { background: #064e3b; color: #34d399; }
+.ss-dbg-status-3xx { background: #1e3a5f; color: #60a5fa; }
+.ss-dbg-status-4xx { background: #422006; color: #fbbf24; }
+.ss-dbg-status-5xx { background: #450a0a; color: #f87171; }
+
 /* Wrench button in stats bar */
 .ss-dbg-btn {
   display: flex;
