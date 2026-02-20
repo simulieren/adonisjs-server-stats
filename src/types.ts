@@ -309,6 +309,23 @@ export interface DevToolbarOptions {
    * @default false
    */
   persistDebugData?: boolean | string
+
+  /**
+   * Enable per-request tracing with timeline visualization.
+   *
+   * When enabled, each HTTP request is traced with a waterfall
+   * of all operations (DB queries, events, mail) that occurred
+   * during the request.
+   *
+   * @default false
+   */
+  tracing?: boolean
+
+  /**
+   * Maximum number of request traces to keep in the ring buffer.
+   * @default 200
+   */
+  maxTraces?: number
 }
 
 // ---------------------------------------------------------------------------

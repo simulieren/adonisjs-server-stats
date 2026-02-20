@@ -18,8 +18,10 @@
 
   const LOGS_ENDPOINT = panel.dataset.logsEndpoint || (BASE + '/logs');
 
+  const tracingEnabled = panel.dataset.tracing === '1';
+
   let isOpen = false;
-  let activeTab = 'queries';
+  let activeTab = tracingEnabled ? 'timeline' : 'queries';
   const fetched = {};
   let refreshTimer = null;
   let logFilter = 'all';
@@ -185,7 +187,8 @@
 
   // ── Data loading ────────────────────────────────────────────────
   const loadTab = (name) => {
-    if (name === 'queries') fetchQueries();
+    if (name === 'timeline') fetchTraces();
+    else if (name === 'queries') fetchQueries();
     else if (name === 'events') fetchEvents();
     else if (name === 'routes' && !fetched.routes) fetchRoutes();
     else if (name === 'logs') fetchLogs();
@@ -696,6 +699,194 @@
       renderEmails();
     });
   }
+
+  // ── Timeline Tab ────────────────────────────────────────────────
+  const tlSearchInput = document.getElementById('ss-dbg-search-timeline');
+  const tlSummaryEl = document.getElementById('ss-dbg-timeline-summary');
+  const tlBodyEl = document.getElementById('ss-dbg-timeline-body');
+  const tlListEl = document.getElementById('ss-dbg-timeline-list');
+  const tlDetailEl = document.getElementById('ss-dbg-timeline-detail');
+  const tlBackBtn = document.getElementById('ss-dbg-tl-back');
+  const tlDetailTitle = document.getElementById('ss-dbg-tl-detail-title');
+  const tlWaterfall = document.getElementById('ss-dbg-tl-waterfall');
+  let cachedTraces = { traces: [], total: 0 };
+
+  const statusClass = (code) => {
+    if (code >= 500) return 'ss-dbg-status-5xx';
+    if (code >= 400) return 'ss-dbg-status-4xx';
+    if (code >= 300) return 'ss-dbg-status-3xx';
+    return 'ss-dbg-status-2xx';
+  };
+
+  const fetchTraces = () => {
+    if (!tracingEnabled) return;
+    fetchJSON(BASE + '/traces')
+      .then((data) => {
+        cachedTraces = data;
+        renderTraces();
+      })
+      .catch(() => {
+        if (tlBodyEl) tlBodyEl.innerHTML = '<div class="ss-dbg-empty">Failed to load traces</div>';
+      });
+  };
+
+  const renderTraces = () => {
+    if (!tlBodyEl) return;
+    const filter = (tlSearchInput ? tlSearchInput.value : '').toLowerCase();
+    const traces = cachedTraces.traces || [];
+
+    if (tlSummaryEl) {
+      tlSummaryEl.textContent = cachedTraces.total + ' requests';
+    }
+
+    let filtered = traces;
+    if (filter) {
+      filtered = traces.filter((t) =>
+        t.url.toLowerCase().indexOf(filter) !== -1
+        || t.method.toLowerCase().indexOf(filter) !== -1
+      );
+    }
+
+    if (filtered.length === 0) {
+      tlBodyEl.innerHTML = '<div class="ss-dbg-empty">' + (filter ? 'No matching requests' : 'No requests traced yet') + '</div>';
+      return;
+    }
+
+    let html = '<table class="ss-dbg-table"><thead><tr>'
+      + '<th style="width:40px">#</th>'
+      + '<th style="width:60px">Method</th>'
+      + '<th>URL</th>'
+      + '<th style="width:55px">Status</th>'
+      + '<th style="width:70px">Duration</th>'
+      + '<th style="width:50px">Spans</th>'
+      + '<th style="width:30px" title="Warnings">&#x26A0;</th>'
+      + '<th style="width:70px">Time</th>'
+      + '</tr></thead><tbody>';
+
+    for (let i = 0; i < filtered.length; i++) {
+      const t = filtered[i];
+      html += '<tr class="ss-dbg-email-row" data-trace-id="' + t.id + '">'
+        + '<td style="color:#525252">' + t.id + '</td>'
+        + '<td><span class="' + methodClass(t.method) + '">' + esc(t.method) + '</span></td>'
+        + '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px" title="' + esc(t.url) + '">' + esc(t.url) + '</td>'
+        + '<td><span class="ss-dbg-status ' + statusClass(t.statusCode) + '">' + t.statusCode + '</span></td>'
+        + '<td class="ss-dbg-duration ' + durationClass(t.totalDuration) + '">' + t.totalDuration.toFixed(1) + 'ms</td>'
+        + '<td style="color:#737373;text-align:center">' + t.spanCount + '</td>'
+        + '<td style="text-align:center">' + (t.warningCount > 0 ? '<span style="color:#fbbf24">' + t.warningCount + '</span>' : '<span style="color:#333">-</span>') + '</td>'
+        + '<td class="ss-dbg-event-time">' + timeAgo(t.timestamp) + '</td>'
+        + '</tr>';
+    }
+
+    html += '</tbody></table>';
+    tlBodyEl.innerHTML = html;
+
+    // Click row to open detail
+    tlBodyEl.querySelectorAll('[data-trace-id]').forEach((row) => {
+      row.addEventListener('click', () => {
+        const id = row.getAttribute('data-trace-id');
+        fetchTraceDetail(id);
+      });
+    });
+  };
+
+  const fetchTraceDetail = (id) => {
+    fetchJSON(BASE + '/traces/' + id)
+      .then((trace) => {
+        showTimeline(trace);
+      })
+      .catch(() => {
+        if (tlWaterfall) tlWaterfall.innerHTML = '<div class="ss-dbg-empty">Failed to load trace</div>';
+      });
+  };
+
+  const showTimeline = (trace) => {
+    if (!tlListEl || !tlDetailEl || !tlDetailTitle || !tlWaterfall) return;
+
+    tlListEl.style.display = 'none';
+    tlDetailEl.style.display = '';
+
+    tlDetailTitle.innerHTML =
+      '<span class="' + methodClass(trace.method) + '">' + esc(trace.method) + '</span> '
+      + esc(trace.url) + ' '
+      + '<span class="ss-dbg-status ' + statusClass(trace.statusCode) + '">' + trace.statusCode + '</span>'
+      + '<span class="ss-dbg-tl-meta">' + trace.totalDuration.toFixed(1) + 'ms &middot; '
+      + trace.spanCount + ' spans &middot; '
+      + formatTime(trace.timestamp) + '</span>';
+
+    const spans = trace.spans || [];
+    const total = trace.totalDuration || 1;
+
+    // Legend
+    let html = '<div class="ss-dbg-tl-legend">'
+      + '<div class="ss-dbg-tl-legend-item"><span class="ss-dbg-tl-legend-dot" style="background:#6d28d9"></span>DB</div>'
+      + '<div class="ss-dbg-tl-legend-item"><span class="ss-dbg-tl-legend-dot" style="background:#1e3a5f"></span>Request</div>'
+      + '<div class="ss-dbg-tl-legend-item"><span class="ss-dbg-tl-legend-dot" style="background:#059669"></span>Mail</div>'
+      + '<div class="ss-dbg-tl-legend-item"><span class="ss-dbg-tl-legend-dot" style="background:#b45309"></span>Event</div>'
+      + '<div class="ss-dbg-tl-legend-item"><span class="ss-dbg-tl-legend-dot" style="background:#0e7490"></span>View</div>'
+      + '<div class="ss-dbg-tl-legend-item"><span class="ss-dbg-tl-legend-dot" style="background:#525252"></span>Custom</div>'
+      + '</div>';
+
+    if (spans.length === 0) {
+      html += '<div class="ss-dbg-empty">No spans captured for this request</div>';
+    } else {
+      // Build nesting depth from parentId
+      const depthMap = {};
+      for (let i = 0; i < spans.length; i++) {
+        const s = spans[i];
+        if (!s.parentId) {
+          depthMap[s.id] = 0;
+        } else {
+          depthMap[s.id] = (depthMap[s.parentId] || 0) + 1;
+        }
+      }
+
+      // Sort by startOffset
+      const sorted = spans.slice().sort((a, b) => a.startOffset - b.startOffset);
+
+      for (let i = 0; i < sorted.length; i++) {
+        const s = sorted[i];
+        const depth = depthMap[s.id] || 0;
+        const leftPct = (s.startOffset / total * 100).toFixed(2);
+        const widthPct = Math.max(s.duration / total * 100, 0.5).toFixed(2);
+        const indent = depth * 16;
+        const catLabel = s.category === 'db' ? 'DB' : s.category;
+        const metaStr = s.metadata ? Object.entries(s.metadata).filter(([,v]) => v != null).map(([k,v]) => k + '=' + v).join(', ') : '';
+        const tooltip = s.label + ' (' + s.duration.toFixed(2) + 'ms)' + (metaStr ? '\n' + metaStr : '');
+
+        html += '<div class="ss-dbg-tl-row">'
+          + '<div class="ss-dbg-tl-label" style="padding-left:' + (8 + indent) + 'px" title="' + esc(tooltip) + '">'
+          + '<span class="ss-dbg-badge ss-dbg-badge-' + (s.category === 'db' ? 'purple' : s.category === 'mail' ? 'green' : s.category === 'event' ? 'amber' : s.category === 'view' ? 'blue' : 'muted') + '" style="font-size:9px;margin-right:4px">' + esc(catLabel) + '</span>'
+          + esc(s.label.length > 40 ? s.label.slice(0, 40) + '...' : s.label)
+          + '</div>'
+          + '<div class="ss-dbg-tl-track">'
+          + '<div class="ss-dbg-tl-bar ss-dbg-tl-bar-' + esc(s.category) + '" style="left:' + leftPct + '%;width:' + widthPct + '%" title="' + esc(tooltip) + '"></div>'
+          + '</div>'
+          + '<span class="ss-dbg-tl-dur">' + s.duration.toFixed(2) + 'ms</span>'
+          + '</div>';
+      }
+    }
+
+    // Warnings
+    if (trace.warnings && trace.warnings.length > 0) {
+      html += '<div class="ss-dbg-tl-warnings">'
+        + '<div class="ss-dbg-tl-warnings-title">Warnings (' + trace.warnings.length + ')</div>';
+      for (let w = 0; w < trace.warnings.length; w++) {
+        html += '<div class="ss-dbg-tl-warning">' + esc(trace.warnings[w]) + '</div>';
+      }
+      html += '</div>';
+    }
+
+    tlWaterfall.innerHTML = html;
+  };
+
+  if (tlBackBtn) {
+    tlBackBtn.addEventListener('click', () => {
+      if (tlListEl) tlListEl.style.display = '';
+      if (tlDetailEl) tlDetailEl.style.display = 'none';
+    });
+  }
+
+  if (tlSearchInput) tlSearchInput.addEventListener('input', renderTraces);
 
   // ── Custom panes: fetch, render, bind ───────────────────────────
   const getNestedValue = (obj, path) => {
