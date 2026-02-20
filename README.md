@@ -35,6 +35,7 @@ Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 
 - **Live stats bar** -- CPU, memory, event loop lag, HTTP throughput, DB pool, Redis, queues, logs
 - **Debug toolbar** -- SQL queries, events, emails, routes, logs with search and filtering
+- **Request tracing** -- per-request waterfall timeline showing DB queries, events, and custom spans
 - **Custom panes** -- add your own tabs (webhooks, emails, cache, anything) with a simple config
 - **Pluggable collectors** -- use built-in collectors or write your own
 - **Visibility control** -- show only to admins, specific roles, or in dev mode
@@ -223,6 +224,8 @@ export default class ServerStatsController {
 | `maxEmails`            | `number`        | `100`   | Max emails to buffer                           |
 | `slowQueryThresholdMs` | `number`        | `100`   | Slow query threshold (ms)                      |
 | `persistDebugData`     | `boolean \| string` | `false` | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path. |
+| `tracing`              | `boolean`       | `false` | Enable per-request tracing with timeline visualization |
+| `maxTraces`            | `number`        | `200`   | Max request traces to buffer                   |
 | `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs                        |
 
 ---
@@ -372,7 +375,7 @@ Features:
 
 ## Dev Toolbar
 
-Adds a debug panel with SQL query inspection, event tracking, email capture with HTML preview, route table, and live logs. Only active in non-production environments.
+Adds a debug panel with SQL query inspection, event tracking, email capture with HTML preview, route table, live logs, and per-request tracing. Only active in non-production environments.
 
 ```ts
 export default defineConfig({
@@ -383,6 +386,7 @@ export default defineConfig({
     maxEmails: 100,
     slowQueryThresholdMs: 100,
     persistDebugData: true,  // or a custom path: 'custom/debug.json'
+    tracing: true,           // enable per-request timeline
   },
 })
 ```
@@ -398,6 +402,8 @@ router
     router.get('routes', '#controllers/admin/debug_controller.routes')
     router.get('emails', '#controllers/admin/debug_controller.emails')
     router.get('emails/:id/preview', '#controllers/admin/debug_controller.emailPreview')
+    router.get('traces', '#controllers/admin/debug_controller.traces')
+    router.get('traces/:id', '#controllers/admin/debug_controller.traceDetail')
   })
   .prefix('/admin/api/debug')
   .use(middleware.admin())
@@ -413,6 +419,52 @@ Enable `persistDebugData: true` to save queries, events, and emails to `.adonisj
 - **Loaded** on server startup (before collectors start)
 - **Flushed** every 30 seconds (handles crashes)
 - **Saved** on graceful shutdown
+
+### Request Tracing
+
+When `tracing: true` is set, the debug panel gains a **Timeline** tab that shows a waterfall view of every HTTP request -- which DB queries ran, in what order, and how long each took.
+
+Tracing uses `AsyncLocalStorage` to automatically correlate operations to the request that triggered them. DB queries captured via `db:query` events and `console.warn` calls are automatically attached to the active request trace.
+
+#### How it works
+
+```
+GET /organizations/create    286ms
+├─ SELECT * FROM users          2ms  █
+├─ SELECT * FROM orgs           4ms    █
+├─ fetchMembers (custom)      180ms    ██████████████████
+└─ response sent                5ms                      ██
+```
+
+1. The **Timeline** tab shows a list of recent requests with method, URL, status code, duration, span count, and any warnings
+2. Click a request to see the **waterfall chart** -- each span is a horizontal bar positioned by time offset, color-coded by category
+3. Spans can be nested (a custom span wrapping DB queries will show them indented)
+
+#### Span categories
+
+| Category | Color  | Auto-captured |
+|----------|--------|---------------|
+| DB       | Purple | `db:query` events |
+| Request  | Blue   | Full request lifecycle |
+| Mail     | Green  | -- |
+| Event    | Amber  | -- |
+| View     | Cyan   | -- |
+| Custom   | Gray   | Via `trace()` helper |
+
+#### Custom spans
+
+Use the `trace()` helper to wrap any async code in a named span:
+
+```ts
+import { trace } from 'adonisjs-server-stats'
+
+// In a controller or service:
+const result = await trace('organization.fetchMembers', async () => {
+  return OrganizationService.getMembers(orgId)
+})
+```
+
+If tracing is disabled or no request is active, `trace()` executes the function directly with no overhead.
 
 ### Custom Debug Panes
 
@@ -573,7 +625,12 @@ import type {
   EventRecord,
   EmailRecord,
   RouteRecord,
+  TraceSpan,
+  TraceRecord,
 } from 'adonisjs-server-stats'
+
+// Trace helper
+import { trace } from 'adonisjs-server-stats'
 
 // Collector option types
 import type {
