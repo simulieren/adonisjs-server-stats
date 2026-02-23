@@ -6,7 +6,7 @@
   position: fixed;
   inset-inline: 0;
   bottom: 0;
-  z-index: 50;
+  z-index: 150;
   display: flex;
   height: 28px;
   align-items: center;
@@ -102,7 +102,7 @@
 .ss-toggle {
   position: fixed;
   right: 12px;
-  z-index: 50;
+  z-index: 150;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -139,7 +139,7 @@
 /* Tooltip — positioned absolutely within .ss-bar (outside scroll area) via JS */
 .ss-tooltip {
   position: absolute;
-  z-index: 60;
+  z-index: 180;
   pointer-events: none;
 }
 .ss-tooltip.ss-pinned {
