@@ -2,10 +2,10 @@
 
 [![npm version](https://img.shields.io/npm/v/adonisjs-server-stats.svg)](https://www.npmjs.com/package/adonisjs-server-stats)
 [![npm downloads](https://img.shields.io/npm/dm/adonisjs-server-stats.svg)](https://www.npmjs.com/package/adonisjs-server-stats)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/adonisjs-server-stats)](https://bundlephobia.com/package/adonisjs-server-stats)
 [![license](https://img.shields.io/npm/l/adonisjs-server-stats.svg)](https://github.com/simulieren/adonisjs-server-stats/blob/main/LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9+-blue.svg)](https://www.typescriptlang.org/)
 [![AdonisJS](https://img.shields.io/badge/AdonisJS-v6-5A45FF.svg)](https://adonisjs.com/)
+[![AdonisJS](https://img.shields.io/badge/AdonisJS-v7-5A45FF.svg)](https://adonisjs.com/)
 
 A Laravel Telescope-inspired dev toolbar and real-time server monitor for **AdonisJS v6**.
 
