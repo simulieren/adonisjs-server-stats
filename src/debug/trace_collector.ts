@@ -70,10 +70,10 @@ export class TraceCollector {
     return this.als.run(ctx, callback)
   }
 
-  /** Finish the current trace and save it to the ring buffer. */
-  finishTrace(method: string, url: string, statusCode: number): void {
+  /** Finish the current trace and save it to the ring buffer. Returns the record, or null if no context. */
+  finishTrace(method: string, url: string, statusCode: number): TraceRecord | null {
     const ctx = this.als.getStore()
-    if (!ctx) return
+    if (!ctx) return null
 
     const totalDuration = performance.now() - ctx.requestStart
 
@@ -90,6 +90,7 @@ export class TraceCollector {
     }
 
     this.buffer.push(record)
+    return record
   }
 
   /** Add a span to the current trace (if active). */
@@ -215,6 +216,11 @@ export class TraceCollector {
 
   clear(): void {
     this.buffer.clear()
+  }
+
+  /** Register a callback that fires whenever a new trace is recorded. */
+  onNewItem(cb: ((item: TraceRecord) => void) | null): void {
+    this.buffer.onPush(cb)
   }
 
   /** Restore persisted records into the buffer and reset the ID counter. */

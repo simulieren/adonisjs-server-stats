@@ -1,6 +1,80 @@
 /* Scoped CSS for the Edge server stats bar.
  * All classes use the `.ss-` prefix to avoid conflicts with Tailwind or app styles.
+ * Theme via CSS custom properties scoped to .ss-bar and .ss-toggle.
  */
+
+/* ── Theme: Dark (default) ────────────────────────────────────── */
+.ss-bar, .ss-toggle {
+  --ss-bg-deep: #0a0a0a;
+  --ss-surface: #171717;
+  --ss-surface-alt: #141414;
+  --ss-text: #d4d4d4;
+  --ss-text-bright: #e5e5e5;
+  --ss-text-secondary: #a3a3a3;
+  --ss-muted: #737373;
+  --ss-dim: #525252;
+  --ss-accent: #34d399;
+  --ss-amber-fg: #fbbf24;
+  --ss-red-fg: #f87171;
+  --ss-border: #333;
+  --ss-border-dim: #262626;
+  --ss-border-strong: #404040;
+  --ss-hover: rgba(38,38,38,0.4);
+  --ss-hover-subtle: rgba(38,38,38,0.25);
+  --ss-shadow: rgb(0 0 0 / 0.15);
+  --ss-tooltip-bg: #262626;
+  --ss-tooltip-border: rgba(255,255,255,0.1);
+}
+
+/* ── Theme: Light (auto via system preference) ────────────────── */
+@media (prefers-color-scheme: light) {
+  .ss-bar:not([data-ss-theme="dark"]),
+  .ss-toggle:not([data-ss-theme="dark"]) {
+    --ss-bg-deep: #f0f0f0;
+    --ss-surface: #ffffff;
+    --ss-surface-alt: #f5f5f5;
+    --ss-text: #171717;
+    --ss-text-bright: #0f0f0f;
+    --ss-text-secondary: #525252;
+    --ss-muted: #6b7280;
+    --ss-dim: #9ca3af;
+    --ss-accent: #059669;
+    --ss-amber-fg: #b45309;
+    --ss-red-fg: #dc2626;
+    --ss-border: #e5e5e5;
+    --ss-border-dim: #e5e5e5;
+    --ss-border-strong: #d4d4d4;
+    --ss-hover: rgba(0,0,0,0.04);
+    --ss-hover-subtle: rgba(0,0,0,0.02);
+    --ss-shadow: rgb(0 0 0 / 0.06);
+    --ss-tooltip-bg: #ffffff;
+    --ss-tooltip-border: rgba(0,0,0,0.1);
+  }
+}
+
+/* ── Theme: Light (manual override) ───────────────────────────── */
+.ss-bar[data-ss-theme="light"],
+.ss-toggle[data-ss-theme="light"] {
+  --ss-bg-deep: #f0f0f0;
+  --ss-surface: #ffffff;
+  --ss-surface-alt: #f5f5f5;
+  --ss-text: #171717;
+  --ss-text-bright: #0f0f0f;
+  --ss-text-secondary: #525252;
+  --ss-muted: #6b7280;
+  --ss-dim: #9ca3af;
+  --ss-accent: #059669;
+  --ss-amber-fg: #b45309;
+  --ss-red-fg: #dc2626;
+  --ss-border: #e5e5e5;
+  --ss-border-dim: #e5e5e5;
+  --ss-border-strong: #d4d4d4;
+  --ss-hover: rgba(0,0,0,0.04);
+  --ss-hover-subtle: rgba(0,0,0,0.02);
+  --ss-shadow: rgb(0 0 0 / 0.06);
+  --ss-tooltip-bg: #ffffff;
+  --ss-tooltip-border: rgba(0,0,0,0.1);
+}
 
 .ss-bar {
   position: fixed;
@@ -10,11 +84,11 @@
   display: flex;
   height: 28px;
   align-items: center;
-  border-top: 1px solid #262626;
-  background: #0a0a0a;
+  border-top: 1px solid var(--ss-border-dim);
+  background: var(--ss-bg-deep);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: #a3a3a3;
-  box-shadow: 0 -4px 6px -1px rgb(0 0 0 / 0.1), 0 -2px 4px -2px rgb(0 0 0 / 0.1);
+  color: var(--ss-text-secondary);
+  box-shadow: 0 -4px 6px -1px var(--ss-shadow), 0 -2px 4px -2px var(--ss-shadow);
 }
 .ss-bar.ss-hidden { display: none; }
 
@@ -44,7 +118,7 @@
   align-items: center;
   flex-shrink: 0;
   gap: 0;
-  background: rgba(38, 38, 38, 0.25);
+  background: var(--ss-hover-subtle);
   border-radius: 4px;
   padding: 0 1px;
 }
@@ -52,7 +126,7 @@
 .ss-group-sep {
   width: 1px;
   height: 14px;
-  background: #333;
+  background: var(--ss-border);
   flex-shrink: 0;
 }
 
@@ -68,35 +142,35 @@
 .ss-badge-link {
   cursor: pointer;
 }
-.ss-badge:hover { background: rgba(38, 38, 38, 0.6); }
-.ss-badge.ss-pinned { background: rgba(38, 38, 38, 0.8); }
+.ss-badge:hover { background: var(--ss-hover); }
+.ss-badge.ss-pinned { background: var(--ss-hover); }
 
 .ss-label {
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.05em;
-  color: #737373;
+  color: var(--ss-muted);
 }
 .ss-value {
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #34d399;
+  color: var(--ss-accent);
 }
 
 .ss-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #34d399;
+  background: var(--ss-accent);
   flex-shrink: 0;
 }
-.ss-dot.ss-stale { background: #f59e0b; }
+.ss-dot.ss-stale { background: var(--ss-amber-fg); }
 
-.ss-green { color: #34d399; }
-.ss-amber { color: #fbbf24; }
-.ss-red { color: #f87171; }
-.ss-muted { color: #737373; }
+.ss-green { color: var(--ss-accent); }
+.ss-amber { color: var(--ss-amber-fg); }
+.ss-red { color: var(--ss-red-fg); }
+.ss-muted { color: var(--ss-muted); }
 
 /* Toggle button */
 .ss-toggle {
@@ -107,19 +181,19 @@
   align-items: center;
   gap: 6px;
   border-radius: 4px;
-  border: 1px solid #404040;
-  background: #171717;
+  border: 1px solid var(--ss-border-strong);
+  background: var(--ss-surface);
   padding: 2px 8px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 10px;
   text-transform: uppercase;
-  color: #a3a3a3;
+  color: var(--ss-text-secondary);
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
 }
 .ss-toggle:hover {
-  border-color: #525252;
-  color: #e5e5e5;
+  border-color: var(--ss-dim);
+  color: var(--ss-text-bright);
 }
 .ss-toggle.ss-visible { bottom: 36px; }
 .ss-toggle.ss-collapsed { bottom: 12px; }
@@ -128,7 +202,7 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  color: #737373;
+  color: var(--ss-muted);
 }
 .ss-toggle-summary .ss-value {
   font-size: 10px;
@@ -147,12 +221,12 @@
 }
 .ss-tooltip-inner {
   border-radius: 8px;
-  background: #262626;
+  background: var(--ss-tooltip-bg);
   padding: 10px 12px;
   font-size: 11px;
-  color: #d4d4d4;
-  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.25);
-  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--ss-text);
+  box-shadow: 0 20px 25px -5px var(--ss-shadow);
+  border: 1px solid var(--ss-tooltip-border);
   min-width: 160px;
 }
 .ss-tooltip-close {
@@ -161,14 +235,14 @@
   right: 6px;
   background: none;
   border: none;
-  color: #737373;
+  color: var(--ss-muted);
   font-size: 14px;
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
   font-family: inherit;
 }
-.ss-tooltip-close:hover { color: #e5e5e5; }
+.ss-tooltip-close:hover { color: var(--ss-text-bright); }
 .ss-tooltip-header {
   display: flex;
   align-items: baseline;
@@ -177,44 +251,44 @@
 }
 .ss-tooltip-title {
   font-weight: 500;
-  color: #f5f5f5;
+  color: var(--ss-text-bright);
 }
 .ss-tooltip-unit {
   font-size: 10px;
-  color: #737373;
+  color: var(--ss-muted);
 }
 .ss-tooltip-current {
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
-.ss-tooltip-current-label { color: #a3a3a3; }
-.ss-tooltip-current-value { font-weight: 600; color: #f5f5f5; }
+.ss-tooltip-current-label { color: var(--ss-text-secondary); }
+.ss-tooltip-current-value { font-weight: 600; color: var(--ss-text-bright); }
 .ss-tooltip-stats {
   margin-top: 4px;
   display: flex;
   gap: 12px;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-  color: #a3a3a3;
+  color: var(--ss-text-secondary);
 }
 .ss-tooltip-details {
   margin-top: 6px;
   font-size: 10px;
   line-height: 1.625;
-  color: #737373;
+  color: var(--ss-muted);
 }
 .ss-tooltip-sparkline {
   margin-top: 8px;
   overflow: hidden;
   border-radius: 4px;
-  border: 1px solid rgba(64,64,64,0.5);
-  background: rgba(23,23,23,0.5);
+  border: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
 }
 .ss-tooltip-samples {
   margin-top: 4px;
   text-align: center;
   font-size: 9px;
-  color: #525252;
+  color: var(--ss-dim);
 }
 .ss-tooltip-arrow {
   position: absolute;
@@ -225,5 +299,5 @@
   height: 0;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 5px solid #262626;
+  border-top: 5px solid var(--ss-tooltip-bg);
 }

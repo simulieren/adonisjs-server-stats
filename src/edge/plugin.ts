@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Template } from "edge.js";
@@ -7,6 +8,27 @@ import type { ServerStatsConfig } from "../types.js";
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) => readFileSync(join(DIR, rel), "utf-8");
+
+/**
+ * Try to locate and read the @adonisjs/transmit-client build file.
+ * Returns the file contents wrapped to expose `window.Transmit`, or
+ * an empty string if the package is not installed.
+ */
+function loadTransmitClient(): string {
+  try {
+    const req = createRequire(join(process.cwd(), "package.json"));
+    const clientPath = req.resolve(
+      "@adonisjs/transmit-client/build/index.js",
+    );
+    const src = readFileSync(clientPath, "utf-8");
+    return `(function(){var __exports={};(function(){${src.replace(
+      /^export\s*\{[^}]*\}\s*;?\s*$/m,
+      "",
+    )}\n__exports.Transmit=Transmit;})();window.Transmit=__exports.Transmit;})()`;
+  } catch {
+    return "";
+  }
+}
 
 /**
  * Edge plugin that registers the `@serverStats()` tag.
@@ -109,6 +131,10 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
       state.logsEndpoint = "/admin/api/debug/logs";
       state.customPanes = config.devToolbar?.panes || [];
       state.showTracing = !!config.devToolbar?.tracing;
+      state.dashboardPath = config.devToolbar?.dashboard
+        ? (config.devToolbar.dashboardPath || '/__stats')
+        : null;
+      state.transmitClient = loadTransmitClient();
     }
 
     // Pre-render via Template directly — bypasses edge.createRenderer() which

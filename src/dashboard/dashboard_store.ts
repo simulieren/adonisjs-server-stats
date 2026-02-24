@@ -1,0 +1,894 @@
+import { mkdir } from 'node:fs/promises'
+import { dirname } from 'node:path'
+import { autoMigrate, runRetentionCleanup } from './migrator.js'
+import { ChartAggregator } from './chart_aggregator.js'
+import type { DevToolbarConfig } from '../debug/types.js'
+import type { QueryRecord, EventRecord, EmailRecord, TraceRecord } from '../debug/types.js'
+
+// ---------------------------------------------------------------------------
+// Filter types
+// ---------------------------------------------------------------------------
+
+export interface RequestFilters {
+  method?: string
+  url?: string
+  statusMin?: number
+  statusMax?: number
+  durationMin?: number
+  durationMax?: number
+}
+
+export interface QueryFilters {
+  method?: string
+  model?: string
+  connection?: string
+  durationMin?: number
+  durationMax?: number
+  requestId?: number
+}
+
+export interface EventFilters {
+  eventName?: string
+}
+
+export interface EmailFilters {
+  from?: string
+  to?: string
+  subject?: string
+  mailer?: string
+  status?: string
+}
+
+export interface LogFilters {
+  level?: string
+  requestId?: string
+  search?: string
+  /** Structured filters: array of { field, operator, value } */
+  structured?: { field: string; operator: 'equals' | 'contains' | 'startsWith'; value: string }[]
+}
+
+export interface TraceFilters {
+  method?: string
+  url?: string
+  statusMin?: number
+  statusMax?: number
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  total: number
+  page: number
+  perPage: number
+  lastPage: number
+}
+
+// ---------------------------------------------------------------------------
+// DashboardStore
+// ---------------------------------------------------------------------------
+
+/**
+ * Bridges the in-memory RingBuffer collectors to SQLite persistence
+ * and provides query methods for the dashboard API.
+ *
+ * Handles auto-migration, retention cleanup, periodic metrics aggregation,
+ * and self-exclusion of dashboard routes and server_stats connection queries.
+ */
+export class DashboardStore {
+  private db: any = null
+  private emitter: any = null
+  private config: DevToolbarConfig
+  private dashboardPath: string
+  private retentionTimer: ReturnType<typeof setInterval> | null = null
+  private chartAggregator: ChartAggregator | null = null
+  private handlers: { event: string; fn: (...args: any[]) => void }[] = []
+
+  constructor(config: DevToolbarConfig) {
+    this.config = config
+    this.dashboardPath = config.dashboardPath
+  }
+
+  // =========================================================================
+  // Lifecycle
+  // =========================================================================
+
+  /**
+   * Initialize the SQLite connection, run migrations and retention
+   * cleanup, start chart aggregation, and wire event listeners.
+   */
+  async start(_lucidDb: any, emitter: any, appRoot: string): Promise<void> {
+    this.emitter = emitter
+
+    const dbFilePath = appRoot + '/' + this.config.dbPath
+    await mkdir(dirname(dbFilePath), { recursive: true })
+
+    // Create a standalone Knex connection to SQLite — bypasses Lucid's
+    // connection manager entirely so we never pollute the app's pool.
+    const knexModule = await import('knex')
+    const knexFactory = knexModule.default ?? knexModule
+    this.db = knexFactory({
+      client: 'better-sqlite3',
+      connection: { filename: dbFilePath },
+      useNullAsDefault: true,
+    })
+
+    await this.db.raw('PRAGMA journal_mode=WAL')
+    await this.db.raw('PRAGMA foreign_keys=ON')
+
+    await autoMigrate(this.db)
+    await runRetentionCleanup(this.db, this.config.retentionDays)
+
+    // Hourly retention cleanup
+    this.retentionTimer = setInterval(
+      async () => {
+        try {
+          await runRetentionCleanup(this.db, this.config.retentionDays)
+        } catch {
+          // Silently ignore
+        }
+      },
+      60 * 60 * 1000
+    )
+
+    // Start chart aggregation (every 60s)
+    this.chartAggregator = new ChartAggregator(this.db)
+    this.chartAggregator.start()
+
+    // Wire email event listeners
+    this.wireEventListeners()
+  }
+
+  /** Shut down timers, event listeners, and database connection. */
+  async stop(): Promise<void> {
+    if (this.retentionTimer) {
+      clearInterval(this.retentionTimer)
+      this.retentionTimer = null
+    }
+
+    this.chartAggregator?.stop()
+
+    if (this.emitter) {
+      for (const h of this.handlers) {
+        if (typeof this.emitter.off === 'function') {
+          this.emitter.off(h.event, h.fn)
+        }
+      }
+    }
+    this.handlers = []
+
+    if (this.db && typeof this.db.destroy === 'function') {
+      try {
+        await this.db.destroy()
+      } catch {
+        // Ignore
+      }
+    }
+    this.db = null
+  }
+
+  /** Get the raw Knex database connection (for DashboardController). */
+  getDb(): any {
+    return this.db
+  }
+
+  /** Whether the store is initialized and ready. */
+  isReady(): boolean {
+    return this.db !== null
+  }
+
+  // =========================================================================
+  // Write methods — persist data from collectors
+  // =========================================================================
+
+  /**
+   * Record a completed request. Returns the inserted row ID, or null
+   * if the request was self-excluded or an error occurred.
+   */
+  async recordRequest(
+    method: string,
+    url: string,
+    statusCode: number,
+    duration: number,
+    spanCount: number = 0,
+    warningCount: number = 0
+  ): Promise<number | null> {
+    if (!this.db) return null
+    if (url.startsWith(this.dashboardPath)) return null
+
+    try {
+      const [id] = await this.db('server_stats_requests').insert({
+        method,
+        url,
+        status_code: statusCode,
+        duration: Math.round(duration * 100) / 100,
+        span_count: spanCount,
+        warning_count: warningCount,
+      })
+      return id
+    } catch {
+      return null
+    }
+  }
+
+  /** Batch-insert queries for a request. Filters out server_stats connection queries. */
+  async recordQueries(requestId: number, queries: QueryRecord[]): Promise<void> {
+    if (!this.db || queries.length === 0) return
+
+    const filtered = queries.filter((q) => q.connection !== 'server_stats')
+    if (filtered.length === 0) return
+
+    try {
+      const rows = filtered.map((q) => ({
+        request_id: requestId,
+        sql_text: q.sql,
+        sql_normalized: normalizeSql(q.sql),
+        bindings: q.bindings ? JSON.stringify(q.bindings) : null,
+        duration: Math.round(q.duration * 100) / 100,
+        method: q.method,
+        model: q.model,
+        connection: q.connection,
+        in_transaction: q.inTransaction ? 1 : 0,
+      }))
+
+      // SQLite variable limit: batch in chunks of 50
+      for (let i = 0; i < rows.length; i += 50) {
+        await this.db('server_stats_queries').insert(rows.slice(i, i + 50))
+      }
+    } catch {
+      // Silently ignore
+    }
+  }
+
+  /** Batch-insert events for a request. */
+  async recordEvents(requestId: number, events: EventRecord[]): Promise<void> {
+    if (!this.db || events.length === 0) return
+
+    try {
+      const rows = events.map((e) => ({
+        request_id: requestId,
+        event_name: e.event,
+        data: e.data,
+      }))
+
+      for (let i = 0; i < rows.length; i += 50) {
+        await this.db('server_stats_events').insert(rows.slice(i, i + 50))
+      }
+    } catch {
+      // Silently ignore
+    }
+  }
+
+  /** Record a single email. */
+  async recordEmail(record: EmailRecord): Promise<void> {
+    if (!this.db) return
+
+    try {
+      await this.db('server_stats_emails').insert({
+        from_addr: record.from,
+        to_addr: record.to,
+        cc: record.cc,
+        bcc: record.bcc,
+        subject: record.subject,
+        html: record.html,
+        text_body: record.text,
+        mailer: record.mailer,
+        status: record.status,
+        message_id: record.messageId,
+        attachment_count: record.attachmentCount,
+      })
+    } catch {
+      // Silently ignore
+    }
+  }
+
+  /** Record a single log entry (from LogStreamService). */
+  async recordLog(entry: Record<string, unknown>): Promise<void> {
+    if (!this.db) return
+
+    try {
+      const levelName =
+        typeof entry.levelName === 'string'
+          ? entry.levelName
+          : String(entry.level || 'unknown')
+
+      await this.db('server_stats_logs').insert({
+        level: levelName,
+        message: String(entry.msg || entry.message || ''),
+        request_id: entry.requestId ? String(entry.requestId) : null,
+        data: JSON.stringify(entry),
+      })
+    } catch {
+      // Silently ignore
+    }
+  }
+
+  /** Record a trace for a request. */
+  async recordTrace(requestId: number, trace: TraceRecord): Promise<void> {
+    if (!this.db) return
+
+    try {
+      await this.db('server_stats_traces').insert({
+        request_id: requestId,
+        method: trace.method,
+        url: trace.url,
+        status_code: trace.statusCode,
+        total_duration: Math.round(trace.totalDuration * 100) / 100,
+        span_count: trace.spanCount,
+        spans: JSON.stringify(trace.spans),
+        warnings: trace.warnings.length > 0 ? JSON.stringify(trace.warnings) : null,
+      })
+    } catch {
+      // Silently ignore
+    }
+  }
+
+  /**
+   * Convenience: persist a full request with associated queries and trace.
+   * Calls recordRequest, recordQueries, and recordTrace in sequence.
+   */
+  async persistRequest(
+    method: string,
+    url: string,
+    statusCode: number,
+    duration: number,
+    queries: QueryRecord[],
+    trace: TraceRecord | null
+  ): Promise<number | null> {
+    const requestId = await this.recordRequest(
+      method,
+      url,
+      statusCode,
+      duration,
+      trace?.spanCount ?? 0,
+      trace?.warnings?.length ?? 0
+    )
+
+    if (requestId === null) return null
+
+    await this.recordQueries(requestId, queries)
+    if (trace) {
+      await this.recordTrace(requestId, trace)
+    }
+
+    return requestId
+  }
+
+  // =========================================================================
+  // Read methods — query data for dashboard API
+  // =========================================================================
+
+  /** Paginated request history with optional filters. */
+  async getRequests(
+    page: number = 1,
+    perPage: number = 50,
+    filters?: RequestFilters
+  ): Promise<PaginatedResult<any>> {
+    return this.paginate('server_stats_requests', page, perPage, (query) => {
+      if (filters?.method) query.where('method', filters.method)
+      if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
+      if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
+      if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
+      if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
+      if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
+    })
+  }
+
+  /** Paginated query history with optional filters. */
+  async getQueries(
+    page: number = 1,
+    perPage: number = 50,
+    filters?: QueryFilters
+  ): Promise<PaginatedResult<any>> {
+    return this.paginate('server_stats_queries', page, perPage, (query) => {
+      if (filters?.method) query.where('method', filters.method)
+      if (filters?.model) query.where('model', filters.model)
+      if (filters?.connection) query.where('connection', filters.connection)
+      if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
+      if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
+      if (filters?.requestId) query.where('request_id', filters.requestId)
+    })
+  }
+
+  /**
+   * Grouped query patterns: aggregated by sql_normalized
+   * with count, avg/min/max/total duration.
+   */
+  async getQueriesGrouped(): Promise<any[]> {
+    if (!this.db) return []
+
+    return this.db('server_stats_queries')
+      .select(
+        'sql_normalized',
+        this.db.raw('COUNT(*) as count'),
+        this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
+        this.db.raw('ROUND(MIN(duration), 2) as min_duration'),
+        this.db.raw('ROUND(MAX(duration), 2) as max_duration'),
+        this.db.raw('ROUND(SUM(duration), 2) as total_duration')
+      )
+      .groupBy('sql_normalized')
+      .orderBy('count', 'desc')
+      .limit(200)
+  }
+
+  /** Paginated event history with optional filters. */
+  async getEvents(
+    page: number = 1,
+    perPage: number = 50,
+    filters?: EventFilters
+  ): Promise<PaginatedResult<any>> {
+    return this.paginate('server_stats_events', page, perPage, (query) => {
+      if (filters?.eventName) query.where('event_name', 'like', `%${filters.eventName}%`)
+    })
+  }
+
+  /** Paginated email history with optional filters. */
+  async getEmails(
+    page: number = 1,
+    perPage: number = 50,
+    filters?: EmailFilters
+  ): Promise<PaginatedResult<any>> {
+    return this.paginate('server_stats_emails', page, perPage, (query) => {
+      if (filters?.from) query.where('from_addr', 'like', `%${filters.from}%`)
+      if (filters?.to) query.where('to_addr', 'like', `%${filters.to}%`)
+      if (filters?.subject) query.where('subject', 'like', `%${filters.subject}%`)
+      if (filters?.mailer) query.where('mailer', filters.mailer)
+      if (filters?.status) query.where('status', filters.status)
+    })
+  }
+
+  /** Get email HTML body for preview. */
+  async getEmailHtml(id: number): Promise<string | null> {
+    if (!this.db) return null
+    const row = await this.db('server_stats_emails').where('id', id).select('html').first()
+    return row?.html ?? null
+  }
+
+  /**
+   * Paginated log history with structured search support.
+   *
+   * Structured filters query into the JSON `data` column using
+   * SQLite's `json_extract()`.
+   */
+  async getLogs(
+    page: number = 1,
+    perPage: number = 50,
+    filters?: LogFilters
+  ): Promise<PaginatedResult<any>> {
+    return this.paginate('server_stats_logs', page, perPage, (query) => {
+      if (filters?.level) query.where('level', filters.level)
+      if (filters?.requestId) query.where('request_id', filters.requestId)
+      if (filters?.search) {
+        query.where('message', 'like', `%${filters.search}%`)
+      }
+      if (filters?.structured && filters.structured.length > 0) {
+        for (const sf of filters.structured) {
+          const jsonPath = `$.${sf.field}`
+          switch (sf.operator) {
+            case 'equals':
+              query.whereRaw(`json_extract(data, ?) = ?`, [jsonPath, sf.value])
+              break
+            case 'contains':
+              query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `%${sf.value}%`])
+              break
+            case 'startsWith':
+              query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `${sf.value}%`])
+              break
+          }
+        }
+      }
+    })
+  }
+
+  /** Paginated trace history with optional filters. */
+  async getTraces(
+    page: number = 1,
+    perPage: number = 50,
+    filters?: TraceFilters
+  ): Promise<PaginatedResult<any>> {
+    return this.paginate('server_stats_traces', page, perPage, (query) => {
+      if (filters?.method) query.where('method', filters.method)
+      if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
+      if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
+      if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
+    })
+  }
+
+  /** Single trace with full span data. */
+  async getTraceDetail(id: number): Promise<any | null> {
+    if (!this.db) return null
+
+    const row = await this.db('server_stats_traces').where('id', id).first()
+    if (!row) return null
+
+    return {
+      ...row,
+      spans: typeof row.spans === 'string' ? JSON.parse(row.spans) : row.spans,
+      warnings: row.warnings
+        ? typeof row.warnings === 'string'
+          ? JSON.parse(row.warnings)
+          : row.warnings
+        : [],
+    }
+  }
+
+  /** Single request with associated queries, events, and trace. */
+  async getRequestDetail(id: number): Promise<any | null> {
+    if (!this.db) return null
+
+    const request = await this.db('server_stats_requests').where('id', id).first()
+    if (!request) return null
+
+    const [queries, events, trace] = await Promise.all([
+      this.db('server_stats_queries').where('request_id', id).orderBy('created_at', 'asc'),
+      this.db('server_stats_events').where('request_id', id).orderBy('created_at', 'asc'),
+      this.db('server_stats_traces').where('request_id', id).first(),
+    ])
+
+    return {
+      ...request,
+      queries,
+      events,
+      trace: trace
+        ? {
+            ...trace,
+            spans: typeof trace.spans === 'string' ? JSON.parse(trace.spans) : trace.spans,
+            warnings: trace.warnings
+              ? typeof trace.warnings === 'string'
+                ? JSON.parse(trace.warnings)
+                : trace.warnings
+              : [],
+          }
+        : null,
+    }
+  }
+
+  // =========================================================================
+  // Overview & Charts
+  // =========================================================================
+
+  /**
+   * Aggregated overview metrics for the dashboard cards.
+   *
+   * @param range — '1h' | '6h' | '24h' | '7d'
+   */
+  async getOverviewMetrics(range: string = '1h'): Promise<any> {
+    if (!this.db) return null
+
+    const cutoff = rangeToCutoff(range)
+
+    // Recent requests for calculations
+    const requests: any[] = await this.db('server_stats_requests')
+      .where('created_at', '>=', cutoff)
+      .select('duration', 'status_code', 'url', 'created_at')
+
+    const total = requests.length
+    if (total === 0) {
+      return {
+        avgResponseTime: 0,
+        p95ResponseTime: 0,
+        requestsPerMinute: 0,
+        errorRate: 0,
+        totalRequests: 0,
+        slowestEndpoints: [],
+        queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
+        recentErrors: [],
+      }
+    }
+
+    const durations = requests.map((r) => r.duration).sort((a: number, b: number) => a - b)
+    const avgResponseTime = durations.reduce((s: number, d: number) => s + d, 0) / total
+    const p95Index = Math.floor(total * 0.95)
+    const p95ResponseTime = durations[Math.min(p95Index, total - 1)]
+    const errorCount = requests.filter((r) => r.status_code >= 400).length
+    const rangeMinutes = rangeToMinutes(range)
+    const requestsPerMin = total / rangeMinutes
+
+    // Slowest endpoints (top 5 by average duration)
+    const slowestEndpoints = await this.db('server_stats_requests')
+      .where('created_at', '>=', cutoff)
+      .select(
+        'url',
+        this.db.raw('COUNT(*) as count'),
+        this.db.raw('ROUND(AVG(duration), 2) as avg_duration')
+      )
+      .groupBy('url')
+      .orderBy('avg_duration', 'desc')
+      .limit(5)
+
+    // Query stats
+    const queryStats: any = await this.db('server_stats_queries')
+      .where('created_at', '>=', cutoff)
+      .select(
+        this.db.raw('COUNT(*) as total'),
+        this.db.raw('ROUND(AVG(duration), 2) as avg_duration')
+      )
+      .first()
+
+    // Recent errors (last 5 log entries with level error/fatal)
+    const recentErrors = await this.db('server_stats_logs')
+      .where('created_at', '>=', cutoff)
+      .whereIn('level', ['error', 'fatal'])
+      .orderBy('created_at', 'desc')
+      .limit(5)
+
+    return {
+      avgResponseTime: Math.round(avgResponseTime * 100) / 100,
+      p95ResponseTime: Math.round(p95ResponseTime * 100) / 100,
+      requestsPerMinute: Math.round(requestsPerMin * 100) / 100,
+      errorRate: Math.round((errorCount / total) * 10000) / 100,
+      totalRequests: total,
+      slowestEndpoints: slowestEndpoints.map((s: any) => ({
+        url: s.url,
+        count: s.count,
+        avgDuration: s.avg_duration,
+      })),
+      queryStats: {
+        total: queryStats?.total ?? 0,
+        avgDuration: queryStats?.avg_duration ?? 0,
+        perRequest: total > 0 ? Math.round(((queryStats?.total ?? 0) / total) * 100) / 100 : 0,
+      },
+      recentErrors: recentErrors.map((e: any) => ({
+        id: e.id,
+        message: e.message,
+        createdAt: e.created_at,
+      })),
+    }
+  }
+
+  /**
+   * Time-series chart data from server_stats_metrics.
+   *
+   * @param range — '1h' | '6h' | '24h' | '7d'
+   */
+  async getChartData(range: string = '1h'): Promise<any[]> {
+    if (!this.db) return []
+
+    const cutoff = rangeToCutoff(range)
+
+    // For 1h/6h, use the per-minute metrics table.
+    // For 24h/7d, aggregate metrics into larger buckets.
+    const rows = await this.db('server_stats_metrics')
+      .where('bucket', '>=', cutoff)
+      .orderBy('bucket', 'asc')
+
+    if (range === '1h' || range === '6h') {
+      return rows
+    }
+
+    // For 24h: group by 15-minute buckets; for 7d: group by hourly buckets
+    const bucketMinutes = range === '7d' ? 60 : 15
+    const grouped = new Map<string, any>()
+
+    for (const row of rows) {
+      const bucketKey = roundBucket(row.bucket, bucketMinutes)
+      if (!grouped.has(bucketKey)) {
+        grouped.set(bucketKey, {
+          bucket: bucketKey,
+          request_count: 0,
+          avg_duration: 0,
+          p95_duration: 0,
+          error_count: 0,
+          query_count: 0,
+          avg_query_duration: 0,
+          _count: 0,
+        })
+      }
+      const g = grouped.get(bucketKey)!
+      g.request_count += row.request_count
+      g.error_count += row.error_count
+      g.query_count += row.query_count
+      g.avg_duration += row.avg_duration
+      g.p95_duration = Math.max(g.p95_duration, row.p95_duration)
+      g.avg_query_duration += row.avg_query_duration
+      g._count++
+    }
+
+    return Array.from(grouped.values()).map((g) => ({
+      bucket: g.bucket,
+      request_count: g.request_count,
+      avg_duration: g._count > 0 ? Math.round((g.avg_duration / g._count) * 100) / 100 : 0,
+      p95_duration: Math.round(g.p95_duration * 100) / 100,
+      error_count: g.error_count,
+      query_count: g.query_count,
+      avg_query_duration:
+        g._count > 0 ? Math.round((g.avg_query_duration / g._count) * 100) / 100 : 0,
+    }))
+  }
+
+  // =========================================================================
+  // Saved filters CRUD
+  // =========================================================================
+
+  async getSavedFilters(section?: string): Promise<any[]> {
+    if (!this.db) return []
+
+    const query = this.db('server_stats_saved_filters').orderBy('created_at', 'desc')
+    if (section) query.where('section', section)
+    return query
+  }
+
+  async createSavedFilter(
+    name: string,
+    section: string,
+    filterConfig: Record<string, any>
+  ): Promise<any> {
+    if (!this.db) return null
+
+    const [id] = await this.db('server_stats_saved_filters').insert({
+      name,
+      section,
+      filter_config: JSON.stringify(filterConfig),
+    })
+
+    return { id, name, section, filterConfig }
+  }
+
+  async deleteSavedFilter(id: number): Promise<boolean> {
+    if (!this.db) return false
+
+    const deleted = await this.db('server_stats_saved_filters').where('id', id).delete()
+    return deleted > 0
+  }
+
+  // =========================================================================
+  // EXPLAIN
+  // =========================================================================
+
+  /**
+   * Run EXPLAIN on a stored query using the app's default database connection.
+   * Only allows SELECT queries for safety.
+   *
+   * @param queryId — ID from server_stats_queries
+   * @param appDb — The application's Lucid database manager
+   */
+  async runExplain(queryId: number, appDb: any): Promise<any> {
+    if (!this.db) return { error: 'Dashboard store not initialized' }
+
+    const row = await this.db('server_stats_queries').where('id', queryId).first()
+    if (!row) return { error: 'Query not found' }
+
+    const sql = row.sql_text.trim()
+    if (!sql.toLowerCase().startsWith('select')) {
+      return { error: 'EXPLAIN is only supported for SELECT queries' }
+    }
+
+    try {
+      const result = await appDb.rawQuery(`EXPLAIN ${sql}`)
+      return { plan: result.rows || result }
+    } catch (err: any) {
+      return { error: err.message || 'EXPLAIN failed' }
+    }
+  }
+
+  // =========================================================================
+  // Private helpers
+  // =========================================================================
+
+  /** Generic paginated query with filter callback. */
+  private async paginate(
+    table: string,
+    page: number,
+    perPage: number,
+    applyFilters?: (query: any) => void
+  ): Promise<PaginatedResult<any>> {
+    if (!this.db) {
+      return { data: [], total: 0, page, perPage, lastPage: 0 }
+    }
+
+    // Count total
+    const countQuery = this.db(table)
+    if (applyFilters) applyFilters(countQuery)
+    const [{ count: total }] = await countQuery.count('* as count')
+
+    // Fetch page
+    const offset = (page - 1) * perPage
+    const dataQuery = this.db(table).orderBy('created_at', 'desc').limit(perPage).offset(offset)
+    if (applyFilters) applyFilters(dataQuery)
+    const data = await dataQuery
+
+    return {
+      data,
+      total,
+      page,
+      perPage,
+      lastPage: Math.ceil(total / perPage),
+    }
+  }
+
+  /**
+   * Wire email event listeners to persist emails as they arrive.
+   */
+  private wireEventListeners(): void {
+    if (!this.emitter || typeof this.emitter.on !== 'function') return
+
+    const buildAndPersistEmail = (data: any, status: EmailRecord['status']) => {
+      const msg = data?.message || data
+      const record: EmailRecord = {
+        id: 0,
+        from: extractAddresses(msg?.from) || 'unknown',
+        to: extractAddresses(msg?.to) || 'unknown',
+        cc: extractAddresses(msg?.cc) || null,
+        bcc: extractAddresses(msg?.bcc) || null,
+        subject: msg?.subject || '(no subject)',
+        html: msg?.html || null,
+        text: msg?.text || null,
+        mailer: data?.mailerName || data?.mailer || 'unknown',
+        status,
+        messageId: data?.response?.messageId || data?.messageId || null,
+        attachmentCount: Array.isArray(msg?.attachments) ? msg.attachments.length : 0,
+        timestamp: Date.now(),
+      }
+      this.recordEmail(record)
+    }
+
+    this.handlers = [
+      { event: 'mail:sent', fn: (data: any) => buildAndPersistEmail(data, 'sent') },
+      { event: 'mail:queued', fn: (data: any) => buildAndPersistEmail(data, 'queued') },
+      { event: 'queued:mail:error', fn: (data: any) => buildAndPersistEmail(data, 'failed') },
+    ]
+
+    for (const h of this.handlers) {
+      this.emitter.on(h.event, h.fn)
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Normalize a SQL query by replacing literal values with `?` placeholders.
+ * Used for grouping identical query patterns.
+ */
+function normalizeSql(sql: string): string {
+  return sql
+    .replace(/'[^']*'/g, '?')
+    .replace(/\b\d+(\.\d+)?\b/g, '?')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Extract email addresses from various AdonisJS mail address formats. */
+function extractAddresses(value: any): string {
+  if (!value) return ''
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) {
+    return value
+      .map((v: any) => (typeof v === 'string' ? v : v?.address || ''))
+      .filter(Boolean)
+      .join(', ')
+  }
+  if (typeof value === 'object' && value.address) return value.address
+  return ''
+}
+
+/** Convert a range string to a SQLite-compatible datetime cutoff. */
+function rangeToCutoff(range: string): string {
+  const minutes = rangeToMinutes(range)
+  const cutoff = new Date(Date.now() - minutes * 60_000)
+  return cutoff.toISOString().replace('T', ' ').slice(0, 19)
+}
+
+/** Convert a range string to total minutes. */
+function rangeToMinutes(range: string): number {
+  switch (range) {
+    case '1h':
+      return 60
+    case '6h':
+      return 360
+    case '24h':
+      return 1440
+    case '7d':
+      return 10080
+    default:
+      return 60
+  }
+}
+
+/** Round a bucket timestamp string down to the nearest N minutes. */
+function roundBucket(bucket: string, minutes: number): string {
+  const date = new Date(bucket.replace(' ', 'T') + 'Z')
+  const ms = minutes * 60_000
+  const rounded = new Date(Math.floor(date.getTime() / ms) * ms)
+  return rounded.toISOString().replace('T', ' ').slice(0, 19)
+}

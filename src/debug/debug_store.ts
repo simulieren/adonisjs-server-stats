@@ -29,6 +29,17 @@ export class DebugStore {
     this.traces = config.tracing ? new TraceCollector(config.maxTraces) : null;
   }
 
+  /**
+   * Register a callback that fires whenever any collector records a new item.
+   * The callback receives the item type ('query' | 'event' | 'email' | 'trace').
+   */
+  onNewItem(cb: ((type: string) => void) | null): void {
+    this.queries.onNewItem(cb ? () => cb('query') : null);
+    this.events.onNewItem(cb ? () => cb('event') : null);
+    this.emails.onNewItem(cb ? () => cb('email') : null);
+    this.traces?.onNewItem(cb ? () => cb('trace') : null);
+  }
+
   async start(emitter: any, router: any): Promise<void> {
     await this.queries.start(emitter);
     this.events.start(emitter);

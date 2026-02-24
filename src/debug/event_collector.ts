@@ -1,4 +1,5 @@
 import { RingBuffer } from "./ring_buffer.js";
+import { isExcludedRequest } from "../middleware/request_tracking_middleware.js";
 import type { EventRecord } from "./types.js";
 
 /**
@@ -25,12 +26,16 @@ export class EventCollector {
       // Resolve event name: class-based events use the class name, string events are used as-is
       const eventName = typeof event === "string" ? event : event?.name || "unknown";
 
-      // Skip internal/noisy events and mail events (handled by EmailCollector)
+      // Skip internal/noisy events, mail events (handled by EmailCollector),
+      // HTTP lifecycle events (redundant with timeline), and events triggered
+      // by debug panel polling requests
       if (
         !eventName.startsWith("__") &&
         eventName !== "db:query" &&
         !eventName.startsWith("mail:") &&
-        eventName !== "queued:mail:error"
+        eventName !== "queued:mail:error" &&
+        eventName !== "http:request_completed" &&
+        !isExcludedRequest()
       ) {
         const record: EventRecord = {
           id: self.buffer.getNextId(),
@@ -96,6 +101,11 @@ export class EventCollector {
 
   clear(): void {
     this.buffer.clear();
+  }
+
+  /** Register a callback that fires whenever a new event is recorded. */
+  onNewItem(cb: ((item: EventRecord) => void) | null): void {
+    this.buffer.onPush(cb);
   }
 
   /** Restore persisted records into the buffer and reset the ID counter. */

@@ -7,9 +7,15 @@ export class RingBuffer<T> {
   private head: number = 0;
   private count: number = 0;
   private nextId: number = 1;
+  private pushCallback: ((item: T) => void) | null = null;
 
   constructor(private capacity: number) {
     this.buffer = new Array(capacity);
+  }
+
+  /** Register a callback that fires whenever a new item is pushed. */
+  onPush(cb: ((item: T) => void) | null): void {
+    this.pushCallback = cb;
   }
 
   push(item: T): void {
@@ -18,6 +24,7 @@ export class RingBuffer<T> {
     if (this.count < this.capacity) {
       this.count++;
     }
+    this.pushCallback?.(item);
   }
 
   /** Returns all items in insertion order (oldest first). */

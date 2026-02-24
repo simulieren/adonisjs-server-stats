@@ -137,6 +137,11 @@ export class EmailCollector {
    * - An object: `{ address: "user@example.com", name: "User" }`
    * - An array of strings or objects
    */
+  /** Register a callback that fires whenever a new email is recorded. */
+  onNewItem(cb: ((item: EmailRecord) => void) | null): void {
+    this.buffer.onPush(cb);
+  }
+
   /** Restore persisted records into the buffer and reset the ID counter. */
   loadRecords(records: EmailRecord[]): void {
     this.buffer.load(records);

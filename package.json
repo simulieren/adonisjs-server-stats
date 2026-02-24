@@ -1,6 +1,6 @@
 {
   "name": "adonisjs-server-stats",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "Real-time server monitoring for AdonisJS v6 applications",
   "type": "module",
   "main": "./dist/src/index.js",
@@ -58,6 +58,14 @@
       "types": "./dist/src/edge/plugin.d.ts",
       "import": "./dist/src/edge/plugin.js"
     },
+    "./dashboard": {
+      "types": "./dist/src/dashboard/dashboard_store.d.ts",
+      "import": "./dist/src/dashboard/dashboard_store.js"
+    },
+    "./dashboard/controller": {
+      "types": "./dist/src/dashboard/dashboard_controller.d.ts",
+      "import": "./dist/src/dashboard/dashboard_controller.js"
+    },
     "./configure": {
       "types": "./dist/configure.d.ts",
       "import": "./dist/configure.js"
@@ -106,6 +114,9 @@
     },
     "edge.js": {
       "optional": true
+    },
+    "better-sqlite3": {
+      "optional": true
     }
   },
   "devDependencies": {
@@ -114,7 +125,9 @@
     "@adonisjs/redis": "^9.0.0",
     "@adonisjs/transmit": "^1.0.0",
     "@julr/adonisjs-prometheus": "^1.4.0",
+    "@types/better-sqlite3": "^7.0.0",
     "@types/node": "^22.0.0",
+    "better-sqlite3": "^11.0.0",
     "bullmq": "^5.0.0",
     "edge.js": "^6.0.0",
     "typescript": "^5.9.0"

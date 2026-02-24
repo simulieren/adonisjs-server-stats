@@ -37,12 +37,14 @@ Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 - **Debug toolbar** -- SQL queries, events, emails, routes, logs with search and filtering
 - **Request tracing** -- per-request waterfall timeline showing DB queries, events, and custom spans
 - **Custom panes** -- add your own tabs (webhooks, emails, cache, anything) with a simple config
+- **Full-page dashboard** -- dedicated page at `/__stats` with overview cards, charts, request history, query analysis, EXPLAIN plans, cache/queue/config inspection, and saved filters
 - **Pluggable collectors** -- use built-in collectors or write your own
 - **Visibility control** -- show only to admins, specific roles, or in dev mode
 - **SSE broadcasting** -- real-time updates via AdonisJS Transmit
 - **Prometheus export** -- expose all metrics as Prometheus gauges
 - **Self-contained** -- inline HTML/CSS/JS Edge tag, no React, no external assets
 - **Graceful degradation** -- missing optional dependencies are handled automatically
+- **Theme support** -- dark and light themes across dashboard, debug panel, and stats bar with system preference detection and manual toggle
 
 ## Installation
 
@@ -226,6 +228,10 @@ export default class ServerStatsController {
 | `persistDebugData`     | `boolean \| string` | `false` | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path. |
 | `tracing`              | `boolean`       | `false` | Enable per-request tracing with timeline visualization |
 | `maxTraces`            | `number`        | `200`   | Max request traces to buffer                   |
+| `dashboard`            | `boolean`       | `false` | Enable the full-page dashboard (requires `better-sqlite3`) |
+| `dashboardPath`        | `string`        | `'/__stats'` | URL path for the dashboard page           |
+| `retentionDays`        | `number`        | `7`     | Days to keep historical data in SQLite         |
+| `dbPath`               | `string`        | `'tmp/server-stats.sqlite3'` | Path to the SQLite database file |
 | `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs                        |
 
 ---
@@ -466,6 +472,120 @@ const result = await trace('organization.fetchMembers', async () => {
 
 If tracing is disabled or no request is active, `trace()` executes the function directly with no overhead.
 
+### Full-Page Dashboard
+
+The dashboard is a dedicated page that provides historical data, charts, query analysis, and integration inspectors -- all persisted to a local SQLite database. It's like having Laravel Telescope built into your dev toolbar.
+
+#### Prerequisites
+
+The dashboard requires `better-sqlite3` for local data storage:
+
+```bash
+npm install better-sqlite3
+```
+
+If `better-sqlite3` is not installed, the dashboard will log a helpful message and disable itself gracefully -- the rest of the stats bar and debug toolbar continues to work.
+
+#### Enable the Dashboard
+
+```ts
+// config/server_stats.ts
+export default defineConfig({
+  devToolbar: {
+    enabled: true,
+    dashboard: true,
+  },
+})
+```
+
+Restart your dev server and visit **`/__stats`** (or your configured `dashboardPath`).
+
+#### Configuration
+
+```ts
+devToolbar: {
+  enabled: true,
+  dashboard: true,
+
+  // URL path for the dashboard (default: '/__stats')
+  dashboardPath: '/__stats',
+
+  // Days to retain historical data (default: 7)
+  retentionDays: 7,
+
+  // SQLite database file path, relative to app root (default: 'tmp/server-stats.sqlite3')
+  dbPath: 'tmp/server-stats.sqlite3',
+
+  // Enable tracing for per-request timeline in the dashboard (recommended)
+  tracing: true,
+}
+```
+
+#### Dashboard Sections
+
+| Section    | Description |
+|------------|-------------|
+| **Overview** | Performance cards (avg/p95 response time, req/min, error rate) with sparkline charts and configurable time ranges (1h/6h/24h/7d) |
+| **Requests** | Paginated request history with method, URL, status, duration. Click for detail view with associated queries and trace |
+| **Queries**  | All captured SQL queries with duration, model, connection. Grouped view shows query patterns by normalized SQL. EXPLAIN plan support for SELECT queries |
+| **Events**   | Application events captured from the AdonisJS emitter |
+| **Routes**   | Full route table with methods, patterns, handlers, and middleware stacks |
+| **Logs**     | Log history with level filtering, text search, and structured JSON field search (e.g. filter by `userId = 5`) |
+| **Emails**   | Email history with sender, recipient, subject, status. Click for HTML preview in iframe |
+| **Timeline** | Per-request waterfall timeline (requires `tracing: true`) |
+| **Cache**    | Redis key browser with SCAN-based listing, type-aware detail view, and server stats (requires `@adonisjs/redis`) |
+| **Jobs**     | Queue overview with job listing, detail, and retry for failed jobs (requires `@rlanz/bull-queue`) |
+| **Config**   | Sanitized view of app configuration and environment variables. Secrets are auto-redacted |
+
+#### Access Control
+
+The dashboard reuses the `shouldShow` callback from the main config. If set, all dashboard routes are gated by it -- unauthorized requests receive a 403.
+
+```ts
+export default defineConfig({
+  shouldShow: (ctx) => ctx.auth?.user?.role === 'admin',
+  devToolbar: {
+    enabled: true,
+    dashboard: true,
+  },
+})
+```
+
+#### Deep Links from Debug Panel
+
+When the dashboard is enabled, the debug panel gains link icons on query, event, email, and trace rows. Clicking them opens the dashboard in a new tab, navigating directly to the relevant section and item.
+
+#### Real-Time Updates
+
+The dashboard supports real-time updates via two mechanisms:
+- **Transmit (SSE)**: If `@adonisjs/transmit` is installed, the dashboard subscribes to `server-stats/dashboard` for live overview updates
+- **Polling fallback**: If Transmit is not available, the dashboard polls the API at a configurable interval
+
+#### Data Storage
+
+The dashboard uses a dedicated SQLite database (separate from your app's database) with 8 tables prefixed with `server_stats_`. The database is:
+- **Auto-migrated** on startup (no manual migration step)
+- **Self-contained** -- uses its own Knex connection, never touches your app's migration history
+- **Self-cleaning** -- old data is automatically purged based on `retentionDays`
+- **WAL mode** -- concurrent reads don't block writes
+
+The SQLite file is created at the configured `dbPath` (default: `tmp/server-stats.sqlite3`). Add it to your `.gitignore`:
+
+```
+tmp/server-stats.sqlite3
+```
+
+#### Theme Support
+
+All three UIs (dashboard, debug panel, and stats bar) support dark and light themes:
+
+- **System preference** -- automatically follows `prefers-color-scheme` (dark is default)
+- **Manual toggle** -- sun/moon button in the dashboard sidebar and debug panel tab bar
+- **Synced** -- theme choice is shared via `localStorage` across all three UIs, including cross-tab sync
+- **Scoped** -- CSS variables are scoped to their containers, so they won't leak into your app's styles
+
+---
+
 ### Custom Debug Panes
 
 Add custom tabs to the debug panel:
@@ -629,6 +749,20 @@ import type {
   TraceRecord,
 } from 'adonisjs-server-stats'
 
+// Dashboard types
+import type {
+  RequestFilters,
+  QueryFilters,
+  EventFilters,
+  EmailFilters,
+  LogFilters,
+  TraceFilters,
+  PaginatedResult,
+} from 'adonisjs-server-stats'
+
+// Dashboard store (for advanced use)
+import { DashboardStore } from 'adonisjs-server-stats'
+
 // Trace helper
 import { trace } from 'adonisjs-server-stats'
 
@@ -649,15 +783,16 @@ import type {
 
 All integrations use lazy `import()` -- missing peer deps won't crash the app. The corresponding collector simply returns defaults.
 
-| Dependency                  | Required By                       |
-|-----------------------------|-----------------------------------|
-| `@adonisjs/core`            | Everything (required)             |
-| `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector` |
-| `@adonisjs/redis`           | `redisCollector`                  |
-| `@adonisjs/transmit`        | Provider (SSE broadcast)          |
-| `@julr/adonisjs-prometheus` | `serverStatsCollector`            |
-| `bullmq`                    | `queueCollector`                  |
-| `edge.js`                   | Edge tag                          |
+| Dependency                  | Required By                                    |
+|-----------------------------|------------------------------------------------|
+| `@adonisjs/core`            | Everything (required)                          |
+| `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector`, dashboard    |
+| `@adonisjs/redis`           | `redisCollector`, dashboard cache inspector    |
+| `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time  |
+| `@julr/adonisjs-prometheus` | `serverStatsCollector`                         |
+| `bullmq`                    | `queueCollector`                               |
+| `better-sqlite3`            | Dashboard (`dashboard: true`)                  |
+| `edge.js`                   | Edge tag                                       |
 
 ## License
 

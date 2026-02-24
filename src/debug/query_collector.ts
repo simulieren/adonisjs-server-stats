@@ -1,4 +1,5 @@
 import { RingBuffer } from "./ring_buffer.js";
+import { isExcludedRequest } from "../middleware/request_tracking_middleware.js";
 import type { QueryRecord } from "./types.js";
 
 /**
@@ -21,6 +22,11 @@ export class QueryCollector {
   async start(emitter: any): Promise<void> {
     this.emitter = emitter;
     this.handler = (data: any) => {
+      // Self-exclude: skip queries from the dashboard's dedicated SQLite connection
+      if (data.connection === 'server_stats') return;
+      // Self-exclude: skip queries triggered by debug panel polling requests
+      if (isExcludedRequest()) return;
+
       const duration =
         typeof data.duration === "number"
           ? data.duration
@@ -100,6 +106,11 @@ export class QueryCollector {
 
   clear(): void {
     this.buffer.clear();
+  }
+
+  /** Register a callback that fires whenever a new query is recorded. */
+  onNewItem(cb: ((item: QueryRecord) => void) | null): void {
+    this.buffer.onPush(cb);
   }
 
   /** Restore persisted records into the buffer and reset the ID counter. */

@@ -233,6 +233,18 @@ export interface DevToolbarConfig {
 
   /** Maximum traces to keep in the ring buffer. */
   maxTraces: number
+
+  /** Whether the full-page dashboard is enabled. */
+  dashboard: boolean
+
+  /** URL path for the full-page dashboard. */
+  dashboardPath: string
+
+  /** Data retention period in days for historical persistence. */
+  retentionDays: number
+
+  /** Path to the SQLite database file for historical persistence. */
+  dbPath: string
 }
 
 // ---------------------------------------------------------------------------

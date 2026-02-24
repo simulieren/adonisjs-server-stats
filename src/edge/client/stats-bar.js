@@ -16,6 +16,32 @@
 
   if (!bar || !toggle) return;
 
+  // ── Theme detection & application ───────────────────────────────
+  let themeOverride = localStorage.getItem('ss-dash-theme');
+
+  const applyBarTheme = () => {
+    if (themeOverride) {
+      bar.setAttribute('data-ss-theme', themeOverride);
+      toggle.setAttribute('data-ss-theme', themeOverride);
+    } else {
+      bar.removeAttribute('data-ss-theme');
+      toggle.removeAttribute('data-ss-theme');
+    }
+  };
+
+  applyBarTheme();
+
+  // Expose for debug-panel toggle to call directly
+  window.__ssApplyBarTheme = applyBarTheme;
+
+  // Listen for cross-tab theme changes
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'ss-dash-theme') {
+      themeOverride = e.newValue;
+      applyBarTheme();
+    }
+  });
+
   const ENDPOINT = bar.dataset.endpoint || '/admin/api/server-stats';
   const INTERVAL = Number(bar.dataset.interval) || 3000;
   const MAX_HISTORY = 60;
@@ -63,9 +89,17 @@
   const thresh = (v, warn, crit) => v > crit ? 'ss-red' : v > warn ? 'ss-amber' : 'ss-green';
   const threshInverse = (v, warn, crit) => v < crit ? 'ss-red' : v < warn ? 'ss-amber' : 'ss-green';
 
-  // Map color class → hex for sparklines
-  const HEX = { 'ss-red': '#f87171', 'ss-amber': '#fbbf24', 'ss-green': '#34d399', 'ss-muted': '#737373' };
-  const hexFromClass = (cls) => HEX[cls] || '#34d399';
+  // Map color class → CSS variable for sparklines (reads themed value at render time)
+  const HEX_FALLBACK = { 'ss-red': '#f87171', 'ss-amber': '#fbbf24', 'ss-green': '#34d399', 'ss-muted': '#737373' };
+  const HEX_VAR = { 'ss-red': '--ss-red-fg', 'ss-amber': '--ss-amber-fg', 'ss-green': '--ss-accent', 'ss-muted': '--ss-muted' };
+  const hexFromClass = (cls) => {
+    const varName = HEX_VAR[cls];
+    if (varName) {
+      const val = getComputedStyle(bar).getPropertyValue(varName).trim();
+      if (val) return val;
+    }
+    return HEX_FALLBACK[cls] || '#34d399';
+  };
 
   const ratioColor = (used, max) => {
     if (max === 0) return 'ss-muted';

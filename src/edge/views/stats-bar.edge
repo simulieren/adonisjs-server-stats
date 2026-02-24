@@ -43,5 +43,14 @@
 @if(showDebug)
   <style>{{{ debugCss }}}</style>
   @include('ss::debug-panel')
+  @if(transmitClient)
+    <script>
+      try {
+        if (typeof window.Transmit === 'undefined') {
+          {{{ transmitClient }}}
+        }
+      } catch(e) { /* Transmit client failed to load */ }
+    </script>
+  @end
   <script type="module">{{{ debugJs }}}</script>
 @end

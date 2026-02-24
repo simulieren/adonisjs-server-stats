@@ -326,6 +326,53 @@ export interface DevToolbarOptions {
    * @default 200
    */
   maxTraces?: number
+
+  /**
+   * Enable the full-page dashboard.
+   * Serves a standalone HTML page at `dashboardPath`.
+   * @default false
+   */
+  dashboard?: boolean
+
+  /**
+   * URL path for the full-page dashboard.
+   * Must start with `/`.
+   * @default '/__stats'
+   */
+  dashboardPath?: string
+
+  /**
+   * Data retention period in days for historical persistence.
+   * Records older than this are auto-pruned on startup and periodically.
+   * @default 7
+   */
+  retentionDays?: number
+
+  /**
+   * Path to the SQLite database file for historical persistence.
+   * Relative to app root.
+   * @default '.adonisjs/server-stats/dashboard.sqlite3'
+   */
+  dbPath?: string
+
+  /**
+   * URL prefixes to exclude from tracing and dashboard persistence.
+   *
+   * Requests matching these prefixes will still count toward HTTP
+   * metrics (req/s, latency) but won't appear in the timeline or
+   * be persisted to the dashboard.
+   *
+   * The stats endpoint (`config.endpoint`) is always excluded
+   * automatically when tracing is enabled.
+   *
+   * @example
+   * ```ts
+   * excludeFromTracing: ['/admin/api/debug']
+   * ```
+   *
+   * @default []
+   */
+  excludeFromTracing?: string[]
 }
 
 // ---------------------------------------------------------------------------

@@ -16,9 +16,59 @@
 
   if (!panel || !wrench) return;
 
+  // ── Theme detection & toggle ────────────────────────────────────
+  let themeOverride = localStorage.getItem('ss-dash-theme');
+  const themeBtn = document.getElementById('ss-dbg-theme-btn');
+
+  const applyPanelTheme = () => {
+    if (themeOverride) {
+      panel.setAttribute('data-ss-theme', themeOverride);
+    } else {
+      panel.removeAttribute('data-ss-theme');
+    }
+    if (themeBtn) {
+      const isDark = themeOverride === 'dark' || (!themeOverride && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      themeBtn.textContent = isDark ? '\u2600' : '\u263D';
+      themeBtn.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
+    }
+  };
+
+  if (themeBtn) {
+    themeBtn.addEventListener('click', function () {
+      const isDark = themeOverride === 'dark' || (!themeOverride && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      themeOverride = isDark ? 'light' : 'dark';
+      localStorage.setItem('ss-dash-theme', themeOverride);
+      applyPanelTheme();
+      // Sync stats bar if applyBarTheme exists globally
+      if (typeof window.__ssApplyBarTheme === 'function') window.__ssApplyBarTheme();
+    });
+  }
+
+  applyPanelTheme();
+
+  // Listen for cross-tab theme changes
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'ss-dash-theme') {
+      themeOverride = e.newValue;
+      applyPanelTheme();
+    }
+  });
+
   const LOGS_ENDPOINT = panel.dataset.logsEndpoint || (BASE + '/logs');
 
   const tracingEnabled = panel.dataset.tracing === '1';
+  const dashboardPath = panel.dataset.dashboardPath || null;
+  const DASH_API = dashboardPath ? (dashboardPath.replace(/\/+$/, '') + '/api') : null;
+
+  /** Build an SVG external-link icon for deep links. */
+  const deepLinkSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+
+  /** Build a deep link anchor element HTML string. */
+  const deepLink = (section, id) => {
+    if (!dashboardPath) return '';
+    const href = dashboardPath + '#' + section + (id != null ? '?id=' + id : '');
+    return ' <a href="' + esc(href) + '" target="_blank" class="ss-dbg-deeplink" title="Open in dashboard" onclick="event.stopPropagation()">' + deepLinkSvg + '</a>';
+  };
 
   let isOpen = false;
   let activeTab = tracingEnabled ? 'timeline' : 'queries';
@@ -27,6 +77,8 @@
   let logFilter = 'all';
   let cachedLogs = [];
   const currentPath = window.location.pathname;
+  let isLive = false;
+  let transmitSub = null;
 
   // ── Helpers ──────────────────────────────────────────────────────
   const esc = (s) => {
@@ -92,7 +144,7 @@
 
   // ── Custom pane cell formatter ────────────────────────────────────
   const formatCell = (value, col) => {
-    if (value === null || value === undefined) return '<span style="color:#525252">-</span>';
+    if (value === null || value === undefined) return '<span class="ss-dbg-c-dim">-</span>';
     const fmt = col.format || 'text';
     switch (fmt) {
       case 'time':
@@ -177,6 +229,7 @@
       panel.querySelectorAll('.ss-dbg-pane').forEach((p) => p.classList.remove('ss-dbg-active'));
 
       tab.classList.add('ss-dbg-active');
+      tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       const pane = document.getElementById('ss-dbg-pane-' + name);
       if (pane) pane.classList.add('ss-dbg-active');
 
@@ -193,6 +246,9 @@
     else if (name === 'routes' && !fetched.routes) fetchRoutes();
     else if (name === 'logs') fetchLogs();
     else if (name === 'emails') fetchEmails();
+    else if (name === 'cache') fetchCache();
+    else if (name === 'jobs') fetchJobs();
+    else if (name === 'config' && !fetched.config) fetchConfig();
     else {
       const cp = customPanes.find((p) => p.id === name);
       if (cp) {
@@ -264,7 +320,7 @@
     }
 
     let html = '<table class="ss-dbg-table"><thead><tr>'
-      + '<th style="width:40px">#</th>'
+      + '<th style="width:64px">#</th>'
       + '<th>SQL</th>'
       + '<th style="width:70px">Duration</th>'
       + '<th style="width:60px">Method</th>'
@@ -277,13 +333,13 @@
       const durClass = durationClass(q.duration);
       const dupCount = sqlCounts[q.sql] || 1;
       html += '<tr>'
-        + '<td style="color:#525252">' + q.id + '</td>'
+        + '<td class="ss-dbg-c-dim" style="white-space:nowrap">' + q.id + deepLink('queries', q.id) + '</td>'
         + '<td><span class="ss-dbg-sql" title="Click to expand" onclick="this.classList.toggle(\'ss-dbg-expanded\')">' + esc(q.sql) + '</span>'
         + (dupCount > 1 ? ' <span class="ss-dbg-dup">x' + dupCount + '</span>' : '')
         + '</td>'
         + '<td class="ss-dbg-duration ' + durClass + '">' + q.duration.toFixed(2) + 'ms</td>'
         + '<td><span class="' + methodClass(q.method) + '">' + esc(q.method) + '</span></td>'
-        + '<td style="color:#737373">' + esc(q.model || '-') + '</td>'
+        + '<td class="ss-dbg-c-muted">' + esc(q.model || '-') + '</td>'
         + '<td class="ss-dbg-event-time">' + timeAgo(q.timestamp) + '</td>'
         + '</tr>';
     }
@@ -340,7 +396,7 @@
     }
 
     let html = '<table class="ss-dbg-table"><thead><tr>'
-      + '<th style="width:40px">#</th>'
+      + '<th style="width:64px">#</th>'
       + '<th>Event</th>'
       + '<th>Data</th>'
       + '<th style="width:100px">Time</th>'
@@ -351,14 +407,14 @@
       const hasData = ev.data && ev.data !== '-';
       const preview = hasData ? eventPreview(ev.data) : '-';
       html += '<tr>'
-        + '<td style="color:#525252">' + ev.id + '</td>'
+        + '<td class="ss-dbg-c-dim" style="white-space:nowrap">' + ev.id + deepLink('events', ev.id) + '</td>'
         + '<td class="ss-dbg-event-name">' + esc(ev.event) + '</td>'
         + '<td class="ss-dbg-event-data">'
         + (hasData
           ? '<span class="ss-dbg-data-preview" data-ev-idx="' + i + '">' + esc(preview) + '</span>'
             + '<pre class="ss-dbg-data-full" id="ss-dbg-evdata-' + i + '" style="display:none">' + esc(ev.data) + '</pre>'
             + '<button type="button" class="ss-dbg-copy-btn" data-copy-idx="' + i + '" title="Copy JSON">&#x2398;</button>'
-          : '<span style="color:#525252">-</span>')
+          : '<span class="ss-dbg-c-dim">-</span>')
         + '</td>'
         + '<td class="ss-dbg-event-time">' + formatTime(ev.timestamp) + '</td>'
         + '</tr>';
@@ -468,9 +524,9 @@
       html += '<tr' + (isCurrent ? ' class="ss-dbg-current-route"' : '') + '>'
         + '<td><span class="' + methodClass(r.method) + '">' + esc(r.method) + '</span></td>'
         + '<td>' + esc(r.pattern) + '</td>'
-        + '<td style="color:#737373">' + esc(r.name || '-') + '</td>'
-        + '<td style="color:#93c5fd">' + esc(r.handler) + '</td>'
-        + '<td style="color:#525252;font-size:10px">' + (r.middleware.length ? esc(r.middleware.join(', ')) : '-') + '</td>'
+        + '<td class="ss-dbg-c-muted">' + esc(r.name || '-') + '</td>'
+        + '<td class="ss-dbg-c-sql">' + esc(r.handler) + '</td>'
+        + '<td class="ss-dbg-c-dim" style="font-size:10px">' + (r.middleware.length ? esc(r.middleware.join(', ')) : '-') + '</td>'
         + '</tr>';
     }
 
@@ -631,7 +687,7 @@
     }
 
     let html = '<table class="ss-dbg-table"><thead><tr>'
-      + '<th style="width:40px">#</th>'
+      + '<th style="width:64px">#</th>'
       + '<th style="width:160px">From</th>'
       + '<th style="width:160px">To</th>'
       + '<th>Subject</th>'
@@ -644,13 +700,13 @@
     for (let i = 0; i < filtered.length; i++) {
       const e = filtered[i];
       html += '<tr class="ss-dbg-email-row" data-email-id="' + e.id + '">'
-        + '<td style="color:#525252">' + e.id + '</td>'
-        + '<td style="color:#a3a3a3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="' + esc(e.from) + '">' + esc(e.from) + '</td>'
-        + '<td style="color:#a3a3a3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="' + esc(e.to) + '">' + esc(e.to) + '</td>'
-        + '<td style="color:#93c5fd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.subject) + '</td>'
+        + '<td class="ss-dbg-c-dim" style="white-space:nowrap">' + e.id + deepLink('emails', e.id) + '</td>'
+        + '<td class="ss-dbg-c-secondary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="' + esc(e.from) + '">' + esc(e.from) + '</td>'
+        + '<td class="ss-dbg-c-secondary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px" title="' + esc(e.to) + '">' + esc(e.to) + '</td>'
+        + '<td class="ss-dbg-c-sql" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(e.subject) + '</td>'
         + '<td><span class="ss-dbg-email-status ss-dbg-email-status-' + esc(e.status) + '">' + esc(e.status) + '</span></td>'
-        + '<td style="color:#737373">' + esc(e.mailer) + '</td>'
-        + '<td style="color:#525252;text-align:center">' + (e.attachmentCount > 0 ? e.attachmentCount : '-') + '</td>'
+        + '<td class="ss-dbg-c-muted">' + esc(e.mailer) + '</td>'
+        + '<td class="ss-dbg-c-dim" style="text-align:center">' + (e.attachmentCount > 0 ? e.attachmentCount : '-') + '</td>'
         + '<td class="ss-dbg-event-time">' + timeAgo(e.timestamp) + '</td>'
         + '</tr>';
     }
@@ -753,7 +809,7 @@
     }
 
     let html = '<table class="ss-dbg-table"><thead><tr>'
-      + '<th style="width:40px">#</th>'
+      + '<th style="width:64px">#</th>'
       + '<th style="width:60px">Method</th>'
       + '<th>URL</th>'
       + '<th style="width:55px">Status</th>'
@@ -766,13 +822,13 @@
     for (let i = 0; i < filtered.length; i++) {
       const t = filtered[i];
       html += '<tr class="ss-dbg-email-row" data-trace-id="' + t.id + '">'
-        + '<td style="color:#525252">' + t.id + '</td>'
+        + '<td class="ss-dbg-c-dim" style="white-space:nowrap">' + t.id + deepLink('traces', t.id) + '</td>'
         + '<td><span class="' + methodClass(t.method) + '">' + esc(t.method) + '</span></td>'
         + '<td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px" title="' + esc(t.url) + '">' + esc(t.url) + '</td>'
         + '<td><span class="ss-dbg-status ' + statusClass(t.statusCode) + '">' + t.statusCode + '</span></td>'
         + '<td class="ss-dbg-duration ' + durationClass(t.totalDuration) + '">' + t.totalDuration.toFixed(1) + 'ms</td>'
-        + '<td style="color:#737373;text-align:center">' + t.spanCount + '</td>'
-        + '<td style="text-align:center">' + (t.warningCount > 0 ? '<span style="color:#fbbf24">' + t.warningCount + '</span>' : '<span style="color:#333">-</span>') + '</td>'
+        + '<td class="ss-dbg-c-muted" style="text-align:center">' + t.spanCount + '</td>'
+        + '<td style="text-align:center">' + (t.warningCount > 0 ? '<span class="ss-dbg-c-amber">' + t.warningCount + '</span>' : '<span class="ss-dbg-c-border">-</span>') + '</td>'
         + '<td class="ss-dbg-event-time">' + timeAgo(t.timestamp) + '</td>'
         + '</tr>';
     }
@@ -887,6 +943,493 @@
   }
 
   if (tlSearchInput) tlSearchInput.addEventListener('input', renderTraces);
+
+  // ── Mini Stats Bar ─────────────────────────────────────────────
+  const miniStatsEl = document.getElementById('ss-dbg-mini-stats');
+  let miniStatsTimer = null;
+
+  const fetchMiniStats = () => {
+    if (!DASH_API || !miniStatsEl) return;
+    fetchJSON(DASH_API + '/overview?range=1h')
+      .then((data) => {
+        const avg = data.avgResponseTime || 0;
+        const err = data.errorRate || 0;
+        const rpm = data.requestsPerMinute || 0;
+        const hasData = (data.totalRequests || 0) > 0;
+
+        if (!hasData) {
+          miniStatsEl.innerHTML = '';
+          return;
+        }
+
+        const avgClass = avg > 500 ? 'ss-dbg-stat-red' : avg > 200 ? 'ss-dbg-stat-amber' : 'ss-dbg-stat-green';
+        const errClass = err > 5 ? 'ss-dbg-stat-red' : err > 1 ? 'ss-dbg-stat-amber' : 'ss-dbg-stat-green';
+
+        miniStatsEl.innerHTML =
+          '<span class="ss-dbg-mini-stat"><span class="ss-dbg-mini-stat-value ' + avgClass + '">' + avg.toFixed(1) + 'ms</span> avg</span>'
+          + '<span class="ss-dbg-mini-stat"><span class="ss-dbg-mini-stat-value ' + errClass + '">' + err.toFixed(1) + '%</span> err</span>'
+          + '<span class="ss-dbg-mini-stat"><span class="ss-dbg-mini-stat-value">' + Math.round(rpm) + '</span> req/m</span>';
+      })
+      .catch(() => {
+        miniStatsEl.innerHTML = '';
+      });
+  };
+
+  // ── Cache Tab ─────────────────────────────────────────────────
+  const cacheSearchInput = document.getElementById('ss-dbg-search-cache');
+  const cacheSummaryEl = document.getElementById('ss-dbg-cache-summary');
+  const cacheBodyEl = document.getElementById('ss-dbg-cache-body');
+  const cacheStatsArea = document.getElementById('ss-dbg-cache-stats-area');
+  let cachedCacheData = { stats: {}, keys: [] };
+
+  const fetchCache = () => {
+    if (!DASH_API) return;
+    fetchJSON(DASH_API + '/cache')
+      .then((data) => {
+        cachedCacheData = data;
+        renderCache();
+      })
+      .catch(() => {
+        if (cacheBodyEl) cacheBodyEl.innerHTML = '<div class="ss-dbg-empty">Cache not available</div>';
+        if (cacheStatsArea) cacheStatsArea.innerHTML = '';
+      });
+  };
+
+  const renderCache = () => {
+    if (!cacheBodyEl) return;
+    const stats = cachedCacheData.stats || {};
+    const keys = cachedCacheData.keys || cachedCacheData.data || [];
+    const filter = (cacheSearchInput ? cacheSearchInput.value : '').toLowerCase();
+
+    // Stats area
+    if (cacheStatsArea) {
+      cacheStatsArea.innerHTML =
+        '<div class="ss-dbg-cache-stat"><span class="ss-dbg-cache-stat-label">Hit Rate:</span><span class="ss-dbg-cache-stat-value">' + (stats.hitRate || 0).toFixed(1) + '%</span></div>'
+        + '<div class="ss-dbg-cache-stat"><span class="ss-dbg-cache-stat-label">Hits:</span><span class="ss-dbg-cache-stat-value">' + (stats.hits || 0) + '</span></div>'
+        + '<div class="ss-dbg-cache-stat"><span class="ss-dbg-cache-stat-label">Misses:</span><span class="ss-dbg-cache-stat-value">' + (stats.misses || 0) + '</span></div>'
+        + '<div class="ss-dbg-cache-stat"><span class="ss-dbg-cache-stat-label">Keys:</span><span class="ss-dbg-cache-stat-value">' + (stats.keyCount || keys.length || 0) + '</span></div>';
+    }
+
+    if (cacheSummaryEl) {
+      cacheSummaryEl.textContent = (stats.keyCount || keys.length || 0) + ' keys';
+    }
+
+    let filtered = keys;
+    if (filter) {
+      filtered = keys.filter((k) => (k.key || '').toLowerCase().indexOf(filter) !== -1);
+    }
+
+    if (filtered.length === 0) {
+      cacheBodyEl.innerHTML = '<div class="ss-dbg-empty">' + (filter ? 'No matching cache keys' : 'No cache keys found') + '</div>';
+      return;
+    }
+
+    let html = '<table class="ss-dbg-table"><thead><tr>'
+      + '<th>Key</th>'
+      + '<th style="width:80px">Type</th>'
+      + '<th style="width:80px">TTL</th>'
+      + '<th style="width:80px">Size</th>'
+      + '</tr></thead><tbody>';
+
+    for (let i = 0; i < filtered.length; i++) {
+      const k = filtered[i];
+      html += '<tr class="ss-dbg-email-row" data-cache-key="' + esc(k.key || '') + '">'
+        + '<td class="ss-dbg-c-sql">' + esc(k.key || '') + '</td>'
+        + '<td class="ss-dbg-c-muted">' + esc(k.type || '-') + '</td>'
+        + '<td class="ss-dbg-c-muted">' + (k.ttl != null ? k.ttl + 's' : '-') + '</td>'
+        + '<td class="ss-dbg-c-dim">' + (k.size != null ? k.size + 'B' : '-') + '</td>'
+        + '</tr>';
+    }
+
+    html += '</tbody></table>';
+    cacheBodyEl.innerHTML = html;
+
+    // Click row to show cache detail
+    cacheBodyEl.querySelectorAll('[data-cache-key]').forEach((row) => {
+      row.addEventListener('click', () => {
+        const key = row.getAttribute('data-cache-key');
+        fetchJSON(DASH_API + '/cache/' + encodeURIComponent(key))
+          .then((data) => {
+            cacheBodyEl.innerHTML = '<div class="ss-dbg-cache-detail">'
+              + '<button type="button" class="ss-dbg-btn-clear" id="ss-dbg-cache-back">&larr; Back</button>'
+              + '&nbsp;&nbsp;<strong>' + esc(key) + '</strong>'
+              + '<pre>' + esc(JSON.stringify(data.value || data, null, 2)) + '</pre>'
+              + '</div>';
+            const backBtn = document.getElementById('ss-dbg-cache-back');
+            if (backBtn) backBtn.addEventListener('click', () => renderCache());
+          })
+          .catch(() => { /* ignore */ });
+      });
+    });
+  };
+
+  if (cacheSearchInput) cacheSearchInput.addEventListener('input', renderCache);
+
+  // ── Jobs Tab ──────────────────────────────────────────────────
+  const jobsBodyEl = document.getElementById('ss-dbg-jobs-body');
+  const jobsSummaryEl = document.getElementById('ss-dbg-jobs-summary');
+  const jobsStatsArea = document.getElementById('ss-dbg-jobs-stats-area');
+  const jobFilters = panel.querySelectorAll('[data-ss-dbg-job-status]');
+  let jobStatusFilter = 'all';
+  let cachedJobsData = { data: [], stats: {} };
+
+  const fetchJobs = () => {
+    if (!DASH_API) return;
+    let url = DASH_API + '/jobs?limit=100';
+    if (jobStatusFilter && jobStatusFilter !== 'all') url += '&status=' + jobStatusFilter;
+
+    fetchJSON(url)
+      .then((data) => {
+        cachedJobsData = data;
+        renderJobs();
+      })
+      .catch(() => {
+        if (jobsBodyEl) jobsBodyEl.innerHTML = '<div class="ss-dbg-empty">Jobs/Queue not available</div>';
+        if (jobsStatsArea) jobsStatsArea.innerHTML = '';
+      });
+  };
+
+  const renderJobs = () => {
+    if (!jobsBodyEl) return;
+    const items = cachedJobsData.data || cachedJobsData.jobs || [];
+    const stats = cachedJobsData.stats || {};
+
+    // Stats area
+    if (jobsStatsArea) {
+      jobsStatsArea.innerHTML = '<div class="ss-dbg-job-stats">'
+        + '<div class="ss-dbg-job-stat"><span class="ss-dbg-job-stat-label">Active:</span><span class="ss-dbg-job-stat-value">' + (stats.active || 0) + '</span></div>'
+        + '<div class="ss-dbg-job-stat"><span class="ss-dbg-job-stat-label">Waiting:</span><span class="ss-dbg-job-stat-value">' + (stats.waiting || 0) + '</span></div>'
+        + '<div class="ss-dbg-job-stat"><span class="ss-dbg-job-stat-label">Delayed:</span><span class="ss-dbg-job-stat-value">' + (stats.delayed || 0) + '</span></div>'
+        + '<div class="ss-dbg-job-stat"><span class="ss-dbg-job-stat-label">Completed:</span><span class="ss-dbg-job-stat-value">' + (stats.completed || 0) + '</span></div>'
+        + '<div class="ss-dbg-job-stat"><span class="ss-dbg-job-stat-label">Failed:</span><span class="ss-dbg-job-stat-value ss-dbg-c-red">' + (stats.failed || 0) + '</span></div>'
+        + '</div>';
+    }
+
+    if (jobsSummaryEl) {
+      const total = (cachedJobsData.meta ? cachedJobsData.meta.total : null) || items.length;
+      jobsSummaryEl.textContent = total + ' jobs';
+    }
+
+    if (items.length === 0) {
+      jobsBodyEl.innerHTML = '<div class="ss-dbg-empty">No jobs found</div>';
+      return;
+    }
+
+    let html = '<table class="ss-dbg-table"><thead><tr>'
+      + '<th style="width:50px">ID</th>'
+      + '<th>Name</th>'
+      + '<th style="width:80px">Status</th>'
+      + '<th style="width:60px">Attempts</th>'
+      + '<th style="width:80px">Duration</th>'
+      + '<th style="width:70px">Time</th>'
+      + '<th style="width:50px"></th>'
+      + '</tr></thead><tbody>';
+
+    for (let i = 0; i < items.length; i++) {
+      const j = items[i];
+      const statusBadge = j.status === 'failed' ? 'red' : j.status === 'completed' ? 'green' : j.status === 'active' ? 'blue' : 'amber';
+      html += '<tr>'
+        + '<td class="ss-dbg-c-dim">' + j.id + '</td>'
+        + '<td class="ss-dbg-c-sql">' + esc(j.name || '') + '</td>'
+        + '<td><span class="ss-dbg-badge ss-dbg-badge-' + statusBadge + '">' + esc(j.status || '') + '</span></td>'
+        + '<td class="ss-dbg-c-muted" style="text-align:center">' + (j.attempts || j.attemptsMade || 0) + '</td>'
+        + '<td class="ss-dbg-duration">' + (j.duration != null ? j.duration.toFixed(0) + 'ms' : '-') + '</td>'
+        + '<td class="ss-dbg-event-time">' + timeAgo(j.timestamp || j.processedOn || j.created_at) + '</td>'
+        + '<td>' + (j.status === 'failed' ? '<button class="ss-dbg-retry-btn" data-retry-id="' + j.id + '">Retry</button>' : '') + '</td>'
+        + '</tr>';
+    }
+
+    html += '</tbody></table>';
+    jobsBodyEl.innerHTML = html;
+
+    // Retry buttons
+    jobsBodyEl.querySelectorAll('.ss-dbg-retry-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = btn.getAttribute('data-retry-id');
+        btn.textContent = '...';
+        btn.disabled = true;
+        fetch(DASH_API + '/jobs/' + id + '/retry', { method: 'POST', credentials: 'same-origin' })
+          .then(() => { btn.textContent = 'OK'; setTimeout(fetchJobs, 1000); })
+          .catch(() => { btn.textContent = 'Retry'; btn.disabled = false; });
+      });
+    });
+  };
+
+  jobFilters.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      jobFilters.forEach((b) => b.classList.remove('ss-dbg-active'));
+      btn.classList.add('ss-dbg-active');
+      jobStatusFilter = btn.getAttribute('data-ss-dbg-job-status');
+      fetchJobs();
+    });
+  });
+
+  // ── Config Tab ────────────────────────────────────────────────
+  const configBodyEl = document.getElementById('ss-dbg-config-body');
+  const configSummaryEl = document.getElementById('ss-dbg-config-summary');
+  const configSearchInput = document.getElementById('ss-dbg-search-config');
+  const configTabs = panel.querySelectorAll('[data-ss-dbg-config-tab]');
+  let configRawData = null;
+  let configActiveTab = 'config';
+  let configSearchTerm = '';
+
+  const flattenConfig = (obj, prefix) => {
+    const results = [];
+    if (typeof obj !== 'object' || obj === null) {
+      results.push({ path: prefix, value: obj });
+      return results;
+    }
+    const keys = Object.keys(obj);
+    for (let i = 0; i < keys.length; i++) {
+      const fullPath = prefix ? prefix + '.' + keys[i] : keys[i];
+      const val = obj[keys[i]];
+      if (typeof val === 'object' && val !== null && !Array.isArray(val) && !val.__redacted) {
+        const nested = flattenConfig(val, fullPath);
+        for (let n = 0; n < nested.length; n++) results.push(nested[n]);
+      } else {
+        results.push({ path: fullPath, value: val });
+      }
+    }
+    return results;
+  };
+
+  const countLeaves = (obj) => {
+    if (typeof obj !== 'object' || obj === null || obj.__redacted) return 1;
+    let count = 0;
+    const keys = Object.keys(obj);
+    for (let i = 0; i < keys.length; i++) count += countLeaves(obj[keys[i]]);
+    return count;
+  };
+
+  const formatConfigValue = (val) => {
+    if (val === null || val === undefined) return '<span class="ss-dbg-config-val-null">null</span>';
+    if (val === true) return '<span class="ss-dbg-config-val-true">true</span>';
+    if (val === false) return '<span class="ss-dbg-config-val-false">false</span>';
+    if (typeof val === 'number') return '<span class="ss-dbg-config-val-number">' + val + '</span>';
+    if (Array.isArray(val)) {
+      const items = val.map((item) => {
+        if (item === null || item === undefined) return 'null';
+        if (typeof item === 'object') {
+          try { return JSON.stringify(item); } catch { return String(item); }
+        }
+        return String(item);
+      });
+      return '<span class="ss-dbg-config-val-array">[' + esc(items.join(', ')) + ']</span>';
+    }
+    if (typeof val === 'object') {
+      try { return '<span class="ss-dbg-config-val-null">' + esc(JSON.stringify(val, null, 2)) + '</span>'; } catch { /* fall through */ }
+    }
+    return esc(String(val));
+  };
+
+  const highlightMatch = (text, term) => {
+    if (!term) return text;
+    const idx = text.toLowerCase().indexOf(term.toLowerCase());
+    if (idx === -1) return text;
+    return text.slice(0, idx) + '<mark class="ss-dbg-config-match">' + text.slice(idx, idx + term.length) + '</mark>' + text.slice(idx + term.length);
+  };
+
+  const isRedactedObj = (val) => val && typeof val === 'object' && val.__redacted === true;
+
+  const renderRedacted = (val, prefix) => {
+    const cls = prefix + '-config-redacted';
+    const realVal = esc(val.value || '');
+    return '<span class="' + cls + ' ' + prefix + '-redacted-wrap" data-redacted-value="' + realVal + '">'
+      + '<span class="' + prefix + '-redacted-display">' + esc(val.display) + '</span>'
+      + '<span class="' + prefix + '-redacted-real" style="display:none">' + realVal + '</span>'
+      + '<button type="button" class="' + prefix + '-redacted-reveal" title="Reveal value">'
+      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+      + '</button>'
+      + '<button type="button" class="' + prefix + '-redacted-copy" title="Copy value">'
+      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+      + '</button>'
+      + '</span>';
+  };
+
+  const bindRedactedButtons = (container, prefix) => {
+    container.querySelectorAll('.' + prefix + '-redacted-reveal').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wrap = btn.closest('.' + prefix + '-redacted-wrap');
+        if (!wrap) return;
+        const display = wrap.querySelector('.' + prefix + '-redacted-display');
+        const real = wrap.querySelector('.' + prefix + '-redacted-real');
+        if (!display || !real) return;
+        const isHidden = real.style.display === 'none';
+        display.style.display = isHidden ? 'none' : '';
+        real.style.display = isHidden ? '' : 'none';
+        btn.innerHTML = isHidden
+          ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+          : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+        btn.title = isHidden ? 'Hide value' : 'Reveal value';
+      });
+    });
+
+    container.querySelectorAll('.' + prefix + '-redacted-copy').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const wrap = btn.closest('.' + prefix + '-redacted-wrap');
+        if (!wrap) return;
+        const val = wrap.getAttribute('data-redacted-value');
+        if (!val) return;
+        navigator.clipboard.writeText(val).then(() => {
+          btn.innerHTML = '\u2713';
+          setTimeout(() => {
+            btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+          }, 1200);
+        });
+      });
+    });
+  };
+
+  const fetchConfig = () => {
+    if (!DASH_API) return;
+    fetchJSON(DASH_API + '/config')
+      .then((data) => {
+        configRawData = data;
+        fetched.config = true;
+        renderConfig();
+      })
+      .catch(() => {
+        if (configBodyEl) configBodyEl.innerHTML = '<div class="ss-dbg-empty">Config not available</div>';
+      });
+  };
+
+  const renderConfigTable = (obj, prefix) => {
+    const flat = flattenConfig(obj, prefix);
+    let html = '<table class="ss-dbg-table"><thead><tr>'
+      + '<th style="width:320px">Key</th><th>Value</th>'
+      + '</tr></thead><tbody>';
+    for (let i = 0; i < flat.length; i++) {
+      const item = flat[i];
+      const relPath = item.path.indexOf(prefix + '.') === 0 ? item.path.slice(prefix.length + 1) : item.path;
+      const redacted = isRedactedObj(item.value);
+      html += '<tr>'
+        + '<td><span class="ss-dbg-config-key">' + esc(relPath) + '</span></td>'
+        + '<td>' + (redacted ? renderRedacted(item.value, 'ss-dbg') : '<span class="ss-dbg-config-val">' + formatConfigValue(item.value) + '</span>') + '</td>'
+        + '</tr>';
+    }
+    html += '</tbody></table>';
+    return html;
+  };
+
+  const renderConfig = () => {
+    if (!configBodyEl || !configRawData) return;
+
+    const source = configActiveTab === 'env' ? (configRawData.env || {}) : (configRawData.config || configRawData);
+    const flat = flattenConfig(source, '');
+    const term = configSearchTerm.toLowerCase();
+    let filtered = flat;
+    if (term) {
+      filtered = flat.filter((item) => {
+        var valStr = isRedactedObj(item.value) ? item.value.display : String(item.value);
+        return item.path.toLowerCase().indexOf(term) !== -1 || valStr.toLowerCase().indexOf(term) !== -1;
+      });
+    }
+
+    if (configSummaryEl) {
+      configSummaryEl.textContent = filtered.length + (term ? ' of ' + flat.length : '') + ' entries';
+    }
+
+    let html = '';
+
+    if (configActiveTab === 'env') {
+      // Env vars: simple table
+      html += '<div class="ss-dbg-config-table-wrap"><table class="ss-dbg-table"><thead><tr>'
+        + '<th>Variable</th><th>Value</th>'
+        + '</tr></thead><tbody>';
+      for (let i = 0; i < filtered.length; i++) {
+        const item = filtered[i];
+        const redacted = isRedactedObj(item.value);
+        const displayVal = redacted ? item.value.display : String(item.value);
+        html += '<tr>'
+          + '<td><span class="ss-dbg-config-key">' + highlightMatch(esc(item.path), term) + '</span></td>'
+          + '<td>' + (redacted ? renderRedacted(item.value, 'ss-dbg') : '<span class="ss-dbg-config-val">' + highlightMatch(esc(displayVal), term) + '</span>') + '</td>'
+          + '</tr>';
+      }
+      html += '</tbody></table></div>';
+    } else {
+      if (term) {
+        // Search mode: flat list
+        html += '<div class="ss-dbg-config-table-wrap"><table class="ss-dbg-table"><thead><tr>'
+          + '<th>Path</th><th>Value</th>'
+          + '</tr></thead><tbody>';
+        for (let i = 0; i < filtered.length; i++) {
+          const item = filtered[i];
+          const redacted = isRedactedObj(item.value);
+          const displayVal = redacted ? item.value.display : String(item.value);
+          html += '<tr>'
+            + '<td><span class="ss-dbg-config-key" style="white-space:nowrap">' + highlightMatch(esc(item.path), term) + '</span></td>'
+            + '<td>' + (redacted ? renderRedacted(item.value, 'ss-dbg') : '<span class="ss-dbg-config-val" style="word-break:break-all">' + highlightMatch(esc(displayVal), term) + '</span>') + '</td>'
+            + '</tr>';
+        }
+        html += '</tbody></table></div>';
+      } else {
+        // Browse mode: collapsible sections
+        const topKeys = Object.keys(source);
+        html += '<div class="ss-dbg-config-sections">';
+        for (let t = 0; t < topKeys.length; t++) {
+          const sectionKey = topKeys[t];
+          const sectionVal = source[sectionKey];
+          const childCount = countLeaves(sectionVal);
+          const isObj = typeof sectionVal === 'object' && sectionVal !== null && !sectionVal.__redacted;
+
+          html += '<div class="ss-dbg-config-section">';
+          if (isObj) {
+            html += '<div class="ss-dbg-config-section-header" data-config-section="' + esc(sectionKey) + '">'
+              + '<span class="ss-dbg-config-toggle">\u25B6</span>'
+              + '<span class="ss-dbg-config-key">' + esc(sectionKey) + '</span>'
+              + '<span class="ss-dbg-config-count">' + childCount + ' entries</span>'
+              + '</div>';
+            html += '<div class="ss-dbg-config-section-body" style="display:none">';
+            html += renderConfigTable(sectionVal, sectionKey);
+            html += '</div>';
+          } else {
+            html += '<div class="ss-dbg-config-section-header ss-dbg-config-leaf">'
+              + '<span class="ss-dbg-config-key">' + esc(sectionKey) + '</span>'
+              + '<span class="ss-dbg-config-val" style="margin-left:8px">' + formatConfigValue(sectionVal) + '</span>'
+              + '</div>';
+          }
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+    }
+
+    configBodyEl.innerHTML = html;
+
+    // Bind section toggles
+    configBodyEl.querySelectorAll('[data-config-section]').forEach((header) => {
+      header.addEventListener('click', () => {
+        const sectionBody = header.nextElementSibling;
+        if (!sectionBody) return;
+        const isHidden = sectionBody.style.display === 'none';
+        sectionBody.style.display = isHidden ? '' : 'none';
+        const toggle = header.querySelector('.ss-dbg-config-toggle');
+        if (toggle) toggle.textContent = isHidden ? '\u25BC' : '\u25B6';
+      });
+    });
+
+    // Bind redacted reveal/copy buttons
+    bindRedactedButtons(configBodyEl, 'ss-dbg');
+  };
+
+  configTabs.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      configTabs.forEach((b) => b.classList.remove('ss-dbg-active'));
+      btn.classList.add('ss-dbg-active');
+      configActiveTab = btn.getAttribute('data-ss-dbg-config-tab');
+      renderConfig();
+    });
+  });
+
+  if (configSearchInput) {
+    configSearchInput.addEventListener('input', () => {
+      configSearchTerm = configSearchInput.value.trim();
+      renderConfig();
+    });
+  }
 
   // ── Custom panes: fetch, render, bind ───────────────────────────
   const getNestedValue = (obj, path) => {
@@ -1008,13 +1551,34 @@
     }
   }
 
+  // ── Connection mode indicator ──────────────────────────────────
+  const POLL_INTERVAL_NORMAL = REFRESH_INTERVAL;
+  const POLL_INTERVAL_LIVE = 15000; // slow polling as fallback when live
+
+  const updateConnectionIndicator = () => {
+    const el = document.getElementById('ss-dbg-conn-mode');
+    if (!el) return;
+    if (isLive) {
+      el.textContent = 'live';
+      el.className = 'ss-dbg-conn-mode ss-dbg-conn-live';
+      el.title = 'Connected via Transmit (SSE) — real-time updates';
+    } else {
+      el.textContent = 'polling';
+      el.className = 'ss-dbg-conn-mode ss-dbg-conn-polling';
+      el.title = 'Polling every ' + (POLL_INTERVAL_NORMAL / 1000) + 's';
+    }
+  };
+
   // ── Auto-refresh ────────────────────────────────────────────────
   const startRefresh = () => {
     stopRefresh();
+    fetchMiniStats();
+    const interval = isLive ? POLL_INTERVAL_LIVE : POLL_INTERVAL_NORMAL;
     refreshTimer = setInterval(() => {
       if (!isOpen) return;
       loadTab(activeTab);
-    }, REFRESH_INTERVAL);
+      fetchMiniStats();
+    }, interval);
   };
 
   const stopRefresh = () => {
@@ -1023,6 +1587,83 @@
       refreshTimer = null;
     }
   };
+
+  // ── Transmit (SSE) support ─────────────────────────────────────
+  const initTransmit = () => {
+    // window.Transmit is set by the inline IIFE injected before this module
+    const TransmitClass = (typeof window !== 'undefined' && window.Transmit) ? window.Transmit : null;
+
+    if (!TransmitClass) return; // Transmit client not available
+
+    try {
+      const transmit = new TransmitClass({
+        baseUrl: window.location.origin,
+        onSubscription: () => {
+          isLive = true;
+          updateConnectionIndicator();
+          // Restart refresh with slower interval now that we have live updates
+          if (isOpen) startRefresh();
+        },
+        onReconnectFailed: () => {
+          isLive = false;
+          updateConnectionIndicator();
+          if (isOpen) startRefresh();
+        },
+        onSubscribeFailed: () => {
+          isLive = false;
+          updateConnectionIndicator();
+        }
+      });
+
+      transmitSub = transmit.subscription('server-stats/debug');
+
+      transmitSub.onMessage((message) => {
+        try {
+          const event = typeof message === 'string' ? JSON.parse(message) : message;
+          handleLiveEvent(event);
+        } catch { /* ignore */ }
+      });
+
+      transmitSub.create().catch(() => {
+        isLive = false;
+        updateConnectionIndicator();
+      });
+    } catch {
+      // Transmit init failed — stay on polling
+    }
+  };
+
+  const handleLiveEvent = (event) => {
+    if (!isOpen) return;
+
+    // Backend sends { types: ['query', 'event', ...] }
+    const types = event.types || (event.type ? [event.type] : []);
+    const tabMap = {
+      'query': 'queries',
+      'event': 'events',
+      'email': 'emails',
+      'trace': 'timeline'
+    };
+
+    let shouldRefresh = false;
+    for (let i = 0; i < types.length; i++) {
+      const targetTab = tabMap[types[i]];
+      if (targetTab && targetTab === activeTab) {
+        shouldRefresh = true;
+      }
+      if (types[i] === 'query') {
+        updateBarQueryBadge();
+      }
+    }
+
+    if (shouldRefresh) {
+      loadTab(activeTab);
+    }
+  };
+
+  // Initialize Transmit after a short delay to let the page fully load
+  setTimeout(initTransmit, 500);
+  updateConnectionIndicator();
 
   // ── Stats bar query badge (always visible) ──────────────────────
   const updateBarQueryBadge = () => {
