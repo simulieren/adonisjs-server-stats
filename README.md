@@ -231,7 +231,8 @@ export default class ServerStatsController {
 | `dashboard`            | `boolean`       | `false` | Enable the full-page dashboard (requires `better-sqlite3`) |
 | `dashboardPath`        | `string`        | `'/__stats'` | URL path for the dashboard page           |
 | `retentionDays`        | `number`        | `7`     | Days to keep historical data in SQLite         |
-| `dbPath`               | `string`        | `'tmp/server-stats.sqlite3'` | Path to the SQLite database file |
+| `dbPath`               | `string`        | `'.adonisjs/server-stats/dashboard.sqlite3'` | Path to the SQLite database file (relative to app root) |
+| `excludeFromTracing`   | `string[]`      | `[]`    | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
 | `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs                        |
 
 ---
@@ -513,8 +514,11 @@ devToolbar: {
   // Days to retain historical data (default: 7)
   retentionDays: 7,
 
-  // SQLite database file path, relative to app root (default: 'tmp/server-stats.sqlite3')
-  dbPath: 'tmp/server-stats.sqlite3',
+  // SQLite database file path, relative to app root (default: '.adonisjs/server-stats/dashboard.sqlite3')
+  dbPath: '.adonisjs/server-stats/dashboard.sqlite3',
+
+  // URL prefixes to exclude from tracing and dashboard persistence (default: [])
+  excludeFromTracing: ['/admin/api/debug'],
 
   // Enable tracing for per-request timeline in the dashboard (recommended)
   tracing: true,
@@ -569,10 +573,10 @@ The dashboard uses a dedicated SQLite database (separate from your app's databas
 - **Self-cleaning** -- old data is automatically purged based on `retentionDays`
 - **WAL mode** -- concurrent reads don't block writes
 
-The SQLite file is created at the configured `dbPath` (default: `tmp/server-stats.sqlite3`). Add it to your `.gitignore`:
+The SQLite file is created at the configured `dbPath` (default: `.adonisjs/server-stats/dashboard.sqlite3`). Add it to your `.gitignore`:
 
 ```
-tmp/server-stats.sqlite3
+.adonisjs/server-stats/
 ```
 
 #### Theme Support
