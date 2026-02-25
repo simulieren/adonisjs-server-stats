@@ -694,6 +694,130 @@ export class DashboardStore {
     }))
   }
 
+  /**
+   * Widget data for the dashboard overview.
+   *
+   * @param range — '1h' | '6h' | '24h' | '7d'
+   */
+  async getOverviewWidgets(range: string = '1h'): Promise<{
+    topEvents: { eventName: string; count: number }[]
+    emailActivity: { sent: number; queued: number; failed: number }
+    logLevelBreakdown: { error: number; warn: number; info: number; debug: number }
+    statusDistribution: { '2xx': number; '3xx': number; '4xx': number; '5xx': number }
+    slowestQueries: { sqlNormalized: string; avgDuration: number; count: number }[]
+  }> {
+    const empty = {
+      topEvents: [] as { eventName: string; count: number }[],
+      emailActivity: { sent: 0, queued: 0, failed: 0 },
+      logLevelBreakdown: { error: 0, warn: 0, info: 0, debug: 0 },
+      statusDistribution: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 },
+      slowestQueries: [] as { sqlNormalized: string; avgDuration: number; count: number }[],
+    }
+
+    if (!this.db) return empty
+
+    const cutoff = rangeToCutoff(range)
+
+    try {
+      const [topEventsRaw, emailStatusRaw, logLevelsRaw, statusRaw, slowQueriesRaw] =
+        await Promise.all([
+          // Top 5 events by count
+          this.db('server_stats_events')
+            .select('event_name', this.db.raw('COUNT(*) as count'))
+            .where('created_at', '>=', cutoff)
+            .groupBy('event_name')
+            .orderBy('count', 'desc')
+            .limit(5),
+
+          // Email activity by status
+          this.db('server_stats_emails')
+            .select('status', this.db.raw('COUNT(*) as count'))
+            .where('created_at', '>=', cutoff)
+            .groupBy('status'),
+
+          // Log level breakdown
+          this.db('server_stats_logs')
+            .select('level', this.db.raw('COUNT(*) as count'))
+            .where('created_at', '>=', cutoff)
+            .groupBy('level'),
+
+          // Status code distribution bucketed into 2xx/3xx/4xx/5xx
+          this.db('server_stats_requests')
+            .select(
+              this.db.raw(
+                `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
+              ),
+              this.db.raw(
+                `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
+              ),
+              this.db.raw(
+                `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
+              ),
+              this.db.raw(
+                `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
+              )
+            )
+            .where('created_at', '>=', cutoff)
+            .first(),
+
+          // Slowest queries by avg duration (top 5)
+          this.db('server_stats_queries')
+            .select(
+              'sql_normalized',
+              this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
+              this.db.raw('COUNT(*) as count')
+            )
+            .where('created_at', '>=', cutoff)
+            .groupBy('sql_normalized')
+            .orderBy('avg_duration', 'desc')
+            .limit(5),
+        ])
+
+      // Map top events
+      const topEvents = (topEventsRaw || []).map((r: any) => ({
+        eventName: r.event_name,
+        count: r.count,
+      }))
+
+      // Map email activity
+      const emailActivity = { sent: 0, queued: 0, failed: 0 }
+      for (const row of emailStatusRaw || []) {
+        const status = row.status as string
+        if (status === 'sent') emailActivity.sent = row.count
+        else if (status === 'queued') emailActivity.queued = row.count
+        else if (status === 'failed') emailActivity.failed = row.count
+      }
+
+      // Map log level breakdown
+      const logLevelBreakdown = { error: 0, warn: 0, info: 0, debug: 0 }
+      for (const row of logLevelsRaw || []) {
+        const level = row.level as string
+        if (level in logLevelBreakdown) {
+          logLevelBreakdown[level as keyof typeof logLevelBreakdown] = row.count
+        }
+      }
+
+      // Map status distribution
+      const statusDistribution = {
+        '2xx': statusRaw?.s2xx ?? 0,
+        '3xx': statusRaw?.s3xx ?? 0,
+        '4xx': statusRaw?.s4xx ?? 0,
+        '5xx': statusRaw?.s5xx ?? 0,
+      }
+
+      // Map slowest queries
+      const slowestQueries = (slowQueriesRaw || []).map((r: any) => ({
+        sqlNormalized: r.sql_normalized,
+        avgDuration: r.avg_duration,
+        count: r.count,
+      }))
+
+      return { topEvents, emailActivity, logLevelBreakdown, statusDistribution, slowestQueries }
+    } catch {
+      return empty
+    }
+  }
+
   // =========================================================================
   // Saved filters CRUD
   // =========================================================================

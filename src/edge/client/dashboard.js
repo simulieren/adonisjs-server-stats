@@ -283,6 +283,13 @@
     var slowest = data.slowestEndpoints || [];
     var queryStats = data.queryStats || {};
     var recentErrors = data.recentErrors || [];
+    var topEvents = data.topEvents || [];
+    var emailActivity = data.emailActivity || {};
+    var logLevelBreakdown = data.logLevelBreakdown || {};
+    var cacheStats = data.cacheStats || null;
+    var jobQueueStatus = data.jobQueueStatus || null;
+    var statusDistribution = data.statusDistribution || {};
+    var slowQueries = data.slowestQueries || [];
 
     var avgVal = data.avgResponseTime || 0;
     var p95Val = data.p95ResponseTime || 0;
@@ -325,11 +332,12 @@
 
     // Slowest endpoints
     html += '<div class="ss-dash-secondary-card">';
-    html += '<div class="ss-dash-secondary-card-title">Slowest Endpoints</div>';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#requests" class="ss-dash-widget-link">Slowest Endpoints</a></div>';
     if (slowest.length > 0) {
       html += '<ul class="ss-dash-secondary-list">';
       slowest.forEach(function (ep) {
-        html += '<li><span title="' + esc(ep.url || ep.pattern || '-') + '">' + esc(ep.url || ep.pattern || '-') + '</span><span class="ss-dash-secondary-list-value ss-dash-duration ' + durationClass(ep.avgDuration || 0) + '">' + (ep.avgDuration || 0).toFixed(1) + 'ms</span></li>';
+        var epUrl = ep.url || ep.pattern || '-';
+        html += '<li><a href="#requests?url=' + encodeURIComponent(epUrl) + '" class="ss-dash-widget-row-link"><span title="' + esc(epUrl) + '">' + esc(epUrl) + '</span><span class="ss-dash-secondary-list-value ss-dash-duration ' + durationClass(ep.avgDuration || 0) + '">' + (ep.avgDuration || 0).toFixed(1) + 'ms</span></a></li>';
       });
       html += '</ul>';
     } else {
@@ -339,7 +347,7 @@
 
     // Query stats
     html += '<div class="ss-dash-secondary-card">';
-    html += '<div class="ss-dash-secondary-card-title">Query Stats</div>';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#queries" class="ss-dash-widget-link">Query Stats</a></div>';
     html += '<ul class="ss-dash-secondary-list">';
     html += '<li><span>Total Queries</span><span class="ss-dash-secondary-list-value">' + (queryStats.total || 0) + '</span></li>';
     html += '<li><span>Avg Duration</span><span class="ss-dash-secondary-list-value">' + (queryStats.avgDuration || 0).toFixed(1) + 'ms</span></li>';
@@ -349,15 +357,104 @@
 
     // Recent errors
     html += '<div class="ss-dash-secondary-card">';
-    html += '<div class="ss-dash-secondary-card-title">Recent Errors</div>';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#logs?level=error" class="ss-dash-widget-link">Recent Errors</a></div>';
     if (recentErrors.length > 0) {
       html += '<ul class="ss-dash-secondary-list">';
       recentErrors.forEach(function (err) {
-        html += '<li><span style="color:var(--ss-red-fg)" title="' + esc(err.message || '') + '">' + esc(err.message || '') + '</span><span class="ss-dash-secondary-list-value">' + timeAgo(err.createdAt || err.created_at || err.timestamp) + '</span></li>';
+        html += '<li><a href="#logs?id=' + encodeURIComponent(err.id || '') + '" class="ss-dash-widget-row-link"><span style="color:var(--ss-red-fg)" title="' + esc(err.message || '') + '">' + esc(err.message || '') + '</span><span class="ss-dash-secondary-list-value">' + timeAgo(err.createdAt || err.created_at || err.timestamp) + '</span></a></li>';
       });
       html += '</ul>';
     } else {
       html += '<div class="ss-dash-empty" style="min-height:60px">No recent errors</div>';
+    }
+    html += '</div>';
+
+    // Top Events
+    html += '<div class="ss-dash-secondary-card">';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#events" class="ss-dash-widget-link">Top Events</a></div>';
+    if (topEvents.length > 0) {
+      html += '<ul class="ss-dash-secondary-list">';
+      topEvents.slice(0, 5).forEach(function (ev) {
+        html += '<li><a href="#events?event_name=' + encodeURIComponent(ev.name || ev.event || '') + '" class="ss-dash-widget-row-link"><span title="' + esc(ev.name || ev.event || '') + '">' + esc(ev.name || ev.event || '') + '</span><span class="ss-dash-secondary-list-value">' + (ev.count || 0) + '</span></a></li>';
+      });
+      html += '</ul>';
+    } else {
+      html += '<div class="ss-dash-empty" style="min-height:60px">No events yet</div>';
+    }
+    html += '</div>';
+
+    // Email Activity
+    html += '<div class="ss-dash-secondary-card">';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#emails" class="ss-dash-widget-link">Email Activity</a></div>';
+    html += '<ul class="ss-dash-secondary-list">';
+    html += '<li><a href="#emails?status=sent" class="ss-dash-widget-row-link"><span>Sent</span><span class="ss-dash-secondary-list-value">' + (emailActivity.sent || 0) + '</span></a></li>';
+    html += '<li><a href="#emails?status=queued" class="ss-dash-widget-row-link"><span>Queued</span><span class="ss-dash-secondary-list-value">' + (emailActivity.queued || 0) + '</span></a></li>';
+    html += '<li><a href="#emails?status=failed" class="ss-dash-widget-row-link"><span>Failed</span><span class="ss-dash-secondary-list-value">' + (emailActivity.failed || 0) + '</span></a></li>';
+    html += '</ul>';
+    html += '</div>';
+
+    // Log Level Breakdown
+    html += '<div class="ss-dash-secondary-card">';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#logs" class="ss-dash-widget-link">Log Levels</a></div>';
+    html += '<ul class="ss-dash-secondary-list">';
+    html += '<li><a href="#logs?level=error" class="ss-dash-widget-row-link"><span style="color:var(--ss-red-fg)">Error</span><span class="ss-dash-secondary-list-value">' + (logLevelBreakdown.error || 0) + '</span></a></li>';
+    html += '<li><a href="#logs?level=warn" class="ss-dash-widget-row-link"><span style="color:var(--ss-amber-fg)">Warn</span><span class="ss-dash-secondary-list-value">' + (logLevelBreakdown.warn || 0) + '</span></a></li>';
+    html += '<li><a href="#logs?level=info" class="ss-dash-widget-row-link"><span style="color:var(--ss-green-fg)">Info</span><span class="ss-dash-secondary-list-value">' + (logLevelBreakdown.info || 0) + '</span></a></li>';
+    html += '<li><a href="#logs?level=debug" class="ss-dash-widget-row-link"><span style="color:var(--ss-muted)">Debug</span><span class="ss-dash-secondary-list-value">' + (logLevelBreakdown.debug || 0) + '</span></a></li>';
+    html += '</ul>';
+    html += '</div>';
+
+    // Cache Stats
+    html += '<div class="ss-dash-secondary-card">';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#cache" class="ss-dash-widget-link">Cache</a></div>';
+    if (cacheStats) {
+      html += '<div class="ss-dash-widget-stat"><span class="ss-dash-widget-stat-label">Connected</span><span class="ss-dash-widget-stat-value" style="color:var(--ss-green-fg)">\u2713</span></div>';
+      html += '<div class="ss-dash-widget-stat"><span class="ss-dash-widget-stat-label">Total Keys</span><span class="ss-dash-widget-stat-value">' + (cacheStats.totalKeys || 0) + '</span></div>';
+      html += '<div class="ss-dash-widget-stat"><span class="ss-dash-widget-stat-label">Hit Rate</span><span class="ss-dash-widget-stat-value">' + (cacheStats.hitRate || 0).toFixed(1) + '%</span></div>';
+      html += '<div class="ss-dash-widget-stat"><span class="ss-dash-widget-stat-label">Memory</span><span class="ss-dash-widget-stat-value">' + esc(cacheStats.memory || '-') + '</span></div>';
+    } else {
+      html += '<div class="ss-dash-empty" style="min-height:60px">Not available</div>';
+    }
+    html += '</div>';
+
+    // Job Queue
+    html += '<div class="ss-dash-secondary-card">';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#jobs" class="ss-dash-widget-link">Job Queue</a></div>';
+    if (jobQueueStatus) {
+      html += '<ul class="ss-dash-secondary-list">';
+      html += '<li><a href="#jobs?status=active" class="ss-dash-widget-row-link"><span>Active</span><span class="ss-dash-secondary-list-value">' + (jobQueueStatus.active || 0) + '</span></a></li>';
+      html += '<li><a href="#jobs?status=waiting" class="ss-dash-widget-row-link"><span>Waiting</span><span class="ss-dash-secondary-list-value">' + (jobQueueStatus.waiting || 0) + '</span></a></li>';
+      html += '<li><a href="#jobs?status=failed" class="ss-dash-widget-row-link"><span>Failed</span><span class="ss-dash-secondary-list-value">' + (jobQueueStatus.failed || 0) + '</span></a></li>';
+      html += '<li><a href="#jobs?status=completed" class="ss-dash-widget-row-link"><span>Completed</span><span class="ss-dash-secondary-list-value">' + (jobQueueStatus.completed || 0) + '</span></a></li>';
+      html += '</ul>';
+    } else {
+      html += '<div class="ss-dash-empty" style="min-height:60px">Not available</div>';
+    }
+    html += '</div>';
+
+    // Response Status
+    html += '<div class="ss-dash-secondary-card">';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#requests" class="ss-dash-widget-link">Response Status</a></div>';
+    html += '<ul class="ss-dash-secondary-list">';
+    html += '<li><a href="#requests?status=2xx" class="ss-dash-widget-row-link"><span style="color:var(--ss-green-fg)">2xx</span><span class="ss-dash-secondary-list-value">' + (statusDistribution['2xx'] || 0) + '</span></a></li>';
+    html += '<li><a href="#requests?status=3xx" class="ss-dash-widget-row-link"><span style="color:var(--ss-blue-fg)">3xx</span><span class="ss-dash-secondary-list-value">' + (statusDistribution['3xx'] || 0) + '</span></a></li>';
+    html += '<li><a href="#requests?status=4xx" class="ss-dash-widget-row-link"><span style="color:var(--ss-amber-fg)">4xx</span><span class="ss-dash-secondary-list-value">' + (statusDistribution['4xx'] || 0) + '</span></a></li>';
+    html += '<li><a href="#requests?status=5xx" class="ss-dash-widget-row-link"><span style="color:var(--ss-red-fg)">5xx</span><span class="ss-dash-secondary-list-value">' + (statusDistribution['5xx'] || 0) + '</span></a></li>';
+    html += '</ul>';
+    html += '</div>';
+
+    // Slowest Queries
+    html += '<div class="ss-dash-secondary-card">';
+    html += '<div class="ss-dash-secondary-card-title"><a href="#queries" class="ss-dash-widget-link">Slowest Queries</a></div>';
+    if (slowQueries.length > 0) {
+      html += '<ul class="ss-dash-secondary-list">';
+      slowQueries.slice(0, 5).forEach(function (q) {
+        var sql = q.normalizedSql || q.sql || '-';
+        html += '<li><a href="#queries" class="ss-dash-widget-row-link"><span title="' + esc(sql) + '">' + esc(sql) + '</span><span class="ss-dash-secondary-list-value ss-dash-duration ' + durationClass(q.avgDuration || 0) + '">' + (q.avgDuration || 0).toFixed(1) + 'ms</span></a></li>';
+      });
+      html += '</ul>';
+    } else {
+      html += '<div class="ss-dash-empty" style="min-height:60px">No queries yet</div>';
     }
     html += '</div>';
 
@@ -637,9 +734,17 @@
   };
 
   // ── Requests ──────────────────────────────────────────────────
+  var requestUrlFilter = '';
+  var requestStatusFilter = '';
+
   var fetchRequests = function () {
     var ps = getPage('requests');
-    fetchJSON(API + '/requests?page=' + ps.page + '&limit=' + PER_PAGE)
+    var url = API + '/requests?page=' + ps.page + '&limit=' + PER_PAGE;
+    if (requestUrlFilter) url += '&url=' + encodeURIComponent(requestUrlFilter);
+    if (requestStatusFilter) url += '&status=' + encodeURIComponent(requestStatusFilter);
+    requestUrlFilter = '';
+    requestStatusFilter = '';
+    fetchJSON(url)
       .then(function (data) { renderRequests(data); })
       .catch(function () { setInner('ss-dash-requests-body', '<div class="ss-dash-empty">Failed to load requests</div>'); });
   };
@@ -978,9 +1083,14 @@
   }
 
   // ── Events ────────────────────────────────────────────────────
+  var eventNameFilter = '';
+
   var fetchEvents = function () {
     var ps = getPage('events');
-    fetchJSON(API + '/events?page=' + ps.page + '&limit=' + PER_PAGE)
+    var url = API + '/events?page=' + ps.page + '&limit=' + PER_PAGE;
+    if (eventNameFilter) url += '&event_name=' + encodeURIComponent(eventNameFilter);
+    eventNameFilter = '';
+    fetchJSON(url)
       .then(function (data) { renderEvents(data); })
       .catch(function () { setInner('ss-dash-events-body', '<div class="ss-dash-empty">Failed to load events</div>'); });
   };
@@ -1073,12 +1183,17 @@
   // ── Logs ──────────────────────────────────────────────────────
   var logLevelFilter = 'all';
   var logReqIdFilter = '';
+  var logDeepLevelFilter = '';
   var logStructuredFilters = [];
   var logSavedFilters = [];
 
   var fetchLogs = function () {
     var ps = getPage('logs');
     var params = 'page=' + ps.page + '&limit=' + PER_PAGE;
+    if (logDeepLevelFilter) {
+      logLevelFilter = logDeepLevelFilter;
+      logDeepLevelFilter = '';
+    }
     if (logLevelFilter !== 'all') params += '&level=' + logLevelFilter;
     if (logReqIdFilter) params += '&request_id=' + encodeURIComponent(logReqIdFilter);
     logStructuredFilters.forEach(function (f) {
@@ -1290,9 +1405,14 @@
   fetchSavedFilters();
 
   // ── Emails ────────────────────────────────────────────────────
+  var emailStatusFilter = '';
+
   var fetchEmails = function () {
     var ps = getPage('emails');
-    fetchJSON(API + '/emails?page=' + ps.page + '&limit=' + PER_PAGE)
+    var url = API + '/emails?page=' + ps.page + '&limit=' + PER_PAGE;
+    if (emailStatusFilter) url += '&status=' + encodeURIComponent(emailStatusFilter);
+    emailStatusFilter = '';
+    fetchJSON(url)
       .then(function (data) { renderEmails(data); })
       .catch(function () { setInner('ss-dash-emails-body', '<div class="ss-dash-empty">Failed to load emails</div>'); });
   };
@@ -2337,6 +2457,33 @@
     return { section: section, params: params };
   };
 
+  var applyRouteParams = function (route) {
+    var section = route.section;
+    if (route.params.requestId && section === 'logs') {
+      logReqIdFilter = route.params.requestId;
+      var input = document.getElementById('ss-dash-log-reqid-input');
+      if (input) input.value = logReqIdFilter;
+    }
+    if (route.params.level && section === 'logs') {
+      logDeepLevelFilter = route.params.level;
+    }
+    if (route.params.url && section === 'requests') {
+      requestUrlFilter = route.params.url;
+    }
+    if (route.params.status && section === 'requests') {
+      requestStatusFilter = route.params.status;
+    }
+    if (route.params.status && section === 'emails') {
+      emailStatusFilter = route.params.status;
+    }
+    if (route.params.event_name && section === 'events') {
+      eventNameFilter = route.params.event_name;
+    }
+    if (route.params.status && section === 'jobs') {
+      jobStatusFilter = route.params.status;
+    }
+  };
+
   var initRoute = function () {
     var route = parseHash();
     var section = route.section;
@@ -2347,11 +2494,7 @@
     if (valid.indexOf(section) === -1) section = 'overview';
 
     // Apply deep link params
-    if (route.params.requestId && section === 'logs') {
-      logReqIdFilter = route.params.requestId;
-      var input = document.getElementById('ss-dash-log-reqid-input');
-      if (input) input.value = logReqIdFilter;
-    }
+    applyRouteParams({ section: section, params: route.params });
 
     // Switch to section
     activeSection = section;
@@ -2368,7 +2511,11 @@
   window.addEventListener('hashchange', function () {
     var route = parseHash();
     if (route.section !== activeSection) {
+      applyRouteParams(route);
       switchSection(route.section);
+    } else if (Object.keys(route.params).length > 0) {
+      applyRouteParams(route);
+      loadSection(activeSection);
     }
   });
 

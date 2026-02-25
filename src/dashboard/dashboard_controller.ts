@@ -100,7 +100,10 @@ export default class DashboardController {
       const range = request.qs().range || '1h'
 
       // Use getOverviewMetrics for accurate stats (computed from raw requests)
-      const overview = await this.dashboardStore.getOverviewMetrics(range)
+      const [overview, widgets] = await Promise.all([
+        this.dashboardStore.getOverviewMetrics(range),
+        this.dashboardStore.getOverviewWidgets(range),
+      ])
       if (!overview) return response.json(emptyOverview())
 
       // Add sparklines from the pre-aggregated metrics table
@@ -110,6 +113,41 @@ export default class DashboardController {
         .orderBy('bucket', 'asc')
 
       const sparklineData = metrics.slice(-15)
+
+      // Fetch cache and queue stats (non-blocking — null if unavailable)
+      let cacheStats: { available: boolean; totalKeys: number; hitRate: number; memoryUsedHuman: string } | null = null
+      let jobQueueStatus: { available: boolean; active: number; waiting: number; failed: number; completed: number } | null = null
+
+      try {
+        const cacheInspector = await this.getCacheInspector()
+        if (cacheInspector) {
+          const stats = await cacheInspector.getStats()
+          cacheStats = {
+            available: true,
+            totalKeys: stats.totalKeys,
+            hitRate: stats.hitRate,
+            memoryUsedHuman: stats.memoryUsedHuman,
+          }
+        }
+      } catch {
+        // Cache not available
+      }
+
+      try {
+        const queueInspector = await this.getQueueInspector()
+        if (queueInspector) {
+          const qOverview = await queueInspector.getOverview()
+          jobQueueStatus = {
+            available: true,
+            active: qOverview.active,
+            waiting: qOverview.waiting,
+            failed: qOverview.failed,
+            completed: qOverview.completed,
+          }
+        }
+      } catch {
+        // Queue not available
+      }
 
       return response.json({
         ...overview,
@@ -121,6 +159,9 @@ export default class DashboardController {
             m.request_count > 0 ? round((m.error_count / m.request_count) * 100) : 0
           ),
         },
+        ...widgets,
+        cacheStats,
+        jobQueueStatus,
       })
     } catch {
       return response.json(emptyOverview())
@@ -1043,6 +1084,13 @@ function emptyOverview() {
     slowestEndpoints: [],
     queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
     recentErrors: [],
+    topEvents: [],
+    emailActivity: { sent: 0, queued: 0, failed: 0 },
+    logLevelBreakdown: { error: 0, warn: 0, info: 0, debug: 0 },
+    statusDistribution: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 },
+    slowestQueries: [],
+    cacheStats: null,
+    jobQueueStatus: null,
   }
 }
 
