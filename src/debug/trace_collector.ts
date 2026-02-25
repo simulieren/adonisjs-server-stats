@@ -1,6 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { performance } from 'node:perf_hooks'
+
+import { round } from '../utils/math_helpers.js'
 import { RingBuffer } from './ring_buffer.js'
+
 import type { TraceSpan, TraceRecord } from './types.js'
 
 /**
@@ -82,7 +85,7 @@ export class TraceCollector {
       method,
       url,
       statusCode,
-      totalDuration: Math.round(totalDuration * 100) / 100,
+      totalDuration: round(totalDuration),
       spanCount: ctx.spans.length,
       spans: ctx.spans,
       warnings: ctx.warnings,
@@ -109,18 +112,14 @@ export class TraceCollector {
       parentId: ctx.currentSpanId,
       label,
       category,
-      startOffset: Math.round(startOffset * 100) / 100,
-      duration: Math.round(duration * 100) / 100,
+      startOffset: round(startOffset),
+      duration: round(duration),
       metadata,
     })
   }
 
   /** Wrap a function in a traced span with automatic nesting. */
-  async span<T>(
-    label: string,
-    category: TraceSpan['category'],
-    fn: () => Promise<T>
-  ): Promise<T> {
+  async span<T>(label: string, category: TraceSpan['category'], fn: () => Promise<T>): Promise<T> {
     const ctx = this.als.getStore()
     if (!ctx) return fn()
 
@@ -138,8 +137,8 @@ export class TraceCollector {
         parentId,
         label,
         category,
-        startOffset: Math.round((start - ctx.requestStart) * 100) / 100,
-        duration: Math.round(duration * 100) / 100,
+        startOffset: round(start - ctx.requestStart),
+        duration: round(duration),
       })
       ctx.currentSpanId = parentId
     }

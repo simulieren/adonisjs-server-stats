@@ -1,4 +1,6 @@
+import { extractAddresses } from '../utils/mail_helpers.js'
 import { RingBuffer } from './ring_buffer.js'
+
 import type { EmailRecord } from './types.js'
 
 /**
@@ -31,7 +33,7 @@ export class EmailCollector {
 
     const onSent = (data: any) => {
       const msg = data?.message || data
-      const to = this.extractAddresses(msg?.to)
+      const to = extractAddresses(msg?.to)
       const subject = msg?.subject || ''
 
       // Try to find the matching 'sending' record and update it
@@ -107,17 +109,13 @@ export class EmailCollector {
     this.buffer.clear()
   }
 
-  private buildRecord(
-    msg: any,
-    status: EmailRecord['status'],
-    data: any
-  ): EmailRecord {
+  private buildRecord(msg: any, status: EmailRecord['status'], data: any): EmailRecord {
     return {
       id: this.buffer.getNextId(),
-      from: this.extractAddresses(msg?.from) || 'unknown',
-      to: this.extractAddresses(msg?.to) || 'unknown',
-      cc: this.extractAddresses(msg?.cc) || null,
-      bcc: this.extractAddresses(msg?.bcc) || null,
+      from: extractAddresses(msg?.from) || 'unknown',
+      to: extractAddresses(msg?.to) || 'unknown',
+      cc: extractAddresses(msg?.cc) || null,
+      bcc: extractAddresses(msg?.bcc) || null,
       subject: msg?.subject || '(no subject)',
       html: msg?.html || null,
       text: msg?.text || null,
@@ -129,36 +127,15 @@ export class EmailCollector {
     }
   }
 
-  /**
-   * Normalize various address formats to a comma-separated string.
-   *
-   * AdonisJS mail addresses can be:
-   * - A string: `"user@example.com"`
-   * - An object: `{ address: "user@example.com", name: "User" }`
-   * - An array of strings or objects
-   */
   /** Register a callback that fires whenever a new email is recorded. */
   onNewItem(cb: ((item: EmailRecord) => void) | null): void {
-    this.buffer.onPush(cb);
+    this.buffer.onPush(cb)
   }
 
   /** Restore persisted records into the buffer and reset the ID counter. */
   loadRecords(records: EmailRecord[]): void {
-    this.buffer.load(records);
-    const maxId = records.reduce((m, r) => Math.max(m, r.id), 0);
-    this.buffer.setNextId(maxId + 1);
-  }
-
-  private extractAddresses(value: any): string {
-    if (!value) return ''
-    if (typeof value === 'string') return value
-    if (Array.isArray(value)) {
-      return value
-        .map((v: any) => (typeof v === 'string' ? v : v?.address || ''))
-        .filter(Boolean)
-        .join(', ')
-    }
-    if (typeof value === 'object' && value.address) return value.address
-    return ''
+    this.buffer.load(records)
+    const maxId = records.reduce((m, r) => Math.max(m, r.id), 0)
+    this.buffer.setNextId(maxId + 1)
   }
 }

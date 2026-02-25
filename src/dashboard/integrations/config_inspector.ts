@@ -32,8 +32,8 @@ export interface SanitizedEnvVars {
  * in regex, so `\b` won't match between `CLIENT` and `SECRET` in
  * `GOOGLE_CLIENT_SECRET`.
  */
-const B = '(?:^|[_.\\-])'  // boundary before
-const A = '(?:$|[_.\\-])'  // boundary after
+const B = '(?:^|[_.\\-])' // boundary before
+const A = '(?:$|[_.\\-])' // boundary after
 
 const SENSITIVE_PATTERNS: RegExp[] = [
   new RegExp(`${B}password${A}`, 'i'),

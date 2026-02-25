@@ -4,7 +4,8 @@
  */
 
 /* ── Theme: Dark (default) ────────────────────────────────────── */
-.ss-bar, .ss-toggle {
+.ss-bar,
+.ss-toggle {
   --ss-bg-deep: #0a0a0a;
   --ss-surface: #171717;
   --ss-surface-alt: #141414;
@@ -19,17 +20,17 @@
   --ss-border: #333;
   --ss-border-dim: #262626;
   --ss-border-strong: #404040;
-  --ss-hover: rgba(38,38,38,0.4);
-  --ss-hover-subtle: rgba(38,38,38,0.25);
+  --ss-hover: rgba(38, 38, 38, 0.4);
+  --ss-hover-subtle: rgba(38, 38, 38, 0.25);
   --ss-shadow: rgb(0 0 0 / 0.15);
   --ss-tooltip-bg: #262626;
-  --ss-tooltip-border: rgba(255,255,255,0.1);
+  --ss-tooltip-border: rgba(255, 255, 255, 0.1);
 }
 
 /* ── Theme: Light (auto via system preference) ────────────────── */
 @media (prefers-color-scheme: light) {
-  .ss-bar:not([data-ss-theme="dark"]),
-  .ss-toggle:not([data-ss-theme="dark"]) {
+  .ss-bar:not([data-ss-theme='dark']),
+  .ss-toggle:not([data-ss-theme='dark']) {
     --ss-bg-deep: #f0f0f0;
     --ss-surface: #ffffff;
     --ss-surface-alt: #f5f5f5;
@@ -44,17 +45,17 @@
     --ss-border: #e5e5e5;
     --ss-border-dim: #e5e5e5;
     --ss-border-strong: #d4d4d4;
-    --ss-hover: rgba(0,0,0,0.04);
-    --ss-hover-subtle: rgba(0,0,0,0.02);
+    --ss-hover: rgba(0, 0, 0, 0.04);
+    --ss-hover-subtle: rgba(0, 0, 0, 0.02);
     --ss-shadow: rgb(0 0 0 / 0.06);
     --ss-tooltip-bg: #ffffff;
-    --ss-tooltip-border: rgba(0,0,0,0.1);
+    --ss-tooltip-border: rgba(0, 0, 0, 0.1);
   }
 }
 
 /* ── Theme: Light (manual override) ───────────────────────────── */
-.ss-bar[data-ss-theme="light"],
-.ss-toggle[data-ss-theme="light"] {
+.ss-bar[data-ss-theme='light'],
+.ss-toggle[data-ss-theme='light'] {
   --ss-bg-deep: #f0f0f0;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;
@@ -69,11 +70,11 @@
   --ss-border: #e5e5e5;
   --ss-border-dim: #e5e5e5;
   --ss-border-strong: #d4d4d4;
-  --ss-hover: rgba(0,0,0,0.04);
-  --ss-hover-subtle: rgba(0,0,0,0.02);
+  --ss-hover: rgba(0, 0, 0, 0.04);
+  --ss-hover-subtle: rgba(0, 0, 0, 0.02);
   --ss-shadow: rgb(0 0 0 / 0.06);
   --ss-tooltip-bg: #ffffff;
-  --ss-tooltip-border: rgba(0,0,0,0.1);
+  --ss-tooltip-border: rgba(0, 0, 0, 0.1);
 }
 
 .ss-bar {
@@ -88,9 +89,13 @@
   background: var(--ss-bg-deep);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: var(--ss-text-secondary);
-  box-shadow: 0 -4px 6px -1px var(--ss-shadow), 0 -2px 4px -2px var(--ss-shadow);
+  box-shadow:
+    0 -4px 6px -1px var(--ss-shadow),
+    0 -2px 4px -2px var(--ss-shadow);
 }
-.ss-bar.ss-hidden { display: none; }
+.ss-bar.ss-hidden {
+  display: none;
+}
 
 .ss-bar-left {
   display: flex;
@@ -111,7 +116,9 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-.ss-bar-scroll::-webkit-scrollbar { display: none; }
+.ss-bar-scroll::-webkit-scrollbar {
+  display: none;
+}
 
 .ss-group {
   display: flex;
@@ -142,8 +149,12 @@
 .ss-badge-link {
   cursor: pointer;
 }
-.ss-badge:hover { background: var(--ss-hover); }
-.ss-badge.ss-pinned { background: var(--ss-hover); }
+.ss-badge:hover {
+  background: var(--ss-hover);
+}
+.ss-badge.ss-pinned {
+  background: var(--ss-hover);
+}
 
 .ss-label {
   font-size: 10px;
@@ -165,12 +176,22 @@
   background: var(--ss-accent);
   flex-shrink: 0;
 }
-.ss-dot.ss-stale { background: var(--ss-amber-fg); }
+.ss-dot.ss-stale {
+  background: var(--ss-amber-fg);
+}
 
-.ss-green { color: var(--ss-accent); }
-.ss-amber { color: var(--ss-amber-fg); }
-.ss-red { color: var(--ss-red-fg); }
-.ss-muted { color: var(--ss-muted); }
+.ss-green {
+  color: var(--ss-accent);
+}
+.ss-amber {
+  color: var(--ss-amber-fg);
+}
+.ss-red {
+  color: var(--ss-red-fg);
+}
+.ss-muted {
+  color: var(--ss-muted);
+}
 
 /* Toggle button */
 .ss-toggle {
@@ -189,14 +210,20 @@
   text-transform: uppercase;
   color: var(--ss-text-secondary);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 .ss-toggle:hover {
   border-color: var(--ss-dim);
   color: var(--ss-text-bright);
 }
-.ss-toggle.ss-visible { bottom: 36px; }
-.ss-toggle.ss-collapsed { bottom: 12px; }
+.ss-toggle.ss-visible {
+  bottom: 36px;
+}
+.ss-toggle.ss-collapsed {
+  bottom: 12px;
+}
 
 .ss-toggle-summary {
   display: flex;
@@ -242,7 +269,9 @@
   line-height: 1;
   font-family: inherit;
 }
-.ss-tooltip-close:hover { color: var(--ss-text-bright); }
+.ss-tooltip-close:hover {
+  color: var(--ss-text-bright);
+}
 .ss-tooltip-header {
   display: flex;
   align-items: baseline;
@@ -261,8 +290,13 @@
   margin-top: 6px;
   font-variant-numeric: tabular-nums;
 }
-.ss-tooltip-current-label { color: var(--ss-text-secondary); }
-.ss-tooltip-current-value { font-weight: 600; color: var(--ss-text-bright); }
+.ss-tooltip-current-label {
+  color: var(--ss-text-secondary);
+}
+.ss-tooltip-current-value {
+  font-weight: 600;
+  color: var(--ss-text-bright);
+}
 .ss-tooltip-stats {
   margin-top: 4px;
   display: flex;

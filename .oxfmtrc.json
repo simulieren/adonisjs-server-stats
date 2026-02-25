@@ -1,0 +1,24 @@
+{
+  "semi": false,
+  "singleQuote": true,
+  "useTabs": false,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "printWidth": 100,
+  "trailingComma": "es5",
+  "endOfLine": "lf",
+  "insertFinalNewline": true,
+  "ignorePatterns": ["dist/**"],
+  "sortImports": {
+    "groups": [
+      "builtin",
+      "external",
+      ["internal", "subpath"],
+      ["parent", "sibling", "index"],
+      "type"
+    ],
+    "newlinesBetween": true,
+    "ignoreCase": true
+  },
+  "sortPackageJson": true
+}

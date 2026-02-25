@@ -1,7 +1,7 @@
 import { configProvider } from '@adonisjs/core'
 
-import type { ConfigProvider } from '@adonisjs/core/types'
 import type { ServerStats } from '../types.js'
+import type { ConfigProvider } from '@adonisjs/core/types'
 
 export function serverStatsCollector(): ConfigProvider<any> {
   return configProvider.create(async (app) => {
@@ -176,7 +176,8 @@ export function serverStatsCollector(): ConfigProvider<any> {
         if (stats.dbPoolMax !== undefined) this.dbPoolMax.set(stats.dbPoolMax)
 
         if (stats.redisOk !== undefined) this.redisUp.set(stats.redisOk ? 1 : 0)
-        if (stats.redisMemoryUsedMb !== undefined) this.redisMemoryUsedMb.set(stats.redisMemoryUsedMb)
+        if (stats.redisMemoryUsedMb !== undefined)
+          this.redisMemoryUsedMb.set(stats.redisMemoryUsedMb)
         if (stats.redisConnectedClients !== undefined)
           this.redisConnectedClients.set(stats.redisConnectedClients)
         if (stats.redisKeysCount !== undefined) this.redisKeysCount.set(stats.redisKeysCount)
@@ -209,6 +210,8 @@ export function serverStatsCollector(): ConfigProvider<any> {
   })
 }
 
-export const ServerStatsCollector: { instance: { update(stats: Partial<ServerStats>): void } | null } = {
+export const ServerStatsCollector: {
+  instance: { update(stats: Partial<ServerStats>): void } | null
+} = {
   instance: null,
 }

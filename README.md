@@ -19,16 +19,16 @@ Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 
 **Debug toolbar** -- expandable panels for deep inspection:
 
-| Queries | Events |
-|---------|--------|
+| Queries                                                                                                                                                                  | Events                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | ![Queries panel showing SQL queries with duration and model info](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/debug-queries.png) | ![Events panel showing application events with payload data](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/debug-events.png) |
 
-| Routes | Logs |
-|--------|------|
+| Routes                                                                                                                                                            | Logs                                                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ![Routes panel showing all registered routes with handlers](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/debug-routes.png) | ![Logs panel with level filtering and request ID correlation](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/debug-logs.png) |
 
-| Emails (custom pane) |
-|----------------------|
+| Emails (custom pane)                                                                                                                                           |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | ![Emails panel showing sent emails with delivery status](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/debug-emails.png) |
 
 ## Features
@@ -74,9 +74,7 @@ providers: [
 
 ```ts
 // start/kernel.ts
-server.use([
-  () => import('adonisjs-server-stats/middleware'),
-])
+server.use([() => import('adonisjs-server-stats/middleware')])
 ```
 
 ### 3. Create config
@@ -87,11 +85,7 @@ import { defineConfig } from 'adonisjs-server-stats'
 import { processCollector, systemCollector, httpCollector } from 'adonisjs-server-stats/collectors'
 
 export default defineConfig({
-  collectors: [
-    processCollector(),
-    systemCollector(),
-    httpCollector(),
-  ],
+  collectors: [processCollector(), systemCollector(), httpCollector()],
 })
 ```
 
@@ -184,7 +178,7 @@ import type { StatsEngine } from 'adonisjs-server-stats'
 
 export default class ServerStatsController {
   async index({ response }: HttpContext) {
-    const engine = await app.container.make('server_stats.engine') as StatsEngine
+    const engine = (await app.container.make('server_stats.engine')) as StatsEngine
     return response.json(engine.getLatestStats())
   }
 }
@@ -204,36 +198,36 @@ export default class ServerStatsController {
 
 ### `ServerStatsConfig`
 
-| Option        | Type                   | Default                     | Description                                |
-|---------------|------------------------|-----------------------------|--------------------------------------------|
-| `intervalMs`  | `number`               | `3000`                      | Collection + broadcast interval (ms)       |
-| `transport`   | `'transmit' \| 'none'` | `'transmit'`                | SSE transport. `'none'` = poll-only.       |
-| `channelName` | `string`               | `'admin/server-stats'`      | Transmit channel name                      |
-| `endpoint`    | `string \| false`      | `'/admin/api/server-stats'` | HTTP endpoint. `false` to disable.         |
-| `collectors`  | `MetricCollector[]`    | `[]`                        | Array of collector instances                |
-| `skipInTest`  | `boolean`              | `true`                      | Skip collection during tests               |
-| `onStats`     | `(stats) => void`      | --                          | Callback after each collection tick        |
-| `shouldShow`  | `(ctx) => boolean`     | --                          | Per-request visibility guard               |
-| `devToolbar`  | `DevToolbarOptions`    | --                          | Dev toolbar configuration                  |
+| Option        | Type                   | Default                     | Description                          |
+| ------------- | ---------------------- | --------------------------- | ------------------------------------ |
+| `intervalMs`  | `number`               | `3000`                      | Collection + broadcast interval (ms) |
+| `transport`   | `'transmit' \| 'none'` | `'transmit'`                | SSE transport. `'none'` = poll-only. |
+| `channelName` | `string`               | `'admin/server-stats'`      | Transmit channel name                |
+| `endpoint`    | `string \| false`      | `'/admin/api/server-stats'` | HTTP endpoint. `false` to disable.   |
+| `collectors`  | `MetricCollector[]`    | `[]`                        | Array of collector instances         |
+| `skipInTest`  | `boolean`              | `true`                      | Skip collection during tests         |
+| `onStats`     | `(stats) => void`      | --                          | Callback after each collection tick  |
+| `shouldShow`  | `(ctx) => boolean`     | --                          | Per-request visibility guard         |
+| `devToolbar`  | `DevToolbarOptions`    | --                          | Dev toolbar configuration            |
 
 ### `DevToolbarOptions`
 
-| Option                 | Type            | Default | Description                                    |
-|------------------------|-----------------|---------|------------------------------------------------|
-| `enabled`              | `boolean`       | `false` | Enable the dev toolbar                         |
-| `maxQueries`           | `number`        | `500`   | Max SQL queries to buffer                      |
-| `maxEvents`            | `number`        | `200`   | Max events to buffer                           |
-| `maxEmails`            | `number`        | `100`   | Max emails to buffer                           |
-| `slowQueryThresholdMs` | `number`        | `100`   | Slow query threshold (ms)                      |
-| `persistDebugData`     | `boolean \| string` | `false` | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path. |
-| `tracing`              | `boolean`       | `false` | Enable per-request tracing with timeline visualization |
-| `maxTraces`            | `number`        | `200`   | Max request traces to buffer                   |
-| `dashboard`            | `boolean`       | `false` | Enable the full-page dashboard (requires `better-sqlite3`) |
-| `dashboardPath`        | `string`        | `'/__stats'` | URL path for the dashboard page           |
-| `retentionDays`        | `number`        | `7`     | Days to keep historical data in SQLite         |
-| `dbPath`               | `string`        | `'.adonisjs/server-stats/dashboard.sqlite3'` | Path to the SQLite database file (relative to app root) |
-| `excludeFromTracing`   | `string[]`      | `[]`    | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
-| `panes`                | `DebugPane[]`   | --      | Custom debug panel tabs                        |
+| Option                 | Type                | Default                                      | Description                                                                                                                                                                                                  |
+| ---------------------- | ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`              | `boolean`           | `false`                                      | Enable the dev toolbar                                                                                                                                                                                       |
+| `maxQueries`           | `number`            | `500`                                        | Max SQL queries to buffer                                                                                                                                                                                    |
+| `maxEvents`            | `number`            | `200`                                        | Max events to buffer                                                                                                                                                                                         |
+| `maxEmails`            | `number`            | `100`                                        | Max emails to buffer                                                                                                                                                                                         |
+| `slowQueryThresholdMs` | `number`            | `100`                                        | Slow query threshold (ms)                                                                                                                                                                                    |
+| `persistDebugData`     | `boolean \| string` | `false`                                      | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path.                                                                                |
+| `tracing`              | `boolean`           | `false`                                      | Enable per-request tracing with timeline visualization                                                                                                                                                       |
+| `maxTraces`            | `number`            | `200`                                        | Max request traces to buffer                                                                                                                                                                                 |
+| `dashboard`            | `boolean`           | `false`                                      | Enable the full-page dashboard (requires `better-sqlite3`)                                                                                                                                                   |
+| `dashboardPath`        | `string`            | `'/__stats'`                                 | URL path for the dashboard page                                                                                                                                                                              |
+| `retentionDays`        | `number`            | `7`                                          | Days to keep historical data in SQLite                                                                                                                                                                       |
+| `dbPath`               | `string`            | `'.adonisjs/server-stats/dashboard.sqlite3'` | Path to the SQLite database file (relative to app root)                                                                                                                                                      |
+| `excludeFromTracing`   | `string[]`          | `[]`                                         | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
+| `panes`                | `DebugPane[]`       | --                                           | Custom debug panel tabs                                                                                                                                                                                      |
 
 ---
 
@@ -243,27 +237,27 @@ Each collector is a factory function that returns a `MetricCollector`. All colle
 
 ### Built-in Collectors
 
-| Collector                | Metrics                                                     | Options    | Peer Deps           |
-|--------------------------|-------------------------------------------------------------|------------|---------------------|
-| `processCollector()`     | CPU %, event loop lag, heap/RSS memory, uptime, Node version | none       | --                  |
-| `systemCollector()`      | OS load averages, system memory, system uptime               | none       | --                  |
-| `httpCollector(opts?)`   | Requests/sec, avg response time, error rate, active connections | optional | --                  |
-| `dbPoolCollector(opts?)` | Pool used/free/pending/max connections                       | optional   | `@adonisjs/lucid`   |
-| `redisCollector()`       | Status, memory, clients, keys, hit rate                      | none       | `@adonisjs/redis`   |
-| `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count             | **required** | `bullmq`          |
-| `logCollector(opts)`     | Errors/warnings/entries (5m window), entries/minute           | **required** | --                |
-| `appCollector()`         | Online users, pending webhooks, pending emails               | none       | `@adonisjs/lucid`   |
+| Collector                | Metrics                                                         | Options      | Peer Deps         |
+| ------------------------ | --------------------------------------------------------------- | ------------ | ----------------- |
+| `processCollector()`     | CPU %, event loop lag, heap/RSS memory, uptime, Node version    | none         | --                |
+| `systemCollector()`      | OS load averages, system memory, system uptime                  | none         | --                |
+| `httpCollector(opts?)`   | Requests/sec, avg response time, error rate, active connections | optional     | --                |
+| `dbPoolCollector(opts?)` | Pool used/free/pending/max connections                          | optional     | `@adonisjs/lucid` |
+| `redisCollector()`       | Status, memory, clients, keys, hit rate                         | none         | `@adonisjs/redis` |
+| `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count                | **required** | `bullmq`          |
+| `logCollector(opts)`     | Errors/warnings/entries (5m window), entries/minute             | **required** | --                |
+| `appCollector()`         | Online users, pending webhooks, pending emails                  | none         | `@adonisjs/lucid` |
 
 ### Collector Options
 
 ```ts
 httpCollector({
-  maxRecords: 10_000,  // Circular buffer size (default: 10,000)
-  windowMs: 60_000,    // Rolling window for rate calc (default: 60s)
+  maxRecords: 10_000, // Circular buffer size (default: 10,000)
+  windowMs: 60_000, // Rolling window for rate calc (default: 60s)
 })
 
 dbPoolCollector({
-  connectionName: 'postgres',  // Lucid connection name (default: 'postgres')
+  connectionName: 'postgres', // Lucid connection name (default: 'postgres')
 })
 
 queueCollector({
@@ -305,7 +299,7 @@ function diskCollector(): MetricCollector {
 export default defineConfig({
   collectors: [
     processCollector(),
-    diskCollector(),  // mix with built-in collectors
+    diskCollector(), // mix with built-in collectors
   ],
 })
 ```
@@ -369,6 +363,7 @@ The `@serverStats()` Edge tag renders a self-contained stats bar with inline HTM
 ```
 
 Features:
+
 - Polls the stats API at the configured interval
 - Color-coded thresholds (green/amber/red)
 - SVG sparkline charts with gradient fills
@@ -392,8 +387,8 @@ export default defineConfig({
     maxEvents: 200,
     maxEmails: 100,
     slowQueryThresholdMs: 100,
-    persistDebugData: true,  // or a custom path: 'custom/debug.json'
-    tracing: true,           // enable per-request timeline
+    persistDebugData: true, // or a custom path: 'custom/debug.json'
+    tracing: true, // enable per-request timeline
   },
 })
 ```
@@ -423,6 +418,7 @@ The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `m
 ### Persistent Debug Data
 
 Enable `persistDebugData: true` to save queries, events, and emails to `.adonisjs/server-stats/debug-data.json`. You can also pass a custom path (relative to app root) like `persistDebugData: 'custom/debug.json'`. Data is:
+
 - **Loaded** on server startup (before collectors start)
 - **Flushed** every 30 seconds (handles crashes)
 - **Saved** on graceful shutdown
@@ -449,14 +445,14 @@ GET /organizations/create    286ms
 
 #### Span categories
 
-| Category | Color  | Auto-captured |
-|----------|--------|---------------|
-| DB       | Purple | `db:query` events |
+| Category | Color  | Auto-captured          |
+| -------- | ------ | ---------------------- |
+| DB       | Purple | `db:query` events      |
 | Request  | Blue   | Full request lifecycle |
-| Mail     | Green  | -- |
-| Event    | Amber  | -- |
-| View     | Cyan   | -- |
-| Custom   | Gray   | Via `trace()` helper |
+| Mail     | Green  | --                     |
+| Event    | Amber  | --                     |
+| View     | Cyan   | --                     |
+| Custom   | Gray   | Via `trace()` helper   |
 
 #### Custom spans
 
@@ -527,19 +523,19 @@ devToolbar: {
 
 #### Dashboard Sections
 
-| Section    | Description |
-|------------|-------------|
-| **Overview** | Performance cards (avg/p95 response time, req/min, error rate) with sparkline charts and configurable time ranges (1h/6h/24h/7d) |
-| **Requests** | Paginated request history with method, URL, status, duration. Click for detail view with associated queries and trace |
+| Section      | Description                                                                                                                                             |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Overview** | Performance cards (avg/p95 response time, req/min, error rate) with sparkline charts and configurable time ranges (1h/6h/24h/7d)                        |
+| **Requests** | Paginated request history with method, URL, status, duration. Click for detail view with associated queries and trace                                   |
 | **Queries**  | All captured SQL queries with duration, model, connection. Grouped view shows query patterns by normalized SQL. EXPLAIN plan support for SELECT queries |
-| **Events**   | Application events captured from the AdonisJS emitter |
-| **Routes**   | Full route table with methods, patterns, handlers, and middleware stacks |
-| **Logs**     | Log history with level filtering, text search, and structured JSON field search (e.g. filter by `userId = 5`) |
-| **Emails**   | Email history with sender, recipient, subject, status. Click for HTML preview in iframe |
-| **Timeline** | Per-request waterfall timeline (requires `tracing: true`) |
-| **Cache**    | Redis key browser with SCAN-based listing, type-aware detail view, and server stats (requires `@adonisjs/redis`) |
-| **Jobs**     | Queue overview with job listing, detail, and retry for failed jobs (requires `@rlanz/bull-queue`) |
-| **Config**   | Sanitized view of app configuration and environment variables. Secrets are auto-redacted |
+| **Events**   | Application events captured from the AdonisJS emitter                                                                                                   |
+| **Routes**   | Full route table with methods, patterns, handlers, and middleware stacks                                                                                |
+| **Logs**     | Log history with level filtering, text search, and structured JSON field search (e.g. filter by `userId = 5`)                                           |
+| **Emails**   | Email history with sender, recipient, subject, status. Click for HTML preview in iframe                                                                 |
+| **Timeline** | Per-request waterfall timeline (requires `tracing: true`)                                                                                               |
+| **Cache**    | Redis key browser with SCAN-based listing, type-aware detail view, and server stats (requires `@adonisjs/redis`)                                        |
+| **Jobs**     | Queue overview with job listing, detail, and retry for failed jobs (requires `@rlanz/bull-queue`)                                                       |
+| **Config**   | Sanitized view of app configuration and environment variables. Secrets are auto-redacted                                                                |
 
 #### Access Control
 
@@ -562,12 +558,14 @@ When the dashboard is enabled, the debug panel gains link icons on query, event,
 #### Real-Time Updates
 
 The dashboard supports real-time updates via two mechanisms:
+
 - **Transmit (SSE)**: If `@adonisjs/transmit` is installed, the dashboard subscribes to `server-stats/dashboard` for live overview updates
 - **Polling fallback**: If Transmit is not available, the dashboard polls the API at a configurable interval
 
 #### Data Storage
 
 The dashboard uses a dedicated SQLite database (separate from your app's database) with 8 tables prefixed with `server_stats_`. The database is:
+
 - **Auto-migrated** on startup (no manual migration step)
 - **Self-contained** -- uses its own Knex connection, never touches your app's migration history
 - **Self-cleaning** -- old data is automatically purged based on `retentionDays`
@@ -640,40 +638,40 @@ async webhooks({ response }: HttpContext) {
 
 #### `DebugPane` Options
 
-| Option      | Type                | Default | Description                                  |
-|-------------|---------------------|---------|----------------------------------------------|
-| `id`        | `string`            | --      | Unique identifier (also default data key)    |
-| `label`     | `string`            | --      | Tab display name                             |
-| `endpoint`  | `string`            | --      | API endpoint URL                             |
-| `columns`   | `DebugPaneColumn[]` | --      | Column definitions                           |
-| `search`    | `{ placeholder }`   | --      | Enable search bar                            |
-| `dataKey`   | `string`            | `id`    | JSON key for data array (dot notation OK)    |
-| `fetchOnce` | `boolean`           | `false` | Cache after first fetch                      |
-| `clearable` | `boolean`           | `false` | Show Clear button                            |
+| Option      | Type                | Default | Description                               |
+| ----------- | ------------------- | ------- | ----------------------------------------- |
+| `id`        | `string`            | --      | Unique identifier (also default data key) |
+| `label`     | `string`            | --      | Tab display name                          |
+| `endpoint`  | `string`            | --      | API endpoint URL                          |
+| `columns`   | `DebugPaneColumn[]` | --      | Column definitions                        |
+| `search`    | `{ placeholder }`   | --      | Enable search bar                         |
+| `dataKey`   | `string`            | `id`    | JSON key for data array (dot notation OK) |
+| `fetchOnce` | `boolean`           | `false` | Cache after first fetch                   |
+| `clearable` | `boolean`           | `false` | Show Clear button                         |
 
 #### `DebugPaneColumn` Options
 
-| Option          | Type                     | Default  | Description                              |
-|-----------------|--------------------------|----------|------------------------------------------|
-| `key`           | `string`                 | --       | JSON field name                          |
-| `label`         | `string`                 | --       | Column header text                       |
-| `width`         | `string`                 | auto     | CSS width (e.g. `'60px'`)               |
-| `format`        | `DebugPaneFormatType`    | `'text'` | Cell format (see table below)            |
-| `searchable`    | `boolean`                | `false`  | Include in search filtering              |
-| `filterable`    | `boolean`                | `false`  | Click to set as search filter            |
-| `badgeColorMap` | `Record<string, string>` | --       | Value-to-color map for `badge` format    |
+| Option          | Type                     | Default  | Description                           |
+| --------------- | ------------------------ | -------- | ------------------------------------- |
+| `key`           | `string`                 | --       | JSON field name                       |
+| `label`         | `string`                 | --       | Column header text                    |
+| `width`         | `string`                 | auto     | CSS width (e.g. `'60px'`)             |
+| `format`        | `DebugPaneFormatType`    | `'text'` | Cell format (see table below)         |
+| `searchable`    | `boolean`                | `false`  | Include in search filtering           |
+| `filterable`    | `boolean`                | `false`  | Click to set as search filter         |
+| `badgeColorMap` | `Record<string, string>` | --       | Value-to-color map for `badge` format |
 
 #### Format Types
 
-| Format     | Renders As                             | Expected Input          |
-|------------|----------------------------------------|-------------------------|
-| `text`     | Escaped plain text                     | any                     |
-| `time`     | `HH:MM:SS.mmm`                        | Unix timestamp (ms)     |
-| `timeAgo`  | `3s ago`, `2m ago`                     | Unix timestamp (ms)     |
-| `duration` | `X.XXms` with color coding             | number (ms)             |
-| `method`   | HTTP method pill badge                 | `'GET'`, `'POST'`, etc. |
-| `json`     | Compact preview, click to expand       | object or array         |
-| `badge`    | Colored pill via `badgeColorMap`       | string                  |
+| Format     | Renders As                       | Expected Input          |
+| ---------- | -------------------------------- | ----------------------- |
+| `text`     | Escaped plain text               | any                     |
+| `time`     | `HH:MM:SS.mmm`                   | Unix timestamp (ms)     |
+| `timeAgo`  | `3s ago`, `2m ago`               | Unix timestamp (ms)     |
+| `duration` | `X.XXms` with color coding       | number (ms)             |
+| `method`   | HTTP method pill badge           | `'GET'`, `'POST'`, etc. |
+| `json`     | Compact preview, click to expand | object or array         |
+| `badge`    | Colored pill via `badgeColorMap` | string                  |
 
 Badge colors: `green`, `amber`, `red`, `blue`, `purple`, `muted`
 
@@ -704,6 +702,7 @@ Gauges are updated automatically on each collection tick.
 The log stream module watches a JSON log file and broadcasts new entries via Transmit (SSE).
 
 **Two purposes:**
+
 1. Provides error/warning counts to the stats bar via `logCollector()`
 2. Broadcasts individual log entries to a Transmit channel via `LogStreamProvider`
 
@@ -778,7 +777,6 @@ import type {
   QueueRedisConnection,
   LogCollectorOptions,
 } from 'adonisjs-server-stats/collectors'
-
 ```
 
 ---
@@ -787,16 +785,16 @@ import type {
 
 All integrations use lazy `import()` -- missing peer deps won't crash the app. The corresponding collector simply returns defaults.
 
-| Dependency                  | Required By                                    |
-|-----------------------------|------------------------------------------------|
-| `@adonisjs/core`            | Everything (required)                          |
-| `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector`, dashboard    |
-| `@adonisjs/redis`           | `redisCollector`, dashboard cache inspector    |
-| `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time  |
-| `@julr/adonisjs-prometheus` | `serverStatsCollector`                         |
-| `bullmq`                    | `queueCollector`                               |
-| `better-sqlite3`            | Dashboard (`dashboard: true`)                  |
-| `edge.js`                   | Edge tag                                       |
+| Dependency                  | Required By                                   |
+| --------------------------- | --------------------------------------------- |
+| `@adonisjs/core`            | Everything (required)                         |
+| `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector`, dashboard  |
+| `@adonisjs/redis`           | `redisCollector`, dashboard cache inspector   |
+| `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time |
+| `@julr/adonisjs-prometheus` | `serverStatsCollector`                        |
+| `bullmq`                    | `queueCollector`                              |
+| `better-sqlite3`            | Dashboard (`dashboard: true`)                 |
+| `edge.js`                   | Edge tag                                      |
 
 ## License
 

@@ -8,35 +8,35 @@ A dedicated full-page dashboard accessible at a configurable URL path, providing
 
 ## Architecture Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Page rendering | Edge template, own minimal layout | Self-contained dark/light layout, no host app dependency |
-| Data relationship | Enhanced full page | Additional capabilities (EXPLAIN, grouping, history, streaming) beyond the panel |
-| Real-time updates | Transmit (SSE) with polling fallback | Leverage existing AdonisJS infrastructure, graceful degradation |
-| URL path | Fully configurable (default `/__stats`) | Avoid conflicts, user control |
-| Auth/access control | Reuse `shouldShow` callback | Consistent gating with existing panel |
-| Historical storage | SQLite via Lucid dedicated connection | Zero-config file-based DB, auto-excludes own queries from collection |
-| Migration strategy | Auto-migrate on boot | Zero friction, tables created if missing |
-| Query analysis | EXPLAIN (without ANALYZE) + query grouping | Safe execution (no actual query run), useful pattern analysis |
-| N+1 detection | Skipped | No reliable detection method without false positives |
-| Navigation | SPA-like tabs with collapsible sidebar | Fast tab switching, scalable to many sections |
-| Theme | System preference (prefers-color-scheme) | Light + dark themes, respects user OS setting |
-| Data retention | Time-based, 7 days (configurable) | Predictable disk usage, auto-prune old records |
-| Landing page | Overview dashboard (performance focused) | Avg/P95 response time, slowest endpoints, request volume chart |
-| Live updates | Always live when dashboard is open | All sections auto-update via Transmit subscription |
-| Charts | Pure SVG/CSS | Zero dependencies, minimal bundle, self-contained |
-| Chart ranges | Selectable (1h / 6h / 24h / 7d) | Flexible time analysis with appropriate granularity |
-| Panel deep links | Open in new tab | Preserve app context, reference both simultaneously |
-| Self-exclusion | Always exclude own queries/requests | Dashboard routes and SQLite queries filtered from collectors |
-| Log search | Structured JSON + saved filter presets | Parse JSON fields, filter by key, save named presets |
-| New sections | Cache + Jobs/Queue + Config viewer | Comprehensive debugging without external tools |
-| Queue integration | Optional (detect @rlanz/bull-queue) | Only show queue section if Bull Queue is installed |
-| Config viewer | Sanitized auto-detect | Show config with auto-redacted secrets |
-| Custom panes | Extend to dashboard | User-registered panes appear in sidebar too |
-| Table prefix | `server_stats_` | Explicit, low conflict risk |
-| Scope | Full implementation | All features in one release |
-| DB connection | Dedicated Lucid connection (SQLite) | Isolate debug data, exclude from collection |
-| Environments | Always available if enabled in config | Trust shouldShow for access control |
+| Decision            | Choice                                     | Rationale                                                                        |
+| ------------------- | ------------------------------------------ | -------------------------------------------------------------------------------- |
+| Page rendering      | Edge template, own minimal layout          | Self-contained dark/light layout, no host app dependency                         |
+| Data relationship   | Enhanced full page                         | Additional capabilities (EXPLAIN, grouping, history, streaming) beyond the panel |
+| Real-time updates   | Transmit (SSE) with polling fallback       | Leverage existing AdonisJS infrastructure, graceful degradation                  |
+| URL path            | Fully configurable (default `/__stats`)    | Avoid conflicts, user control                                                    |
+| Auth/access control | Reuse `shouldShow` callback                | Consistent gating with existing panel                                            |
+| Historical storage  | SQLite via Lucid dedicated connection      | Zero-config file-based DB, auto-excludes own queries from collection             |
+| Migration strategy  | Auto-migrate on boot                       | Zero friction, tables created if missing                                         |
+| Query analysis      | EXPLAIN (without ANALYZE) + query grouping | Safe execution (no actual query run), useful pattern analysis                    |
+| N+1 detection       | Skipped                                    | No reliable detection method without false positives                             |
+| Navigation          | SPA-like tabs with collapsible sidebar     | Fast tab switching, scalable to many sections                                    |
+| Theme               | System preference (prefers-color-scheme)   | Light + dark themes, respects user OS setting                                    |
+| Data retention      | Time-based, 7 days (configurable)          | Predictable disk usage, auto-prune old records                                   |
+| Landing page        | Overview dashboard (performance focused)   | Avg/P95 response time, slowest endpoints, request volume chart                   |
+| Live updates        | Always live when dashboard is open         | All sections auto-update via Transmit subscription                               |
+| Charts              | Pure SVG/CSS                               | Zero dependencies, minimal bundle, self-contained                                |
+| Chart ranges        | Selectable (1h / 6h / 24h / 7d)            | Flexible time analysis with appropriate granularity                              |
+| Panel deep links    | Open in new tab                            | Preserve app context, reference both simultaneously                              |
+| Self-exclusion      | Always exclude own queries/requests        | Dashboard routes and SQLite queries filtered from collectors                     |
+| Log search          | Structured JSON + saved filter presets     | Parse JSON fields, filter by key, save named presets                             |
+| New sections        | Cache + Jobs/Queue + Config viewer         | Comprehensive debugging without external tools                                   |
+| Queue integration   | Optional (detect @rlanz/bull-queue)        | Only show queue section if Bull Queue is installed                               |
+| Config viewer       | Sanitized auto-detect                      | Show config with auto-redacted secrets                                           |
+| Custom panes        | Extend to dashboard                        | User-registered panes appear in sidebar too                                      |
+| Table prefix        | `server_stats_`                            | Explicit, low conflict risk                                                      |
+| Scope               | Full implementation                        | All features in one release                                                      |
+| DB connection       | Dedicated Lucid connection (SQLite)        | Isolate debug data, exclude from collection                                      |
+| Environments        | Always available if enabled in config      | Trust shouldShow for access control                                              |
 
 ---
 
@@ -313,12 +313,14 @@ All collectors must check if the current request URL starts with the configured 
 Two complete themes responding to `prefers-color-scheme`:
 
 **Dark theme** (default when system prefers dark):
+
 - Background: `#0f0f0f` (matching existing panel)
 - Surface: `#171717`
 - Text: `#d4d4d4`
 - Accent: `#34d399` (emerald)
 
 **Light theme** (when system prefers light):
+
 - Background: `#fafafa`
 - Surface: `#ffffff`
 - Text: `#171717`
@@ -335,18 +337,21 @@ Implemented via CSS custom properties and `@media (prefers-color-scheme: ...)`.
 Performance-focused summary cards:
 
 **Top row — Key metrics cards:**
+
 - **Avg Response Time** — Current average with sparkline showing trend
 - **P95 Response Time** — 95th percentile with sparkline
 - **Requests/min** — Current rate with sparkline
 - **Error Rate** — Percentage with sparkline
 
 **Request volume chart:**
+
 - Pure SVG bar chart showing requests over time
 - Selectable range: 1h (per minute), 6h (per 5min), 24h (per 15min), 7d (per hour)
 - Color-coded bars: green (2xx), blue (3xx), amber (4xx), red (5xx)
 - Hover tooltip showing exact count + timestamp
 
 **Bottom row — Secondary cards:**
+
 - **Slowest Endpoints** — Top 5 URLs by avg response time (from history)
 - **Query Stats** — Total queries, avg duration, queries per request
 - **Recent Errors** — Last 5 error log entries with links to Logs section
@@ -356,6 +361,7 @@ Performance-focused summary cards:
 ### 2. Requests
 
 Enhanced version of the Timeline trace list:
+
 - Table: Method, URL, Status, Duration, Spans, Warnings, Time
 - Click row to see full trace waterfall (inline expand or separate view)
 - Filters: method, status range, duration range, URL search
@@ -365,6 +371,7 @@ Enhanced version of the Timeline trace list:
 ### 3. Queries
 
 Enhanced beyond the panel:
+
 - **List view:** Same as panel but with history (paginated from SQLite)
 - **Grouped view:** Toggle to group by normalized SQL pattern
   - Shows: pattern, count, avg/min/max/total duration, % of total time
@@ -379,6 +386,7 @@ Enhanced beyond the panel:
 ### 4. Events
 
 Enhanced beyond the panel:
+
 - Full history from SQLite (paginated)
 - Click event name to filter by that event
 - Click data preview to expand JSON with syntax highlighting
@@ -388,6 +396,7 @@ Enhanced beyond the panel:
 ### 5. Routes
 
 Same as panel but full-page width:
+
 - Current route highlighted
 - Click route to filter requests by that URL pattern
 - Group by controller (collapsible)
@@ -395,6 +404,7 @@ Same as panel but full-page width:
 ### 6. Logs
 
 Significantly enhanced:
+
 - **Structured search:** Parse JSON log entries, filter by any field
   - Dropdown to select field (level, message, request_id, userId, etc.)
   - Operator selector (equals, contains, starts with)
@@ -414,6 +424,7 @@ Significantly enhanced:
 ### 7. Emails
 
 Enhanced beyond the panel:
+
 - Full history from SQLite (paginated)
 - Click row to preview email HTML in iframe (same as panel)
 - Filters: from, to, subject, mailer, status, time range
@@ -422,6 +433,7 @@ Enhanced beyond the panel:
 ### 8. Timeline
 
 Enhanced trace view:
+
 - Request list (same as panel Requests section)
 - Click to see waterfall (same as panel but with more space)
 - Full history from SQLite
@@ -430,6 +442,7 @@ Enhanced trace view:
 ### 9. Cache (New)
 
 Cache inspector using `@adonisjs/cache` or Redis:
+
 - **Key browser:** List cache keys with TTL, size, type
 - **Hit/miss stats:** Hit rate, total hits, total misses (from Redis INFO)
 - **Key detail:** Click key to see value, TTL, type
@@ -438,6 +451,7 @@ Cache inspector using `@adonisjs/cache` or Redis:
 ### 10. Jobs/Queue (New)
 
 Bull Queue monitor (optional — only if `@rlanz/bull-queue` detected):
+
 - **Queue overview:** Active, waiting, delayed, completed, failed counts
 - **Job list:** Table with job name, status, payload preview, attempts, duration, time
 - **Failed jobs:** View error message, retry button
@@ -447,6 +461,7 @@ Bull Queue monitor (optional — only if `@rlanz/bull-queue` detected):
 ### 11. Config (New)
 
 Read-only config viewer:
+
 - Shows app configuration from `app.config.all()`
 - Auto-redacts values matching sensitive patterns: `password`, `secret`, `key`, `token`, `api_key`, `apiKey`, `credential`, `auth`
 - Redacted values shown as `••••••••`
@@ -457,6 +472,7 @@ Read-only config viewer:
 ### 12. Custom Panes
 
 User-registered custom panes (from `devToolbar.panes` config) also appear as sidebar sections:
+
 - Same rendering logic as the debug panel custom panes
 - Full-page width for better table layout
 - Inherit search, clear, column formatting capabilities
@@ -483,6 +499,7 @@ When `@adonisjs/transmit` is available:
 ### Polling Fallback
 
 When Transmit is not available:
+
 - Each active section polls its API endpoint every 3 seconds (same as debug panel)
 - Overview polls aggregated endpoint every 5 seconds
 
@@ -497,6 +514,7 @@ Each data row in the panel (queries, events, emails, traces) gets a subtle link 
 **URL format:** `{dashboardPath}#{section}?id={itemId}`
 
 Examples:
+
 - `/__stats#queries?id=42` — Opens Queries section, scrolls to query #42
 - `/__stats#traces?id=15` — Opens Timeline section, expands trace #15
 - `/__stats#logs?requestId=abc123` — Opens Logs section, filtered by request ID
@@ -509,32 +527,32 @@ The dashboard page reads the hash on load and navigates to the correct section +
 
 All dashboard API routes registered under the configured `dashboardPath`:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `{path}` | Serve the dashboard HTML page |
-| GET | `{path}/api/overview` | Overview metrics (cards + chart data) |
-| GET | `{path}/api/overview/chart` | Chart data with `?range=1h\|6h\|24h\|7d` |
-| GET | `{path}/api/requests` | Paginated request history |
-| GET | `{path}/api/requests/:id` | Single request with trace detail |
-| GET | `{path}/api/queries` | Paginated query history |
-| GET | `{path}/api/queries/grouped` | Grouped query patterns |
-| GET | `{path}/api/queries/:id/explain` | Run EXPLAIN on a query |
-| GET | `{path}/api/events` | Paginated event history |
-| GET | `{path}/api/routes` | Route table |
-| GET | `{path}/api/logs` | Paginated log history with structured search |
-| GET | `{path}/api/emails` | Paginated email history |
-| GET | `{path}/api/emails/:id/preview` | Email HTML preview |
-| GET | `{path}/api/traces` | Paginated trace history |
-| GET | `{path}/api/traces/:id` | Single trace with spans |
-| GET | `{path}/api/cache` | Cache stats + key list |
-| GET | `{path}/api/cache/:key` | Single cache key value |
-| GET | `{path}/api/jobs` | Job list with status filter |
-| GET | `{path}/api/jobs/:id` | Single job detail |
-| POST | `{path}/api/jobs/:id/retry` | Retry a failed job |
-| GET | `{path}/api/config` | Sanitized app config |
-| GET | `{path}/api/filters` | Saved filter presets |
-| POST | `{path}/api/filters` | Create filter preset |
-| DELETE | `{path}/api/filters/:id` | Delete filter preset |
+| Method | Path                             | Description                                  |
+| ------ | -------------------------------- | -------------------------------------------- |
+| GET    | `{path}`                         | Serve the dashboard HTML page                |
+| GET    | `{path}/api/overview`            | Overview metrics (cards + chart data)        |
+| GET    | `{path}/api/overview/chart`      | Chart data with `?range=1h\|6h\|24h\|7d`     |
+| GET    | `{path}/api/requests`            | Paginated request history                    |
+| GET    | `{path}/api/requests/:id`        | Single request with trace detail             |
+| GET    | `{path}/api/queries`             | Paginated query history                      |
+| GET    | `{path}/api/queries/grouped`     | Grouped query patterns                       |
+| GET    | `{path}/api/queries/:id/explain` | Run EXPLAIN on a query                       |
+| GET    | `{path}/api/events`              | Paginated event history                      |
+| GET    | `{path}/api/routes`              | Route table                                  |
+| GET    | `{path}/api/logs`                | Paginated log history with structured search |
+| GET    | `{path}/api/emails`              | Paginated email history                      |
+| GET    | `{path}/api/emails/:id/preview`  | Email HTML preview                           |
+| GET    | `{path}/api/traces`              | Paginated trace history                      |
+| GET    | `{path}/api/traces/:id`          | Single trace with spans                      |
+| GET    | `{path}/api/cache`               | Cache stats + key list                       |
+| GET    | `{path}/api/cache/:key`          | Single cache key value                       |
+| GET    | `{path}/api/jobs`                | Job list with status filter                  |
+| GET    | `{path}/api/jobs/:id`            | Single job detail                            |
+| POST   | `{path}/api/jobs/:id/retry`      | Retry a failed job                           |
+| GET    | `{path}/api/config`              | Sanitized app config                         |
+| GET    | `{path}/api/filters`             | Saved filter presets                         |
+| POST   | `{path}/api/filters`             | Create filter preset                         |
+| DELETE | `{path}/api/filters/:id`         | Delete filter preset                         |
 
 All endpoints gated by the `shouldShow` callback (same as debug panel). The dashboard page itself is also gated.
 
@@ -607,6 +625,7 @@ db.manager.add('server_stats', {
 ### Piping Data to SQLite
 
 After each request completes (in the existing `finishTrace` or a new hook):
+
 1. Write request summary to `server_stats_requests`
 2. Write associated queries to `server_stats_queries`
 3. Write trace to `server_stats_traces`
@@ -617,6 +636,7 @@ For events, emails, logs — insert as they arrive (from existing collectors' ev
 ### Metrics Aggregation
 
 A periodic task (every 60 seconds) aggregates recent requests into `server_stats_metrics`:
+
 - Count requests in the last minute
 - Calculate avg/p95 response time
 - Count errors
@@ -626,6 +646,7 @@ A periodic task (every 60 seconds) aggregates recent requests into `server_stats
 ### Retention Cleanup
 
 On startup and every hour:
+
 ```sql
 DELETE FROM server_stats_requests WHERE created_at < datetime('now', '-{retentionDays} days');
 -- Cascading deletes handle queries, events, traces via foreign keys
@@ -637,6 +658,7 @@ DELETE FROM server_stats_metrics WHERE created_at < datetime('now', '-{retention
 ### EXPLAIN Integration
 
 When user clicks EXPLAIN on a query:
+
 1. Server receives the query ID
 2. Look up the original SQL from `server_stats_queries`
 3. Only allow EXPLAIN on SELECT queries (reject INSERT/UPDATE/DELETE)
@@ -647,12 +669,14 @@ When user clicks EXPLAIN on a query:
 ### Dashboard Page Serving
 
 The dashboard HTML is a single Edge template that includes:
+
 - Inline CSS (dashboard.css, compiled at boot like the debug panel)
 - Inline JS (dashboard.js, compiled at boot)
 - SVG icons for sidebar (inline, no external deps)
 - No external dependencies — fully self-contained
 
 The page is served via a GET route handler that:
+
 1. Checks `shouldShow(ctx)` — returns 403 if unauthorized
 2. Renders the Edge template with config data (endpoints, tracing enabled, etc.)
 

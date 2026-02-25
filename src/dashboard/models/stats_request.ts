@@ -1,8 +1,10 @@
 import { BaseModel, column, hasMany } from '@adonisjs/lucid/orm'
-import type { HasMany } from '@adonisjs/lucid/types/relations'
-import StatsQuery from './stats_query.js'
+
 import StatsEvent from './stats_event.js'
+import StatsQuery from './stats_query.js'
 import StatsTrace from './stats_trace.js'
+
+import type { HasMany } from '@adonisjs/lucid/types/relations'
 
 export default class StatsRequest extends BaseModel {
   static connection = 'server_stats'

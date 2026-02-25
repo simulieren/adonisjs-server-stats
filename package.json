@@ -1,7 +1,22 @@
 {
   "name": "adonisjs-server-stats",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Real-time server monitoring for AdonisJS v6 applications",
+  "keywords": [
+    "adonisjs",
+    "debug",
+    "devtools",
+    "metrics",
+    "monitoring",
+    "server-stats"
+  ],
+  "license": "MIT",
+  "author": "",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "type": "module",
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
@@ -71,28 +86,32 @@
       "import": "./dist/configure.js"
     }
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
   "scripts": {
     "copy-assets": "cp -r src/stubs/config.stub dist/src/stubs/ && cp -r src/edge/views dist/src/edge/ && cp -r src/edge/client dist/src/edge/",
     "build": "tsc && npm run copy-assets",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": [
-    "adonisjs",
-    "server-stats",
-    "monitoring",
-    "metrics",
-    "debug",
-    "devtools"
-  ],
-  "author": "",
-  "license": "MIT",
+  "devDependencies": {
+    "@adonisjs/core": "^6.0.0",
+    "@adonisjs/lucid": "^21.0.0",
+    "@adonisjs/redis": "^9.0.0",
+    "@adonisjs/transmit": "^1.0.0",
+    "@julr/adonisjs-prometheus": "^1.4.0",
+    "@types/better-sqlite3": "^7.0.0",
+    "@types/node": "^22.0.0",
+    "better-sqlite3": "^11.10.0",
+    "bullmq": "^5.0.0",
+    "edge.js": "^6.0.0",
+    "oxfmt": "^0.35.0",
+    "oxlint": "^1.50.0",
+    "typescript": "^5.9.0"
+  },
   "peerDependencies": {
     "@adonisjs/core": "^6.0.0 || ^7.0.0-next || ^7.0.0"
   },
@@ -118,18 +137,5 @@
     "better-sqlite3": {
       "optional": true
     }
-  },
-  "devDependencies": {
-    "@adonisjs/core": "^6.0.0",
-    "@adonisjs/lucid": "^21.0.0",
-    "@adonisjs/redis": "^9.0.0",
-    "@adonisjs/transmit": "^1.0.0",
-    "@julr/adonisjs-prometheus": "^1.4.0",
-    "@types/better-sqlite3": "^7.0.0",
-    "@types/node": "^22.0.0",
-    "better-sqlite3": "^11.10.0",
-    "bullmq": "^5.0.0",
-    "edge.js": "^6.0.0",
-    "typescript": "^5.9.0"
   }
 }

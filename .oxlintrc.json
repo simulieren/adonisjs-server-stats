@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "import", "unicorn"],
+  "categories": {
+    "correctness": "warn"
+  },
+  "env": {
+    "node": true
+  },
+  "rules": {
+    "no-console": "warn",
+    "max-params": ["warn", { "max": 5 }],
+    "eqeqeq": "warn",
+    "typescript/no-explicit-any": "warn"
+  },
+  "ignorePatterns": ["dist/**", "node_modules/**"]
+}

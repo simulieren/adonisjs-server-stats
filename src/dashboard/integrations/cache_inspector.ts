@@ -157,13 +157,7 @@ export class CacheInspector {
    */
   async listKeys(pattern = '*', cursor = '0', count = 100): Promise<CacheKeyListResult> {
     try {
-      const [nextCursor, rawKeys] = await this.redis.scan(
-        cursor,
-        'MATCH',
-        pattern,
-        'COUNT',
-        count
-      )
+      const [nextCursor, rawKeys] = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', count)
 
       const keys: CacheKeyEntry[] = await Promise.all(
         (rawKeys as string[]).map(async (key: string) => {

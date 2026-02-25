@@ -1,23 +1,46 @@
 import { readFileSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
+import { round, clamp } from '../utils/math_helpers.js'
+import { loadTransmitClient } from '../utils/transmit_client.js'
+import { CacheInspector } from './integrations/cache_inspector.js'
+import { ConfigInspector } from './integrations/config_inspector.js'
+import { QueueInspector } from './integrations/queue_inspector.js'
+
+import type { DebugStore } from '../debug/debug_store.js'
+import type { DashboardStore } from './dashboard_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
-import type { DashboardStore } from './dashboard_store.js'
-import type { DebugStore } from '../debug/debug_store.js'
-import { CacheInspector } from './integrations/cache_inspector.js'
-import { QueueInspector } from './integrations/queue_inspector.js'
-import { ConfigInspector } from './integrations/config_inspector.js'
 
 const EDGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'edge')
+
+interface PaginatedResponse<T> {
+  data: T[]
+  total: number
+  page: number
+  perPage: number
+}
+
+function emptyPage<T>(page: number, perPage: number): PaginatedResponse<T> {
+  return { data: [], total: 0, page, perPage }
+}
+
+interface ChartBucket {
+  bucket: string
+  requestCount: number
+  avgDuration: number
+  p95Duration: number
+  errorCount: number
+  queryCount: number
+}
 
 /**
  * Controller for the full-page dashboard.
  *
  * Serves the dashboard HTML page and all JSON API endpoints.
- * Constructor-injected with the SQLite-backed DashboardStore,
- * the in-memory DebugStore, and the AdonisJS application instance.
+ * Delegates all data access to the DashboardStore.
  */
 export default class DashboardController {
   private cacheInspector: CacheInspector | null = null
@@ -41,18 +64,11 @@ export default class DashboardController {
   // Page
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath} — Render the dashboard Edge template.
-   *
-   * Reads the dashboard CSS/JS assets and passes them as template state
-   * along with configuration for tracing and custom panes.
-   */
   async page(ctx: HttpContext) {
     if (!this.checkAccess(ctx)) {
       return ctx.response.forbidden({ error: 'Access denied' })
     }
 
-    // Lazily read and cache the CSS/JS assets
     if (!this.cachedCss) {
       this.cachedCss = readFileSync(join(EDGE_DIR, 'client', 'dashboard.css'), 'utf-8')
     }
@@ -60,7 +76,14 @@ export default class DashboardController {
       this.cachedJs = readFileSync(join(EDGE_DIR, 'client', 'dashboard.js'), 'utf-8')
     }
     if (this.cachedTransmitClient === null) {
-      this.cachedTransmitClient = this.loadTransmitClient()
+      this.cachedTransmitClient = loadTransmitClient(this.app.makePath('package.json'))
+      if (this.cachedTransmitClient) {
+        console.log('[server-stats] Transmit client loaded for dashboard')
+      } else {
+        console.log(
+          '[server-stats] Dashboard will use polling. Install @adonisjs/transmit-client for real-time updates.'
+        )
+      }
     }
 
     const config = this.app.config.get<any>('server_stats')
@@ -89,67 +112,23 @@ export default class DashboardController {
   // Overview
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/overview — Overview metrics cards.
-   */
   async overview({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json(emptyOverview())
-
-    try {
+    return this.withDb(response, emptyOverview(), async () => {
       const range = request.qs().range || '1h'
 
-      // Use getOverviewMetrics for accurate stats (computed from raw requests)
-      const [overview, widgets] = await Promise.all([
+      const [overview, widgets, sparklineData] = await Promise.all([
         this.dashboardStore.getOverviewMetrics(range),
         this.dashboardStore.getOverviewWidgets(range),
+        this.dashboardStore.getSparklineData(range),
       ])
-      if (!overview) return response.json(emptyOverview())
+      if (!overview) return emptyOverview()
 
-      // Add sparklines from the pre-aggregated metrics table
-      const cutoff = minutesAgo(60)
-      const metrics: any[] = await db('server_stats_metrics')
-        .where('created_at', '>=', cutoff)
-        .orderBy('bucket', 'asc')
+      const [cacheStats, jobQueueStatus] = await Promise.all([
+        this.fetchCacheOverview(),
+        this.fetchQueueOverview(),
+      ])
 
-      const sparklineData = metrics.slice(-15)
-
-      // Fetch cache and queue stats (non-blocking — null if unavailable)
-      let cacheStats: { available: boolean; totalKeys: number; hitRate: number; memoryUsedHuman: string } | null = null
-      let jobQueueStatus: { available: boolean; active: number; waiting: number; failed: number; completed: number } | null = null
-
-      try {
-        const cacheInspector = await this.getCacheInspector()
-        if (cacheInspector) {
-          const stats = await cacheInspector.getStats()
-          cacheStats = {
-            available: true,
-            totalKeys: stats.totalKeys,
-            hitRate: stats.hitRate,
-            memoryUsedHuman: stats.memoryUsedHuman,
-          }
-        }
-      } catch {
-        // Cache not available
-      }
-
-      try {
-        const queueInspector = await this.getQueueInspector()
-        if (queueInspector) {
-          const qOverview = await queueInspector.getOverview()
-          jobQueueStatus = {
-            available: true,
-            active: qOverview.active,
-            waiting: qOverview.waiting,
-            failed: qOverview.failed,
-            completed: qOverview.completed,
-          }
-        }
-      } catch {
-        // Queue not available
-      }
-
-      return response.json({
+      return {
         ...overview,
         sparklines: {
           avgResponseTime: sparklineData.map((m: any) => m.avg_duration),
@@ -162,105 +141,70 @@ export default class DashboardController {
         ...widgets,
         cacheStats,
         jobQueueStatus,
-      })
-    } catch {
-      return response.json(emptyOverview())
-    }
+      }
+    })
   }
 
-  /**
-   * GET {dashboardPath}/api/overview/chart — Chart data with time range.
-   */
   async overviewChart({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ buckets: [] })
-
     const range = request.qs().range || '1h'
-    const { cutoff } = parseRange(range)
 
-    try {
-      const buckets: any[] = await db('server_stats_metrics')
-        .where('bucket', '>=', cutoff)
-        .orderBy('bucket', 'asc')
+    return this.withDb(response, { range, buckets: [] as ChartBucket[] }, async () => {
+      const buckets = await this.dashboardStore.getChartData(range)
 
-      return response.json({
+      return {
         range,
-        buckets: buckets.map((b: any) => ({
-          bucket: b.bucket,
-          requestCount: b.request_count,
-          avgDuration: b.avg_duration,
-          p95Duration: b.p95_duration,
-          errorCount: b.error_count,
-          queryCount: b.query_count,
-        })),
-      })
-    } catch {
-      return response.json({ buckets: [] })
-    }
+        buckets: buckets.map(
+          (b: any): ChartBucket => ({
+            bucket: b.bucket,
+            requestCount: b.request_count,
+            avgDuration: b.avg_duration,
+            p95Duration: b.p95_duration,
+            errorCount: b.error_count,
+            queryCount: b.query_count,
+          })
+        ),
+      }
+    })
   }
 
   // ---------------------------------------------------------------------------
   // Requests
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/requests — Paginated request history.
-   */
   async requests({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ data: [], total: 0 })
-
     const qs = request.qs()
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    try {
-      let query = db('server_stats_requests')
-
-      if (qs.method) query = query.where('method', qs.method.toUpperCase())
-      if (qs.status) query = query.where('status_code', Number(qs.status))
-      if (qs.url) query = query.where('url', 'like', `%${qs.url}%`)
-
-      const countResult: any = await query.clone().count('* as total').first()
-      const total = countResult?.total ?? 0
-
-      const data: any[] = await query
-        .orderBy('created_at', 'desc')
-        .limit(perPage)
-        .offset((page - 1) * perPage)
-
-      return response.json({
-        data: data.map(formatRequest),
-        total,
-        page,
-        perPage,
+    return this.withDb(response, emptyPage(page, perPage), async () => {
+      const result = await this.dashboardStore.getRequests(page, perPage, {
+        method: qs.method ? qs.method.toUpperCase() : undefined,
+        url: qs.url || undefined,
+        status: qs.status ? Number(qs.status) : undefined,
       })
-    } catch {
-      return response.json({ data: [], total: 0 })
-    }
+
+      return {
+        data: result.data.map(formatRequest),
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+      }
+    })
   }
 
-  /**
-   * GET {dashboardPath}/api/requests/:id — Single request with trace.
-   */
   async requestDetail({ params, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.notFound({ error: 'Not found' })
+    if (!this.dashboardStore.isReady()) {
+      return response.notFound({ error: 'Not found' })
+    }
 
     try {
-      const id = Number(params.id)
-      const req: any = await db('server_stats_requests').where('id', id).first()
-      if (!req) return response.notFound({ error: 'Request not found' })
-
-      const [queries, trace]: [any[], any] = await Promise.all([
-        db('server_stats_queries').where('request_id', id).orderBy('created_at', 'asc'),
-        db('server_stats_traces').where('request_id', id).first(),
-      ])
+      const detail = await this.dashboardStore.getRequestDetail(Number(params.id))
+      if (!detail) return response.notFound({ error: 'Request not found' })
 
       return response.json({
-        ...formatRequest(req),
-        queries: queries.map(formatQuery),
-        trace: trace ? formatTrace(trace) : null,
+        ...formatRequest(detail),
+        queries: (detail.queries || []).map(formatQuery),
+        trace: detail.trace ? formatTrace(detail.trace) : null,
       })
     } catch {
       return response.notFound({ error: 'Not found' })
@@ -271,78 +215,39 @@ export default class DashboardController {
   // Queries
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/queries — Paginated query history.
-   */
   async queries({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ data: [], total: 0 })
-
     const qs = request.qs()
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    try {
-      let query = db('server_stats_queries')
-
-      if (qs.duration_min) query = query.where('duration', '>=', Number(qs.duration_min))
-      if (qs.model) query = query.where('model', qs.model)
-      if (qs.method) query = query.where('method', qs.method)
-      if (qs.connection) query = query.where('connection', qs.connection)
-
-      const countResult: any = await query.clone().count('* as total').first()
-      const total = countResult?.total ?? 0
-
-      const data: any[] = await query
-        .orderBy('created_at', 'desc')
-        .limit(perPage)
-        .offset((page - 1) * perPage)
-
-      return response.json({
-        data: data.map(formatQuery),
-        total,
-        page,
-        perPage,
+    return this.withDb(response, emptyPage(page, perPage), async () => {
+      const result = await this.dashboardStore.getQueries(page, perPage, {
+        durationMin: qs.duration_min ? Number(qs.duration_min) : undefined,
+        model: qs.model || undefined,
+        method: qs.method || undefined,
+        connection: qs.connection || undefined,
       })
-    } catch {
-      return response.json({ data: [], total: 0 })
-    }
+
+      return {
+        data: result.data.map(formatQuery),
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+      }
+    })
   }
 
-  /**
-   * GET {dashboardPath}/api/queries/grouped — Grouped by normalized SQL.
-   */
   async queriesGrouped({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ groups: [] })
+    return this.withDb(response, { groups: [] }, async () => {
+      const qs = request.qs()
+      const limit = clamp(Number(qs.limit) || 50, 1, 200)
+      const sort = qs.sort || 'total_duration'
 
-    const qs = request.qs()
-    const limit = clamp(Number(qs.limit) || 50, 1, 200)
-    const sort = qs.sort || 'total_duration'
+      const groups = await this.dashboardStore.getQueriesGrouped(limit, sort)
 
-    try {
-      const validSorts: Record<string, string> = {
-        count: 'count',
-        avg_duration: 'avg_duration',
-        total_duration: 'total_duration',
-      }
-      const orderCol = validSorts[sort] || 'total_duration'
-
-      const groups: any[] = await db('server_stats_queries')
-        .select('sql_normalized')
-        .select(db.raw('COUNT(*) as count'))
-        .select(db.raw('AVG(duration) as avg_duration'))
-        .select(db.raw('MIN(duration) as min_duration'))
-        .select(db.raw('MAX(duration) as max_duration'))
-        .select(db.raw('SUM(duration) as total_duration'))
-        .groupBy('sql_normalized')
-        .orderBy(orderCol, 'desc')
-        .limit(limit)
-
-      // Calculate total time for percentage
       const totalTime = groups.reduce((sum: number, g: any) => sum + (g.total_duration || 0), 0)
 
-      return response.json({
+      return {
         groups: groups.map((g: any) => ({
           sqlNormalized: g.sql_normalized,
           count: g.count,
@@ -352,31 +257,26 @@ export default class DashboardController {
           totalDuration: round(g.total_duration),
           percentOfTotal: totalTime > 0 ? round((g.total_duration / totalTime) * 100) : 0,
         })),
-      })
-    } catch {
-      return response.json({ groups: [] })
-    }
+      }
+    })
   }
 
-  /**
-   * GET {dashboardPath}/api/queries/:id/explain — Run EXPLAIN on a query.
-   */
   async queryExplain({ params, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.notFound({ error: 'Not found' })
+    if (!this.dashboardStore.isReady()) {
+      return response.notFound({ error: 'Not found' })
+    }
 
     try {
+      const db = this.dashboardStore.getDb()
       const id = Number(params.id)
       const query: any = await db('server_stats_queries').where('id', id).first()
       if (!query) return response.notFound({ error: 'Query not found' })
 
-      // Only allow EXPLAIN on SELECT queries
       const sqlTrimmed = query.sql_text.trim().toUpperCase()
       if (!sqlTrimmed.startsWith('SELECT')) {
         return response.badRequest({ error: 'EXPLAIN is only supported for SELECT queries' })
       }
 
-      // Run EXPLAIN on the app's default database connection (not the stats connection)
       let appDb: any
       try {
         const lucid: any = await this.app.container.make('lucid.db')
@@ -385,7 +285,6 @@ export default class DashboardController {
         return response.serviceUnavailable({ error: 'App database connection not available' })
       }
 
-      // Parse stored bindings and pass them to the EXPLAIN query
       let bindings: any[] = []
       if (query.bindings) {
         try {
@@ -397,22 +296,15 @@ export default class DashboardController {
 
       const explainResult = await appDb.raw(`EXPLAIN (FORMAT JSON) ${query.sql_text}`, bindings)
 
-      // PostgreSQL with Knex: result is { rows: [...] }
-      // Each row has a "QUERY PLAN" key containing the JSON plan
       let plan: any[] = []
       const rawRows = explainResult?.rows ?? (Array.isArray(explainResult) ? explainResult : [])
       if (rawRows.length > 0 && rawRows[0]['QUERY PLAN']) {
-        // EXPLAIN (FORMAT JSON) returns a single row with a JSON array
         plan = rawRows[0]['QUERY PLAN']
       } else {
         plan = rawRows
       }
 
-      return response.json({
-        queryId: id,
-        sql: query.sql_text,
-        plan,
-      })
+      return response.json({ queryId: id, sql: query.sql_text, plan })
     } catch (error: any) {
       return response.internalServerError({
         error: 'EXPLAIN failed',
@@ -425,54 +317,35 @@ export default class DashboardController {
   // Events
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/events — Paginated event history.
-   */
   async events({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ data: [], total: 0 })
-
     const qs = request.qs()
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    try {
-      let query = db('server_stats_events')
+    return this.withDb(response, emptyPage(page, perPage), async () => {
+      const result = await this.dashboardStore.getEvents(page, perPage, {
+        eventName: qs.event_name || undefined,
+      })
 
-      if (qs.event_name) query = query.where('event_name', qs.event_name)
-
-      const countResult: any = await query.clone().count('* as total').first()
-      const total = countResult?.total ?? 0
-
-      const data: any[] = await query
-        .orderBy('created_at', 'desc')
-        .limit(perPage)
-        .offset((page - 1) * perPage)
-
-      return response.json({
-        data: data.map((e: any) => ({
+      return {
+        data: result.data.map((e: any) => ({
           id: e.id,
           requestId: e.request_id,
           eventName: e.event_name,
           data: safeParseJson(e.data),
           createdAt: e.created_at,
         })),
-        total,
-        page,
-        perPage,
-      })
-    } catch {
-      return response.json({ data: [], total: 0 })
-    }
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+      }
+    })
   }
 
   // ---------------------------------------------------------------------------
   // Routes
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/routes — Route table (delegates to DebugStore).
-   */
   async routes({ response }: HttpContext) {
     const routes = this.debugStore.routes.getRoutes()
     return response.json({
@@ -485,48 +358,41 @@ export default class DashboardController {
   // Logs
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/logs — Paginated logs with structured search.
-   */
   async logs({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ data: [], total: 0 })
-
     const qs = request.qs()
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 50, 1, 200)
 
-    try {
-      let query = db('server_stats_logs')
-
-      if (qs.level) query = query.where('level', qs.level)
-      if (qs.message) query = query.where('message', 'like', `%${qs.message}%`)
-      if (qs.request_id) query = query.where('request_id', qs.request_id)
-
-      // Structured JSON field search: ?field=userId&operator=equals&value=5
-      if (qs.field && qs.value !== undefined) {
-        const operator = qs.operator || 'equals'
-        const jsonPath = `$.${qs.field}`
-
-        if (operator === 'equals') {
-          query = query.whereRaw(`json_extract(data, ?) = ?`, [jsonPath, qs.value])
-        } else if (operator === 'contains') {
-          query = query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `%${qs.value}%`])
-        } else if (operator === 'starts_with') {
-          query = query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `${qs.value}%`])
-        }
+    // Build structured filters from query string
+    const structured: {
+      field: string
+      operator: 'equals' | 'contains' | 'startsWith'
+      value: string
+    }[] = []
+    if (qs.field && qs.value !== undefined) {
+      const op = qs.operator || 'equals'
+      const operatorMap: Record<string, 'equals' | 'contains' | 'startsWith'> = {
+        equals: 'equals',
+        contains: 'contains',
+        starts_with: 'startsWith',
       }
+      structured.push({
+        field: qs.field,
+        operator: operatorMap[op] || 'equals',
+        value: qs.value,
+      })
+    }
 
-      const countResult: any = await query.clone().count('* as total').first()
-      const total = countResult?.total ?? 0
+    return this.withDb(response, emptyPage(page, perPage), async () => {
+      const result = await this.dashboardStore.getLogs(page, perPage, {
+        level: qs.level || undefined,
+        search: qs.message || undefined,
+        requestId: qs.request_id || undefined,
+        structured: structured.length > 0 ? structured : undefined,
+      })
 
-      const data: any[] = await query
-        .orderBy('created_at', 'desc')
-        .limit(perPage)
-        .offset((page - 1) * perPage)
-
-      return response.json({
-        data: data.map((l: any) => ({
+      return {
+        data: result.data.map((l: any) => ({
           id: l.id,
           level: l.level,
           message: l.message,
@@ -534,80 +400,54 @@ export default class DashboardController {
           data: safeParseJson(l.data),
           createdAt: l.created_at,
         })),
-        total,
-        page,
-        perPage,
-      })
-    } catch {
-      return response.json({ data: [], total: 0 })
-    }
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+      }
+    })
   }
 
   // ---------------------------------------------------------------------------
   // Emails
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/emails — Paginated email history.
-   */
   async emails({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ data: [], total: 0 })
-
     const qs = request.qs()
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    try {
-      let query = db('server_stats_emails')
-
-      if (qs.from) query = query.where('from_addr', 'like', `%${qs.from}%`)
-      if (qs.to) query = query.where('to_addr', 'like', `%${qs.to}%`)
-      if (qs.subject) query = query.where('subject', 'like', `%${qs.subject}%`)
-      if (qs.status) query = query.where('status', qs.status)
-      if (qs.mailer) query = query.where('mailer', qs.mailer)
-
-      const countResult: any = await query.clone().count('* as total').first()
-      const total = countResult?.total ?? 0
-
-      // Strip html/text from list for performance
-      const data: any[] = await query
-        .select(
-          'id', 'from_addr', 'to_addr', 'cc', 'bcc', 'subject',
-          'mailer', 'status', 'message_id', 'attachment_count', 'created_at'
-        )
-        .orderBy('created_at', 'desc')
-        .limit(perPage)
-        .offset((page - 1) * perPage)
-
-      return response.json({
-        data: data.map(formatEmail),
-        total,
+    return this.withDb(response, emptyPage(page, perPage), async () => {
+      const result = await this.dashboardStore.getEmails(
         page,
         perPage,
-      })
-    } catch {
-      return response.json({ data: [], total: 0 })
-    }
+        {
+          from: qs.from || undefined,
+          to: qs.to || undefined,
+          subject: qs.subject || undefined,
+          status: qs.status || undefined,
+          mailer: qs.mailer || undefined,
+        },
+        true
+      )
+
+      return {
+        data: result.data.map(formatEmail),
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+      }
+    })
   }
 
-  /**
-   * GET {dashboardPath}/api/emails/:id/preview — Email HTML preview.
-   */
   async emailPreview({ params, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.notFound({ error: 'Not found' })
+    if (!this.dashboardStore.isReady()) {
+      return response.notFound({ error: 'Not found' })
+    }
 
     try {
-      const id = Number(params.id)
-      const email: any = await db('server_stats_emails')
-        .where('id', id)
-        .select('html', 'text_body')
-        .first()
+      const html = await this.dashboardStore.getEmailHtml(Number(params.id))
+      if (!html) return response.notFound({ error: 'Email not found' })
 
-      if (!email) return response.notFound({ error: 'Email not found' })
-
-      const html = email.html || email.text_body || '<p>No content</p>'
       return response.header('Content-Type', 'text/html; charset=utf-8').send(html)
     } catch {
       return response.notFound({ error: 'Not found' })
@@ -618,33 +458,16 @@ export default class DashboardController {
   // Traces
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/traces — Paginated trace list (lightweight).
-   */
   async traces({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ data: [], total: 0 })
-
     const qs = request.qs()
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    try {
-      const countResult: any = await db('server_stats_traces').count('* as total').first()
-      const total = countResult?.total ?? 0
+    return this.withDb(response, emptyPage(page, perPage), async () => {
+      const result = await this.dashboardStore.getTraces(page, perPage)
 
-      // Strip spans and warnings from list for performance
-      const data: any[] = await db('server_stats_traces')
-        .select(
-          'id', 'request_id', 'method', 'url', 'status_code',
-          'total_duration', 'span_count', 'warnings', 'created_at'
-        )
-        .orderBy('created_at', 'desc')
-        .limit(perPage)
-        .offset((page - 1) * perPage)
-
-      return response.json({
-        data: data.map((t: any) => ({
+      return {
+        data: result.data.map((t: any) => ({
           id: t.id,
           requestId: t.request_id,
           method: t.method,
@@ -655,25 +478,20 @@ export default class DashboardController {
           warningCount: safeParseJsonArray(t.warnings).length,
           createdAt: t.created_at,
         })),
-        total,
-        page,
-        perPage,
-      })
-    } catch {
-      return response.json({ data: [], total: 0 })
-    }
+        total: result.total,
+        page: result.page,
+        perPage: result.perPage,
+      }
+    })
   }
 
-  /**
-   * GET {dashboardPath}/api/traces/:id — Single trace with full spans.
-   */
   async traceDetail({ params, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.notFound({ error: 'Not found' })
+    if (!this.dashboardStore.isReady()) {
+      return response.notFound({ error: 'Not found' })
+    }
 
     try {
-      const id = Number(params.id)
-      const trace: any = await db('server_stats_traces').where('id', id).first()
+      const trace = await this.dashboardStore.getTraceDetail(Number(params.id))
       if (!trace) return response.notFound({ error: 'Trace not found' })
 
       return response.json(formatTrace(trace))
@@ -686,11 +504,8 @@ export default class DashboardController {
   // Cache
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/cache — Cache stats and key list.
-   */
   async cacheStats({ request, response }: HttpContext) {
-    const inspector = await this.getCacheInspector()
+    const inspector = await this.getInspector('cache')
     if (!inspector) {
       return response.json({ available: false, stats: null, keys: [] })
     }
@@ -717,11 +532,8 @@ export default class DashboardController {
     }
   }
 
-  /**
-   * GET {dashboardPath}/api/cache/:key — Single cache key detail.
-   */
   async cacheKey({ params, response }: HttpContext) {
-    const inspector = await this.getCacheInspector()
+    const inspector = await this.getInspector('cache')
     if (!inspector) {
       return response.notFound({ error: 'Cache not available' })
     }
@@ -741,11 +553,8 @@ export default class DashboardController {
   // Jobs / Queue
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/jobs — Job list with status filter.
-   */
   async jobs({ request, response }: HttpContext) {
-    const inspector = await this.getQueueInspector()
+    const inspector = await this.getInspector('queue')
     if (!inspector) {
       return response.json({ available: false, overview: null, jobs: [], total: 0 })
     }
@@ -774,11 +583,8 @@ export default class DashboardController {
     }
   }
 
-  /**
-   * GET {dashboardPath}/api/jobs/:id — Single job detail.
-   */
   async jobDetail({ params, response }: HttpContext) {
-    const inspector = await this.getQueueInspector()
+    const inspector = await this.getInspector('queue')
     if (!inspector) {
       return response.notFound({ error: 'Queue not available' })
     }
@@ -793,11 +599,8 @@ export default class DashboardController {
     }
   }
 
-  /**
-   * POST {dashboardPath}/api/jobs/:id/retry — Retry a failed job.
-   */
   async jobRetry({ params, response }: HttpContext) {
-    const inspector = await this.getQueueInspector()
+    const inspector = await this.getInspector('queue')
     if (!inspector) {
       return response.notFound({ error: 'Queue not available' })
     }
@@ -817,9 +620,6 @@ export default class DashboardController {
   // Config
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/config — Sanitized app config and env vars.
-   */
   async config({ response }: HttpContext) {
     const configData = this.configInspector.getConfig()
     const envData = this.configInspector.getEnvVars()
@@ -834,18 +634,10 @@ export default class DashboardController {
   // Saved Filters
   // ---------------------------------------------------------------------------
 
-  /**
-   * GET {dashboardPath}/api/filters — List saved filter presets.
-   */
   async savedFilters({ response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.json({ filters: [] })
-
-    try {
-      const filters: any[] = await db('server_stats_saved_filters')
-        .orderBy('created_at', 'desc')
-
-      return response.json({
+    return this.withDb(response, { filters: [] }, async () => {
+      const filters = await this.dashboardStore.getSavedFilters()
+      return {
         filters: filters.map((f: any) => ({
           id: f.id,
           name: f.name,
@@ -853,57 +645,45 @@ export default class DashboardController {
           filterConfig: safeParseJson(f.filter_config),
           createdAt: f.created_at,
         })),
-      })
-    } catch {
-      return response.json({ filters: [] })
-    }
+      }
+    })
   }
 
-  /**
-   * POST {dashboardPath}/api/filters — Create a saved filter preset.
-   */
   async createSavedFilter({ request, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.serviceUnavailable({ error: 'Database not available' })
+    if (!this.dashboardStore.isReady()) {
+      return response.serviceUnavailable({ error: 'Database not available' })
+    }
 
     try {
       const body = request.body()
-      const name = body.name
-      const section = body.section
-      const filterConfig = body.filterConfig
+      const { name, section, filterConfig } = body
 
       if (!name || !section || !filterConfig) {
-        return response.badRequest({ error: 'Missing required fields: name, section, filterConfig' })
+        return response.badRequest({
+          error: 'Missing required fields: name, section, filterConfig',
+        })
       }
 
-      const [id] = await db('server_stats_saved_filters').insert({
-        name,
-        section,
-        filter_config: typeof filterConfig === 'string' ? filterConfig : JSON.stringify(filterConfig),
-      })
+      const configObj =
+        typeof filterConfig === 'string' ? safeParseJson(filterConfig) : filterConfig
+      const result = await this.dashboardStore.createSavedFilter(name, section, configObj)
+      if (!result) {
+        return response.serviceUnavailable({ error: 'Database not available' })
+      }
 
-      return response.json({
-        id,
-        name,
-        section,
-        filterConfig: typeof filterConfig === 'string' ? safeParseJson(filterConfig) : filterConfig,
-      })
+      return response.json(result)
     } catch {
       return response.internalServerError({ error: 'Failed to create filter' })
     }
   }
 
-  /**
-   * DELETE {dashboardPath}/api/filters/:id — Delete a saved filter preset.
-   */
   async deleteSavedFilter({ params, response }: HttpContext) {
-    const db = this.dashboardStore.getDb()
-    if (!db) return response.serviceUnavailable({ error: 'Database not available' })
+    if (!this.dashboardStore.isReady()) {
+      return response.serviceUnavailable({ error: 'Database not available' })
+    }
 
     try {
-      const id = Number(params.id)
-      const deleted = await db('server_stats_saved_filters').where('id', id).del()
-
+      const deleted = await this.dashboardStore.deleteSavedFilter(Number(params.id))
       if (!deleted) return response.notFound({ error: 'Filter not found' })
       return response.json({ success: true })
     } catch {
@@ -916,8 +696,19 @@ export default class DashboardController {
   // ---------------------------------------------------------------------------
 
   /**
-   * Check if the current request is authorized via shouldShow.
+   * Wraps a store call with null-guard + try/catch boilerplate.
+   * Returns emptyValue if the store is not ready or the fn throws.
    */
+  private async withDb<T>(response: HttpContext['response'], emptyValue: T, fn: () => Promise<T>) {
+    if (!this.dashboardStore.isReady()) return response.json(emptyValue)
+
+    try {
+      return response.json(await fn())
+    } catch {
+      return response.json(emptyValue)
+    }
+  }
+
   private checkAccess(ctx: HttpContext): boolean {
     const config = this.app.config.get<any>('server_stats')
     if (!config?.shouldShow) return true
@@ -929,84 +720,92 @@ export default class DashboardController {
     }
   }
 
-  /**
-   * Get the configured dashboard path.
-   */
   private getDashboardPath(): string {
     const config = this.app.config.get<any>('server_stats')
     return config?.devToolbar?.dashboardPath ?? '/__stats'
   }
 
-  /**
-   * Try to locate and read the @adonisjs/transmit-client build file.
-   * Returns the file contents wrapped to expose `window.Transmit`, or
-   * an empty string if the package is not installed.
-   */
-  private loadTransmitClient(): string {
-    try {
-      const req = createRequire(this.app.makePath('package.json'))
-      const clientPath = req.resolve('@adonisjs/transmit-client/build/index.js')
-      const src = readFileSync(clientPath, 'utf-8')
-      console.log('[server-stats] Transmit client loaded from:', clientPath, `(${src.length} bytes)`)
-      // The file is ESM with `export { Transmit }`. Wrap it in an IIFE
-      // that captures the export and assigns it to window.Transmit.
-      return `(function(){var __exports={};(function(){${
-        src.replace(/^export\s*\{[^}]*\}\s*;?\s*$/m, '')
-      }\n__exports.Transmit=Transmit;})();window.Transmit=__exports.Transmit;})()`
-    } catch (err: any) {
-      console.log('[server-stats] Transmit client not available:', err?.message || 'unknown error')
-      console.log('[server-stats] Dashboard will use polling. Install @adonisjs/transmit-client for real-time updates.')
-      return ''
+  /** Lazy-init inspector pattern for cache and queue. */
+  private async getInspector(type: 'cache'): Promise<CacheInspector | null>
+  private async getInspector(type: 'queue'): Promise<QueueInspector | null>
+  private async getInspector(
+    type: 'cache' | 'queue'
+  ): Promise<CacheInspector | QueueInspector | null> {
+    if (type === 'cache') {
+      if (this.cacheAvailable === false) return null
+      if (this.cacheInspector) return this.cacheInspector
+
+      try {
+        const available = await CacheInspector.isAvailable(this.app)
+        this.cacheAvailable = available
+        if (!available) return null
+
+        const redis = await this.app.container.make('redis')
+        this.cacheInspector = new CacheInspector(redis)
+        return this.cacheInspector
+      } catch {
+        this.cacheAvailable = false
+        return null
+      }
+    } else {
+      if (this.queueAvailable === false) return null
+      if (this.queueInspector) return this.queueInspector
+
+      try {
+        const available = await QueueInspector.isAvailable(this.app)
+        this.queueAvailable = available
+        if (!available) return null
+
+        const queue = await this.app.container.make('queue')
+        this.queueInspector = new QueueInspector(queue)
+        return this.queueInspector
+      } catch {
+        this.queueAvailable = false
+        return null
+      }
     }
   }
 
-  /**
-   * Lazily initialize and return the CacheInspector (if Redis is available).
-   */
-  private async getCacheInspector(): Promise<CacheInspector | null> {
-    if (this.cacheAvailable === false) return null
-
-    if (this.cacheInspector) return this.cacheInspector
-
+  /** Fetch cache overview stats for the overview page. */
+  private async fetchCacheOverview() {
     try {
-      const available = await CacheInspector.isAvailable(this.app)
-      this.cacheAvailable = available
-      if (!available) return null
+      const inspector = await this.getInspector('cache')
+      if (!inspector) return null
 
-      const redis = await this.app.container.make('redis')
-      this.cacheInspector = new CacheInspector(redis)
-      return this.cacheInspector
+      const stats = await inspector.getStats()
+      return {
+        available: true,
+        totalKeys: stats.totalKeys,
+        hitRate: stats.hitRate,
+        memoryUsedHuman: stats.memoryUsedHuman,
+      }
     } catch {
-      this.cacheAvailable = false
       return null
     }
   }
 
-  /**
-   * Lazily initialize and return the QueueInspector (if Bull Queue is available).
-   */
-  private async getQueueInspector(): Promise<QueueInspector | null> {
-    if (this.queueAvailable === false) return null
-
-    if (this.queueInspector) return this.queueInspector
-
+  /** Fetch queue overview stats for the overview page. */
+  private async fetchQueueOverview() {
     try {
-      const available = await QueueInspector.isAvailable(this.app)
-      this.queueAvailable = available
-      if (!available) return null
+      const inspector = await this.getInspector('queue')
+      if (!inspector) return null
 
-      const queue = await this.app.container.make('queue')
-      this.queueInspector = new QueueInspector(queue)
-      return this.queueInspector
+      const overview = await inspector.getOverview()
+      return {
+        available: true,
+        active: overview.active,
+        waiting: overview.waiting,
+        failed: overview.failed,
+        completed: overview.completed,
+      }
     } catch {
-      this.queueAvailable = false
       return null
     }
   }
 }
 
 // ---------------------------------------------------------------------------
-// Formatting helpers
+// Formatting helpers (snake_case DB rows → camelCase API response)
 // ---------------------------------------------------------------------------
 
 function formatRequest(r: any) {
@@ -1092,50 +891,4 @@ function emptyOverview() {
     cacheStats: null,
     jobQueueStatus: null,
   }
-}
-
-// ---------------------------------------------------------------------------
-// Utility functions
-// ---------------------------------------------------------------------------
-
-function round(n: number): number {
-  return Math.round(n * 100) / 100
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
-}
-
-function minutesAgo(minutes: number): string {
-  const d = new Date(Date.now() - minutes * 60_000)
-  return d.toISOString().replace('T', ' ').slice(0, 19)
-}
-
-function parseRange(range: string): { cutoff: string } {
-  const rangeMap: Record<string, number> = {
-    '5m': 5,
-    '15m': 15,
-    '30m': 30,
-    '1h': 60,
-    '6h': 360,
-    '24h': 1440,
-    '7d': 10080,
-  }
-  const minutes = rangeMap[range] ?? 60
-  return { cutoff: minutesAgo(minutes) }
-}
-
-function safeParseJson(value: any): any {
-  if (value === null || value === undefined) return null
-  if (typeof value !== 'string') return value
-  try {
-    return JSON.parse(value)
-  } catch {
-    return value
-  }
-}
-
-function safeParseJsonArray(value: any): any[] {
-  const parsed = safeParseJson(value)
-  return Array.isArray(parsed) ? parsed : []
 }

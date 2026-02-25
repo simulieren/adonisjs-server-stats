@@ -1,3 +1,6 @@
+import { round } from '../utils/math_helpers.js'
+import { toSqliteTimestamp } from '../utils/time_helpers.js'
+
 import type { Knex } from 'knex'
 
 /**
@@ -38,14 +41,12 @@ export class ChartAggregator {
     const bucket = getBucketTimestamp()
 
     // Check if we already have a row for this bucket (idempotent)
-    const existing = await this.db('server_stats_metrics')
-      .where('bucket', bucket)
-      .first()
+    const existing = await this.db('server_stats_metrics').where('bucket', bucket).first()
 
     if (existing) return
 
     // Get requests from the last 60 seconds
-    const cutoff = new Date(Date.now() - 60_000).toISOString().replace('T', ' ').slice(0, 19)
+    const cutoff = toSqliteTimestamp(new Date(Date.now() - 60_000))
 
     const requests: any[] = await this.db('server_stats_requests')
       .where('created_at', '>=', cutoff)
@@ -87,11 +88,11 @@ export class ChartAggregator {
     await this.db('server_stats_metrics').insert({
       bucket,
       request_count: requestCount,
-      avg_duration: Math.round(avgDuration * 100) / 100,
-      p95_duration: Math.round(p95Duration * 100) / 100,
+      avg_duration: round(avgDuration),
+      p95_duration: round(p95Duration),
       error_count: errorCount,
       query_count: queryStats?.query_count ?? 0,
-      avg_query_duration: Math.round((queryStats?.avg_query_duration ?? 0) * 100) / 100,
+      avg_query_duration: round(queryStats?.avg_query_duration ?? 0),
     })
   }
 }
@@ -103,5 +104,5 @@ export class ChartAggregator {
 function getBucketTimestamp(): string {
   const now = new Date()
   now.setSeconds(0, 0)
-  return now.toISOString().replace('T', ' ').slice(0, 19)
+  return toSqliteTimestamp(now)
 }

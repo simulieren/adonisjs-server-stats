@@ -1,7 +1,13 @@
 import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { autoMigrate, runRetentionCleanup } from './migrator.js'
+
+import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
+import { extractAddresses } from '../utils/mail_helpers.js'
+import { round } from '../utils/math_helpers.js'
+import { rangeToCutoff, rangeToMinutes, roundBucket } from '../utils/time_helpers.js'
 import { ChartAggregator } from './chart_aggregator.js'
+import { autoMigrate, runRetentionCleanup } from './migrator.js'
+
 import type { DevToolbarConfig } from '../debug/types.js'
 import type { QueryRecord, EventRecord, EmailRecord, TraceRecord } from '../debug/types.js'
 
@@ -12,6 +18,7 @@ import type { QueryRecord, EventRecord, EmailRecord, TraceRecord } from '../debu
 export interface RequestFilters {
   method?: string
   url?: string
+  status?: number
   statusMin?: number
   statusMax?: number
   durationMin?: number
@@ -199,7 +206,7 @@ export class DashboardStore {
         method,
         url,
         status_code: statusCode,
-        duration: Math.round(duration * 100) / 100,
+        duration: round(duration),
         span_count: spanCount,
         warning_count: warningCount,
       })
@@ -222,7 +229,7 @@ export class DashboardStore {
         sql_text: q.sql,
         sql_normalized: normalizeSql(q.sql),
         bindings: q.bindings ? JSON.stringify(q.bindings) : null,
-        duration: Math.round(q.duration * 100) / 100,
+        duration: round(q.duration),
         method: q.method,
         model: q.model,
         connection: q.connection,
@@ -286,9 +293,7 @@ export class DashboardStore {
 
     try {
       const levelName =
-        typeof entry.levelName === 'string'
-          ? entry.levelName
-          : String(entry.level || 'unknown')
+        typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
 
       await this.db('server_stats_logs').insert({
         level: levelName,
@@ -311,7 +316,7 @@ export class DashboardStore {
         method: trace.method,
         url: trace.url,
         status_code: trace.statusCode,
-        total_duration: Math.round(trace.totalDuration * 100) / 100,
+        total_duration: round(trace.totalDuration),
         span_count: trace.spanCount,
         spans: JSON.stringify(trace.spans),
         warnings: trace.warnings.length > 0 ? JSON.stringify(trace.warnings) : null,
@@ -365,6 +370,7 @@ export class DashboardStore {
     return this.paginate('server_stats_requests', page, perPage, (query) => {
       if (filters?.method) query.where('method', filters.method)
       if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
+      if (filters?.status) query.where('status_code', filters.status)
       if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
       if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
       if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
@@ -392,8 +398,15 @@ export class DashboardStore {
    * Grouped query patterns: aggregated by sql_normalized
    * with count, avg/min/max/total duration.
    */
-  async getQueriesGrouped(): Promise<any[]> {
+  async getQueriesGrouped(limit: number = 200, sort: string = 'total_duration'): Promise<any[]> {
     if (!this.db) return []
+
+    const validSorts: Record<string, string> = {
+      count: 'count',
+      avg_duration: 'avg_duration',
+      total_duration: 'total_duration',
+    }
+    const orderCol = validSorts[sort] || 'total_duration'
 
     return this.db('server_stats_queries')
       .select(
@@ -405,8 +418,8 @@ export class DashboardStore {
         this.db.raw('ROUND(SUM(duration), 2) as total_duration')
       )
       .groupBy('sql_normalized')
-      .orderBy('count', 'desc')
-      .limit(200)
+      .orderBy(orderCol, 'desc')
+      .limit(limit)
   }
 
   /** Paginated event history with optional filters. */
@@ -424,7 +437,8 @@ export class DashboardStore {
   async getEmails(
     page: number = 1,
     perPage: number = 50,
-    filters?: EmailFilters
+    filters?: EmailFilters,
+    excludeBody: boolean = false
   ): Promise<PaginatedResult<any>> {
     return this.paginate('server_stats_emails', page, perPage, (query) => {
       if (filters?.from) query.where('from_addr', 'like', `%${filters.from}%`)
@@ -432,14 +446,33 @@ export class DashboardStore {
       if (filters?.subject) query.where('subject', 'like', `%${filters.subject}%`)
       if (filters?.mailer) query.where('mailer', filters.mailer)
       if (filters?.status) query.where('status', filters.status)
+      if (excludeBody) {
+        query.select(
+          'id',
+          'from_addr',
+          'to_addr',
+          'cc',
+          'bcc',
+          'subject',
+          'mailer',
+          'status',
+          'message_id',
+          'attachment_count',
+          'created_at'
+        )
+      }
     })
   }
 
-  /** Get email HTML body for preview. */
+  /** Get email HTML body for preview (falls back to text_body). */
   async getEmailHtml(id: number): Promise<string | null> {
     if (!this.db) return null
-    const row = await this.db('server_stats_emails').where('id', id).select('html').first()
-    return row?.html ?? null
+    const row = await this.db('server_stats_emails')
+      .where('id', id)
+      .select('html', 'text_body')
+      .first()
+    if (!row) return null
+    return row.html || row.text_body || null
   }
 
   /**
@@ -501,12 +534,8 @@ export class DashboardStore {
 
     return {
       ...row,
-      spans: typeof row.spans === 'string' ? JSON.parse(row.spans) : row.spans,
-      warnings: row.warnings
-        ? typeof row.warnings === 'string'
-          ? JSON.parse(row.warnings)
-          : row.warnings
-        : [],
+      spans: safeParseJson(row.spans) ?? [],
+      warnings: safeParseJsonArray(row.warnings),
     }
   }
 
@@ -530,12 +559,8 @@ export class DashboardStore {
       trace: trace
         ? {
             ...trace,
-            spans: typeof trace.spans === 'string' ? JSON.parse(trace.spans) : trace.spans,
-            warnings: trace.warnings
-              ? typeof trace.warnings === 'string'
-                ? JSON.parse(trace.warnings)
-                : trace.warnings
-              : [],
+            spans: safeParseJson(trace.spans) ?? [],
+            warnings: safeParseJsonArray(trace.warnings),
           }
         : null,
     }
@@ -611,10 +636,10 @@ export class DashboardStore {
       .limit(5)
 
     return {
-      avgResponseTime: Math.round(avgResponseTime * 100) / 100,
-      p95ResponseTime: Math.round(p95ResponseTime * 100) / 100,
-      requestsPerMinute: Math.round(requestsPerMin * 100) / 100,
-      errorRate: Math.round((errorCount / total) * 10000) / 100,
+      avgResponseTime: round(avgResponseTime),
+      p95ResponseTime: round(p95ResponseTime),
+      requestsPerMinute: round(requestsPerMin),
+      errorRate: round((errorCount / total) * 100),
       totalRequests: total,
       slowestEndpoints: slowestEndpoints.map((s: any) => ({
         url: s.url,
@@ -624,7 +649,7 @@ export class DashboardStore {
       queryStats: {
         total: queryStats?.total ?? 0,
         avgDuration: queryStats?.avg_duration ?? 0,
-        perRequest: total > 0 ? Math.round(((queryStats?.total ?? 0) / total) * 100) / 100 : 0,
+        perRequest: total > 0 ? round((queryStats?.total ?? 0) / total) : 0,
       },
       recentErrors: recentErrors.map((e: any) => ({
         id: e.id,
@@ -685,12 +710,11 @@ export class DashboardStore {
     return Array.from(grouped.values()).map((g) => ({
       bucket: g.bucket,
       request_count: g.request_count,
-      avg_duration: g._count > 0 ? Math.round((g.avg_duration / g._count) * 100) / 100 : 0,
-      p95_duration: Math.round(g.p95_duration * 100) / 100,
+      avg_duration: g._count > 0 ? round(g.avg_duration / g._count) : 0,
+      p95_duration: round(g.p95_duration),
       error_count: g.error_count,
       query_count: g.query_count,
-      avg_query_duration:
-        g._count > 0 ? Math.round((g.avg_query_duration / g._count) * 100) / 100 : 0,
+      avg_query_duration: g._count > 0 ? round(g.avg_query_duration / g._count) : 0,
     }))
   }
 
@@ -816,6 +840,18 @@ export class DashboardStore {
     } catch {
       return empty
     }
+  }
+
+  /** Get sparkline data points from pre-aggregated metrics. */
+  async getSparklineData(range: string): Promise<any[]> {
+    if (!this.db) return []
+
+    const cutoff = rangeToCutoff(range)
+    const metrics: any[] = await this.db('server_stats_metrics')
+      .where('created_at', '>=', cutoff)
+      .orderBy('bucket', 'asc')
+
+    return metrics.slice(-15)
   }
 
   // =========================================================================
@@ -970,49 +1006,4 @@ function normalizeSql(sql: string): string {
     .replace(/\b\d+(\.\d+)?\b/g, '?')
     .replace(/\s+/g, ' ')
     .trim()
-}
-
-/** Extract email addresses from various AdonisJS mail address formats. */
-function extractAddresses(value: any): string {
-  if (!value) return ''
-  if (typeof value === 'string') return value
-  if (Array.isArray(value)) {
-    return value
-      .map((v: any) => (typeof v === 'string' ? v : v?.address || ''))
-      .filter(Boolean)
-      .join(', ')
-  }
-  if (typeof value === 'object' && value.address) return value.address
-  return ''
-}
-
-/** Convert a range string to a SQLite-compatible datetime cutoff. */
-function rangeToCutoff(range: string): string {
-  const minutes = rangeToMinutes(range)
-  const cutoff = new Date(Date.now() - minutes * 60_000)
-  return cutoff.toISOString().replace('T', ' ').slice(0, 19)
-}
-
-/** Convert a range string to total minutes. */
-function rangeToMinutes(range: string): number {
-  switch (range) {
-    case '1h':
-      return 60
-    case '6h':
-      return 360
-    case '24h':
-      return 1440
-    case '7d':
-      return 10080
-    default:
-      return 60
-  }
-}
-
-/** Round a bucket timestamp string down to the nearest N minutes. */
-function roundBucket(bucket: string, minutes: number): string {
-  const date = new Date(bucket.replace(' ', 'T') + 'Z')
-  const ms = minutes * 60_000
-  const rounded = new Date(Math.floor(date.getTime() / ms) * ms)
-  return rounded.toISOString().replace('T', ' ').slice(0, 19)
 }

@@ -1,6 +1,8 @@
 import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+
 import StatsRequest from './stats_request.js'
+
+import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 
 export default class StatsEvent extends BaseModel {
   static connection = 'server_stats'

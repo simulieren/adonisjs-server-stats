@@ -21,7 +21,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
-  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_requests_created ON server_stats_requests(created_at)`)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_requests_created ON server_stats_requests(created_at)`
+  )
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_requests_url ON server_stats_requests(url)`)
 
   // -- server_stats_queries ---------------------------------------------------
@@ -40,9 +42,15 @@ export async function autoMigrate(db: Knex): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
-  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_queries_created ON server_stats_queries(created_at)`)
-  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_queries_normalized ON server_stats_queries(sql_normalized)`)
-  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_queries_request ON server_stats_queries(request_id)`)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_queries_created ON server_stats_queries(created_at)`
+  )
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_queries_normalized ON server_stats_queries(sql_normalized)`
+  )
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_queries_request ON server_stats_queries(request_id)`
+  )
 
   // -- server_stats_events ----------------------------------------------------
   await db.raw(`
@@ -54,7 +62,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
-  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_events_created ON server_stats_events(created_at)`)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_events_created ON server_stats_events(created_at)`
+  )
 
   // -- server_stats_emails ----------------------------------------------------
   await db.raw(`
@@ -74,7 +84,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
-  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_emails_created ON server_stats_emails(created_at)`)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_emails_created ON server_stats_emails(created_at)`
+  )
 
   // -- server_stats_logs ------------------------------------------------------
   await db.raw(`
@@ -106,7 +118,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
-  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_traces_created ON server_stats_traces(created_at)`)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_traces_created ON server_stats_traces(created_at)`
+  )
 
   // -- server_stats_metrics ---------------------------------------------------
   await db.raw(`
@@ -147,7 +161,9 @@ export async function runRetentionCleanup(db: Knex, retentionDays: number): Prom
   const modifier = `-${retentionDays} days`
 
   // Cascade deletes queries, events, traces via FK ON DELETE CASCADE
-  await db.raw(`DELETE FROM server_stats_requests WHERE created_at < datetime('now', ?)`, [modifier])
+  await db.raw(`DELETE FROM server_stats_requests WHERE created_at < datetime('now', ?)`, [
+    modifier,
+  ])
 
   // Standalone tables
   await db.raw(`DELETE FROM server_stats_logs WHERE created_at < datetime('now', ?)`, [modifier])

@@ -52,7 +52,9 @@ export function registerDashboardRoutes(
       // Queries
       router.get('/api/queries', bind('queries')).as('server-stats.queries')
       router.get('/api/queries/grouped', bind('queriesGrouped')).as('server-stats.queries.grouped')
-      router.get('/api/queries/:id/explain', bind('queryExplain')).as('server-stats.queries.explain')
+      router
+        .get('/api/queries/:id/explain', bind('queryExplain'))
+        .as('server-stats.queries.explain')
 
       // Events
       router.get('/api/events', bind('events')).as('server-stats.events')
@@ -73,7 +75,10 @@ export function registerDashboardRoutes(
 
       // Cache
       router.get('/api/cache', bind('cacheStats')).as('server-stats.cache')
-      router.get('/api/cache/:key', bind('cacheKey')).as('server-stats.cache.show').where('key', /.*/)
+      router
+        .get('/api/cache/:key', bind('cacheKey'))
+        .as('server-stats.cache.show')
+        .where('key', /.*/)
 
       // Jobs / Queue
       router.get('/api/jobs', bind('jobs')).as('server-stats.jobs')
