@@ -97,7 +97,8 @@ export default class ServerStatsProvider {
 
       // Exclude the stats endpoint and user-specified prefixes from tracing
       // so the debug panel's own polling doesn't flood the timeline
-      const prefixes: string[] = [...(toolbarConfig.excludeFromTracing ?? [])]
+      const defaultExcludes = ['/admin/api/debug', '/admin/api/server-stats']
+      const prefixes: string[] = [...(toolbarConfig.excludeFromTracing ?? defaultExcludes)]
       if (typeof config.endpoint === 'string') {
         prefixes.push(config.endpoint)
       }

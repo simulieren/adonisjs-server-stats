@@ -367,10 +367,10 @@ export interface DevToolbarOptions {
    *
    * @example
    * ```ts
-   * excludeFromTracing: ['/admin/api/debug']
+   * excludeFromTracing: ['/admin/api/debug', '/admin/api/server-stats']
    * ```
    *
-   * @default []
+   * @default ['/admin/api/debug', '/admin/api/server-stats']
    */
   excludeFromTracing?: string[]
 }
