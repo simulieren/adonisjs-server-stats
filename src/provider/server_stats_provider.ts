@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+
 import { registerDashboardRoutes } from '../dashboard/dashboard_routes.js'
 import { DashboardStore } from '../dashboard/dashboard_store.js'
 import { DebugStore } from '../debug/debug_store.js'
@@ -99,14 +101,37 @@ export default class ServerStatsProvider {
 
         console.log(
           `\n${tag} routes registered:\n` +
-            registeredPaths.map((p) => `  ${dim('→')} ${bold(p)}`).join('\n') +
-            '\n\n' +
-            `${tag} ${dim('heads up — these routes get polled every ~3s.')}\n` +
-            `  ${dim('global middleware (like silentAuth) runs on every poll,')}\n` +
-            `  ${dim('which means extra DB queries. two ways to fix this:')}\n` +
-            `  ${dim('1. move auth middleware to a route group (not server.use)')}\n` +
-            `  ${dim('2. use the shouldShow callback in config for access control')}\n`
+            registeredPaths.map((p) => `  ${dim('→')} ${bold(p)}`).join('\n')
         )
+
+        // Only warn about global auth middleware if:
+        // 1. shouldShow is NOT configured (user hasn't set up access control)
+        // 2. There IS auth middleware in server.use() or router.use()
+        if (!config.shouldShow) {
+          const authMiddleware = this.detectGlobalAuthMiddleware()
+          if (authMiddleware.length > 0) {
+            console.log(
+              `\n${tag} ${bold('found global auth middleware that will run on every poll:')}\n` +
+                authMiddleware.map((m) => `  ${dim('→')} ${m}`).join('\n') +
+                '\n\n' +
+                `  ${dim('these routes get polled every ~3s, so auth middleware will')}\n` +
+                `  ${dim('trigger a DB query on each poll. here are two ways to fix it:')}\n` +
+                '\n' +
+                `  ${bold('option 1:')} add a shouldShow callback to your config:\n` +
+                '\n' +
+                `  ${dim('// config/server_stats.ts')}\n` +
+                `  ${dim("shouldShow: (ctx) => ctx.auth?.user?.role === 'admin'")}\n` +
+                '\n' +
+                `  ${bold('option 2:')} move auth middleware from router.use() to a route group:\n` +
+                '\n' +
+                `  ${dim('// start/kernel.ts — remove from router.use()')}\n` +
+                `  ${dim("// () => import('#middleware/silent_auth_middleware')")}\n` +
+                '\n' +
+                `  ${dim('// start/routes.ts — add to your route groups instead')}\n` +
+                `  ${dim("router.group(() => { ... }).use(middleware.silentAuth())")}\n`
+            )
+          }
+        }
       }
     }
 
@@ -119,6 +144,63 @@ export default class ServerStatsProvider {
     } catch {
       // Edge not available — skip tag registration
     }
+  }
+
+  /**
+   * Read start/kernel.ts and detect auth-related middleware in server.use()
+   * or router.use() blocks. Returns import paths of problematic middleware.
+   *
+   * Ignores initialize_auth_middleware (no DB query — just sets up ctx.auth).
+   */
+  private detectGlobalAuthMiddleware(): string[] {
+    const found: string[] = []
+
+    try {
+      // Try both .ts and .js extensions
+      let source = ''
+      for (const ext of ['ts', 'js']) {
+        try {
+          source = readFileSync(this.app.makePath('start', `kernel.${ext}`), 'utf-8')
+          if (source) break
+        } catch {
+          // Try next extension
+        }
+      }
+
+      if (!source) return found
+
+      // Extract server.use([...]) and router.use([...]) blocks
+      const useBlockRegex = /(?:server|router)\.use\(\s*\[([\s\S]*?)\]\s*\)/g
+      let match: RegExpExecArray | null
+
+      while ((match = useBlockRegex.exec(source)) !== null) {
+        const block = match[1]
+
+        // Find all import paths in this block
+        const importRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/g
+        let importMatch: RegExpExecArray | null
+
+        while ((importMatch = importRegex.exec(block)) !== null) {
+          const importPath = importMatch[1]
+
+          // Skip initialize_auth_middleware — it just sets up ctx.auth, no DB query
+          if (importPath.includes('initialize_auth')) continue
+
+          // Detect auth-related middleware
+          if (
+            importPath.includes('auth') ||
+            importPath.includes('silent_auth') ||
+            importPath.includes('silentAuth')
+          ) {
+            found.push(importPath)
+          }
+        }
+      }
+    } catch {
+      // Can't read kernel file — skip detection
+    }
+
+    return found
   }
 
   async ready() {
