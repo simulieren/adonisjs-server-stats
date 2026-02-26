@@ -36,6 +36,7 @@ export function registerDebugRoutes(
 
   router
     .group(() => {
+      router.get('/config', bind('config')).as('server-stats.debug.config')
       router.get('/queries', bind('queries')).as('server-stats.debug.queries')
       router.get('/events', bind('events')).as('server-stats.debug.events')
       router.get('/routes', bind('routes')).as('server-stats.debug.routes')

@@ -36,7 +36,7 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
     edge.mount('ss', join(DIR, 'views'))
 
     // Read client assets once at boot
-    const css = read('client/stats-bar.css')
+    const css = read('../styles/stats-bar.css')
     const js = read('client/stats-bar.js')
 
     const endpoint =
@@ -106,7 +106,7 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
 
     if (showDebug) {
       const debugEndpoint = config.devToolbar?.debugEndpoint || '/admin/api/debug'
-      state.debugCss = read('client/debug-panel.css')
+      state.debugCss = read('../styles/debug-panel.css')
       state.debugJs = read('client/debug-panel.js')
       state.debugEndpoint = debugEndpoint
       state.logsEndpoint = debugEndpoint + '/logs'

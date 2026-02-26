@@ -1,6 +1,7 @@
 import { readFile, stat } from 'node:fs/promises'
 
 import type { DebugStore } from '../debug/debug_store.js'
+import type { ServerStatsConfig } from '../types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
 const LEVEL_NAMES: Record<number, string> = {
@@ -17,9 +18,53 @@ export default class DebugController {
 
   constructor(
     private store: DebugStore,
-    logPath: string
+    logPath: string,
+    private serverConfig?: ServerStatsConfig
   ) {
     this.logPath = logPath
+  }
+
+  async config({ response }: HttpContext) {
+    const cfg = this.serverConfig
+    const toolbarConfig = cfg?.devToolbar
+
+    // Derive feature flags from the actual config
+    const collectorNames = new Set(
+      (cfg?.collectors ?? []).map((c) => c.name)
+    )
+
+    const features = {
+      statsBar: true,
+      debugPanel: !!toolbarConfig?.enabled,
+      dashboard: !!toolbarConfig?.dashboard,
+      tracing: !!toolbarConfig?.tracing,
+      redis: collectorNames.has('redis'),
+      queues: collectorNames.has('queue'),
+      cache: collectorNames.has('redis'),
+      emails: !!toolbarConfig?.enabled,
+    }
+
+    // Custom panes from config
+    const customPanes = toolbarConfig?.panes ?? []
+
+    // Endpoint paths
+    const debugEndpoint = toolbarConfig?.debugEndpoint ?? '/admin/api/debug'
+    const dashboardPath = toolbarConfig?.dashboardPath ?? '/__stats'
+    const statsEndpoint =
+      typeof cfg?.endpoint === 'string' ? cfg.endpoint : '/admin/api/server-stats'
+
+    const endpoints = {
+      stats: statsEndpoint,
+      debug: debugEndpoint,
+      dashboard: dashboardPath,
+    }
+
+    // Transmit config
+    const transmit = {
+      channelName: cfg?.channelName ?? 'admin/server-stats',
+    }
+
+    return response.json({ features, customPanes, endpoints, transmit })
   }
 
   async queries({ response }: HttpContext) {

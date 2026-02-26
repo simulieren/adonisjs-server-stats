@@ -325,8 +325,9 @@ export default class ServerStatsProvider {
 
     // Create the debug controller (makes the debug routes functional)
     const logPath = this.app.makePath('logs', 'adonisjs.log')
+    const serverConfig = this.app.config.get<ServerStatsConfig>('server_stats')
     const DebugControllerClass = (await import('../controller/debug_controller.js')).default
-    this.debugController = new DebugControllerClass(this.debugStore, logPath)
+    this.debugController = new DebugControllerClass(this.debugStore, logPath, serverConfig)
 
     // Wire trace collector into the request tracking middleware
     if (this.debugStore.traces) {

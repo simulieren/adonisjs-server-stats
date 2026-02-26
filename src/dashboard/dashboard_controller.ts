@@ -14,7 +14,9 @@ import type { DashboardStore } from './dashboard_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
 
-const EDGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'edge')
+const SRC_DIR = dirname(fileURLToPath(import.meta.url))
+const EDGE_DIR = join(SRC_DIR, '..', 'edge')
+const STYLES_DIR = join(SRC_DIR, '..', 'styles')
 
 interface PaginatedResponse<T> {
   data: T[]
@@ -70,7 +72,7 @@ export default class DashboardController {
     }
 
     if (!this.cachedCss) {
-      this.cachedCss = readFileSync(join(EDGE_DIR, 'client', 'dashboard.css'), 'utf-8')
+      this.cachedCss = readFileSync(join(STYLES_DIR, 'dashboard.css'), 'utf-8')
     }
     if (!this.cachedJs) {
       this.cachedJs = readFileSync(join(EDGE_DIR, 'client', 'dashboard.js'), 'utf-8')

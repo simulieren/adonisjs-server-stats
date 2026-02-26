@@ -13,6 +13,8 @@ Drop a single Edge tag into your layout and get a live stats bar showing CPU, me
 
 Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 
+**New (alpha):** Native [React & Vue components](#react--vue-inertiajs--alpha) for Inertia.js apps — same features, framework-native.
+
 ![adonisjs-server-stats demo](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/demo.gif)
 
 ## Screenshots
@@ -42,7 +44,8 @@ Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 - **Visibility control** -- show only to admins, specific roles, or in dev mode
 - **SSE broadcasting** -- real-time updates via AdonisJS Transmit
 - **Prometheus export** -- expose all metrics as Prometheus gauges
-- **Self-contained** -- inline HTML/CSS/JS Edge tag, no React, no external assets
+- **Self-contained** -- inline HTML/CSS/JS Edge tag, no external assets
+- **React & Vue support (alpha)** -- native Inertia.js components with the same features as Edge
 - **Graceful degradation** -- missing optional dependencies are handled automatically
 - **Theme support** -- dark and light themes across dashboard, debug panel, and stats bar with system preference detection and manual toggle
 
@@ -420,6 +423,129 @@ Features:
 - Auto-hides for non-admin users (403 detection)
 - Scoped CSS (`.ss-` prefix)
 - Stale connection indicator (amber dot after 10s)
+
+---
+
+## React & Vue (Inertia.js) — Alpha
+
+> **Alpha feature.** The React and Vue integrations are new and may have rough edges. Bug reports and feedback are very welcome — please [open an issue](https://github.com/simulieren/adonisjs-server-stats/issues).
+
+If you're using **Inertia.js** with React or Vue instead of Edge templates, you can drop in the same stats bar, debug panel, and dashboard as fully native components. Same data, same styling, same features — just framework-native.
+
+### Install
+
+No extra packages needed. The components ship inside the main package:
+
+```bash
+npm install adonisjs-server-stats
+```
+
+Peer dependencies (all optional — install what you use):
+
+```bash
+# React
+npm install react react-dom
+
+# Vue
+npm install vue
+
+# Real-time updates (optional — falls back to polling)
+npm install @adonisjs/transmit-client
+```
+
+### React
+
+```tsx
+import { ServerStatsBar, DebugPanel, DashboardPage } from 'adonisjs-server-stats/react'
+import 'adonisjs-server-stats/react/css'
+
+// Stats bar — drop into your layout
+<ServerStatsBar endpoint="/admin/api/server-stats" intervalMs={3000} />
+
+// Debug panel — same layout, add below the stats bar
+<DebugPanel endpoint="/admin/api/debug" />
+
+// Dashboard — use as a full Inertia page
+<DashboardPage endpoint="/__stats/api" />
+```
+
+Available hooks:
+
+```tsx
+import {
+  useServerStats,
+  useDebugData,
+  useDashboardData,
+  useTheme,
+  useFeatures,
+} from 'adonisjs-server-stats/react'
+```
+
+### Vue
+
+```vue
+<script setup>
+import { ServerStatsBar, DebugPanel, DashboardPage } from 'adonisjs-server-stats/vue'
+import 'adonisjs-server-stats/vue/css'
+</script>
+
+<template>
+  <!-- Stats bar — drop into your layout -->
+  <ServerStatsBar endpoint="/admin/api/server-stats" :interval-ms="3000" />
+
+  <!-- Debug panel -->
+  <DebugPanel endpoint="/admin/api/debug" />
+
+  <!-- Dashboard — use as a full Inertia page -->
+  <DashboardPage endpoint="/__stats/api" />
+</template>
+```
+
+Available composables:
+
+```ts
+import {
+  useServerStats,
+  useDebugData,
+  useDashboardData,
+  useTheme,
+  useFeatures,
+} from 'adonisjs-server-stats/vue'
+```
+
+### Shared building blocks (React)
+
+For advanced composition, React also exports lower-level UI primitives:
+
+```tsx
+import { ThemeToggle, Badge, MethodBadge, StatusBadge, JsonViewer, Tooltip } from 'adonisjs-server-stats/react'
+```
+
+### Auth & visibility
+
+The components auto-detect your auth setup:
+
+- **Cookie auth** (default Inertia setup) — requests use `credentials: 'include'` automatically
+- **Bearer token** — pass `authToken` as a prop to any component
+
+The same `shouldShow` callback you configure on the server gates all API routes. If a user isn't authorized, the components detect the 403 and hide themselves.
+
+### Real-time updates
+
+If `@adonisjs/transmit-client` is installed, the stats bar subscribes to SSE for instant updates. Otherwise it falls back to polling at the configured interval. No configuration needed — it just works.
+
+### Theme support
+
+The React and Vue components share the same theme system as Edge. Dark/light preference syncs across all three UIs via `localStorage`, including cross-tab sync.
+
+### Known limitations (alpha)
+
+- The dashboard page is large — lazy-loading helps but initial bundle may be significant
+- Some edge cases in custom pane rendering may not be fully covered yet
+- Error boundaries are minimal — a bad API response may cause a blank panel
+- Only tested with React 18+ and Vue 3.3+
+
+Found a bug? Have feedback? [Open an issue](https://github.com/simulieren/adonisjs-server-stats/issues) — it helps a lot.
 
 ---
 
@@ -833,10 +959,13 @@ All integrations use lazy `import()` -- missing peer deps won't crash the app. T
 | `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector`, dashboard  |
 | `@adonisjs/redis`           | `redisCollector`, dashboard cache inspector   |
 | `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time |
+| `@adonisjs/transmit-client` | React/Vue real-time updates (falls back to polling) |
 | `@julr/adonisjs-prometheus` | `serverStatsCollector`                        |
 | `bullmq`                    | `queueCollector`                              |
 | `better-sqlite3`            | Dashboard (`dashboard: true`)                 |
 | `edge.js`                   | Edge tag                                      |
+| `react`, `react-dom`        | React components (alpha)                      |
+| `vue`                       | Vue components (alpha)                        |
 
 ## License
 
