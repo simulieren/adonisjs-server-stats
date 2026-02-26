@@ -1,8 +1,26 @@
+import { readFile, stat } from 'node:fs/promises'
+
 import type { DebugStore } from '../debug/debug_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
+const LEVEL_NAMES: Record<number, string> = {
+  10: 'trace',
+  20: 'debug',
+  30: 'info',
+  40: 'warn',
+  50: 'error',
+  60: 'fatal',
+}
+
 export default class DebugController {
-  constructor(private store: DebugStore) {}
+  private logPath: string
+
+  constructor(
+    private store: DebugStore,
+    logPath: string
+  ) {
+    this.logPath = logPath
+  }
 
   async queries({ response }: HttpContext) {
     const queries = this.store.queries.getLatest(500)
@@ -59,5 +77,54 @@ export default class DebugController {
       return response.notFound({ error: 'Trace not found' })
     }
     return response.json(trace)
+  }
+
+  async logs({ response }: HttpContext) {
+    try {
+      const stats = await stat(this.logPath)
+
+      // Only read last 256KB to keep response fast
+      const maxBytes = 256 * 1024
+      let content: string
+      if (stats.size > maxBytes) {
+        const { createReadStream } = await import('node:fs')
+        const stream = createReadStream(this.logPath, {
+          start: stats.size - maxBytes,
+          encoding: 'utf-8',
+        })
+        const chunks: string[] = []
+        for await (const chunk of stream) {
+          chunks.push(chunk as string)
+        }
+        content = chunks.join('')
+        // Skip first potentially incomplete line
+        const firstNewline = content.indexOf('\n')
+        if (firstNewline !== -1) content = content.slice(firstNewline + 1)
+      } else {
+        content = await readFile(this.logPath, 'utf-8')
+      }
+
+      const entries = content
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          try {
+            const entry = JSON.parse(line)
+            return {
+              ...entry,
+              levelName: LEVEL_NAMES[entry.level] || 'unknown',
+              timestamp: new Date(entry.time).toISOString(),
+            }
+          } catch {
+            return null
+          }
+        })
+        .filter(Boolean)
+
+      return response.json(entries)
+    } catch {
+      return response.json([])
+    }
   }
 }

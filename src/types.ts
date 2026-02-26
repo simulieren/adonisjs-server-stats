@@ -373,6 +373,18 @@ export interface DevToolbarOptions {
    * @default ['/admin/api/debug', '/admin/api/server-stats']
    */
   excludeFromTracing?: string[]
+
+  /**
+   * Base path for the debug toolbar API endpoints.
+   *
+   * The debug panel fetches data from endpoints under this path
+   * (e.g. `{debugEndpoint}/queries`, `{debugEndpoint}/events`).
+   *
+   * Must start with `/`.
+   *
+   * @default '/admin/api/debug'
+   */
+  debugEndpoint?: string
 }
 
 // ---------------------------------------------------------------------------

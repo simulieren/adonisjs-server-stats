@@ -8,10 +8,10 @@
  *   data-logs-endpoint — logs API URL
  */
 ;(function () {
-  const BASE = '/admin/api/debug'
   const REFRESH_INTERVAL = 3000
   const panel = document.getElementById('ss-dbg-panel')
   const wrench = document.getElementById('ss-dbg-wrench')
+  const BASE = (panel && panel.dataset.debugEndpoint) || '/admin/api/debug'
   const closeBtn = document.getElementById('ss-dbg-close')
 
   if (!panel || !wrench) return

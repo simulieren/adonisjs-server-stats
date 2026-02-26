@@ -105,9 +105,11 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
     }
 
     if (showDebug) {
+      const debugEndpoint = config.devToolbar?.debugEndpoint || '/admin/api/debug'
       state.debugCss = read('client/debug-panel.css')
       state.debugJs = read('client/debug-panel.js')
-      state.logsEndpoint = '/admin/api/debug/logs'
+      state.debugEndpoint = debugEndpoint
+      state.logsEndpoint = debugEndpoint + '/logs'
       state.customPanes = config.devToolbar?.panes || []
       state.showTracing = !!config.devToolbar?.tracing
       state.dashboardPath = config.devToolbar?.dashboard

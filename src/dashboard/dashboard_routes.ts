@@ -1,3 +1,5 @@
+import { createAccessMiddleware } from '../routes/access_middleware.js'
+
 import type DashboardController from './dashboard_controller.js'
 
 /**
@@ -97,19 +99,3 @@ export function registerDashboardRoutes(
     .use(middleware)
 }
 
-/**
- * Create a middleware function that gates access using the shouldShow callback.
- * Returns 403 if the callback returns false.
- */
-function createAccessMiddleware(shouldShow: (ctx: any) => boolean) {
-  return async (ctx: any, next: () => Promise<void>) => {
-    try {
-      if (!shouldShow(ctx)) {
-        return ctx.response.forbidden({ error: 'Access denied' })
-      }
-    } catch {
-      return ctx.response.forbidden({ error: 'Access denied' })
-    }
-    await next()
-  }
-}

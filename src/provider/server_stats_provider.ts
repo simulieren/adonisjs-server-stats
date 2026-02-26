@@ -10,8 +10,12 @@ import {
   setExcludedPrefixes,
   setOnRequestComplete,
 } from '../middleware/request_tracking_middleware.js'
+import { registerDebugRoutes } from '../routes/debug_routes.js'
+import { registerStatsRoutes } from '../routes/stats_routes.js'
 
 import type DashboardController from '../dashboard/dashboard_controller.js'
+import type DebugController from '../controller/debug_controller.js'
+import type ServerStatsController from '../controller/server_stats_controller.js'
 import type { DevToolbarConfig } from '../debug/types.js'
 import type { ServerStatsConfig } from '../types.js'
 import type { ApplicationService } from '@adonisjs/core/types'
@@ -27,6 +31,8 @@ export default class ServerStatsProvider {
   private debugBroadcastTimer: ReturnType<typeof setTimeout> | null = null
   private persistPath: string | null = null
   private flushTimer: ReturnType<typeof setInterval> | null = null
+  private statsController: ServerStatsController | null = null
+  private debugController: DebugController | null = null
 
   constructor(protected app: ApplicationService) {}
 
@@ -39,17 +45,68 @@ export default class ServerStatsProvider {
       setShouldShow(config.shouldShow)
     }
 
-    // Register dashboard routes early (before router commits).
-    // The controller is created later in ready() — routes use a lazy getter.
-    const toolbarConfig = config.devToolbar
-    if (toolbarConfig?.enabled && toolbarConfig.dashboard && !this.app.inProduction) {
-      try {
-        const router = await this.app.container.make('router')
-        const dashPath = toolbarConfig.dashboardPath ?? '/__stats'
+    let router: any = null
+    try {
+      router = await this.app.container.make('router')
+    } catch {
+      // Router not available — skip all route registration
+    }
 
-        registerDashboardRoutes(router, dashPath, () => this.dashboardController, config.shouldShow)
-      } catch {
-        // Router not available — skip route registration
+    if (router && !this.app.inProduction) {
+      const registeredPaths: string[] = []
+
+      // ── Auto-register stats bar endpoint ───────────────────────
+      if (typeof config.endpoint === 'string') {
+        registerStatsRoutes(
+          router,
+          config.endpoint,
+          () => this.statsController,
+          config.shouldShow
+        )
+        registeredPaths.push(config.endpoint)
+      }
+
+      // ── Auto-register debug toolbar routes ─────────────────────
+      const toolbarConfig = config.devToolbar
+      if (toolbarConfig?.enabled) {
+        const debugEndpoint = toolbarConfig.debugEndpoint ?? '/admin/api/debug'
+        registerDebugRoutes(
+          router,
+          debugEndpoint,
+          () => this.debugController,
+          config.shouldShow
+        )
+        registeredPaths.push(debugEndpoint + '/*')
+
+        // ── Auto-register dashboard routes ─────────────────────────
+        if (toolbarConfig.dashboard) {
+          const dashPath = toolbarConfig.dashboardPath ?? '/__stats'
+          registerDashboardRoutes(
+            router,
+            dashPath,
+            () => this.dashboardController,
+            config.shouldShow
+          )
+          registeredPaths.push(dashPath + '/*')
+        }
+      }
+
+      // Log registered routes
+      if (registeredPaths.length > 0) {
+        const tag = '\x1b[36m[ \x1b[1m🔍 server-stats\x1b[0m\x1b[36m ]\x1b[0m'
+        const dim = (s: string) => `\x1b[2m${s}\x1b[0m`
+        const bold = (s: string) => `\x1b[1m${s}\x1b[0m`
+
+        console.log(
+          `\n${tag} routes registered:\n` +
+            registeredPaths.map((p) => `  ${dim('→')} ${bold(p)}`).join('\n') +
+            '\n\n' +
+            `${tag} ${dim('heads up — these routes get polled every ~3s.')}\n` +
+            `  ${dim('global middleware (like silentAuth) runs on every poll,')}\n` +
+            `  ${dim('which means extra DB queries. two ways to fix this:')}\n` +
+            `  ${dim('1. move auth middleware to a route group (not server.use)')}\n` +
+            `  ${dim('2. use the shouldShow callback in config for access control')}\n`
+        )
       }
     }
 
@@ -77,6 +134,10 @@ export default class ServerStatsProvider {
 
     await this.engine.start()
 
+    // Create the stats controller (makes the stats route functional)
+    const StatsControllerClass = (await import('../controller/server_stats_controller.js')).default
+    this.statsController = new StatsControllerClass(this.engine)
+
     // Dev toolbar setup
     const toolbarConfig = config.devToolbar
     if (toolbarConfig?.enabled && !this.app.inProduction) {
@@ -93,13 +154,17 @@ export default class ServerStatsProvider {
         dashboardPath: toolbarConfig.dashboardPath ?? '/__stats',
         retentionDays: toolbarConfig.retentionDays ?? 7,
         dbPath: toolbarConfig.dbPath ?? '.adonisjs/server-stats/dashboard.sqlite3',
+        debugEndpoint: toolbarConfig.debugEndpoint ?? '/admin/api/debug',
       })
 
       // Exclude the stats endpoint and user-specified prefixes from tracing
       // so the debug panel's own polling doesn't flood the timeline
-      const defaultExcludes = ['/admin/api/debug', '/admin/api/server-stats']
+      const debugEndpoint = toolbarConfig.debugEndpoint ?? '/admin/api/debug'
+      const defaultExcludes = [debugEndpoint, config.endpoint as string].filter(
+        (p): p is string => typeof p === 'string'
+      )
       const prefixes: string[] = [...(toolbarConfig.excludeFromTracing ?? defaultExcludes)]
-      if (typeof config.endpoint === 'string') {
+      if (typeof config.endpoint === 'string' && !prefixes.includes(config.endpoint)) {
         prefixes.push(config.endpoint)
       }
       if (prefixes.length > 0) {
@@ -175,6 +240,11 @@ export default class ServerStatsProvider {
     }
 
     await this.debugStore.start(emitter, router)
+
+    // Create the debug controller (makes the debug routes functional)
+    const logPath = this.app.makePath('logs', 'adonisjs.log')
+    const DebugControllerClass = (await import('../controller/debug_controller.js')).default
+    this.debugController = new DebugControllerClass(this.debugStore, logPath)
 
     // Wire trace collector into the request tracking middleware
     if (this.debugStore.traces) {

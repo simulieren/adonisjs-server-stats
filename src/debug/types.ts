@@ -245,6 +245,9 @@ export interface DevToolbarConfig {
 
   /** Path to the SQLite database file for historical persistence. */
   dbPath: string
+
+  /** Base path for the debug toolbar API endpoints. */
+  debugEndpoint: string
 }
 
 // ---------------------------------------------------------------------------

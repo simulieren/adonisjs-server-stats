@@ -159,170 +159,15 @@ export default defineConfig({
 })
 ```
 
-### 4. Add routes
+### 4. Render the stats bar
 
-The package has three layers of functionality, each with its own routes:
+That's it for setup -- **all API routes are auto-registered by the package**. No controllers or route definitions needed. On startup you'll see:
 
-#### Stats bar API route (required)
-
-The stats bar polls this endpoint for live metrics. Create a controller and route:
-
-```ts
-// app/controllers/admin/server_stats_controller.ts
-import app from '@adonisjs/core/services/app'
-import type { HttpContext } from '@adonisjs/core/http'
-import type { StatsEngine } from 'adonisjs-server-stats'
-
-export default class ServerStatsController {
-  async index({ response }: HttpContext) {
-    const engine = (await app.container.make('server_stats.engine')) as StatsEngine
-    return response.json(engine.getLatestStats())
-  }
-}
+```
+[server-stats] auto-registered routes: /admin/api/server-stats, /admin/api/debug/*, /__stats/*
 ```
 
-```ts
-// start/routes.ts
-router
-  .get('/admin/api/server-stats', '#controllers/admin/server_stats_controller.index')
-  .use(middleware.superadmin())
-```
-
-> The route path must match `endpoint` in your config (default: `/admin/api/server-stats`).
-
-#### Debug toolbar routes (optional -- when `devToolbar.enabled: true`)
-
-The debug toolbar panels fetch data from these API endpoints. Create a controller and routes:
-
-```ts
-// app/controllers/admin/debug_controller.ts
-import app from '@adonisjs/core/services/app'
-import type { HttpContext } from '@adonisjs/core/http'
-import type { DebugStore } from 'adonisjs-server-stats/debug'
-
-export default class DebugController {
-  private async getStore(): Promise<DebugStore | null> {
-    try {
-      return (await app.container.make('debug.store')) as DebugStore
-    } catch {
-      return null
-    }
-  }
-
-  async queries({ response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    return response.json({ queries: store.queries.getLatest(500), summary: store.queries.getSummary() })
-  }
-
-  async events({ response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    return response.json({ events: store.events.getLatest(200), total: store.events.getTotalCount() })
-  }
-
-  async routes({ response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    return response.json({ routes: store.routes.getRoutes(), total: store.routes.getRouteCount() })
-  }
-
-  async logs({ response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    return response.json({ logs: store.logs.getLatest(500), total: store.logs.getTotalCount() })
-  }
-
-  async emails({ response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    const emails = store.emails.getLatest(100)
-    const stripped = emails.map(({ html, text, ...rest }) => rest)
-    return response.json({ emails: stripped, total: store.emails.getTotalCount() })
-  }
-
-  async emailPreview({ params, response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    const html = store.emails.getEmailHtml(Number(params.id))
-    if (!html) return response.notFound({ error: 'Email not found' })
-    return response.header('Content-Type', 'text/html; charset=utf-8').send(html)
-  }
-
-  async traces({ response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    if (!store.traces) return response.json({ traces: [], total: 0 })
-    const traces = store.traces.getLatest(100)
-    const list = traces.map(({ spans, warnings, ...rest }: any) => ({
-      ...rest,
-      warningCount: warnings.length,
-    }))
-    return response.json({ traces: list, total: store.traces.getTotalCount() })
-  }
-
-  async traceDetail({ params, response }: HttpContext) {
-    const store = await this.getStore()
-    if (!store) return response.notFound({ error: 'Debug toolbar not enabled' })
-    if (!store.traces) return response.notFound({ error: 'Tracing not enabled' })
-    const trace = store.traces.getTrace(Number(params.id))
-    if (!trace) return response.notFound({ error: 'Trace not found' })
-    return response.json(trace)
-  }
-}
-```
-
-```ts
-// start/routes.ts
-router
-  .group(() => {
-    router.get('queries', '#controllers/admin/debug_controller.queries')
-    router.get('events', '#controllers/admin/debug_controller.events')
-    router.get('routes', '#controllers/admin/debug_controller.routes')
-    router.get('logs', '#controllers/admin/debug_controller.logs')
-    router.get('emails', '#controllers/admin/debug_controller.emails')
-    router.get('emails/:id/preview', '#controllers/admin/debug_controller.emailPreview')
-    router.get('traces', '#controllers/admin/debug_controller.traces')
-    router.get('traces/:id', '#controllers/admin/debug_controller.traceDetail')
-  })
-  .prefix('/admin/api/debug')
-  .use(middleware.superadmin())
-```
-
-#### Dashboard routes (automatic -- when `devToolbar.dashboard: true`)
-
-The full-page dashboard at `/__stats` **registers its own routes automatically** -- no manual route setup needed. The following routes are created under the configured `dashboardPath` (default: `/__stats`):
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Dashboard page (HTML) |
-| GET | `/api/overview` | Overview metrics |
-| GET | `/api/overview/chart` | Time-series chart data |
-| GET | `/api/requests` | Paginated request history |
-| GET | `/api/requests/:id` | Request detail with queries/trace |
-| GET | `/api/queries` | Paginated query list |
-| GET | `/api/queries/grouped` | Queries grouped by normalized SQL |
-| GET | `/api/queries/:id/explain` | EXPLAIN plan for a query |
-| GET | `/api/events` | Paginated event list |
-| GET | `/api/routes` | Route table |
-| GET | `/api/logs` | Paginated log entries |
-| GET | `/api/emails` | Paginated email list |
-| GET | `/api/emails/:id/preview` | Email HTML preview |
-| GET | `/api/traces` | Paginated trace list |
-| GET | `/api/traces/:id` | Trace detail with spans |
-| GET | `/api/cache` | Cache stats and key listing |
-| GET | `/api/cache/:key` | Cache key detail |
-| GET | `/api/jobs` | Job queue overview |
-| GET | `/api/jobs/:id` | Job detail |
-| POST | `/api/jobs/:id/retry` | Retry a failed job |
-| GET | `/api/config` | App config (secrets redacted) |
-| GET | `/api/filters` | Saved filters |
-| POST | `/api/filters` | Create saved filter |
-| DELETE | `/api/filters/:id` | Delete saved filter |
-
-All dashboard routes are gated by the `shouldShow` callback if configured.
-
-### 5. Render the stats bar
+All routes are gated by the `shouldShow` callback if configured (see [Visibility Control](#visibility-control-shouldshow)).
 
 **Edge** (add before `</body>`):
 
@@ -364,6 +209,7 @@ All dashboard routes are gated by the `shouldShow` callback if configured.
 | `dashboardPath`        | `string`            | `'/__stats'`                                 | URL path for the dashboard page                                                                                                                                                                              |
 | `retentionDays`        | `number`            | `7`                                          | Days to keep historical data in SQLite                                                                                                                                                                       |
 | `dbPath`               | `string`            | `'.adonisjs/server-stats/dashboard.sqlite3'` | Path to the SQLite database file (relative to app root)                                                                                                                                                      |
+| `debugEndpoint`        | `string`            | `'/admin/api/debug'`                         | Base path for the debug toolbar API endpoints                                                                                                                                                                |
 | `excludeFromTracing`   | `string[]`          | `['/admin/api/debug', '/admin/api/server-stats']`                                         | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
 | `panes`                | `DebugPane[]`       | --                                           | Custom debug panel tabs                                                                                                                                                                                      |
 
@@ -457,7 +303,7 @@ interface MetricCollector {
 
 ## Visibility Control (`shouldShow`)
 
-By default the stats bar renders for every request. Use `shouldShow` to restrict it. The callback receives the AdonisJS `HttpContext` and should return `true` to show the bar, `false` to hide it.
+Use `shouldShow` to control who can see the stats bar and access all auto-registered API routes (stats, debug, dashboard). The callback receives the AdonisJS `HttpContext` and should return `true` to allow access, `false` to deny (403).
 
 Because `shouldShow` runs **after** middleware (including auth), you have full access to `ctx.auth`.
 
@@ -485,7 +331,71 @@ export default defineConfig({
 })
 ```
 
-> **Tip:** When `shouldShow` is not set, the bar renders for everyone. In production you almost always want to set this.
+> **Tip:** When `shouldShow` is not set, the bar and all routes are accessible to everyone. In production you almost always want to set this.
+
+---
+
+## Auto-Registered Routes
+
+All API routes are registered automatically by the package during `boot()` -- no manual controllers or route definitions needed. Each route group is gated by the `shouldShow` callback if configured.
+
+### Stats bar endpoint
+
+Registered when `endpoint` is a string (default: `/admin/api/server-stats`). Returns the latest stats snapshot as JSON.
+
+### Debug toolbar routes
+
+Registered when `devToolbar.enabled: true`. Base path configurable via `devToolbar.debugEndpoint` (default: `/admin/api/debug`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/queries` | SQL queries with summary stats |
+| GET | `/events` | Application events |
+| GET | `/routes` | Registered route table |
+| GET | `/logs` | Log file entries (last 256KB) |
+| GET | `/emails` | Captured emails (stripped HTML) |
+| GET | `/emails/:id/preview` | Email HTML preview |
+| GET | `/traces` | Request traces |
+| GET | `/traces/:id` | Trace detail with spans |
+
+### Dashboard routes
+
+Registered when `devToolbar.dashboard: true`. Base path configurable via `devToolbar.dashboardPath` (default: `/__stats`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Dashboard page (HTML) |
+| GET | `/api/overview` | Overview metrics |
+| GET | `/api/overview/chart` | Time-series chart data |
+| GET | `/api/requests` | Paginated request history |
+| GET | `/api/requests/:id` | Request detail with queries/trace |
+| GET | `/api/queries` | Paginated query list |
+| GET | `/api/queries/grouped` | Queries grouped by normalized SQL |
+| GET | `/api/queries/:id/explain` | EXPLAIN plan for a query |
+| GET | `/api/events` | Paginated event list |
+| GET | `/api/routes` | Route table |
+| GET | `/api/logs` | Paginated log entries |
+| GET | `/api/emails` | Paginated email list |
+| GET | `/api/emails/:id/preview` | Email HTML preview |
+| GET | `/api/traces` | Paginated trace list |
+| GET | `/api/traces/:id` | Trace detail with spans |
+| GET | `/api/cache` | Cache stats and key listing |
+| GET | `/api/cache/:key` | Cache key detail |
+| GET | `/api/jobs` | Job queue overview |
+| GET | `/api/jobs/:id` | Job detail |
+| POST | `/api/jobs/:id/retry` | Retry a failed job |
+| GET | `/api/config` | App config (secrets redacted) |
+| GET | `/api/filters` | Saved filters |
+| POST | `/api/filters` | Create saved filter |
+| DELETE | `/api/filters/:id` | Delete saved filter |
+
+### Global middleware note
+
+Auto-registered routes bypass route-level middleware but are still subject to global/server middleware. If you have auth middleware (like `silentAuth`) registered globally, each polling request will trigger a DB query every few seconds.
+
+To avoid this, either:
+- Move auth middleware to a named route group instead of global middleware
+- Use the `shouldShow` callback for access control (recommended)
 
 ---
 
@@ -531,7 +441,7 @@ export default defineConfig({
 })
 ```
 
-Register the debug API routes (see [step 4](#4-add-routes) for the full controller and route setup).
+Debug routes are auto-registered by the package at `/admin/api/debug/*` (configurable via `debugEndpoint`).
 
 ### Built-in Emails Tab
 
