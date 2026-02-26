@@ -74,53 +74,43 @@ function formatSize(bytes: number): string {
     </div>
 
     <div class="ss-dbg-search-bar">
-      <input
-        v-model="search"
-        class="ss-dbg-search"
-        placeholder="Filter keys..."
-        type="text"
-      />
+      <input v-model="search" class="ss-dbg-search" placeholder="Filter keys..." type="text" />
       <span class="ss-dbg-summary">{{ keys.length }} keys</span>
     </div>
 
     <!-- Key detail -->
     <div v-if="selectedKey" class="ss-dbg-cache-detail">
       <button class="ss-dbg-close" @click="selectedKey = null">&larr; Back</button>
-      <div style="margin-top: 8px;">
+      <div style="margin-top: 8px">
         <strong>{{ selectedKey.key }}</strong>
-        <span style="color: var(--ss-muted); margin-left: 8px;">
+        <span style="color: var(--ss-muted); margin-left: 8px">
           {{ selectedKey.type }} &middot; TTL: {{ formatTtl(selectedKey.ttl) }}
         </span>
       </div>
-      <pre v-if="selectedKey.value !== undefined">{{ JSON.stringify(selectedKey.value, null, 2) }}</pre>
+      <pre v-if="selectedKey.value !== undefined">{{
+        JSON.stringify(selectedKey.value, null, 2)
+      }}</pre>
     </div>
 
     <!-- Key list -->
     <template v-else>
-      <div v-if="keys.length === 0" class="ss-dbg-empty">
-        No cache keys found
-      </div>
+      <div v-if="keys.length === 0" class="ss-dbg-empty">No cache keys found</div>
 
       <table v-else class="ss-dbg-table">
         <thead>
           <tr>
             <th>Key</th>
-            <th style="width: 60px;">Type</th>
-            <th style="width: 70px;">TTL</th>
-            <th style="width: 70px;">Size</th>
+            <th style="width: 60px">Type</th>
+            <th style="width: 70px">TTL</th>
+            <th style="width: 70px">Size</th>
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="k in keys"
-            :key="k.key"
-            style="cursor: pointer;"
-            @click="selectedKey = k"
-          >
-            <td style="color: var(--ss-sql-color);">{{ k.key }}</td>
-            <td style="color: var(--ss-muted);">{{ k.type }}</td>
-            <td style="color: var(--ss-dim);">{{ formatTtl(k.ttl) }}</td>
-            <td style="color: var(--ss-dim);">{{ formatSize(k.size) }}</td>
+          <tr v-for="k in keys" :key="k.key" style="cursor: pointer" @click="selectedKey = k">
+            <td style="color: var(--ss-sql-color)">{{ k.key }}</td>
+            <td style="color: var(--ss-muted)">{{ k.type }}</td>
+            <td style="color: var(--ss-dim)">{{ formatTtl(k.ttl) }}</td>
+            <td style="color: var(--ss-dim)">{{ formatSize(k.size) }}</td>
           </tr>
         </tbody>
       </table>

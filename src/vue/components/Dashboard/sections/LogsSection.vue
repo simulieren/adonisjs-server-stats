@@ -91,16 +91,10 @@ function filterByRequestId(reqId: string) {
       @update:model-value="handleSearch"
     />
 
-    <div v-if="logs.length === 0" class="ss-dash-empty">
-      No log entries
-    </div>
+    <div v-if="logs.length === 0" class="ss-dash-empty">No log entries</div>
 
     <div v-else class="ss-dash-log-list">
-      <div
-        v-for="(log, i) in logs"
-        :key="log.id || i"
-        class="ss-dash-log-entry"
-      >
+      <div v-for="(log, i) in logs" :key="log.id || i" class="ss-dash-log-entry">
         <span :class="['ss-dash-log-level', levelClass(log.level)]">
           {{ log.level }}
         </span>

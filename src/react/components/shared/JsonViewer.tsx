@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react'
+
 import { compactPreview } from '../../../core/formatters.js'
 
 interface JsonViewerProps {

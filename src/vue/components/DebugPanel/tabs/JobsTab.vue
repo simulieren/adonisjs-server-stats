@@ -85,34 +85,32 @@ function handleRetry(jobId: string) {
       </div>
     </div>
 
-    <div v-if="jobs.length === 0" class="ss-dbg-empty">
-      No jobs found
-    </div>
+    <div v-if="jobs.length === 0" class="ss-dbg-empty">No jobs found</div>
 
     <table v-else class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 60px;">ID</th>
+          <th style="width: 60px">ID</th>
           <th>Name</th>
-          <th style="width: 80px;">Status</th>
+          <th style="width: 80px">Status</th>
           <th>Payload</th>
-          <th style="width: 50px;">Tries</th>
-          <th style="width: 70px;">Duration</th>
-          <th style="width: 80px;">Time</th>
-          <th style="width: 60px;"></th>
+          <th style="width: 50px">Tries</th>
+          <th style="width: 70px">Duration</th>
+          <th style="width: 80px">Time</th>
+          <th style="width: 60px"></th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="j in jobs" :key="j.id">
-          <td style="color: var(--ss-dim);">{{ j.id }}</td>
-          <td style="color: var(--ss-text);">{{ j.name }}</td>
+          <td style="color: var(--ss-dim)">{{ j.id }}</td>
+          <td style="color: var(--ss-text)">{{ j.name }}</td>
           <td>
             <span :class="statusClass(j.status)">{{ j.status }}</span>
           </td>
           <td>
             <JsonViewer :value="j.payload" />
           </td>
-          <td style="color: var(--ss-muted); text-align: center;">{{ j.attempts }}</td>
+          <td style="color: var(--ss-muted); text-align: center">{{ j.attempts }}</td>
           <td class="ss-dbg-duration">
             {{ j.duration !== null ? formatDuration(j.duration) : '-' }}
           </td>

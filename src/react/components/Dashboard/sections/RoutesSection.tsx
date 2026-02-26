@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
-import type { DashboardHookOptions } from '../../../../core/types.js'
+
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
+import { MethodBadge } from '../../shared/Badge.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
-import { MethodBadge } from '../../shared/Badge.js'
+
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface RoutesSectionProps {
   options?: DashboardHookOptions
@@ -22,11 +24,24 @@ export function RoutesSection({ options = {} }: RoutesSectionProps) {
       ) : (
         <DataTable
           columns={[
-            { key: 'method', label: 'Method', width: '70px', render: (v: string) => <MethodBadge method={v} /> },
-            { key: 'pattern', label: 'Pattern', render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span> },
+            {
+              key: 'method',
+              label: 'Method',
+              width: '70px',
+              render: (v: string) => <MethodBadge method={v} />,
+            },
+            {
+              key: 'pattern',
+              label: 'Pattern',
+              render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span>,
+            },
             { key: 'name', label: 'Name', width: '120px' },
             { key: 'handler', label: 'Handler' },
-            { key: 'middleware', label: 'Middleware', render: (v: string[]) => v?.join(', ') || '-' },
+            {
+              key: 'middleware',
+              label: 'Middleware',
+              render: (v: string[]) => v?.join(', ') || '-',
+            },
           ]}
           data={routes}
           keyField="pattern"

@@ -13,7 +13,16 @@
 
 import type { MetricDefinition, ThresholdColor } from './types.js'
 export type { MetricDefinition } from './types.js'
-import { formatBytes, formatMb, formatCount, formatUptime, getThresholdColor, getThresholdColorInverse, getRatioColor, THRESHOLD_CSS_CLASS } from './formatters.js'
+import {
+  formatBytes,
+  formatMb,
+  formatCount,
+  formatUptime,
+  getThresholdColor,
+  getThresholdColorInverse,
+  getRatioColor,
+  THRESHOLD_CSS_CLASS,
+} from './formatters.js'
 
 /** Map a threshold color to its CSS class. */
 function colorClass(color: ThresholdColor): string {
@@ -342,8 +351,7 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
     group: 'log',
     extract: (s) => s.logErrorsLast5m,
     format: (s) => `${s.logErrorsLast5m}`,
-    color: (s) =>
-      s.logErrorsLast5m > 0 ? 'ss-red' : s.logWarningsLast5m > 0 ? 'ss-amber' : '',
+    color: (s) => (s.logErrorsLast5m > 0 ? 'ss-red' : s.logWarningsLast5m > 0 ? 'ss-amber' : ''),
     historyKey: 'logErrorsLast5m',
   },
 

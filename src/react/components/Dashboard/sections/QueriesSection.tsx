@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react'
-import type { DashboardHookOptions } from '../../../../core/types.js'
-import { useDashboardData } from '../../../hooks/useDashboardData.js'
+
 import { formatDuration, formatTime } from '../../../../core/formatters.js'
+import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { DataTable } from '../shared/DataTable.js'
-import { Pagination } from '../shared/Pagination.js'
 import { FilterBar } from '../shared/FilterBar.js'
+import { Pagination } from '../shared/Pagination.js'
+
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface QueriesSectionProps {
   options?: DashboardHookOptions
@@ -42,7 +44,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
   const handleExplain = useCallback(
     async (queryId: number) => {
       try {
-        const result = await mutate(`queries/${queryId}/explain`) as any
+        const result = (await mutate(`queries/${queryId}/explain`)) as any
         // Show in a simple alert or modal
         if (result && result.plan) {
           alert(JSON.stringify(result.plan, null, 2))
@@ -82,12 +84,40 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
       ) : viewMode === 'grouped' ? (
         <DataTable
           columns={[
-            { key: 'sql_normalized', label: 'Pattern', render: (v: string) => <span style={{ color: 'var(--ss-sql-color)', fontSize: '11px' }}>{v}</span> },
+            {
+              key: 'sql_normalized',
+              label: 'Pattern',
+              render: (v: string) => (
+                <span style={{ color: 'var(--ss-sql-color)', fontSize: '11px' }}>{v}</span>
+              ),
+            },
             { key: 'count', label: 'Count', width: '60px', sortable: true },
-            { key: 'avg_duration', label: 'Avg', width: '70px', sortable: true, render: (v: number) => formatDuration(v) },
-            { key: 'min_duration', label: 'Min', width: '70px', render: (v: number) => formatDuration(v) },
-            { key: 'max_duration', label: 'Max', width: '70px', render: (v: number) => formatDuration(v) },
-            { key: 'total_duration', label: 'Total', width: '70px', sortable: true, render: (v: number) => formatDuration(v) },
+            {
+              key: 'avg_duration',
+              label: 'Avg',
+              width: '70px',
+              sortable: true,
+              render: (v: number) => formatDuration(v),
+            },
+            {
+              key: 'min_duration',
+              label: 'Min',
+              width: '70px',
+              render: (v: number) => formatDuration(v),
+            },
+            {
+              key: 'max_duration',
+              label: 'Max',
+              width: '70px',
+              render: (v: number) => formatDuration(v),
+            },
+            {
+              key: 'total_duration',
+              label: 'Total',
+              width: '70px',
+              sortable: true,
+              render: (v: number) => formatDuration(v),
+            },
           ]}
           data={queries}
           keyField="sql_normalized"
@@ -108,10 +138,15 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   <div>
                     <span
                       className={`ss-dash-sql ${expandedSql === row.id ? 'ss-dash-sql-expanded' : ''}`}
-                      onClick={(e) => { e.stopPropagation(); setExpandedSql(expandedSql === row.id ? null : row.id) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExpandedSql(expandedSql === row.id ? null : row.id)
+                      }}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => e.key === 'Enter' && setExpandedSql(expandedSql === row.id ? null : row.id)}
+                      onKeyDown={(e) =>
+                        e.key === 'Enter' && setExpandedSql(expandedSql === row.id ? null : row.id)
+                      }
                     >
                       {v}
                     </span>
@@ -119,7 +154,10 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                       <button
                         type="button"
                         className="ss-dash-explain-btn"
-                        onClick={(e) => { e.stopPropagation(); handleExplain(row.id) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleExplain(row.id)
+                        }}
                       >
                         EXPLAIN
                       </button>
@@ -127,10 +165,28 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   </div>
                 ),
               },
-              { key: 'duration', label: 'Duration', width: '70px', sortable: true, render: (v: number) => <span className={`ss-dash-duration ${v > 500 ? 'ss-dash-very-slow' : v > 100 ? 'ss-dash-slow' : ''}`}>{formatDuration(v)}</span> },
+              {
+                key: 'duration',
+                label: 'Duration',
+                width: '70px',
+                sortable: true,
+                render: (v: number) => (
+                  <span
+                    className={`ss-dash-duration ${v > 500 ? 'ss-dash-very-slow' : v > 100 ? 'ss-dash-slow' : ''}`}
+                  >
+                    {formatDuration(v)}
+                  </span>
+                ),
+              },
               { key: 'method', label: 'Type', width: '60px' },
               { key: 'model', label: 'Model', width: '90px' },
-              { key: 'created_at', label: 'Time', width: '90px', sortable: true, render: (v: string) => <span className="ss-dash-event-time">{formatTime(v)}</span> },
+              {
+                key: 'created_at',
+                label: 'Time',
+                width: '90px',
+                sortable: true,
+                render: (v: string) => <span className="ss-dash-event-time">{formatTime(v)}</span>,
+              },
             ]}
             data={queries}
             sort={sort}
@@ -139,7 +195,12 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
             emptyMessage="No queries recorded"
           />
           {meta && (
-            <Pagination page={meta.page} lastPage={meta.lastPage} total={meta.total} onPageChange={setPage} />
+            <Pagination
+              page={meta.page}
+              lastPage={meta.lastPage}
+              total={meta.total}
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

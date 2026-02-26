@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react'
-import type { RouteRecord, DebugPanelProps } from '../../../../core/types.js'
+
 import { useDebugData } from '../../../hooks/useDebugData.js'
+
+import type { RouteRecord, DebugPanelProps } from '../../../../core/types.js'
 
 interface RoutesTabProps {
   options?: DebugPanelProps

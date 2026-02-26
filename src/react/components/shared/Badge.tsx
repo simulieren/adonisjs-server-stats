@@ -1,4 +1,5 @@
 import React from 'react'
+
 import type { BadgeColor } from '../../../core/types.js'
 
 interface BadgeProps {
@@ -11,11 +12,7 @@ interface BadgeProps {
  * Colored pill badge for status indicators.
  */
 export function Badge({ color = 'muted', children, className = '' }: BadgeProps) {
-  return (
-    <span className={`ss-badge-pill ss-badge-${color} ${className}`}>
-      {children}
-    </span>
-  )
+  return <span className={`ss-badge-pill ss-badge-${color} ${className}`}>{children}</span>
 }
 
 interface MethodBadgeProps {
@@ -28,9 +25,7 @@ interface MethodBadgeProps {
  */
 export function MethodBadge({ method, className = '' }: MethodBadgeProps) {
   return (
-    <span className={`ss-method ss-method-${method.toLowerCase()} ${className}`}>
-      {method}
-    </span>
+    <span className={`ss-method ss-method-${method.toLowerCase()} ${className}`}>{method}</span>
   )
 }
 
@@ -48,9 +43,5 @@ export function StatusBadge({ code, className = '' }: StatusBadgeProps) {
   else if (code >= 400) colorClass = 'ss-status-4xx'
   else if (code >= 300) colorClass = 'ss-status-3xx'
 
-  return (
-    <span className={`ss-status ${colorClass} ${className}`}>
-      {code}
-    </span>
-  )
+  return <span className={`ss-status ${colorClass} ${className}`}>{code}</span>
 }

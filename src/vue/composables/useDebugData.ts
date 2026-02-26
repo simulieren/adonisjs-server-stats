@@ -5,7 +5,9 @@
  */
 
 import { ref, watch, onMounted, onUnmounted } from 'vue'
+
 import { ApiClient, UnauthorizedError, getDebugTabPath } from '../../core/index.js'
+
 import type { DebugTab } from '../../core/index.js'
 
 export interface UseDebugDataOptions {
@@ -19,10 +21,7 @@ export interface UseDebugDataOptions {
   refreshInterval?: number
 }
 
-export function useDebugData(
-  tab: () => DebugTab | string,
-  options: UseDebugDataOptions = {}
-) {
+export function useDebugData(tab: () => DebugTab | string, options: UseDebugDataOptions = {}) {
   const {
     baseUrl = '',
     debugEndpoint = '/admin/api/debug',

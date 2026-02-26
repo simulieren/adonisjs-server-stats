@@ -1,3 +1,4 @@
+import { log } from '../utils/logger.js'
 import { LogStreamService } from './log_stream_service.js'
 
 import type { ApplicationService } from '@adonisjs/core/types'
@@ -14,6 +15,7 @@ export default class LogStreamProvider {
     try {
       transmit = await this.app.container.make('transmit')
     } catch {
+      log.info('@adonisjs/transmit not available — live log streaming disabled')
       return
     }
 

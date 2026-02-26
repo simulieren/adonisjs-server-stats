@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import type { EmailRecord, DebugPanelProps } from '../../../../core/types.js'
-import { useDebugData } from '../../../hooks/useDebugData.js'
+
 import { timeAgo } from '../../../../core/formatters.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
+
+import type { EmailRecord, DebugPanelProps } from '../../../../core/types.js'
 
 interface EmailsTabProps {
   options?: DebugPanelProps
@@ -24,10 +26,7 @@ export function EmailsTab({ options }: EmailsTabProps) {
     )
   }, [data, search])
 
-  const previewEmail = useMemo(
-    () => emails.find((e) => e.id === previewId),
-    [emails, previewId]
-  )
+  const previewEmail = useMemo(() => emails.find((e) => e.id === previewId), [emails, previewId])
 
   const closePreview = useCallback(() => setPreviewId(null), [])
 

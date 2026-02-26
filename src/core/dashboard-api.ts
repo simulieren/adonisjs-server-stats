@@ -8,8 +8,9 @@
 // can use them identically.
 // ---------------------------------------------------------------------------
 
-import type { ApiClient } from './api-client.js'
 import { getDashboardSectionPath } from './routes.js'
+
+import type { ApiClient } from './api-client.js'
 
 /**
  * High-level API client for dashboard-specific operations.
@@ -32,9 +33,7 @@ export class DashboardApi {
    */
   async fetchSection(section: string, queryString?: string) {
     const path = getDashboardSectionPath(section)
-    const url = queryString
-      ? `${this.basePath}${path}?${queryString}`
-      : `${this.basePath}${path}`
+    const url = queryString ? `${this.basePath}${path}?${queryString}` : `${this.basePath}${path}`
     return this.client.fetch<any>(url)
   }
 

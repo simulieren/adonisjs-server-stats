@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react'
-import type { MetricDefinition } from '../../../core/types.js'
-import type { ServerStats } from '../../../core/types.js'
+
 import { formatStatNum } from '../../../core/formatters.js'
 import { computeStats } from '../../../core/sparkline.js'
 import { Sparkline } from './Sparkline.js'
+
+import type { MetricDefinition } from '../../../core/types.js'
+import type { ServerStats } from '../../../core/types.js'
 
 /** Map color class to hex for sparklines. */
 const COLOR_MAP: Record<string, string> = {
@@ -38,7 +40,7 @@ export function MetricCard({ metric, stats, history, className = '' }: MetricCar
 
   const value = metric.value ? metric.value(stats) : metric.format(stats)
   const colorClass = metric.color ? metric.color(stats) : ''
-  const hexColor = colorClass ? (COLOR_MAP[colorClass] || '#34d399') : '#34d399'
+  const hexColor = colorClass ? COLOR_MAP[colorClass] || '#34d399' : '#34d399'
 
   const detail = typeof metric.detail === 'function' ? metric.detail(stats) : metric.detail
 
@@ -46,13 +48,10 @@ export function MetricCard({ metric, stats, history, className = '' }: MetricCar
 
   const showTooltip = pinned || hovered
 
-  const handleClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.stopPropagation()
-      setPinned((prev) => !prev)
-    },
-    []
-  )
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPinned((prev) => !prev)
+  }, [])
 
   // Close pinned tooltip when clicking outside
   useEffect(() => {

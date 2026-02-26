@@ -1,3 +1,5 @@
+import { log, dim, bold } from '../utils/logger.js'
+
 import type { MetricCollector } from './collector.js'
 
 /**
@@ -72,10 +74,31 @@ export interface QueueCollectorOptions {
 export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
   const queueName = opts.queueName ?? 'default'
 
+  let warnedMissingBullmq = false
+  let warnedConnectionError = false
+  let warnedMissingConnection = false
+
   return {
     name: 'queue',
 
     async collect() {
+      if (!opts.connection) {
+        if (!warnedMissingConnection) {
+          warnedMissingConnection = true
+          log.warn(`Queue collector ${bold(queueName)}: missing ${bold('connection')} option`)
+          log.block('Provide a Redis connection when creating the collector:', [
+            `${dim('queueCollector({ connection: { host: "localhost", port: 6379 } })')}`,
+          ])
+        }
+        return {
+          queueActive: 0,
+          queueWaiting: 0,
+          queueDelayed: 0,
+          queueFailed: 0,
+          queueWorkerCount: 0,
+        }
+      }
+
       try {
         const { Queue } = await import('bullmq')
         const queue = new Queue(queueName, { connection: opts.connection })
@@ -88,7 +111,37 @@ export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
           queueFailed: counts.failed ?? 0,
           queueWorkerCount: workers.length,
         }
-      } catch {
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        const isImportError =
+          message.includes('Cannot find package') ||
+          message.includes('MODULE_NOT_FOUND') ||
+          message.includes('ERR_MODULE_NOT_FOUND')
+
+        if (isImportError) {
+          if (!warnedMissingBullmq) {
+            warnedMissingBullmq = true
+            log.warn(`Queue collector ${bold(queueName)}: ${bold('bullmq')} is not installed`)
+            log.block('Install the peer dependency to enable queue metrics:', [
+              `${bold('npm install bullmq')}`,
+              dim('Queue metrics will return zeros until bullmq is available.'),
+            ])
+          }
+        } else {
+          if (!warnedConnectionError) {
+            warnedConnectionError = true
+            const { host, port } = opts.connection
+            log.warn(
+              `Queue collector ${bold(queueName)}: cannot connect to Redis at ${bold(`${host}:${port}`)}`
+            )
+            log.block('Connection failed:', [
+              `${dim('Error:')} ${message}`,
+              dim('Is Redis running? Check with: redis-cli ping'),
+              dim('Queue metrics will return zeros until the connection succeeds.'),
+            ])
+          }
+        }
+
         return {
           queueActive: 0,
           queueWaiting: 0,

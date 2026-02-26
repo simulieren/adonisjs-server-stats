@@ -129,9 +129,7 @@ function copyConfig() {
       >
         Environment
       </button>
-      <button class="ss-dash-action-btn" @click="copyConfig" style="margin-left: auto;">
-        Copy
-      </button>
+      <button class="ss-dash-action-btn" @click="copyConfig" style="margin-left: auto">Copy</button>
     </div>
 
     <FilterBar
@@ -140,16 +138,10 @@ function copyConfig() {
       :summary="`${filteredNodes.length} entries`"
     />
 
-    <div v-if="filteredNodes.length === 0" class="ss-dash-empty">
-      No config entries
-    </div>
+    <div v-if="filteredNodes.length === 0" class="ss-dash-empty">No config entries</div>
 
     <div v-else class="ss-dash-config-sections">
-      <div
-        v-for="node in filteredNodes"
-        :key="node.key"
-        class="ss-dash-config-section"
-      >
+      <div v-for="node in filteredNodes" :key="node.key" class="ss-dash-config-section">
         <div
           v-if="node.type === 'section'"
           class="ss-dash-config-section-header"
@@ -159,24 +151,15 @@ function copyConfig() {
             {{ expandedSections.has(node.key) ? '\u25BC' : '\u25B6' }}
           </span>
           <span class="ss-dash-config-key">{{ node.key }}</span>
-          <span class="ss-dash-config-count">
-            {{ Object.keys(node.value).length }} keys
-          </span>
+          <span class="ss-dash-config-count"> {{ Object.keys(node.value).length }} keys </span>
         </div>
-        <div
-          v-else
-          class="ss-dash-config-section-header ss-dash-config-leaf"
-        >
-          <span class="ss-dash-config-toggle" style="visibility: hidden;">&bull;</span>
+        <div v-else class="ss-dash-config-section-header ss-dash-config-leaf">
+          <span class="ss-dash-config-toggle" style="visibility: hidden">&bull;</span>
           <span class="ss-dash-config-key">{{ node.key }}</span>
-          <span :class="valueClass(node)" style="margin-left: auto;">
+          <span :class="valueClass(node)" style="margin-left: auto">
             {{ formatValue(node) }}
           </span>
-          <button
-            v-if="node.redacted"
-            class="ss-dash-reveal-btn"
-            @click="toggleReveal(node.key)"
-          >
+          <button v-if="node.redacted" class="ss-dash-reveal-btn" @click="toggleReveal(node.key)">
             {{ revealedKeys.has(node.key) ? 'Hide' : 'Reveal' }}
           </button>
         </div>

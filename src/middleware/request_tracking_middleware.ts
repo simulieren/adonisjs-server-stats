@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { performance } from 'node:perf_hooks'
 
 import { getRequestMetrics } from '../collectors/http_collector.js'
+import { log } from '../utils/logger.js'
 
 import type { TraceCollector } from '../debug/trace_collector.js'
 import type { TraceRecord } from '../debug/types.js'
@@ -23,6 +24,11 @@ const excludedRequestAls = new AsyncLocalStorage<boolean>()
 export function isExcludedRequest(): boolean {
   return excludedRequestAls.getStore() === true
 }
+
+/**
+ * Warn-once guard for shouldShow callback failures.
+ */
+let warnedShouldShow = false
 
 /**
  * Module-level `shouldShow` callback, set by the provider at boot.
@@ -107,7 +113,13 @@ export default class RequestTrackingMiddleware {
         __ssShowFn: () => {
           try {
             return shouldShowFn!(ctx)
-          } catch {
+          } catch (err) {
+            if (!warnedShouldShow) {
+              warnedShouldShow = true
+              log.warn(
+                'shouldShow callback threw — stats bar will be hidden: ' + (err as any)?.message
+              )
+            }
             return false
           }
         },

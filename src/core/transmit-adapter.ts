@@ -145,9 +145,7 @@ export interface ChannelSubscriptionConfig {
  * @param config - Channel subscription configuration.
  * @returns A handle with an `unsubscribe()` method.
  */
-export function subscribeToChannel(
-  config: ChannelSubscriptionConfig
-): { unsubscribe: () => void } {
+export function subscribeToChannel(config: ChannelSubscriptionConfig): { unsubscribe: () => void } {
   let didError = false
 
   const handle = createTransmitSubscription({

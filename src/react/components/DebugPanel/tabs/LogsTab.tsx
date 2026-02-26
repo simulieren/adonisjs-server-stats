@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import type { DebugPanelProps } from '../../../../core/types.js'
-import { useDebugData } from '../../../hooks/useDebugData.js'
+
 import { formatTime } from '../../../../core/formatters.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
+
+import type { DebugPanelProps } from '../../../../core/types.js'
 
 interface LogEntry {
   level: string

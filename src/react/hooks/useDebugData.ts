@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { DebugTab, DebugPanelProps } from '../../core/types.js'
+
 import { ApiClient, UnauthorizedError } from '../../core/api-client.js'
 import { getDebugTabPath } from '../../core/routes.js'
+
+import type { DebugTab, DebugPanelProps } from '../../core/types.js'
 
 const REFRESH_INTERVAL = 3000
 
@@ -11,10 +13,7 @@ const REFRESH_INTERVAL = 3000
  * Fetches data for the active tab from the debug endpoint,
  * auto-refreshes every 3 seconds while the tab is active.
  */
-export function useDebugData<T = any>(
-  tab: DebugTab,
-  options: DebugPanelProps = {}
-) {
+export function useDebugData<T = any>(tab: DebugTab, options: DebugPanelProps = {}) {
   const { baseUrl = '', debugEndpoint = '/admin/api/debug', authToken } = options
 
   const [data, setData] = useState<T | null>(null)
@@ -91,12 +90,9 @@ export function useDebugData<T = any>(
   }, [])
 
   /** Cache data for fetchOnce tabs. */
-  const cacheForTab = useCallback(
-    (tabName: string, tabData: any) => {
-      fetchOnceCache.current[tabName] = tabData
-    },
-    []
-  )
+  const cacheForTab = useCallback((tabName: string, tabData: any) => {
+    fetchOnceCache.current[tabName] = tabData
+  }, [])
 
   return { data, isLoading, error, refresh, clearData, cacheForTab } as const
 }

@@ -1,6 +1,7 @@
 import { writeFile, readFile, rename, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
+import { log, bold } from '../utils/logger.js'
 import { EmailCollector } from './email_collector.js'
 import { EventCollector } from './event_collector.js'
 import { QueryCollector } from './query_collector.js'
@@ -76,11 +77,20 @@ export class DebugStore {
     let raw: string
     try {
       raw = await readFile(filePath, 'utf-8')
-    } catch {
-      return // file doesn't exist yet
+    } catch (error: any) {
+      if (error?.code !== 'ENOENT') {
+        log.warn(`Failed to read persisted debug data from ${bold(filePath)}: ${error?.message}`)
+      }
+      return
     }
 
-    const data = JSON.parse(raw)
+    let data: any
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      log.warn(`Persisted debug data corrupted, resetting: ${bold(filePath)}`)
+      return
+    }
 
     if (Array.isArray(data.queries) && data.queries.length > 0) {
       this.queries.loadRecords(data.queries)

@@ -198,23 +198,23 @@ All routes are gated by the `shouldShow` callback if configured (see [Visibility
 
 ### `DevToolbarOptions`
 
-| Option                 | Type                | Default                                      | Description                                                                                                                                                                                                  |
-| ---------------------- | ------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `enabled`              | `boolean`           | `false`                                      | Enable the dev toolbar                                                                                                                                                                                       |
-| `maxQueries`           | `number`            | `500`                                        | Max SQL queries to buffer                                                                                                                                                                                    |
-| `maxEvents`            | `number`            | `200`                                        | Max events to buffer                                                                                                                                                                                         |
-| `maxEmails`            | `number`            | `100`                                        | Max emails to buffer                                                                                                                                                                                         |
-| `slowQueryThresholdMs` | `number`            | `100`                                        | Slow query threshold (ms)                                                                                                                                                                                    |
-| `persistDebugData`     | `boolean \| string` | `false`                                      | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path.                                                                                |
-| `tracing`              | `boolean`           | `false`                                      | Enable per-request tracing with timeline visualization                                                                                                                                                       |
-| `maxTraces`            | `number`            | `200`                                        | Max request traces to buffer                                                                                                                                                                                 |
-| `dashboard`            | `boolean`           | `false`                                      | Enable the full-page dashboard (requires `better-sqlite3`)                                                                                                                                                   |
-| `dashboardPath`        | `string`            | `'/__stats'`                                 | URL path for the dashboard page                                                                                                                                                                              |
-| `retentionDays`        | `number`            | `7`                                          | Days to keep historical data in SQLite                                                                                                                                                                       |
-| `dbPath`               | `string`            | `'.adonisjs/server-stats/dashboard.sqlite3'` | Path to the SQLite database file (relative to app root)                                                                                                                                                      |
-| `debugEndpoint`        | `string`            | `'/admin/api/debug'`                         | Base path for the debug toolbar API endpoints                                                                                                                                                                |
-| `excludeFromTracing`   | `string[]`          | `['/admin/api/debug', '/admin/api/server-stats']`                                         | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
-| `panes`                | `DebugPane[]`       | --                                           | Custom debug panel tabs                                                                                                                                                                                      |
+| Option                 | Type                | Default                                           | Description                                                                                                                                                                                                  |
+| ---------------------- | ------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `enabled`              | `boolean`           | `false`                                           | Enable the dev toolbar                                                                                                                                                                                       |
+| `maxQueries`           | `number`            | `500`                                             | Max SQL queries to buffer                                                                                                                                                                                    |
+| `maxEvents`            | `number`            | `200`                                             | Max events to buffer                                                                                                                                                                                         |
+| `maxEmails`            | `number`            | `100`                                             | Max emails to buffer                                                                                                                                                                                         |
+| `slowQueryThresholdMs` | `number`            | `100`                                             | Slow query threshold (ms)                                                                                                                                                                                    |
+| `persistDebugData`     | `boolean \| string` | `false`                                           | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path.                                                                                |
+| `tracing`              | `boolean`           | `false`                                           | Enable per-request tracing with timeline visualization                                                                                                                                                       |
+| `maxTraces`            | `number`            | `200`                                             | Max request traces to buffer                                                                                                                                                                                 |
+| `dashboard`            | `boolean`           | `false`                                           | Enable the full-page dashboard (requires `better-sqlite3`)                                                                                                                                                   |
+| `dashboardPath`        | `string`            | `'/__stats'`                                      | URL path for the dashboard page                                                                                                                                                                              |
+| `retentionDays`        | `number`            | `7`                                               | Days to keep historical data in SQLite                                                                                                                                                                       |
+| `dbPath`               | `string`            | `'.adonisjs/server-stats/dashboard.sqlite3'`      | Path to the SQLite database file (relative to app root)                                                                                                                                                      |
+| `debugEndpoint`        | `string`            | `'/admin/api/debug'`                              | Base path for the debug toolbar API endpoints                                                                                                                                                                |
+| `excludeFromTracing`   | `string[]`          | `['/admin/api/debug', '/admin/api/server-stats']` | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
+| `panes`                | `DebugPane[]`       | --                                                | Custom debug panel tabs                                                                                                                                                                                      |
 
 ---
 
@@ -350,53 +350,54 @@ Registered when `endpoint` is a string (default: `/admin/api/server-stats`). Ret
 
 Registered when `devToolbar.enabled: true`. Base path configurable via `devToolbar.debugEndpoint` (default: `/admin/api/debug`).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/queries` | SQL queries with summary stats |
-| GET | `/events` | Application events |
-| GET | `/routes` | Registered route table |
-| GET | `/logs` | Log file entries (last 256KB) |
-| GET | `/emails` | Captured emails (stripped HTML) |
-| GET | `/emails/:id/preview` | Email HTML preview |
-| GET | `/traces` | Request traces |
-| GET | `/traces/:id` | Trace detail with spans |
+| Method | Path                  | Description                     |
+| ------ | --------------------- | ------------------------------- |
+| GET    | `/queries`            | SQL queries with summary stats  |
+| GET    | `/events`             | Application events              |
+| GET    | `/routes`             | Registered route table          |
+| GET    | `/logs`               | Log file entries (last 256KB)   |
+| GET    | `/emails`             | Captured emails (stripped HTML) |
+| GET    | `/emails/:id/preview` | Email HTML preview              |
+| GET    | `/traces`             | Request traces                  |
+| GET    | `/traces/:id`         | Trace detail with spans         |
 
 ### Dashboard routes
 
 Registered when `devToolbar.dashboard: true`. Base path configurable via `devToolbar.dashboardPath` (default: `/__stats`).
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Dashboard page (HTML) |
-| GET | `/api/overview` | Overview metrics |
-| GET | `/api/overview/chart` | Time-series chart data |
-| GET | `/api/requests` | Paginated request history |
-| GET | `/api/requests/:id` | Request detail with queries/trace |
-| GET | `/api/queries` | Paginated query list |
-| GET | `/api/queries/grouped` | Queries grouped by normalized SQL |
-| GET | `/api/queries/:id/explain` | EXPLAIN plan for a query |
-| GET | `/api/events` | Paginated event list |
-| GET | `/api/routes` | Route table |
-| GET | `/api/logs` | Paginated log entries |
-| GET | `/api/emails` | Paginated email list |
-| GET | `/api/emails/:id/preview` | Email HTML preview |
-| GET | `/api/traces` | Paginated trace list |
-| GET | `/api/traces/:id` | Trace detail with spans |
-| GET | `/api/cache` | Cache stats and key listing |
-| GET | `/api/cache/:key` | Cache key detail |
-| GET | `/api/jobs` | Job queue overview |
-| GET | `/api/jobs/:id` | Job detail |
-| POST | `/api/jobs/:id/retry` | Retry a failed job |
-| GET | `/api/config` | App config (secrets redacted) |
-| GET | `/api/filters` | Saved filters |
-| POST | `/api/filters` | Create saved filter |
-| DELETE | `/api/filters/:id` | Delete saved filter |
+| Method | Path                       | Description                       |
+| ------ | -------------------------- | --------------------------------- |
+| GET    | `/`                        | Dashboard page (HTML)             |
+| GET    | `/api/overview`            | Overview metrics                  |
+| GET    | `/api/overview/chart`      | Time-series chart data            |
+| GET    | `/api/requests`            | Paginated request history         |
+| GET    | `/api/requests/:id`        | Request detail with queries/trace |
+| GET    | `/api/queries`             | Paginated query list              |
+| GET    | `/api/queries/grouped`     | Queries grouped by normalized SQL |
+| GET    | `/api/queries/:id/explain` | EXPLAIN plan for a query          |
+| GET    | `/api/events`              | Paginated event list              |
+| GET    | `/api/routes`              | Route table                       |
+| GET    | `/api/logs`                | Paginated log entries             |
+| GET    | `/api/emails`              | Paginated email list              |
+| GET    | `/api/emails/:id/preview`  | Email HTML preview                |
+| GET    | `/api/traces`              | Paginated trace list              |
+| GET    | `/api/traces/:id`          | Trace detail with spans           |
+| GET    | `/api/cache`               | Cache stats and key listing       |
+| GET    | `/api/cache/:key`          | Cache key detail                  |
+| GET    | `/api/jobs`                | Job queue overview                |
+| GET    | `/api/jobs/:id`            | Job detail                        |
+| POST   | `/api/jobs/:id/retry`      | Retry a failed job                |
+| GET    | `/api/config`              | App config (secrets redacted)     |
+| GET    | `/api/filters`             | Saved filters                     |
+| POST   | `/api/filters`             | Create saved filter               |
+| DELETE | `/api/filters/:id`         | Delete saved filter               |
 
 ### Global middleware note
 
 Auto-registered routes bypass route-level middleware but are still subject to global/server middleware. If you have auth middleware (like `silentAuth`) registered globally, each polling request will trigger a DB query every few seconds.
 
 To avoid this, either:
+
 - Move auth middleware to a named route group instead of global middleware
 - Use the `shouldShow` callback for access control (recommended)
 
@@ -518,7 +519,14 @@ import {
 For advanced composition, React also exports lower-level UI primitives:
 
 ```tsx
-import { ThemeToggle, Badge, MethodBadge, StatusBadge, JsonViewer, Tooltip } from 'adonisjs-server-stats/react'
+import {
+  ThemeToggle,
+  Badge,
+  MethodBadge,
+  StatusBadge,
+  JsonViewer,
+  Tooltip,
+} from 'adonisjs-server-stats/react'
 ```
 
 ### Auth & visibility
@@ -953,19 +961,19 @@ import type {
 
 All integrations use lazy `import()` -- missing peer deps won't crash the app. The corresponding collector simply returns defaults.
 
-| Dependency                  | Required By                                   |
-| --------------------------- | --------------------------------------------- |
-| `@adonisjs/core`            | Everything (required)                         |
-| `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector`, dashboard  |
-| `@adonisjs/redis`           | `redisCollector`, dashboard cache inspector   |
-| `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time |
+| Dependency                  | Required By                                         |
+| --------------------------- | --------------------------------------------------- |
+| `@adonisjs/core`            | Everything (required)                               |
+| `@adonisjs/lucid`           | `dbPoolCollector`, `appCollector`, dashboard        |
+| `@adonisjs/redis`           | `redisCollector`, dashboard cache inspector         |
+| `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time       |
 | `@adonisjs/transmit-client` | React/Vue real-time updates (falls back to polling) |
-| `@julr/adonisjs-prometheus` | `serverStatsCollector`                        |
-| `bullmq`                    | `queueCollector`                              |
-| `better-sqlite3`            | Dashboard (`dashboard: true`)                 |
-| `edge.js`                   | Edge tag                                      |
-| `react`, `react-dom`        | React components (alpha)                      |
-| `vue`                       | Vue components (alpha)                        |
+| `@julr/adonisjs-prometheus` | `serverStatsCollector`                              |
+| `bullmq`                    | `queueCollector`                                    |
+| `better-sqlite3`            | Dashboard (`dashboard: true`)                       |
+| `edge.js`                   | Edge tag                                            |
+| `react`, `react-dom`        | React components (alpha)                            |
+| `vue`                       | Vue components (alpha)                              |
 
 ## License
 

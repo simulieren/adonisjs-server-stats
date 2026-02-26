@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react'
-import type { DebugPane, DebugPanelProps } from '../../../../core/types.js'
-import { useDebugData } from '../../../hooks/useDebugData.js'
+
 import { formatTime, timeAgo, formatDuration, compactPreview } from '../../../../core/formatters.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
+
+import type { DebugPane, DebugPanelProps } from '../../../../core/types.js'
 
 interface CustomPaneTabProps {
   pane: DebugPane
@@ -56,7 +58,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     )
   }, [rows, search, pane.columns])
 
-  const formatCell = (value: any, col: typeof pane.columns[0]): React.ReactNode => {
+  const formatCell = (value: any, col: (typeof pane.columns)[0]): React.ReactNode => {
     if (value === null || value === undefined) {
       return <span style={{ color: 'var(--ss-dim)' }}>-</span>
     }

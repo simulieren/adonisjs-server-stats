@@ -27,7 +27,7 @@ const ranges: { value: TimeRange; label: string }[] = [
       :key="range.value"
       :class="[
         'ss-dash-time-range-btn',
-        { 'ss-dash-time-range-active': modelValue === range.value }
+        { 'ss-dash-time-range-active': modelValue === range.value },
       ]"
       @click="emit('update:modelValue', range.value)"
     >

@@ -300,14 +300,35 @@ export interface DashboardHookOptions extends DashboardPageProps {
  *
  * Known tabs are provided for autocomplete; any custom string is also accepted.
  */
-export type DebugTab = 'timeline' | 'queries' | 'events' | 'routes' | 'logs' | 'emails' | 'cache' | 'jobs' | (string & {})
+export type DebugTab =
+  | 'timeline'
+  | 'queries'
+  | 'events'
+  | 'routes'
+  | 'logs'
+  | 'emails'
+  | 'cache'
+  | 'jobs'
+  | (string & {})
 
 /**
  * Built-in dashboard section identifiers.
  *
  * Known sections are provided for autocomplete; any custom string is also accepted.
  */
-export type DashboardSection = 'overview' | 'requests' | 'queries' | 'events' | 'routes' | 'logs' | 'emails' | 'timeline' | 'cache' | 'jobs' | 'config' | (string & {})
+export type DashboardSection =
+  | 'overview'
+  | 'requests'
+  | 'queries'
+  | 'events'
+  | 'routes'
+  | 'logs'
+  | 'emails'
+  | 'timeline'
+  | 'cache'
+  | 'jobs'
+  | 'config'
+  | (string & {})
 
 // ---------------------------------------------------------------------------
 // Time range

@@ -42,9 +42,7 @@ export function registerDebugRoutes(
       router.get('/routes', bind('routes')).as('server-stats.debug.routes')
       router.get('/logs', bind('logs')).as('server-stats.debug.logs')
       router.get('/emails', bind('emails')).as('server-stats.debug.emails')
-      router
-        .get('/emails/:id/preview', bind('emailPreview'))
-        .as('server-stats.debug.emailPreview')
+      router.get('/emails/:id/preview', bind('emailPreview')).as('server-stats.debug.emailPreview')
       router.get('/traces', bind('traces')).as('server-stats.debug.traces')
       router.get('/traces/:id', bind('traceDetail')).as('server-stats.debug.traceDetail')
     })

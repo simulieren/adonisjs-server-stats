@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react'
-import type { DashboardHookOptions } from '../../../../core/types.js'
+
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
+import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
-import { JsonViewer } from '../../shared/JsonViewer.js'
+
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface CacheSectionProps {
   options?: DashboardHookOptions
@@ -57,10 +59,24 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
       ) : (
         <DataTable
           columns={[
-            { key: 'key', label: 'Key', render: (v: string) => <span style={{ color: 'var(--ss-sql-color)' }}>{v}</span> },
+            {
+              key: 'key',
+              label: 'Key',
+              render: (v: string) => <span style={{ color: 'var(--ss-sql-color)' }}>{v}</span>,
+            },
             { key: 'type', label: 'Type', width: '70px' },
-            { key: 'ttl', label: 'TTL', width: '70px', render: (v: number) => v > 0 ? `${v}s` : '-' },
-            { key: 'size', label: 'Size', width: '70px', render: (v: number) => v > 0 ? `${v}B` : '-' },
+            {
+              key: 'ttl',
+              label: 'TTL',
+              width: '70px',
+              render: (v: number) => (v > 0 ? `${v}s` : '-'),
+            },
+            {
+              key: 'size',
+              label: 'Size',
+              width: '70px',
+              render: (v: number) => (v > 0 ? `${v}B` : '-'),
+            },
             {
               key: '_actions',
               label: '',
@@ -69,7 +85,10 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
                 <button
                   type="button"
                   className="ss-dash-btn-danger"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(row.key) }}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDelete(row.key)
+                  }}
                 >
                   Delete
                 </button>

@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { ApiClient } from './api-client.js'
+
 import type { FeatureFlags, FeatureConfig } from './types.js'
 
 /**
@@ -100,9 +101,10 @@ export function getVisibleMetricGroups(features: FeatureFlags | FeatureConfig): 
   const groups = new Set<string>(['process', 'memory', 'http', 'db', 'app', 'log'])
 
   // Handle both nested FeatureFlags and flat FeatureConfig
-  const ff = 'features' in features && typeof features.features === 'object' && features.features !== null
-    ? (features as FeatureFlags).features
-    : features as FeatureConfig
+  const ff =
+    'features' in features && typeof features.features === 'object' && features.features !== null
+      ? (features as FeatureFlags).features
+      : (features as FeatureConfig)
 
   if ('redis' in ff && ff.redis) groups.add('redis')
   if ('queues' in ff && (ff as any).queues) groups.add('queue')

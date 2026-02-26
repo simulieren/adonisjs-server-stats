@@ -80,14 +80,11 @@ const {
   retryJob,
   deleteCacheKey,
   fetchEmailPreview,
-} = useDashboardData(
-  () => activeSection.value,
-  {
-    baseUrl: props.baseUrl,
-    dashboardEndpoint: props.dashboardEndpoint,
-    authToken: props.authToken,
-  }
-)
+} = useDashboardData(() => activeSection.value, {
+  baseUrl: props.baseUrl,
+  dashboardEndpoint: props.dashboardEndpoint,
+  authToken: props.authToken,
+})
 
 // Section definitions
 interface SectionDef {
@@ -134,10 +131,7 @@ const themeAttr = computed(() => theme.value)
 </script>
 
 <template>
-  <div
-    class="ss-dash"
-    :data-theme="themeAttr"
-  >
+  <div class="ss-dash" :data-theme="themeAttr">
     <!-- Header -->
     <header class="ss-dash-header">
       <div class="ss-dash-header-left">
@@ -159,7 +153,10 @@ const themeAttr = computed(() => theme.value)
           <button
             v-for="section in visibleSections"
             :key="section.id"
-            :class="['ss-dash-sidebar-item', { 'ss-dash-sidebar-active': activeSection === section.id }]"
+            :class="[
+              'ss-dash-sidebar-item',
+              { 'ss-dash-sidebar-active': activeSection === section.id },
+            ]"
             @click="navigateTo(section.id)"
             :title="section.label"
           >
@@ -180,12 +177,10 @@ const themeAttr = computed(() => theme.value)
         </div>
 
         <!-- Loading -->
-        <div v-else-if="loading && !data" class="ss-dash-empty">
-          Loading...
-        </div>
+        <div v-else-if="loading && !data" class="ss-dash-empty">Loading...</div>
 
         <!-- Error -->
-        <div v-else-if="error" class="ss-dash-empty" style="color: var(--ss-red-fg);">
+        <div v-else-if="error" class="ss-dash-empty" style="color: var(--ss-red-fg)">
           Error: {{ error.message }}
         </div>
 
@@ -232,10 +227,7 @@ const themeAttr = computed(() => theme.value)
             @search="setSearch"
           />
 
-          <RoutesSection
-            v-else-if="activeSection === 'routes'"
-            :data="data"
-          />
+          <RoutesSection v-else-if="activeSection === 'routes'" :data="data" />
 
           <LogsSection
             v-else-if="activeSection === 'logs'"
@@ -287,10 +279,7 @@ const themeAttr = computed(() => theme.value)
             @filter="setFilter"
           />
 
-          <ConfigSection
-            v-else-if="activeSection === 'config'"
-            :data="data"
-          />
+          <ConfigSection v-else-if="activeSection === 'config'" :data="data" />
         </template>
       </main>
     </div>

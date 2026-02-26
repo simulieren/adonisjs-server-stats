@@ -30,13 +30,23 @@ const metricCards = computed(() => {
       label: 'Avg Response Time',
       value: formatStatNum(overview.value.avgResponseTime, 'ms'),
       series: overview.value.avgResponseTimeSeries || [],
-      color: overview.value.avgResponseTime > 500 ? '#f87171' : overview.value.avgResponseTime > 200 ? '#fbbf24' : '#34d399',
+      color:
+        overview.value.avgResponseTime > 500
+          ? '#f87171'
+          : overview.value.avgResponseTime > 200
+            ? '#fbbf24'
+            : '#34d399',
     },
     {
       label: 'P95 Response Time',
       value: formatStatNum(overview.value.p95ResponseTime, 'ms'),
       series: overview.value.p95ResponseTimeSeries || [],
-      color: overview.value.p95ResponseTime > 1000 ? '#f87171' : overview.value.p95ResponseTime > 500 ? '#fbbf24' : '#34d399',
+      color:
+        overview.value.p95ResponseTime > 1000
+          ? '#f87171'
+          : overview.value.p95ResponseTime > 500
+            ? '#fbbf24'
+            : '#34d399',
     },
     {
       label: 'Requests/min',
@@ -48,7 +58,12 @@ const metricCards = computed(() => {
       label: 'Error Rate',
       value: `${overview.value.errorRate.toFixed(1)}%`,
       series: overview.value.errorRateSeries || [],
-      color: overview.value.errorRate > 5 ? '#f87171' : overview.value.errorRate > 1 ? '#fbbf24' : '#34d399',
+      color:
+        overview.value.errorRate > 5
+          ? '#f87171'
+          : overview.value.errorRate > 1
+            ? '#fbbf24'
+            : '#34d399',
     },
   ]
 })
@@ -83,11 +98,7 @@ onMounted(async () => {
   <div class="ss-dash-overview">
     <!-- Metric cards -->
     <div v-if="overview" class="ss-dash-metric-cards">
-      <div
-        v-for="card in metricCards"
-        :key="card.label"
-        class="ss-dash-metric-card"
-      >
+      <div v-for="card in metricCards" :key="card.label" class="ss-dash-metric-card">
         <div class="ss-dash-metric-card-header">
           <span class="ss-dash-metric-card-label">{{ card.label }}</span>
           <span class="ss-dash-metric-card-value" :style="{ color: card.color }">
@@ -95,12 +106,7 @@ onMounted(async () => {
           </span>
         </div>
         <div class="ss-dash-metric-card-chart">
-          <Sparkline
-            :data="card.series"
-            :color="card.color"
-            :width="200"
-            :height="40"
-          />
+          <Sparkline :data="card.series" :color="card.color" :width="200" :height="40" />
         </div>
       </div>
     </div>
@@ -109,17 +115,14 @@ onMounted(async () => {
     <div class="ss-dash-chart-section">
       <div class="ss-dash-chart-header">
         <h3 class="ss-dash-section-title">Request Volume</h3>
-        <TimeRangeSelector
-          :model-value="timeRange"
-          @update:model-value="handleRangeChange"
-        />
+        <TimeRangeSelector :model-value="timeRange" @update:model-value="handleRangeChange" />
       </div>
 
       <div v-if="chartData.length > 0" class="ss-dash-bar-chart">
         <svg
           :width="Math.max(chartData.length * 12, 400)"
           height="120"
-          style="display: block; width: 100%;"
+          style="display: block; width: 100%"
           preserveAspectRatio="none"
           :viewBox="`0 0 ${Math.max(chartData.length * 12, 400)} 120`"
         >
@@ -147,7 +150,9 @@ onMounted(async () => {
             </rect>
             <rect
               :x="i * 12 + 1"
-              :y="120 - barHeight(point.total) + barHeight(point.count2xx) + barHeight(point.count3xx)"
+              :y="
+                120 - barHeight(point.total) + barHeight(point.count2xx) + barHeight(point.count3xx)
+              "
               :width="10"
               :height="barHeight(point.count4xx)"
               fill="var(--ss-amber-fg, #fbbf24)"
@@ -212,12 +217,7 @@ onMounted(async () => {
       <div class="ss-dash-secondary-card">
         <h4 class="ss-dash-secondary-title">
           Recent Errors
-          <button
-            class="ss-dash-link-btn"
-            @click="emit('navigateTo', 'logs')"
-          >
-            View all
-          </button>
+          <button class="ss-dash-link-btn" @click="emit('navigateTo', 'logs')">View all</button>
         </h4>
         <div v-if="overview.recentErrors && overview.recentErrors.length > 0">
           <div

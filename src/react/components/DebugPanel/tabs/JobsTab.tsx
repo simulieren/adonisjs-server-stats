@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import type { JobRecord, JobStats, DebugPanelProps } from '../../../../core/types.js'
-import { useDebugData } from '../../../hooks/useDebugData.js'
+
 import { timeAgo, formatDuration } from '../../../../core/formatters.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
+
+import type { JobRecord, JobStats, DebugPanelProps } from '../../../../core/types.js'
 
 interface JobsTabProps {
   options?: DebugPanelProps
@@ -140,9 +142,7 @@ export function JobsTab({ options }: JobsTabProps) {
                   <JsonViewer data={job.data} maxPreviewLength={60} />
                 </td>
                 <td>{job.attempts}</td>
-                <td>
-                  {job.duration !== null ? formatDuration(job.duration) : '-'}
-                </td>
+                <td>{job.duration !== null ? formatDuration(job.duration) : '-'}</td>
                 <td className="ss-dbg-event-time">{timeAgo(job.timestamp)}</td>
                 <td>
                   {job.status === 'failed' && (

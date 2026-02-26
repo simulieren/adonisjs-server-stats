@@ -13,10 +13,7 @@ defineProps<{
 </script>
 
 <template>
-  <span :class="[
-    `ss-${prefix || 'dbg'}-badge`,
-    `ss-${prefix || 'dbg'}-badge-${color || 'muted'}`
-  ]">
+  <span :class="[`ss-${prefix || 'dbg'}-badge`, `ss-${prefix || 'dbg'}-badge-${color || 'muted'}`]">
     <slot />
   </span>
 </template>

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { ServerStats, StatsBarProps } from '../../core/types.js'
+
 import { ApiClient, UnauthorizedError } from '../../core/api-client.js'
-import { subscribeToChannel } from '../../core/transmit-adapter.js'
 import { createHistoryBuffer } from '../../core/history-buffer.js'
-import type { HistoryBuffer } from '../../core/history-buffer.js'
 import { STALE_MS } from '../../core/metrics.js'
+import { subscribeToChannel } from '../../core/transmit-adapter.js'
+
+import type { HistoryBuffer } from '../../core/history-buffer.js'
+import type { ServerStats, StatsBarProps } from '../../core/types.js'
 
 export interface StatsHistory {
   [key: string]: number[]
@@ -40,17 +42,14 @@ export function useServerStats(options: StatsBarProps = {}) {
   const clientRef = useRef<ApiClient | null>(null)
 
   /** Process incoming stats data. */
-  const processStats = useCallback(
-    (data: ServerStats) => {
-      setStats(data)
-      setError(null)
-      lastSuccessRef.current = Date.now()
-      setIsStale(false)
+  const processStats = useCallback((data: ServerStats) => {
+    setStats(data)
+    setError(null)
+    lastSuccessRef.current = Date.now()
+    setIsStale(false)
 
-      historyBufferRef.current.push(data)
-    },
-    []
-  )
+    historyBufferRef.current.push(data)
+  }, [])
 
   /** Poll the HTTP endpoint. */
   const poll = useCallback(async () => {

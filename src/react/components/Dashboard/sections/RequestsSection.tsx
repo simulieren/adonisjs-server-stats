@@ -1,12 +1,14 @@
 import React, { useState, useCallback } from 'react'
-import type { DashboardHookOptions, TraceRecord } from '../../../../core/types.js'
-import { useDashboardData } from '../../../hooks/useDashboardData.js'
+
 import { timeAgo, formatDuration } from '../../../../core/formatters.js'
-import { DataTable } from '../shared/DataTable.js'
-import { Pagination } from '../shared/Pagination.js'
-import { FilterBar } from '../shared/FilterBar.js'
-import { WaterfallChart } from '../shared/WaterfallChart.js'
+import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
+import { DataTable } from '../shared/DataTable.js'
+import { FilterBar } from '../shared/FilterBar.js'
+import { Pagination } from '../shared/Pagination.js'
+import { WaterfallChart } from '../shared/WaterfallChart.js'
+
+import type { DashboardHookOptions, TraceRecord } from '../../../../core/types.js'
 
 interface RequestsSectionProps {
   options?: DashboardHookOptions
@@ -55,7 +57,10 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
             {formatDuration(selectedTrace.totalDuration)} | {selectedTrace.spanCount} spans
           </span>
         </div>
-        <WaterfallChart spans={selectedTrace.spans || []} totalDuration={selectedTrace.totalDuration} />
+        <WaterfallChart
+          spans={selectedTrace.spans || []}
+          totalDuration={selectedTrace.totalDuration}
+        />
       </div>
     )
   }
@@ -70,12 +75,47 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
         <>
           <DataTable
             columns={[
-              { key: 'method', label: 'Method', width: '70px', sortable: true, render: (v: string) => <MethodBadge method={v} /> },
-              { key: 'url', label: 'URL', sortable: true, render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span> },
-              { key: 'status_code', label: 'Status', width: '60px', sortable: true, render: (v: number) => <StatusBadge code={v} /> },
-              { key: 'duration', label: 'Duration', width: '80px', sortable: true, render: (v: number) => <span className={`ss-dash-duration ${v > 500 ? 'ss-dash-very-slow' : v > 100 ? 'ss-dash-slow' : ''}`}>{formatDuration(v)}</span> },
+              {
+                key: 'method',
+                label: 'Method',
+                width: '70px',
+                sortable: true,
+                render: (v: string) => <MethodBadge method={v} />,
+              },
+              {
+                key: 'url',
+                label: 'URL',
+                sortable: true,
+                render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span>,
+              },
+              {
+                key: 'status_code',
+                label: 'Status',
+                width: '60px',
+                sortable: true,
+                render: (v: number) => <StatusBadge code={v} />,
+              },
+              {
+                key: 'duration',
+                label: 'Duration',
+                width: '80px',
+                sortable: true,
+                render: (v: number) => (
+                  <span
+                    className={`ss-dash-duration ${v > 500 ? 'ss-dash-very-slow' : v > 100 ? 'ss-dash-slow' : ''}`}
+                  >
+                    {formatDuration(v)}
+                  </span>
+                ),
+              },
               { key: 'span_count', label: 'Spans', width: '50px' },
-              { key: 'created_at', label: 'Time', width: '80px', sortable: true, render: (v: string) => <span className="ss-dash-event-time">{timeAgo(v)}</span> },
+              {
+                key: 'created_at',
+                label: 'Time',
+                width: '80px',
+                sortable: true,
+                render: (v: string) => <span className="ss-dash-event-time">{timeAgo(v)}</span>,
+              },
             ]}
             data={requests}
             sort={sort}
@@ -85,7 +125,12 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
             emptyMessage="No requests recorded"
           />
           {meta && (
-            <Pagination page={meta.page} lastPage={meta.lastPage} total={meta.total} onPageChange={setPage} />
+            <Pagination
+              page={meta.page}
+              lastPage={meta.lastPage}
+              total={meta.total}
+              onPageChange={setPage}
+            />
           )}
         </>
       )}

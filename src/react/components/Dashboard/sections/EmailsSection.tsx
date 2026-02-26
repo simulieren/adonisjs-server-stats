@@ -1,11 +1,13 @@
 import React, { useState, useCallback } from 'react'
-import type { DashboardHookOptions } from '../../../../core/types.js'
-import { useDashboardData } from '../../../hooks/useDashboardData.js'
+
 import { timeAgo } from '../../../../core/formatters.js'
-import { DataTable } from '../shared/DataTable.js'
-import { Pagination } from '../shared/Pagination.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Badge } from '../../shared/Badge.js'
+import { DataTable } from '../shared/DataTable.js'
+import { FilterBar } from '../shared/FilterBar.js'
+import { Pagination } from '../shared/Pagination.js'
+
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface EmailsSectionProps {
   options?: DashboardHookOptions
@@ -59,13 +61,26 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
           <div>
             {email && (
               <>
-                <div><strong>Subject:</strong> {email.subject}</div>
-                <div><strong>From:</strong> {email.from_addr || email.from}</div>
-                <div><strong>To:</strong> {email.to_addr || email.to}</div>
+                <div>
+                  <strong>Subject:</strong> {email.subject}
+                </div>
+                <div>
+                  <strong>From:</strong> {email.from_addr || email.from}
+                </div>
+                <div>
+                  <strong>To:</strong> {email.to_addr || email.to}
+                </div>
               </>
             )}
           </div>
-          <button type="button" className="ss-dash-btn" onClick={() => { setPreviewId(null); setPreviewHtml(null) }}>
+          <button
+            type="button"
+            className="ss-dash-btn"
+            onClick={() => {
+              setPreviewId(null)
+              setPreviewHtml(null)
+            }}
+          >
             Close
           </button>
         </div>
@@ -89,17 +104,40 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
           <DataTable
             columns={[
               { key: 'id', label: '#', width: '40px' },
-              { key: 'subject', label: 'Subject', render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span> },
+              {
+                key: 'subject',
+                label: 'Subject',
+                render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span>,
+              },
               { key: 'to_addr', label: 'To', width: '150px' },
               { key: 'mailer', label: 'Mailer', width: '70px' },
-              { key: 'status', label: 'Status', width: '80px', render: (v: string) => <Badge color={(statusColor[v] || 'muted') as any}>{v}</Badge> },
-              { key: 'created_at', label: 'Time', width: '80px', render: (v: string) => <span className="ss-dash-event-time">{timeAgo(v)}</span> },
+              {
+                key: 'status',
+                label: 'Status',
+                width: '80px',
+                render: (v: string) => (
+                  <Badge color={(statusColor[v] || 'muted') as any}>{v}</Badge>
+                ),
+              },
+              {
+                key: 'created_at',
+                label: 'Time',
+                width: '80px',
+                render: (v: string) => <span className="ss-dash-event-time">{timeAgo(v)}</span>,
+              },
             ]}
             data={emails}
             onRowClick={handlePreview}
             emptyMessage="No emails recorded"
           />
-          {meta && <Pagination page={meta.page} lastPage={meta.lastPage} total={meta.total} onPageChange={setPage} />}
+          {meta && (
+            <Pagination
+              page={meta.page}
+              lastPage={meta.lastPage}
+              total={meta.total}
+              onPageChange={setPage}
+            />
+          )}
         </>
       )}
     </div>

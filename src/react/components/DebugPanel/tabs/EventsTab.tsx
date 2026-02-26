@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react'
-import type { EventRecord, DebugPanelProps } from '../../../../core/types.js'
-import { useDebugData } from '../../../hooks/useDebugData.js'
+
 import { timeAgo } from '../../../../core/formatters.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
+
+import type { EventRecord, DebugPanelProps } from '../../../../core/types.js'
 
 interface EventsTabProps {
   options?: DebugPanelProps

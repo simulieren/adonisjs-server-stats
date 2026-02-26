@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+
 import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
@@ -21,9 +22,7 @@ export default defineConfig({
     emptyOutDir: true,
 
     rollupOptions: {
-      external: [
-        '@adonisjs/transmit-client',
-      ],
+      external: ['@adonisjs/transmit-client'],
     },
   },
 })

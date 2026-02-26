@@ -128,34 +128,29 @@ function handleSearch(term: string) {
       @update:model-value="handleSearch"
     />
 
-    <div v-if="jobs.length === 0" class="ss-dash-empty">
-      No jobs found
-    </div>
+    <div v-if="jobs.length === 0" class="ss-dash-empty">No jobs found</div>
 
     <table v-else class="ss-dash-table">
       <thead>
         <tr>
-          <th style="width: 60px;">ID</th>
+          <th style="width: 60px">ID</th>
           <th>Name</th>
-          <th style="width: 80px;">Status</th>
-          <th style="width: 50px;">Tries</th>
-          <th style="width: 80px;">Duration</th>
-          <th style="width: 100px;">Time</th>
-          <th style="width: 60px;"></th>
+          <th style="width: 80px">Status</th>
+          <th style="width: 50px">Tries</th>
+          <th style="width: 80px">Duration</th>
+          <th style="width: 100px">Time</th>
+          <th style="width: 60px"></th>
         </tr>
       </thead>
       <tbody>
         <template v-for="j in jobs" :key="j.id">
-          <tr
-            style="cursor: pointer;"
-            @click="toggleExpand(j.id)"
-          >
-            <td style="color: var(--ss-dim);">{{ j.id }}</td>
-            <td style="color: var(--ss-text);">{{ j.name }}</td>
+          <tr style="cursor: pointer" @click="toggleExpand(j.id)">
+            <td style="color: var(--ss-dim)">{{ j.id }}</td>
+            <td style="color: var(--ss-text)">{{ j.name }}</td>
             <td>
               <span :class="['ss-dash-badge', statusClass(j.status)]">{{ j.status }}</span>
             </td>
-            <td style="color: var(--ss-muted); text-align: center;">{{ j.attempts }}</td>
+            <td style="color: var(--ss-muted); text-align: center">{{ j.attempts }}</td>
             <td class="ss-dash-duration">
               {{ j.duration !== null ? formatDuration(j.duration) : '-' }}
             </td>
@@ -172,14 +167,16 @@ function handleSearch(term: string) {
           </tr>
           <!-- Expanded detail -->
           <tr v-if="expandedJobId === j.id">
-            <td colspan="7" style="padding: 8px 12px;">
-              <div v-if="j.payload" style="margin-bottom: 8px;">
-                <strong style="color: var(--ss-text);">Payload:</strong>
+            <td colspan="7" style="padding: 8px 12px">
+              <div v-if="j.payload" style="margin-bottom: 8px">
+                <strong style="color: var(--ss-text)">Payload:</strong>
                 <JsonViewer :value="j.payload" />
               </div>
-              <div v-if="j.error" style="color: var(--ss-red-fg);">
+              <div v-if="j.error" style="color: var(--ss-red-fg)">
                 <strong>Error:</strong>
-                <pre style="white-space: pre-wrap; word-break: break-all; margin-top: 4px;">{{ j.error }}</pre>
+                <pre style="white-space: pre-wrap; word-break: break-all; margin-top: 4px">{{
+                  j.error
+                }}</pre>
               </div>
             </td>
           </tr>

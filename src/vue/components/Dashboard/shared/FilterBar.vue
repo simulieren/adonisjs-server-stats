@@ -45,12 +45,6 @@ function handleClear() {
       @input="onInput"
     />
     <span v-if="summary" class="ss-dash-filter-summary">{{ summary }}</span>
-    <button
-      v-if="modelValue"
-      class="ss-dash-filter-clear"
-      @click="handleClear"
-    >
-      Clear
-    </button>
+    <button v-if="modelValue" class="ss-dash-filter-clear" @click="handleClear">Clear</button>
   </div>
 </template>

@@ -387,8 +387,19 @@
     if (data.queryStats && data.queryStats.total !== undefined) lastQueryStats = data.queryStats
     if (data.recentErrors) lastRecentErrors = data.recentErrors
     if (data.topEvents && data.topEvents.length > 0) lastTopEvents = data.topEvents
-    if (data.emailActivity && (data.emailActivity.sent || data.emailActivity.queued || data.emailActivity.failed)) lastEmailActivity = data.emailActivity
-    if (data.logLevelBreakdown && (data.logLevelBreakdown.error || data.logLevelBreakdown.warn || data.logLevelBreakdown.info || data.logLevelBreakdown.debug)) lastLogLevelBreakdown = data.logLevelBreakdown
+    if (
+      data.emailActivity &&
+      (data.emailActivity.sent || data.emailActivity.queued || data.emailActivity.failed)
+    )
+      lastEmailActivity = data.emailActivity
+    if (
+      data.logLevelBreakdown &&
+      (data.logLevelBreakdown.error ||
+        data.logLevelBreakdown.warn ||
+        data.logLevelBreakdown.info ||
+        data.logLevelBreakdown.debug)
+    )
+      lastLogLevelBreakdown = data.logLevelBreakdown
     if (data.cacheStats) lastCacheStats = data.cacheStats
     if (data.jobQueueStatus) lastJobQueueStatus = data.jobQueueStatus
     if (data.statusDistribution) lastStatusDistribution = data.statusDistribution

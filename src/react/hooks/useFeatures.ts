@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import type { FeatureConfig, DebugPanelProps } from '../../core/types.js'
+
 import { detectFeatures, DEFAULT_FEATURES } from '../../core/feature-detect.js'
+
+import type { FeatureConfig, DebugPanelProps } from '../../core/types.js'
 
 /**
  * React hook for feature detection.

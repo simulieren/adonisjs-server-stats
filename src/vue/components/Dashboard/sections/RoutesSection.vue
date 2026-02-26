@@ -55,33 +55,35 @@ function toggleGroup(controller: string) {
       :summary="`${routes.length} routes`"
     />
 
-    <div v-if="routes.length === 0" class="ss-dash-empty">
-      No routes found
-    </div>
+    <div v-if="routes.length === 0" class="ss-dash-empty">No routes found</div>
 
     <table v-else class="ss-dash-table">
       <thead>
         <tr>
-          <th style="width: 70px;">Method</th>
+          <th style="width: 70px">Method</th>
           <th>Pattern</th>
-          <th style="width: 120px;">Name</th>
+          <th style="width: 120px">Name</th>
           <th>Handler</th>
           <th>Middleware</th>
         </tr>
       </thead>
       <tbody>
         <template v-for="[controller, groupRoutes] in groupedByController" :key="controller">
-          <tr
-            style="cursor: pointer;"
-            @click="toggleGroup(controller)"
-          >
+          <tr style="cursor: pointer" @click="toggleGroup(controller)">
             <td
               colspan="5"
-              style="background: var(--ss-surface-alt); font-weight: 600; color: var(--ss-text-secondary); font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;"
+              style="
+                background: var(--ss-surface-alt);
+                font-weight: 600;
+                color: var(--ss-text-secondary);
+                font-size: 10px;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+              "
             >
               {{ collapsedGroups.has(controller) ? '\u25B6' : '\u25BC' }}
               {{ controller }}
-              <span style="color: var(--ss-dim); margin-left: 8px;">{{ groupRoutes.length }}</span>
+              <span style="color: var(--ss-dim); margin-left: 8px">{{ groupRoutes.length }}</span>
             </td>
           </tr>
           <template v-if="!collapsedGroups.has(controller)">
@@ -91,10 +93,10 @@ function toggleGroup(controller: string) {
                   {{ r.method }}
                 </span>
               </td>
-              <td style="color: var(--ss-text);">{{ r.pattern }}</td>
-              <td style="color: var(--ss-muted);">{{ r.name || '-' }}</td>
-              <td style="color: var(--ss-text-secondary);">{{ r.handler }}</td>
-              <td style="color: var(--ss-dim); font-size: 10px;">
+              <td style="color: var(--ss-text)">{{ r.pattern }}</td>
+              <td style="color: var(--ss-muted)">{{ r.name || '-' }}</td>
+              <td style="color: var(--ss-text-secondary)">{{ r.handler }}</td>
+              <td style="color: var(--ss-dim); font-size: 10px">
                 {{ r.middleware.length > 0 ? r.middleware.join(', ') : '-' }}
               </td>
             </tr>

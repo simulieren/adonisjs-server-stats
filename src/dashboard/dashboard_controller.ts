@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
+import { log } from '../utils/logger.js'
 import { round, clamp } from '../utils/math_helpers.js'
 import { loadTransmitClient } from '../utils/transmit_client.js'
 import { CacheInspector } from './integrations/cache_inspector.js'
@@ -13,6 +14,8 @@ import type { DebugStore } from '../debug/debug_store.js'
 import type { DashboardStore } from './dashboard_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
+
+const warnedDbReads = new Set<string>()
 
 const SRC_DIR = dirname(fileURLToPath(import.meta.url))
 const EDGE_DIR = join(SRC_DIR, '..', 'edge')
@@ -80,10 +83,10 @@ export default class DashboardController {
     if (this.cachedTransmitClient === null) {
       this.cachedTransmitClient = loadTransmitClient(this.app.makePath('package.json'))
       if (this.cachedTransmitClient) {
-        console.log('[server-stats] Transmit client loaded for dashboard')
+        log.info('Transmit client loaded for dashboard')
       } else {
-        console.log(
-          '[server-stats] Dashboard will use polling. Install @adonisjs/transmit-client for real-time updates.'
+        log.info(
+          'Dashboard will use polling. Install @adonisjs/transmit-client for real-time updates.'
         )
       }
     }
@@ -115,7 +118,7 @@ export default class DashboardController {
   // ---------------------------------------------------------------------------
 
   async overview({ request, response }: HttpContext) {
-    return this.withDb(response, emptyOverview(), async () => {
+    return this.withDb(response, 'overview', emptyOverview(), async () => {
       const range = request.qs().range || '1h'
 
       const [overview, widgets, sparklineData] = await Promise.all([
@@ -150,23 +153,28 @@ export default class DashboardController {
   async overviewChart({ request, response }: HttpContext) {
     const range = request.qs().range || '1h'
 
-    return this.withDb(response, { range, buckets: [] as ChartBucket[] }, async () => {
-      const buckets = await this.dashboardStore.getChartData(range)
+    return this.withDb(
+      response,
+      'overviewChart',
+      { range, buckets: [] as ChartBucket[] },
+      async () => {
+        const buckets = await this.dashboardStore.getChartData(range)
 
-      return {
-        range,
-        buckets: buckets.map(
-          (b: any): ChartBucket => ({
-            bucket: b.bucket,
-            requestCount: b.request_count,
-            avgDuration: b.avg_duration,
-            p95Duration: b.p95_duration,
-            errorCount: b.error_count,
-            queryCount: b.query_count,
-          })
-        ),
+        return {
+          range,
+          buckets: buckets.map(
+            (b: any): ChartBucket => ({
+              bucket: b.bucket,
+              requestCount: b.request_count,
+              avgDuration: b.avg_duration,
+              p95Duration: b.p95_duration,
+              errorCount: b.error_count,
+              queryCount: b.query_count,
+            })
+          ),
+        }
       }
-    })
+    )
   }
 
   // ---------------------------------------------------------------------------
@@ -178,7 +186,7 @@ export default class DashboardController {
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    return this.withDb(response, emptyPage(page, perPage), async () => {
+    return this.withDb(response, 'requests', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getRequests(page, perPage, {
         method: qs.method ? qs.method.toUpperCase() : undefined,
         url: qs.url || undefined,
@@ -222,7 +230,7 @@ export default class DashboardController {
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    return this.withDb(response, emptyPage(page, perPage), async () => {
+    return this.withDb(response, 'queries', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getQueries(page, perPage, {
         durationMin: qs.duration_min ? Number(qs.duration_min) : undefined,
         model: qs.model || undefined,
@@ -240,7 +248,7 @@ export default class DashboardController {
   }
 
   async queriesGrouped({ request, response }: HttpContext) {
-    return this.withDb(response, { groups: [] }, async () => {
+    return this.withDb(response, 'queriesGrouped', { groups: [] }, async () => {
       const qs = request.qs()
       const limit = clamp(Number(qs.limit) || 50, 1, 200)
       const sort = qs.sort || 'total_duration'
@@ -324,7 +332,7 @@ export default class DashboardController {
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    return this.withDb(response, emptyPage(page, perPage), async () => {
+    return this.withDb(response, 'events', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getEvents(page, perPage, {
         eventName: qs.event_name || undefined,
       })
@@ -385,7 +393,7 @@ export default class DashboardController {
       })
     }
 
-    return this.withDb(response, emptyPage(page, perPage), async () => {
+    return this.withDb(response, 'logs', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getLogs(page, perPage, {
         level: qs.level || undefined,
         search: qs.message || undefined,
@@ -418,7 +426,7 @@ export default class DashboardController {
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    return this.withDb(response, emptyPage(page, perPage), async () => {
+    return this.withDb(response, 'emails', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getEmails(
         page,
         perPage,
@@ -465,7 +473,7 @@ export default class DashboardController {
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
-    return this.withDb(response, emptyPage(page, perPage), async () => {
+    return this.withDb(response, 'traces', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getTraces(page, perPage)
 
       return {
@@ -637,7 +645,7 @@ export default class DashboardController {
   // ---------------------------------------------------------------------------
 
   async savedFilters({ response }: HttpContext) {
-    return this.withDb(response, { filters: [] }, async () => {
+    return this.withDb(response, 'savedFilters', { filters: [] }, async () => {
       const filters = await this.dashboardStore.getSavedFilters()
       return {
         filters: filters.map((f: any) => ({
@@ -701,12 +709,21 @@ export default class DashboardController {
    * Wraps a store call with null-guard + try/catch boilerplate.
    * Returns emptyValue if the store is not ready or the fn throws.
    */
-  private async withDb<T>(response: HttpContext['response'], emptyValue: T, fn: () => Promise<T>) {
+  private async withDb<T>(
+    response: HttpContext['response'],
+    label: string,
+    emptyValue: T,
+    fn: () => Promise<T>
+  ) {
     if (!this.dashboardStore.isReady()) return response.json(emptyValue)
 
     try {
       return response.json(await fn())
-    } catch {
+    } catch (err: any) {
+      if (!warnedDbReads.has(label)) {
+        warnedDbReads.add(label)
+        log.warn(`dashboard ${label}: DB read failed — ${err?.message}`)
+      }
       return response.json(emptyValue)
     }
   }
@@ -740,13 +757,17 @@ export default class DashboardController {
       try {
         const available = await CacheInspector.isAvailable(this.app)
         this.cacheAvailable = available
-        if (!available) return null
+        if (!available) {
+          log.info('dashboard: Redis not detected — Cache panel disabled')
+          return null
+        }
 
         const redis = await this.app.container.make('redis')
         this.cacheInspector = new CacheInspector(redis)
         return this.cacheInspector
-      } catch {
+      } catch (err: any) {
         this.cacheAvailable = false
+        log.warn('dashboard: CacheInspector init failed — ' + err?.message)
         return null
       }
     } else {
@@ -756,13 +777,17 @@ export default class DashboardController {
       try {
         const available = await QueueInspector.isAvailable(this.app)
         this.queueAvailable = available
-        if (!available) return null
+        if (!available) {
+          log.info('dashboard: Queue not detected — Jobs panel disabled')
+          return null
+        }
 
         const queue = await this.app.container.make('queue')
         this.queueInspector = new QueueInspector(queue)
         return this.queueInspector
-      } catch {
+      } catch (err: any) {
         this.queueAvailable = false
+        log.warn('dashboard: QueueInspector init failed — ' + err?.message)
         return null
       }
     }

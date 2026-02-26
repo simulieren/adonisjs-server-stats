@@ -98,4 +98,3 @@ export function registerDashboardRoutes(
     .prefix(base)
     .use(middleware)
 }
-

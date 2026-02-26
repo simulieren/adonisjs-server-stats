@@ -1,3 +1,7 @@
+import { log } from '../utils/logger.js'
+
+let warnedShouldShow = false
+
 /**
  * Create a middleware function that gates access using the shouldShow callback.
  * Returns 403 if the callback returns false.
@@ -10,7 +14,13 @@ export function createAccessMiddleware(shouldShow: (ctx: any) => boolean) {
       if (!shouldShow(ctx)) {
         return ctx.response.forbidden({ error: 'Access denied' })
       }
-    } catch {
+    } catch (err) {
+      if (!warnedShouldShow) {
+        warnedShouldShow = true
+        log.warn(
+          'shouldShow callback threw in route guard — returning 403: ' + (err as any)?.message
+        )
+      }
       return ctx.response.forbidden({ error: 'Access denied' })
     }
     await next()

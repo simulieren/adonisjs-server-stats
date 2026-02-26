@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useMemo } from 'react'
-import type { DashboardHookOptions } from '../../../../core/types.js'
+
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
+
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface ConfigSectionProps {
   options?: DashboardHookOptions
@@ -53,10 +55,10 @@ function ConfigNode({ obj, path = '', search = '' }: { obj: any; path?: string; 
         const isExpanded = expanded.has(fullPath)
 
         // Highlight search matches
-        const matchesSearch = search && (
-          key.toLowerCase().includes(search.toLowerCase()) ||
-          (typeof value === 'string' && value.toLowerCase().includes(search.toLowerCase()))
-        )
+        const matchesSearch =
+          search &&
+          (key.toLowerCase().includes(search.toLowerCase()) ||
+            (typeof value === 'string' && value.toLowerCase().includes(search.toLowerCase())))
 
         return (
           <div key={fullPath} className="ss-dash-config-item">
@@ -66,17 +68,13 @@ function ConfigNode({ obj, path = '', search = '' }: { obj: any; path?: string; 
               style={{ cursor: isObject ? 'pointer' : 'default' }}
             >
               {isObject ? (
-                <span className="ss-dash-config-toggle">
-                  {isExpanded ? '\u25BC' : '\u25B6'}
-                </span>
+                <span className="ss-dash-config-toggle">{isExpanded ? '\u25BC' : '\u25B6'}</span>
               ) : (
                 <span className="ss-dash-config-toggle" />
               )}
               <span className="ss-dash-config-key">{key}</span>
               {isObject ? (
-                <span className="ss-dash-config-count">
-                  {Object.keys(value).length} keys
-                </span>
+                <span className="ss-dash-config-count">{Object.keys(value).length} keys</span>
               ) : (
                 <>
                   <span className="ss-dash-config-sep">:</span>
@@ -153,10 +151,7 @@ export function ConfigSection({ options = {} }: ConfigSectionProps) {
         <div className="ss-dash-empty">Config not available</div>
       ) : (
         <div className="ss-dash-config-content">
-          <ConfigNode
-            obj={activeTab === 'app' ? config.app : config.env}
-            search={search}
-          />
+          <ConfigNode obj={activeTab === 'app' ? config.app : config.env} search={search} />
         </div>
       )}
     </div>

@@ -1,3 +1,5 @@
+import { log } from '../utils/logger.js'
+
 import type { RouteRecord } from './types.js'
 
 /**
@@ -42,8 +44,8 @@ export class RouteInspector {
           }
         }
       }
-    } catch {
-      // Router not available or incompatible — empty route list
+    } catch (err: any) {
+      log.warn(`route inspector: could not read routes — ${err?.message || 'unknown error'}`)
     }
   }
 

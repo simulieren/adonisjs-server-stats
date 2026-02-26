@@ -8,6 +8,7 @@
 // ---------------------------------------------------------------------------
 
 import { METRIC_DEFINITIONS, MAX_HISTORY } from './metrics.js'
+
 import type { ServerStats } from './types.js'
 
 /**

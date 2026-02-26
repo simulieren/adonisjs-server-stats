@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 import { Template } from 'edge.js'
 
+import { log } from '../utils/logger.js'
 import { loadTransmitClient } from '../utils/transmit_client.js'
 
 import type { ServerStatsConfig } from '../types.js'
@@ -116,6 +117,9 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
         ? config.devToolbar.dashboardPath || '/__stats'
         : null
       state.transmitClient = loadTransmitClient(join(process.cwd(), 'package.json'))
+      if (!state.transmitClient) {
+        log.info('@adonisjs/transmit-client not found — debug panel will use polling')
+      }
     }
 
     // Pre-render via Template directly — bypasses edge.createRenderer() which

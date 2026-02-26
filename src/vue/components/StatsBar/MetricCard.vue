@@ -93,7 +93,7 @@ const showTooltip = computed(() => hovered.value || pinned.value)
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
     @click="onClick"
-    style="position: relative;"
+    style="position: relative"
   >
     <span class="ss-label">{{ metric.label }}</span>
     <span :class="['ss-value', `ss-${colorClass}`]">{{ displayValue }}</span>
@@ -102,16 +102,17 @@ const showTooltip = computed(() => hovered.value || pinned.value)
     <div
       v-if="showTooltip"
       :class="['ss-tooltip', { 'ss-pinned': pinned }]"
-      style="position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 10px; z-index: 180;"
+      style="
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 10px;
+        z-index: 180;
+      "
     >
-      <div class="ss-tooltip-inner" style="position: relative;">
-        <button
-          v-if="pinned"
-          class="ss-tooltip-close"
-          @click.stop="closeTooltip"
-        >
-          &times;
-        </button>
+      <div class="ss-tooltip-inner" style="position: relative">
+        <button v-if="pinned" class="ss-tooltip-close" @click.stop="closeTooltip">&times;</button>
         <div class="ss-tooltip-header">
           <span class="ss-tooltip-title">{{ metric.title }}</span>
           <span v-if="metric.unit" class="ss-tooltip-unit">{{ metric.unit }}</span>
@@ -130,8 +131,10 @@ const showTooltip = computed(() => hovered.value || pinned.value)
           <Sparkline :data="history" :color="sparklineColor" />
         </div>
         <div v-if="history.length > 0" class="ss-tooltip-samples">
-          Last {{ Math.min(history.length, 60) }} samples
-          (~{{ Math.round((Math.min(history.length, 60) * 3) / 60) }} min)
+          Last {{ Math.min(history.length, 60) }} samples (~{{
+            Math.round((Math.min(history.length, 60) * 3) / 60)
+          }}
+          min)
         </div>
       </div>
       <div class="ss-tooltip-arrow"></div>

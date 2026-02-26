@@ -14,10 +14,11 @@ import {
 } from '../middleware/request_tracking_middleware.js'
 import { registerDebugRoutes } from '../routes/debug_routes.js'
 import { registerStatsRoutes } from '../routes/stats_routes.js'
+import { log, dim, bold } from '../utils/logger.js'
 
-import type DashboardController from '../dashboard/dashboard_controller.js'
 import type DebugController from '../controller/debug_controller.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
+import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { DevToolbarConfig } from '../debug/types.js'
 import type { ServerStatsConfig } from '../types.js'
 import type { ApplicationService } from '@adonisjs/core/types'
@@ -59,12 +60,7 @@ export default class ServerStatsProvider {
 
       // ── Auto-register stats bar endpoint ───────────────────────
       if (typeof config.endpoint === 'string') {
-        registerStatsRoutes(
-          router,
-          config.endpoint,
-          () => this.statsController,
-          config.shouldShow
-        )
+        registerStatsRoutes(router, config.endpoint, () => this.statsController, config.shouldShow)
         registeredPaths.push(config.endpoint)
       }
 
@@ -72,12 +68,7 @@ export default class ServerStatsProvider {
       const toolbarConfig = config.devToolbar
       if (toolbarConfig?.enabled) {
         const debugEndpoint = toolbarConfig.debugEndpoint ?? '/admin/api/debug'
-        registerDebugRoutes(
-          router,
-          debugEndpoint,
-          () => this.debugController,
-          config.shouldShow
-        )
+        registerDebugRoutes(router, debugEndpoint, () => this.debugController, config.shouldShow)
         registeredPaths.push(debugEndpoint + '/*')
 
         // ── Auto-register dashboard routes ─────────────────────────
@@ -95,14 +86,7 @@ export default class ServerStatsProvider {
 
       // Log registered routes
       if (registeredPaths.length > 0) {
-        const tag = '\x1b[36m[ \x1b[1m🔍 server-stats\x1b[0m\x1b[36m ]\x1b[0m'
-        const dim = (s: string) => `\x1b[2m${s}\x1b[0m`
-        const bold = (s: string) => `\x1b[1m${s}\x1b[0m`
-
-        console.log(
-          `\n${tag} routes registered:\n` +
-            registeredPaths.map((p) => `  ${dim('→')} ${bold(p)}`).join('\n')
-        )
+        log.list('routes registered:', registeredPaths)
 
         // Only warn about global auth middleware if:
         // 1. shouldShow is NOT configured (user hasn't set up access control)
@@ -110,26 +94,25 @@ export default class ServerStatsProvider {
         if (!config.shouldShow) {
           const authMiddleware = this.detectGlobalAuthMiddleware()
           if (authMiddleware.length > 0) {
-            console.log(
-              `\n${tag} ${bold('found global auth middleware that will run on every poll:')}\n` +
-                authMiddleware.map((m) => `  ${dim('→')} ${m}`).join('\n') +
-                '\n\n' +
-                `  ${dim('these routes get polled every ~3s, so auth middleware will')}\n` +
-                `  ${dim('trigger a DB query on each poll. here are two ways to fix it:')}\n` +
-                '\n' +
-                `  ${bold('option 1:')} add a shouldShow callback to your config:\n` +
-                '\n' +
-                `  ${dim('// config/server_stats.ts')}\n` +
-                `  ${dim("shouldShow: (ctx) => ctx.auth?.user?.role === 'admin'")}\n` +
-                '\n' +
-                `  ${bold('option 2:')} move auth middleware from router.use() to a route group:\n` +
-                '\n' +
-                `  ${dim('// start/kernel.ts — remove from router.use()')}\n` +
-                `  ${dim("// () => import('#middleware/silent_auth_middleware')")}\n` +
-                '\n' +
-                `  ${dim('// start/routes.ts — add to your route groups instead')}\n` +
-                `  ${dim("router.group(() => { ... }).use(middleware.silentAuth())")}\n`
-            )
+            log.block(bold('found global auth middleware that will run on every poll:'), [
+              ...authMiddleware.map((m) => `${dim('→')} ${m}`),
+              '',
+              dim('these routes get polled every ~3s, so auth middleware will'),
+              dim('trigger a DB query on each poll. here are two ways to fix it:'),
+              '',
+              `${bold('option 1:')} add a shouldShow callback to your config:`,
+              '',
+              dim('// config/server_stats.ts'),
+              dim("shouldShow: (ctx) => ctx.auth?.user?.role === 'admin'"),
+              '',
+              `${bold('option 2:')} move auth middleware from router.use() to a route group:`,
+              '',
+              dim('// start/kernel.ts — remove from router.use()'),
+              dim("// () => import('#middleware/silent_auth_middleware')"),
+              '',
+              dim('// start/routes.ts — add to your route groups instead'),
+              dim('router.group(() => { ... }).use(middleware.silentAuth())'),
+            ])
           }
         }
       }
@@ -141,8 +124,8 @@ export default class ServerStatsProvider {
       const edge = await import('edge.js')
       const { edgePluginServerStats } = await import('../edge/plugin.js')
       edge.default.use(edgePluginServerStats(config))
-    } catch {
-      // Edge not available — skip tag registration
+    } catch (err: any) {
+      log.warn('could not register Edge plugin — @serverStats() tag will not work: ' + err?.message)
     }
   }
 
@@ -259,7 +242,9 @@ export default class ServerStatsProvider {
       try {
         transmit = await this.app.container.make('transmit')
       } catch {
-        // Transmit not installed — skip broadcasting
+        log.info(
+          'transport is "transmit" but @adonisjs/transmit is not installed — falling back to polling'
+        )
       }
     }
 
@@ -268,7 +253,11 @@ export default class ServerStatsProvider {
       const mod = await import('../prometheus/prometheus_collector.js')
       prometheusCollector = mod.ServerStatsCollector.instance
     } catch {
-      // Prometheus not installed — skip
+      // Prometheus not installed — skip (optional dependency)
+    }
+
+    if (prometheusCollector) {
+      log.info('Prometheus integration active')
     }
 
     this.intervalId = setInterval(async () => {
@@ -310,7 +299,7 @@ export default class ServerStatsProvider {
     try {
       emitter = await this.app.container.make('emitter')
     } catch {
-      // Emitter not available
+      log.warn('AdonisJS emitter not available — query and event collection will be disabled')
     }
 
     // Get the router
@@ -395,10 +384,10 @@ export default class ServerStatsProvider {
     } catch (err: any) {
       const msg = err?.message || ''
       if (msg.includes('better-sqlite3') || msg.includes('Cannot find module')) {
-        console.warn(
-          '[server-stats] Dashboard requires better-sqlite3. Install it with:\n' +
+        log.warn(
+          'Dashboard requires better-sqlite3. Install it with:\n' +
             '  npm install better-sqlite3\n' +
-            'Dashboard has been disabled for this session.'
+            '  Dashboard has been disabled for this session.'
         )
         this.dashboardStore = null
         return
@@ -433,6 +422,7 @@ export default class ServerStatsProvider {
 
     let lastQueryId = 0
     let lastEventId = 0
+    let warnedPersistOnce = false
 
     setOnRequestComplete(({ method, url, statusCode, duration, trace }) => {
       if (!dashStore.isReady()) return
@@ -459,8 +449,11 @@ export default class ServerStatsProvider {
             return dashStore.recordEvents(requestId, newEvents)
           }
         })
-        .catch(() => {
-          // Silently ignore persistence errors
+        .catch((err: any) => {
+          if (!warnedPersistOnce) {
+            warnedPersistOnce = true
+            log.warn('failed to persist request data — ' + (err?.message || 'unknown error'))
+          }
         })
     })
 
@@ -511,8 +504,8 @@ export default class ServerStatsProvider {
     if (this.persistPath && this.debugStore) {
       try {
         await this.debugStore.saveToDisk(this.persistPath)
-      } catch {
-        // Silently ignore save errors during shutdown
+      } catch (err: any) {
+        log.warn('could not save debug data on shutdown — ' + err?.message)
       }
     }
 

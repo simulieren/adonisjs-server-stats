@@ -61,8 +61,10 @@ function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, str
         <span :class="`ss-dbg-method ss-dbg-method-${selectedTrace.method.toLowerCase()}`">
           {{ selectedTrace.method }}
         </span>
-        <span style="color: var(--ss-text);">{{ selectedTrace.url }}</span>
-        <span :class="`ss-dbg-status ss-dbg-status-${Math.floor(selectedTrace.statusCode / 100)}xx`">
+        <span style="color: var(--ss-text)">{{ selectedTrace.url }}</span>
+        <span
+          :class="`ss-dbg-status ss-dbg-status-${Math.floor(selectedTrace.statusCode / 100)}xx`"
+        >
           {{ selectedTrace.statusCode }}
         </span>
         <span class="ss-dbg-tl-meta">
@@ -72,22 +74,14 @@ function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, str
       </div>
 
       <div class="ss-dbg-tl-legend">
-        <span
-          v-for="(color, cat) in CATEGORY_COLORS"
-          :key="cat"
-          class="ss-dbg-tl-legend-item"
-        >
+        <span v-for="(color, cat) in CATEGORY_COLORS" :key="cat" class="ss-dbg-tl-legend-item">
           <span class="ss-dbg-tl-legend-dot" :style="{ background: color }"></span>
           {{ CATEGORY_LABELS[cat] || cat }}
         </span>
       </div>
 
       <div id="ss-dbg-tl-waterfall">
-        <div
-          v-for="span in selectedTrace.spans"
-          :key="span.id"
-          class="ss-dbg-tl-row"
-        >
+        <div v-for="span in selectedTrace.spans" :key="span.id" class="ss-dbg-tl-row">
           <span class="ss-dbg-tl-label" :title="span.label">
             {{ span.label }}
           </span>
@@ -104,11 +98,7 @@ function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, str
 
       <div v-if="selectedTrace.warnings.length > 0" class="ss-dbg-tl-warnings">
         <div class="ss-dbg-tl-warnings-title">Warnings</div>
-        <div
-          v-for="(w, i) in selectedTrace.warnings"
-          :key="i"
-          class="ss-dbg-tl-warning"
-        >
+        <div v-for="(w, i) in selectedTrace.warnings" :key="i" class="ss-dbg-tl-warning">
           {{ w }}
         </div>
       </div>
@@ -116,36 +106,29 @@ function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, str
 
     <!-- Trace list view -->
     <template v-else>
-      <div v-if="traces.length === 0" class="ss-dbg-empty">
-        No traces captured
-      </div>
+      <div v-if="traces.length === 0" class="ss-dbg-empty">No traces captured</div>
 
       <table v-else class="ss-dbg-table">
         <thead>
           <tr>
-            <th style="width: 30px;">#</th>
-            <th style="width: 70px;">Method</th>
+            <th style="width: 30px">#</th>
+            <th style="width: 70px">Method</th>
             <th>URL</th>
-            <th style="width: 60px;">Status</th>
-            <th style="width: 70px;">Duration</th>
-            <th style="width: 50px;">Spans</th>
-            <th style="width: 80px;">Time</th>
+            <th style="width: 60px">Status</th>
+            <th style="width: 70px">Duration</th>
+            <th style="width: 50px">Spans</th>
+            <th style="width: 80px">Time</th>
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="t in traces"
-            :key="t.id"
-            style="cursor: pointer;"
-            @click="selectTrace(t)"
-          >
-            <td style="color: var(--ss-dim);">{{ t.id }}</td>
+          <tr v-for="t in traces" :key="t.id" style="cursor: pointer" @click="selectTrace(t)">
+            <td style="color: var(--ss-dim)">{{ t.id }}</td>
             <td>
               <span :class="`ss-dbg-method ss-dbg-method-${t.method.toLowerCase()}`">
                 {{ t.method }}
               </span>
             </td>
-            <td style="color: var(--ss-text);">
+            <td style="color: var(--ss-text)">
               {{ t.url }}
               <a
                 v-if="dashboardPath"
@@ -154,7 +137,14 @@ function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, str
                 class="ss-dbg-deeplink"
                 @click.stop
               >
-                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <svg
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
                   <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
                 </svg>
               </a>
@@ -165,7 +155,7 @@ function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, str
               </span>
             </td>
             <td class="ss-dbg-duration">{{ formatDuration(t.totalDuration) }}</td>
-            <td style="color: var(--ss-muted); text-align: center;">{{ t.spanCount }}</td>
+            <td style="color: var(--ss-muted); text-align: center">{{ t.spanCount }}</td>
             <td class="ss-dbg-event-time">{{ timeAgo(t.timestamp) }}</td>
           </tr>
         </tbody>

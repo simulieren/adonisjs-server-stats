@@ -62,7 +62,7 @@ function handleSearch(term: string) {
 </script>
 
 <template>
-  <div style="position: relative;">
+  <div style="position: relative">
     <!-- Email preview overlay -->
     <div v-if="previewEmail" class="ss-dash-email-preview">
       <div class="ss-dash-email-preview-header">
@@ -80,11 +80,7 @@ function handleSearch(term: string) {
         </div>
         <button class="ss-dash-close-btn" @click="closePreview">&times;</button>
       </div>
-      <iframe
-        v-if="previewHtml"
-        class="ss-dash-email-iframe"
-        :srcdoc="previewHtml"
-      ></iframe>
+      <iframe v-if="previewHtml" class="ss-dash-email-iframe" :srcdoc="previewHtml"></iframe>
       <div v-else class="ss-dash-empty">No HTML content</div>
     </div>
 
@@ -97,41 +93,34 @@ function handleSearch(term: string) {
         @update:model-value="handleSearch"
       />
 
-      <div v-if="emails.length === 0" class="ss-dash-empty">
-        No emails found
-      </div>
+      <div v-if="emails.length === 0" class="ss-dash-empty">No emails found</div>
 
       <table v-else class="ss-dash-table">
         <thead>
           <tr>
-            <th style="width: 30px;">#</th>
+            <th style="width: 30px">#</th>
             <th>Subject</th>
-            <th style="width: 150px;">From</th>
-            <th style="width: 150px;">To</th>
-            <th style="width: 70px;">Mailer</th>
-            <th style="width: 70px;">Status</th>
-            <th style="width: 30px;">Att.</th>
-            <th style="width: 100px;">Time</th>
+            <th style="width: 150px">From</th>
+            <th style="width: 150px">To</th>
+            <th style="width: 70px">Mailer</th>
+            <th style="width: 70px">Status</th>
+            <th style="width: 30px">Att.</th>
+            <th style="width: 100px">Time</th>
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="e in emails"
-            :key="e.id"
-            style="cursor: pointer;"
-            @click="openPreview(e)"
-          >
-            <td style="color: var(--ss-dim);">{{ e.id }}</td>
-            <td style="color: var(--ss-text);">{{ e.subject }}</td>
-            <td style="color: var(--ss-text-secondary);">{{ e.from }}</td>
-            <td style="color: var(--ss-text-secondary);">{{ e.to }}</td>
-            <td style="color: var(--ss-muted);">{{ e.mailer }}</td>
+          <tr v-for="e in emails" :key="e.id" style="cursor: pointer" @click="openPreview(e)">
+            <td style="color: var(--ss-dim)">{{ e.id }}</td>
+            <td style="color: var(--ss-text)">{{ e.subject }}</td>
+            <td style="color: var(--ss-text-secondary)">{{ e.from }}</td>
+            <td style="color: var(--ss-text-secondary)">{{ e.to }}</td>
+            <td style="color: var(--ss-muted)">{{ e.mailer }}</td>
             <td>
               <span :class="['ss-dash-badge', statusClass(e.status)]">
                 {{ e.status }}
               </span>
             </td>
-            <td style="color: var(--ss-dim); text-align: center;">{{ e.attachmentCount || 0 }}</td>
+            <td style="color: var(--ss-dim); text-align: center">{{ e.attachmentCount || 0 }}</td>
             <td class="ss-dash-event-time">{{ timeAgo(e.timestamp) }}</td>
           </tr>
         </tbody>

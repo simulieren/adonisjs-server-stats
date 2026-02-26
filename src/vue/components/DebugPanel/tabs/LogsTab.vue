@@ -93,16 +93,10 @@ function filterByReqId(reqId: string) {
       <span class="ss-dbg-summary">{{ summary }}</span>
     </div>
 
-    <div v-if="logs.length === 0" class="ss-dbg-empty">
-      No log entries
-    </div>
+    <div v-if="logs.length === 0" class="ss-dbg-empty">No log entries</div>
 
     <div v-else>
-      <div
-        v-for="(log, i) in logs"
-        :key="log.id || i"
-        class="ss-dbg-log-entry"
-      >
+      <div v-for="(log, i) in logs" :key="log.id || i" class="ss-dbg-log-entry">
         <span :class="['ss-dbg-log-level', levelClass(log.level)]">
           {{ log.level }}
         </span>
@@ -123,7 +117,14 @@ function filterByReqId(reqId: string) {
           target="_blank"
           class="ss-dbg-deeplink"
         >
-          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            viewBox="0 0 16 16"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
           </svg>
         </a>

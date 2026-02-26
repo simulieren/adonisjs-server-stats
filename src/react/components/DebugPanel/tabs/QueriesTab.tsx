@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import type { QueryRecord, DebugPanelProps } from '../../../../core/types.js'
-import { useDebugData } from '../../../hooks/useDebugData.js'
+
 import { formatTime, formatDuration } from '../../../../core/formatters.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
+
+import type { QueryRecord, DebugPanelProps } from '../../../../core/types.js'
 
 interface QueriesTabProps {
   options?: DebugPanelProps

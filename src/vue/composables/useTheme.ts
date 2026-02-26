@@ -5,11 +5,9 @@
  */
 
 import { ref, onMounted, onUnmounted } from 'vue'
-import {
-  getTheme,
-  toggleTheme as coreToggleTheme,
-  onThemeChange,
-} from '../../core/index.js'
+
+import { getTheme, toggleTheme as coreToggleTheme, onThemeChange } from '../../core/index.js'
+
 import type { Theme } from '../../core/index.js'
 
 export function useTheme() {

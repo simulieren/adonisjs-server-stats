@@ -14,12 +14,7 @@ const title = computed(() =>
 </script>
 
 <template>
-  <button
-    type="button"
-    class="ss-dbg-theme-toggle"
-    :title="title"
-    @click="toggleTheme"
-  >
+  <button type="button" class="ss-dbg-theme-toggle" :title="title" @click="toggleTheme">
     {{ icon }}
   </button>
 </template>

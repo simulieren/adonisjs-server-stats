@@ -27,15 +27,23 @@ function hide() {
     class="ss-tooltip-trigger"
     @mouseenter="show"
     @mouseleave="hide"
-    style="position: relative; display: inline-flex;"
+    style="position: relative; display: inline-flex"
   >
     <slot />
     <span
       v-if="visible && (text || $slots.content)"
       class="ss-tooltip"
-      style="position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 8px; pointer-events: none; z-index: 180;"
+      style="
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        margin-bottom: 8px;
+        pointer-events: none;
+        z-index: 180;
+      "
     >
-      <span class="ss-tooltip-inner" style="white-space: nowrap;">
+      <span class="ss-tooltip-inner" style="white-space: nowrap">
         <slot name="content">{{ text }}</slot>
       </span>
       <span class="ss-tooltip-arrow"></span>

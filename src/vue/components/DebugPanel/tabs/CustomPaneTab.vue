@@ -6,7 +6,13 @@
  * with support for search, formatting, and badge colors.
  */
 import { ref, computed, onMounted, watch } from 'vue'
-import { ApiClient, compactPreview, formatTime, timeAgo, formatDuration } from '../../../../core/index.js'
+import {
+  ApiClient,
+  compactPreview,
+  formatTime,
+  timeAgo,
+  formatDuration,
+} from '../../../../core/index.js'
 import type { DebugPane, DebugPaneColumn } from '../../../../core/index.js'
 
 const props = defineProps<{
@@ -71,7 +77,9 @@ function formatCell(value: any, col: DebugPaneColumn): string {
       return String(value).toUpperCase()
     case 'json':
       if (typeof value === 'string') {
-        try { value = JSON.parse(value) } catch {}
+        try {
+          value = JSON.parse(value)
+        } catch {}
       }
       return compactPreview(value, 100)
     case 'badge':
@@ -119,19 +127,11 @@ onMounted(fetchData)
         type="text"
       />
       <span class="ss-dbg-summary">{{ filteredData.length }} items</span>
-      <button
-        v-if="pane.clearable"
-        class="ss-dbg-btn-clear"
-        @click="handleClear"
-      >
-        Clear
-      </button>
+      <button v-if="pane.clearable" class="ss-dbg-btn-clear" @click="handleClear">Clear</button>
     </div>
 
     <div v-if="loading" class="ss-dbg-empty">Loading...</div>
-    <div v-else-if="filteredData.length === 0" class="ss-dbg-empty">
-      No data
-    </div>
+    <div v-else-if="filteredData.length === 0" class="ss-dbg-empty">No data</div>
 
     <table v-else class="ss-dbg-table">
       <thead>
@@ -150,10 +150,7 @@ onMounted(fetchData)
           <td
             v-for="col in pane.columns"
             :key="col.key"
-            :class="[
-              cellClass(row[col.key], col),
-              { 'ss-dbg-filterable': col.filterable },
-            ]"
+            :class="[cellClass(row[col.key], col), { 'ss-dbg-filterable': col.filterable }]"
             @click="col.filterable ? (search = String(row[col.key])) : undefined"
           >
             <template v-if="col.format === 'badge'">

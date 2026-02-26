@@ -1,9 +1,16 @@
 import React, { useState, useMemo } from 'react'
-import type { OverviewMetrics, ChartDataPoint, DashboardHookOptions, TimeRange } from '../../../../core/types.js'
-import { useDashboardData } from '../../../hooks/useDashboardData.js'
+
 import { formatDuration } from '../../../../core/formatters.js'
+import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Sparkline } from '../../StatsBar/Sparkline.js'
 import { TimeRangeSelector } from '../shared/TimeRangeSelector.js'
+
+import type {
+  OverviewMetrics,
+  ChartDataPoint,
+  DashboardHookOptions,
+  TimeRange,
+} from '../../../../core/types.js'
 
 interface OverviewSectionProps {
   options?: DashboardHookOptions
@@ -59,7 +66,9 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         </div>
         <div className="ss-dash-metric-card">
           <div className="ss-dash-metric-label">Error Rate</div>
-          <div className={`ss-dash-metric-value ${metrics.errorRate > 5 ? 'ss-dash-text-red' : metrics.errorRate > 1 ? 'ss-dash-text-amber' : ''}`}>
+          <div
+            className={`ss-dash-metric-value ${metrics.errorRate > 5 ? 'ss-dash-text-red' : metrics.errorRate > 1 ? 'ss-dash-text-amber' : ''}`}
+          >
             {metrics.errorRate.toFixed(1)}%
           </div>
           <Sparkline data={errorCounts} color="#f87171" width={160} height={40} />
@@ -74,9 +83,16 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         </div>
         <div className="ss-dash-bar-chart">
           {chartPoints.length === 0 ? (
-            <div className="ss-dash-empty" style={{ minHeight: '120px' }}>No data for this range</div>
+            <div className="ss-dash-empty" style={{ minHeight: '120px' }}>
+              No data for this range
+            </div>
           ) : (
-            <svg width="100%" height="160" viewBox={`0 0 ${chartPoints.length * 12} 160`} preserveAspectRatio="none">
+            <svg
+              width="100%"
+              height="160"
+              viewBox={`0 0 ${chartPoints.length * 12} 160`}
+              preserveAspectRatio="none"
+            >
               {(() => {
                 const maxCount = Math.max(...chartPoints.map((p) => p.requestCount ?? 0), 1)
                 return chartPoints.map((point, i) => {

@@ -2,6 +2,7 @@ import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
+import { log } from '../utils/logger.js'
 import { extractAddresses } from '../utils/mail_helpers.js'
 import { round } from '../utils/math_helpers.js'
 import { rangeToCutoff, rangeToMinutes, roundBucket } from '../utils/time_helpers.js'
@@ -70,6 +71,12 @@ export interface PaginatedResult<T> {
 }
 
 // ---------------------------------------------------------------------------
+// Warn-once tracking for write-path and overview catch blocks
+// ---------------------------------------------------------------------------
+const warnedWritePaths = new Set<string>()
+let overviewWidgetWarned = false
+
+// ---------------------------------------------------------------------------
 // DashboardStore
 // ---------------------------------------------------------------------------
 
@@ -129,8 +136,8 @@ export class DashboardStore {
       async () => {
         try {
           await runRetentionCleanup(this.db, this.config.retentionDays)
-        } catch {
-          // Silently ignore
+        } catch (err: any) {
+          log.warn('dashboard: retention cleanup failed — ' + err?.message)
         }
       },
       60 * 60 * 1000
@@ -165,8 +172,8 @@ export class DashboardStore {
     if (this.db && typeof this.db.destroy === 'function') {
       try {
         await this.db.destroy()
-      } catch {
-        // Ignore
+      } catch (err: any) {
+        log.warn('dashboard: error closing SQLite — ' + err?.message)
       }
     }
     this.db = null
@@ -211,7 +218,12 @@ export class DashboardStore {
         warning_count: warningCount,
       })
       return id
-    } catch {
+    } catch (err: any) {
+      const method_ = 'recordRequest'
+      if (!warnedWritePaths.has(method_)) {
+        warnedWritePaths.add(method_)
+        log.warn(`dashboard: ${method_} failed — ${err?.message}`)
+      }
       return null
     }
   }
@@ -240,8 +252,12 @@ export class DashboardStore {
       for (let i = 0; i < rows.length; i += 50) {
         await this.db('server_stats_queries').insert(rows.slice(i, i + 50))
       }
-    } catch {
-      // Silently ignore
+    } catch (err: any) {
+      const method = 'recordQueries'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${err?.message}`)
+      }
     }
   }
 
@@ -259,8 +275,12 @@ export class DashboardStore {
       for (let i = 0; i < rows.length; i += 50) {
         await this.db('server_stats_events').insert(rows.slice(i, i + 50))
       }
-    } catch {
-      // Silently ignore
+    } catch (err: any) {
+      const method = 'recordEvents'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${err?.message}`)
+      }
     }
   }
 
@@ -282,8 +302,12 @@ export class DashboardStore {
         message_id: record.messageId,
         attachment_count: record.attachmentCount,
       })
-    } catch {
-      // Silently ignore
+    } catch (err: any) {
+      const method = 'recordEmail'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${err?.message}`)
+      }
     }
   }
 
@@ -301,8 +325,12 @@ export class DashboardStore {
         request_id: entry.requestId ? String(entry.requestId) : null,
         data: JSON.stringify(entry),
       })
-    } catch {
-      // Silently ignore
+    } catch (err: any) {
+      const method = 'recordLog'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${err?.message}`)
+      }
     }
   }
 
@@ -321,8 +349,12 @@ export class DashboardStore {
         spans: JSON.stringify(trace.spans),
         warnings: trace.warnings.length > 0 ? JSON.stringify(trace.warnings) : null,
       })
-    } catch {
-      // Silently ignore
+    } catch (err: any) {
+      const method = 'recordTrace'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${err?.message}`)
+      }
     }
   }
 
@@ -837,7 +869,11 @@ export class DashboardStore {
       }))
 
       return { topEvents, emailActivity, logLevelBreakdown, statusDistribution, slowestQueries }
-    } catch {
+    } catch (err: any) {
+      if (!overviewWidgetWarned) {
+        overviewWidgetWarned = true
+        log.warn('dashboard: getOverviewWidgets query failed — ' + err?.message)
+      }
       return empty
     }
   }

@@ -110,9 +110,7 @@ const themeAttr = computed(() => theme.value)
       >
         &#x1F50D; Open debug panel
       </button>
-      <div
-        :class="['ss-dot', { 'ss-stale': isStale }]"
-      ></div>
+      <div :class="['ss-dot', { 'ss-stale': isStale }]"></div>
     </div>
 
     <div id="ss-bar-scroll" class="ss-bar-scroll">
@@ -126,10 +124,7 @@ const themeAttr = computed(() => theme.value)
             :history="getMetricHistory(metric.historyKey)"
           />
         </div>
-        <div
-          v-if="gi < metricGroups.length - 1"
-          class="ss-group-sep"
-        ></div>
+        <div v-if="gi < metricGroups.length - 1" class="ss-group-sep"></div>
       </template>
     </div>
   </div>
@@ -143,15 +138,12 @@ const themeAttr = computed(() => theme.value)
     :title="visible ? 'Hide stats bar' : 'Show stats bar'"
     @click="toggleVisibility"
   >
-    <span
-      v-if="!visible"
-      class="ss-toggle-summary"
-    >
+    <span v-if="!visible" class="ss-toggle-summary">
       <span class="ss-value ss-green">{{ cpuSummary }}</span>
       <span class="ss-value ss-green">{{ memSummary }}</span>
       <span :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']">{{ redisSummary }}</span>
     </span>
-    <span v-if="visible" class="ss-toggle-label" style="color: #737373;">hide stats</span>
+    <span v-if="visible" class="ss-toggle-label" style="color: #737373">hide stats</span>
     <span class="ss-toggle-arrow">{{ visible ? '\u25BC' : '\u25B2' }}</span>
   </button>
 </template>

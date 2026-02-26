@@ -20,8 +20,7 @@ const events = computed<EventRecord[]>(() => {
   const term = search.value.toLowerCase()
   return arr.filter(
     (e: EventRecord) =>
-      e.event.toLowerCase().includes(term) ||
-      (e.data && e.data.toLowerCase().includes(term))
+      e.event.toLowerCase().includes(term) || (e.data && e.data.toLowerCase().includes(term))
   )
 })
 
@@ -34,31 +33,24 @@ const summary = computed(() => {
 <template>
   <div>
     <div class="ss-dbg-search-bar">
-      <input
-        v-model="search"
-        class="ss-dbg-search"
-        placeholder="Filter events..."
-        type="text"
-      />
+      <input v-model="search" class="ss-dbg-search" placeholder="Filter events..." type="text" />
       <span class="ss-dbg-summary">{{ summary }}</span>
     </div>
 
-    <div v-if="events.length === 0" class="ss-dbg-empty">
-      No events captured
-    </div>
+    <div v-if="events.length === 0" class="ss-dbg-empty">No events captured</div>
 
     <table v-else class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 30px;">#</th>
+          <th style="width: 30px">#</th>
           <th>Event</th>
           <th>Data</th>
-          <th style="width: 80px;">Time</th>
+          <th style="width: 80px">Time</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="e in events" :key="e.id">
-          <td style="color: var(--ss-dim);">{{ e.id }}</td>
+          <td style="color: var(--ss-dim)">{{ e.id }}</td>
           <td>
             <span class="ss-dbg-event-name">{{ e.event }}</span>
             <a
@@ -67,7 +59,14 @@ const summary = computed(() => {
               target="_blank"
               class="ss-dbg-deeplink"
             >
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                viewBox="0 0 16 16"
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
               </svg>
             </a>

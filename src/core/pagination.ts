@@ -137,7 +137,10 @@ export function createFilterState(): FilterState {
  * @param field     - Default sort field.
  * @param direction - Default sort direction.
  */
-export function createSortState(field: string = 'id', direction: 'asc' | 'desc' = 'desc'): SortState {
+export function createSortState(
+  field: string = 'id',
+  direction: 'asc' | 'desc' = 'desc'
+): SortState {
   return { field, direction }
 }
 

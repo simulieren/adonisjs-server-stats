@@ -55,33 +55,26 @@ function durationClass(ms: number): string {
 <template>
   <div>
     <div class="ss-dbg-search-bar">
-      <input
-        v-model="search"
-        class="ss-dbg-search"
-        placeholder="Filter queries..."
-        type="text"
-      />
+      <input v-model="search" class="ss-dbg-search" placeholder="Filter queries..." type="text" />
       <span class="ss-dbg-summary">{{ summary }}</span>
     </div>
 
-    <div v-if="queries.length === 0" class="ss-dbg-empty">
-      No queries captured
-    </div>
+    <div v-if="queries.length === 0" class="ss-dbg-empty">No queries captured</div>
 
     <table v-else class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 30px;">#</th>
+          <th style="width: 30px">#</th>
           <th>SQL</th>
-          <th style="width: 60px;">Method</th>
-          <th style="width: 80px;">Model</th>
-          <th style="width: 70px;">Duration</th>
-          <th style="width: 80px;">Time</th>
+          <th style="width: 60px">Method</th>
+          <th style="width: 80px">Model</th>
+          <th style="width: 70px">Duration</th>
+          <th style="width: 80px">Time</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="q in queries" :key="q.id">
-          <td style="color: var(--ss-dim);">{{ q.id }}</td>
+          <td style="color: var(--ss-dim)">{{ q.id }}</td>
           <td>
             <span
               :class="['ss-dbg-sql', { 'ss-dbg-expanded': isExpanded(q.id) }]"
@@ -95,7 +88,14 @@ function durationClass(ms: number): string {
               target="_blank"
               class="ss-dbg-deeplink"
             >
-              <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <svg
+                viewBox="0 0 16 16"
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
                 <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
               </svg>
             </a>
@@ -105,7 +105,7 @@ function durationClass(ms: number): string {
               {{ q.method }}
             </span>
           </td>
-          <td style="color: var(--ss-text-secondary);">{{ q.model || '-' }}</td>
+          <td style="color: var(--ss-text-secondary)">{{ q.model || '-' }}</td>
           <td>
             <span :class="['ss-dbg-duration', durationClass(q.duration)]">
               {{ formatDuration(q.duration) }}

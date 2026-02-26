@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import type { TraceRecord, TraceSpan, DebugPanelProps } from '../../../../core/types.js'
-import { useDebugData } from '../../../hooks/useDebugData.js'
+
 import { timeAgo, formatDuration } from '../../../../core/formatters.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
+
+import type { TraceRecord, TraceSpan, DebugPanelProps } from '../../../../core/types.js'
 
 interface TimelineTabProps {
   options?: DebugPanelProps
@@ -61,11 +63,7 @@ export function TimelineTab({ options }: TimelineTabProps) {
     return (
       <div>
         <div className="ss-dbg-tl-detail-header">
-          <button
-            type="button"
-            className="ss-dbg-btn-clear"
-            onClick={() => setSelectedTrace(null)}
-          >
+          <button type="button" className="ss-dbg-btn-clear" onClick={() => setSelectedTrace(null)}>
             Back
           </button>
           <span className={`ss-dbg-method ss-dbg-method-${activeTrace.method.toLowerCase()}`}>

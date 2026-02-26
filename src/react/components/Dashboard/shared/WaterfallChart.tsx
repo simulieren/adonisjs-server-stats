@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react'
-import type { TraceSpan } from '../../../../core/types.js'
+
 import { formatDuration } from '../../../../core/formatters.js'
+
+import type { TraceSpan } from '../../../../core/types.js'
 
 interface WaterfallChartProps {
   spans: TraceSpan[]
@@ -42,10 +44,7 @@ export function WaterfallChart({ spans, totalDuration, className = '' }: Waterfa
           .filter(([cat]) => spans.some((s) => s.category === cat))
           .map(([cat, color]) => (
             <div key={cat} className="ss-dash-waterfall-legend-item">
-              <div
-                className="ss-dash-waterfall-legend-dot"
-                style={{ background: color }}
-              />
+              <div className="ss-dash-waterfall-legend-dot" style={{ background: color }} />
               <span>{cat}</span>
             </div>
           ))}
@@ -73,9 +72,7 @@ export function WaterfallChart({ spans, totalDuration, className = '' }: Waterfa
                   title={`${span.label}: ${formatDuration(span.duration)} (offset: ${formatDuration(span.startOffset)})`}
                 />
               </div>
-              <span className="ss-dash-waterfall-dur">
-                {formatDuration(span.duration)}
-              </span>
+              <span className="ss-dash-waterfall-dur">{formatDuration(span.duration)}</span>
             </div>
           )
         })}

@@ -1,3 +1,5 @@
+import { log } from '../utils/logger.js'
+
 import type { MetricCollector } from '../collectors/collector.js'
 import type { MetricValue } from '../types.js'
 
@@ -18,6 +20,7 @@ import type { MetricValue } from '../types.js'
 export class StatsEngine {
   private collectors: MetricCollector[]
   private latestStats: Record<string, MetricValue> = {}
+  private warnedCollectors: Set<string> = new Set()
 
   constructor(collectors: MetricCollector[]) {
     this.collectors = collectors
@@ -60,7 +63,11 @@ export class StatsEngine {
       this.collectors.map(async (collector) => {
         try {
           return await collector.collect()
-        } catch {
+        } catch (err: any) {
+          if (!this.warnedCollectors.has(collector.name)) {
+            this.warnedCollectors.add(collector.name)
+            log.warn(`collector "${collector.name}" threw during collect() — ${err.message}`)
+          }
           return {}
         }
       })

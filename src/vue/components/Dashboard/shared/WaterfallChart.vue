@@ -57,25 +57,14 @@ function getBarStyle(span: TraceSpan): Record<string, string> {
 <template>
   <div class="ss-dash-waterfall">
     <div class="ss-dash-waterfall-legend">
-      <span
-        v-for="item in legendItems"
-        :key="item.key"
-        class="ss-dash-waterfall-legend-item"
-      >
-        <span
-          class="ss-dash-waterfall-legend-dot"
-          :style="{ background: item.color }"
-        ></span>
+      <span v-for="item in legendItems" :key="item.key" class="ss-dash-waterfall-legend-item">
+        <span class="ss-dash-waterfall-legend-dot" :style="{ background: item.color }"></span>
         {{ item.label }}
       </span>
     </div>
 
     <div class="ss-dash-waterfall-rows">
-      <div
-        v-for="span in spans"
-        :key="span.id"
-        class="ss-dash-waterfall-row"
-      >
+      <div v-for="span in spans" :key="span.id" class="ss-dash-waterfall-row">
         <span class="ss-dash-waterfall-label" :title="span.label">
           {{ span.label }}
         </span>

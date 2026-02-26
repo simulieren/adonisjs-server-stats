@@ -1,11 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
-import type { StatsBarProps as StatsBarPropsBase, DebugPanelProps } from '../../../core/types.js'
-import { METRIC_DEFINITIONS } from '../../../core/metrics.js'
+
 import { getVisibleMetricGroups } from '../../../core/feature-detect.js'
-import { useServerStats } from '../../hooks/useServerStats.js'
+import { METRIC_DEFINITIONS } from '../../../core/metrics.js'
 import { useFeatures } from '../../hooks/useFeatures.js'
+import { useServerStats } from '../../hooks/useServerStats.js'
 import { useTheme } from '../../hooks/useTheme.js'
 import { MetricCard } from './MetricCard.js'
+
+import type { StatsBarProps as StatsBarPropsBase, DebugPanelProps } from '../../../core/types.js'
 
 interface StatsBarProps extends StatsBarPropsBase {
   /** Options for feature detection. */
@@ -108,7 +110,9 @@ export function StatsBar(props: StatsBarProps) {
         {!visible && stats && (
           <div className="ss-toggle-summary" style={{ display: 'flex' }}>
             <span className="ss-label">CPU</span>
-            <span className={`ss-value ${stats.cpuPercent > 80 ? 'ss-red' : stats.cpuPercent > 50 ? 'ss-amber' : 'ss-green'}`}>
+            <span
+              className={`ss-value ${stats.cpuPercent > 80 ? 'ss-red' : stats.cpuPercent > 50 ? 'ss-amber' : 'ss-green'}`}
+            >
               {stats.cpuPercent.toFixed(0)}%
             </span>
           </div>
@@ -116,11 +120,7 @@ export function StatsBar(props: StatsBarProps) {
       </button>
 
       {/* Stats bar */}
-      <div
-        ref={barRef}
-        className={`ss-bar ${visible ? '' : 'ss-hidden'}`}
-        data-ss-theme={theme}
-      >
+      <div ref={barRef} className={`ss-bar ${visible ? '' : 'ss-hidden'}`} data-ss-theme={theme}>
         <div className="ss-bar-left">
           <div className={`ss-dot ${isStale ? 'ss-stale' : ''}`} />
         </div>

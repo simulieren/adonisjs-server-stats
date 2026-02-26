@@ -44,22 +44,20 @@ function handleSearch(term: string) {
       @update:model-value="handleSearch"
     />
 
-    <div v-if="events.length === 0" class="ss-dash-empty">
-      No events found
-    </div>
+    <div v-if="events.length === 0" class="ss-dash-empty">No events found</div>
 
     <table v-else class="ss-dash-table">
       <thead>
         <tr>
-          <th style="width: 30px;">#</th>
-          <th style="width: 250px;">Event</th>
+          <th style="width: 30px">#</th>
+          <th style="width: 250px">Event</th>
           <th>Data</th>
-          <th style="width: 100px;">Time</th>
+          <th style="width: 100px">Time</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="e in events" :key="e.id">
-          <td style="color: var(--ss-dim);">{{ e.id }}</td>
+          <td style="color: var(--ss-dim)">{{ e.id }}</td>
           <td class="ss-dash-event-name">{{ e.event }}</td>
           <td>
             <JsonViewer :value="e.data" />

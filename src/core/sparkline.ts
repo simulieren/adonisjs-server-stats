@@ -211,4 +211,3 @@ export function buildSparklineData(
     stats: computeStats(values),
   }
 }
-

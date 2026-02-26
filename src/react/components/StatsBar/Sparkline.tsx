@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react'
+
 import { buildSparklineData } from '../../../core/sparkline.js'
 
 interface SparklineProps {
@@ -29,13 +30,7 @@ export function Sparkline({
   if (!sparkline) {
     return (
       <svg width={width} height={height} className={className} style={{ display: 'block' }}>
-        <text
-          x={width / 2}
-          y={height / 2 + 3}
-          textAnchor="middle"
-          fill="#737373"
-          fontSize="9"
-        >
+        <text x={width / 2} y={height / 2 + 3} textAnchor="middle" fill="#737373" fontSize="9">
           collecting...
         </text>
       </svg>
@@ -45,12 +40,7 @@ export function Sparkline({
   const gradId = `sg-${color.replace('#', '')}-${Math.random().toString(36).slice(2, 6)}`
 
   return (
-    <svg
-      width={width}
-      height={height}
-      className={className}
-      style={{ display: 'block' }}
-    >
+    <svg width={width} height={height} className={className} style={{ display: 'block' }}>
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />

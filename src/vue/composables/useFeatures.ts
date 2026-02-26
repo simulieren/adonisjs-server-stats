@@ -6,7 +6,9 @@
  */
 
 import { ref, onMounted } from 'vue'
+
 import { ApiClient, fetchFeatures, DEFAULT_FEATURES } from '../../core/index.js'
+
 import type { FeatureConfig, FeatureFlags } from '../../core/index.js'
 
 export interface UseFeaturesOptions {

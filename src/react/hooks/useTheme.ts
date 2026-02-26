@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Theme } from '../../core/types.js'
+
 import { getTheme, toggleTheme as coreToggle, onThemeChange } from '../../core/theme.js'
+
+import type { Theme } from '../../core/types.js'
 
 /**
  * React hook for theme state management.

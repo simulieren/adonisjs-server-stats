@@ -29,9 +29,7 @@ export default class DebugController {
     const toolbarConfig = cfg?.devToolbar
 
     // Derive feature flags from the actual config
-    const collectorNames = new Set(
-      (cfg?.collectors ?? []).map((c) => c.name)
-    )
+    const collectorNames = new Set((cfg?.collectors ?? []).map((c) => c.name))
 
     const features = {
       statsBar: true,

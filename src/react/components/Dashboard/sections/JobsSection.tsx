@@ -1,12 +1,14 @@
 import React, { useState, useCallback } from 'react'
-import type { DashboardHookOptions } from '../../../../core/types.js'
-import { useDashboardData } from '../../../hooks/useDashboardData.js'
+
 import { timeAgo, formatDuration } from '../../../../core/formatters.js'
-import { DataTable } from '../shared/DataTable.js'
-import { Pagination } from '../shared/Pagination.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Badge } from '../../shared/Badge.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
+import { DataTable } from '../shared/DataTable.js'
+import { FilterBar } from '../shared/FilterBar.js'
+import { Pagination } from '../shared/Pagination.js'
+
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface JobsSectionProps {
   options?: DashboardHookOptions
@@ -73,7 +75,10 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
               key={status}
               type="button"
               className={`ss-dash-filter-btn ${statusFilter === status ? 'ss-dash-active' : ''}`}
-              onClick={() => { setStatusFilter(status); setPage(1) }}
+              onClick={() => {
+                setStatusFilter(status)
+                setPage(1)
+              }}
             >
               {status}
             </button>
@@ -88,12 +93,37 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
           <DataTable
             columns={[
               { key: 'id', label: 'ID', width: '60px' },
-              { key: 'name', label: 'Name', render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span> },
-              { key: 'status', label: 'Status', width: '80px', render: (v: string) => <Badge color={(statusColor[v] || 'muted') as any}>{v}</Badge> },
-              { key: 'data', label: 'Payload', render: (v: any) => <JsonViewer data={v} maxPreviewLength={60} /> },
+              {
+                key: 'name',
+                label: 'Name',
+                render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span>,
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                width: '80px',
+                render: (v: string) => (
+                  <Badge color={(statusColor[v] || 'muted') as any}>{v}</Badge>
+                ),
+              },
+              {
+                key: 'data',
+                label: 'Payload',
+                render: (v: any) => <JsonViewer data={v} maxPreviewLength={60} />,
+              },
               { key: 'attempts', label: 'Tries', width: '50px' },
-              { key: 'duration', label: 'Duration', width: '70px', render: (v: number | null) => v != null ? formatDuration(v) : '-' },
-              { key: 'timestamp', label: 'Time', width: '80px', render: (v: any) => <span className="ss-dash-event-time">{timeAgo(v)}</span> },
+              {
+                key: 'duration',
+                label: 'Duration',
+                width: '70px',
+                render: (v: number | null) => (v != null ? formatDuration(v) : '-'),
+              },
+              {
+                key: 'timestamp',
+                label: 'Time',
+                width: '80px',
+                render: (v: any) => <span className="ss-dash-event-time">{timeAgo(v)}</span>,
+              },
               {
                 key: '_actions',
                 label: '',
@@ -103,7 +133,10 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                     <button
                       type="button"
                       className="ss-dash-btn-retry"
-                      onClick={(e) => { e.stopPropagation(); handleRetry(row.id) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleRetry(row.id)
+                      }}
                     >
                       Retry
                     </button>
@@ -113,7 +146,14 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
             data={jobs}
             emptyMessage="No jobs found"
           />
-          {meta && <Pagination page={meta.page} lastPage={meta.lastPage} total={meta.total} onPageChange={setPage} />}
+          {meta && (
+            <Pagination
+              page={meta.page}
+              lastPage={meta.lastPage}
+              total={meta.total}
+              onPageChange={setPage}
+            />
+          )}
         </>
       )}
     </div>

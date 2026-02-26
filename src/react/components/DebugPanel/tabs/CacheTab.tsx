@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import type { CacheStats, CacheEntry, DebugPanelProps } from '../../../../core/types.js'
+
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
+
+import type { CacheStats, CacheEntry, DebugPanelProps } from '../../../../core/types.js'
 
 interface CacheTabProps {
   options?: DebugPanelProps

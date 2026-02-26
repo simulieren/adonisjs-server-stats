@@ -1,10 +1,12 @@
 import React, { useState, useCallback } from 'react'
-import type { DashboardHookOptions } from '../../../../core/types.js'
-import { useDashboardData } from '../../../hooks/useDashboardData.js'
+
 import { formatTime } from '../../../../core/formatters.js'
-import { Pagination } from '../shared/Pagination.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Badge } from '../../shared/Badge.js'
+import { FilterBar } from '../shared/FilterBar.js'
+import { Pagination } from '../shared/Pagination.js'
+
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface LogsSectionProps {
   options?: DashboardHookOptions
@@ -53,7 +55,10 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
               key={level}
               type="button"
               className={`ss-dash-filter-btn ${levelFilter === level ? 'ss-dash-active' : ''}`}
-              onClick={() => { setLevelFilter(level); setPage(1) }}
+              onClick={() => {
+                setLevelFilter(level)
+                setPage(1)
+              }}
             >
               {level}
             </button>
@@ -81,7 +86,9 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
               <Badge color={(levelColorMap[log.level] || 'muted') as any}>
                 {log.level?.toUpperCase()}
               </Badge>
-              <span className="ss-dash-log-time">{formatTime(log.created_at || log.timestamp)}</span>
+              <span className="ss-dash-log-time">
+                {formatTime(log.created_at || log.timestamp)}
+              </span>
               {log.request_id ? (
                 <span
                   className="ss-dash-log-reqid"
@@ -101,7 +108,14 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
         </div>
       )}
 
-      {meta && <Pagination page={meta.page} lastPage={meta.lastPage} total={meta.total} onPageChange={setPage} />}
+      {meta && (
+        <Pagination
+          page={meta.page}
+          lastPage={meta.lastPage}
+          total={meta.total}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   )
 }

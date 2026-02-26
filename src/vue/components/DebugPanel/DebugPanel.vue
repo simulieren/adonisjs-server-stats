@@ -147,9 +147,7 @@ defineExpose({ toggle, open, close })
 
       <div class="ss-dbg-tabs-right">
         <!-- Connection mode indicator -->
-        <span class="ss-dbg-conn-mode ss-dbg-conn-polling">
-          POLLING
-        </span>
+        <span class="ss-dbg-conn-mode ss-dbg-conn-polling"> POLLING </span>
 
         <!-- Dashboard link -->
         <a
@@ -159,7 +157,14 @@ defineExpose({ toggle, open, close })
           class="ss-dbg-dashboard-link"
           title="Open full dashboard"
         >
-          <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            viewBox="0 0 16 16"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
           </svg>
         </a>
@@ -173,22 +178,16 @@ defineExpose({ toggle, open, close })
     <!-- Tab content -->
     <div class="ss-dbg-content">
       <!-- Loading state -->
-      <div v-if="loading && !data" class="ss-dbg-empty">
-        Loading...
-      </div>
+      <div v-if="loading && !data" class="ss-dbg-empty">Loading...</div>
 
       <!-- Error state -->
-      <div v-else-if="error" class="ss-dbg-empty" style="color: var(--ss-red-fg);">
+      <div v-else-if="error" class="ss-dbg-empty" style="color: var(--ss-red-fg)">
         Error: {{ error.message }}
       </div>
 
       <!-- Tab content -->
       <template v-else>
-        <QueriesTab
-          v-if="activeTab === 'queries'"
-          :data="data"
-          :dashboard-path="dashboardPath"
-        />
+        <QueriesTab v-if="activeTab === 'queries'" :data="data" :dashboard-path="dashboardPath" />
         <EventsTab
           v-else-if="activeTab === 'events'"
           :data="data"
@@ -199,28 +198,15 @@ defineExpose({ toggle, open, close })
           :data="data"
           :dashboard-path="dashboardPath"
         />
-        <RoutesTab
-          v-else-if="activeTab === 'routes'"
-          :data="data"
-        />
-        <LogsTab
-          v-else-if="activeTab === 'logs'"
-          :data="data"
-          :dashboard-path="dashboardPath"
-        />
+        <RoutesTab v-else-if="activeTab === 'routes'" :data="data" />
+        <LogsTab v-else-if="activeTab === 'logs'" :data="data" :dashboard-path="dashboardPath" />
         <TimelineTab
           v-else-if="activeTab === 'timeline'"
           :data="data"
           :dashboard-path="dashboardPath"
         />
-        <CacheTab
-          v-else-if="activeTab === 'cache'"
-          :data="data"
-        />
-        <JobsTab
-          v-else-if="activeTab === 'jobs'"
-          :data="data"
-        />
+        <CacheTab v-else-if="activeTab === 'cache'" :data="data" />
+        <JobsTab v-else-if="activeTab === 'jobs'" :data="data" />
         <CustomPaneTab
           v-else-if="activeTab.startsWith('custom-')"
           :pane="getCustomPane(activeTab)!"

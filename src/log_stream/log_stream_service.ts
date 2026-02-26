@@ -1,6 +1,10 @@
 import { open, stat } from 'node:fs/promises'
 
+import { log } from '../utils/logger.js'
+
 import type { LogStats } from '../types.js'
+
+let warnedPollFailure = false
 
 const LEVEL_NAMES: Record<number, string> = {
   10: 'trace',
@@ -81,6 +85,7 @@ export class LogStreamService {
     }
 
     this.intervalId = setInterval(() => this.pollNewEntries(), 2000)
+    log.info('log stream watching: ' + this.logPath)
   }
 
   stop() {
@@ -92,6 +97,7 @@ export class LogStreamService {
 
   private async pollNewEntries() {
     try {
+      warnedPollFailure = false
       const stats = await stat(this.logPath)
 
       // File was truncated/rotated — reset
@@ -114,8 +120,11 @@ export class LogStreamService {
           this.onEntry?.(entry)
         }
       }
-    } catch {
-      // Silently ignore — file may not exist yet
+    } catch (err: any) {
+      if (!warnedPollFailure) {
+        warnedPollFailure = true
+        log.warn('log stream: cannot read log file — ' + err?.message)
+      }
     }
   }
 }

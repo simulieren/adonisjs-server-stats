@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo } from 'react'
+
 import { getPageNumbers } from '../../../../core/pagination.js'
 
 interface PaginationProps {
@@ -12,7 +13,13 @@ interface PaginationProps {
 /**
  * Pagination controls with page numbers and prev/next buttons.
  */
-export function Pagination({ page, lastPage, total, onPageChange, className = '' }: PaginationProps) {
+export function Pagination({
+  page,
+  lastPage,
+  total,
+  onPageChange,
+  className = '',
+}: PaginationProps) {
   const pages = useMemo(() => getPageNumbers(page, lastPage), [page, lastPage])
 
   const handlePrev = useCallback(() => {

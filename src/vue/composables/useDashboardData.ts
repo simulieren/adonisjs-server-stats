@@ -6,6 +6,7 @@
  */
 
 import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
+
 import {
   ApiClient,
   buildQueryParams,
@@ -14,11 +15,8 @@ import {
   OVERVIEW_REFRESH_MS,
   SECTION_REFRESH_MS,
 } from '../../core/index.js'
-import type {
-  DashboardSection,
-  PaginationState,
-  TimeRange,
-} from '../../core/index.js'
+
+import type { DashboardSection, PaginationState, TimeRange } from '../../core/index.js'
 
 export interface UseDashboardDataOptions {
   /** Base URL for API requests. */
@@ -91,7 +89,8 @@ export function useDashboardData(
       // Handle paginated responses
       if (result && typeof result === 'object' && 'total' in result) {
         pagination.total = result.total
-        pagination.totalPages = result.totalPages ?? (Math.ceil(result.total / pagination.perPage) || 1)
+        pagination.totalPages =
+          result.totalPages ?? (Math.ceil(result.total / pagination.perPage) || 1)
       }
 
       data.value = result

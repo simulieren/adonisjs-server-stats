@@ -7,6 +7,7 @@
  */
 
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+
 import {
   ApiClient,
   createTransmitSubscription,
@@ -14,6 +15,7 @@ import {
   STALE_MS,
   createHistoryBuffer,
 } from '../../core/index.js'
+
 import type { ServerStats, TransmitSubscriptionHandle } from '../../core/index.js'
 
 export interface UseServerStatsOptions {

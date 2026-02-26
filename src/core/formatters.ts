@@ -359,7 +359,8 @@ export function compactPreview(value: unknown, maxLen: number = 100): string {
   if (Array.isArray(value)) {
     if (value.length === 0) return '[]'
     const items = value.slice(0, 3).map((v) => compactPreview(v, 30))
-    const s = '[' + items.join(', ') + (value.length > 3 ? ', ...' + value.length + ' items' : '') + ']'
+    const s =
+      '[' + items.join(', ') + (value.length > 3 ? ', ...' + value.length + ' items' : '') + ']'
     return s.length > maxLen ? '[' + value.length + ' items]' : s
   }
   if (typeof value === 'object') {

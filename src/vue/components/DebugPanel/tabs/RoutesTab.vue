@@ -39,25 +39,18 @@ function isCurrentRoute(route: RouteRecord): boolean {
 <template>
   <div>
     <div class="ss-dbg-search-bar">
-      <input
-        v-model="search"
-        class="ss-dbg-search"
-        placeholder="Filter routes..."
-        type="text"
-      />
+      <input v-model="search" class="ss-dbg-search" placeholder="Filter routes..." type="text" />
       <span class="ss-dbg-summary">{{ summary }}</span>
     </div>
 
-    <div v-if="routes.length === 0" class="ss-dbg-empty">
-      No routes found
-    </div>
+    <div v-if="routes.length === 0" class="ss-dbg-empty">No routes found</div>
 
     <table v-else class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 70px;">Method</th>
+          <th style="width: 70px">Method</th>
           <th>Pattern</th>
-          <th style="width: 100px;">Name</th>
+          <th style="width: 100px">Name</th>
           <th>Handler</th>
           <th>Middleware</th>
         </tr>
@@ -73,10 +66,10 @@ function isCurrentRoute(route: RouteRecord): boolean {
               {{ r.method }}
             </span>
           </td>
-          <td style="color: var(--ss-text);">{{ r.pattern }}</td>
-          <td style="color: var(--ss-muted);">{{ r.name || '-' }}</td>
-          <td style="color: var(--ss-text-secondary);">{{ r.handler }}</td>
-          <td style="color: var(--ss-dim); font-size: 10px;">
+          <td style="color: var(--ss-text)">{{ r.pattern }}</td>
+          <td style="color: var(--ss-muted)">{{ r.name || '-' }}</td>
+          <td style="color: var(--ss-text-secondary)">{{ r.handler }}</td>
+          <td style="color: var(--ss-dim); font-size: 10px">
             {{ r.middleware.length > 0 ? r.middleware.join(', ') : '-' }}
           </td>
         </tr>

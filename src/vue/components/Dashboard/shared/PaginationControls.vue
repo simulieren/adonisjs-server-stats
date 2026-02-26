@@ -63,7 +63,10 @@ const pageNumbers = computed(() => {
         <span v-if="p === '...'" class="ss-dash-pagination-dots">&hellip;</span>
         <button
           v-else
-          :class="['ss-dash-pagination-btn', { 'ss-dash-pagination-active': p === pagination.page }]"
+          :class="[
+            'ss-dash-pagination-btn',
+            { 'ss-dash-pagination-active': p === pagination.page },
+          ]"
           @click="emit('goToPage', p as number)"
         >
           {{ p }}

@@ -72,11 +72,7 @@ function getSortIcon(col: Column): string {
           :style="{ cursor: clickable ? 'pointer' : 'default' }"
           @click="clickable ? emit('rowClick', row, index) : undefined"
         >
-          <td
-            v-for="col in columns"
-            :key="col.key"
-            :style="{ textAlign: col.align || 'left' }"
-          >
+          <td v-for="col in columns" :key="col.key" :style="{ textAlign: col.align || 'left' }">
             <slot :name="`cell-${col.key}`" :value="row[col.key]" :row="row" :index="index">
               {{ row[col.key] ?? '-' }}
             </slot>

@@ -8,7 +8,11 @@ export type { ApiClientConfig } from './api-client.js'
 
 // -- Transmit adapter -------------------------------------------------------
 export { createTransmitSubscription, subscribeToChannel } from './transmit-adapter.js'
-export type { TransmitSubscriptionConfig, TransmitSubscriptionHandle, ChannelSubscriptionConfig } from './transmit-adapter.js'
+export type {
+  TransmitSubscriptionConfig,
+  TransmitSubscriptionHandle,
+  ChannelSubscriptionConfig,
+} from './transmit-adapter.js'
 
 // -- Types ------------------------------------------------------------------
 export type {
@@ -123,13 +127,29 @@ export {
 export type { RawPaginatedResponse } from './pagination.js'
 
 // -- Feature detection ------------------------------------------------------
-export { fetchFeatures, detectFeatures, DEFAULT_FEATURES, getVisibleMetricGroups } from './feature-detect.js'
+export {
+  fetchFeatures,
+  detectFeatures,
+  DEFAULT_FEATURES,
+  getVisibleMetricGroups,
+} from './feature-detect.js'
 
 // -- Metrics ----------------------------------------------------------------
-export { METRIC_DEFINITIONS, getMetricById, getMetricsByGroup, MAX_HISTORY, STALE_MS } from './metrics.js'
+export {
+  METRIC_DEFINITIONS,
+  getMetricById,
+  getMetricsByGroup,
+  MAX_HISTORY,
+  STALE_MS,
+} from './metrics.js'
 
 // -- Routes / tab-to-path mappings ------------------------------------------
-export { getDebugTabPath, getDashboardSectionPath, DEBUG_TAB_PATHS, DASHBOARD_SECTION_PATHS } from './routes.js'
+export {
+  getDebugTabPath,
+  getDashboardSectionPath,
+  DEBUG_TAB_PATHS,
+  DASHBOARD_SECTION_PATHS,
+} from './routes.js'
 
 // -- History buffer ---------------------------------------------------------
 export { createHistoryBuffer } from './history-buffer.js'

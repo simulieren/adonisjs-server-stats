@@ -81,19 +81,16 @@ async function handleDelete(key: string) {
       </span>
     </div>
 
-    <FilterBar
-      v-model="search"
-      placeholder="Filter keys..."
-      :summary="`${keys.length} keys`"
-    />
+    <FilterBar v-model="search" placeholder="Filter keys..." :summary="`${keys.length} keys`" />
 
     <!-- Key detail -->
     <div v-if="selectedKey" class="ss-dash-cache-detail">
       <div class="ss-dash-cache-detail-header">
         <button class="ss-dash-action-btn" @click="selectedKey = null">&larr; Back</button>
-        <strong style="margin-left: 8px;">{{ selectedKey.key }}</strong>
-        <span style="color: var(--ss-muted); margin-left: 8px;">
-          {{ selectedKey.type }} | TTL: {{ formatTtl(selectedKey.ttl) }} | Size: {{ formatSize(selectedKey.size) }}
+        <strong style="margin-left: 8px">{{ selectedKey.key }}</strong>
+        <span style="color: var(--ss-muted); margin-left: 8px">
+          {{ selectedKey.type }} | TTL: {{ formatTtl(selectedKey.ttl) }} | Size:
+          {{ formatSize(selectedKey.size) }}
         </span>
         <button
           v-if="onDeleteKey"
@@ -103,35 +100,30 @@ async function handleDelete(key: string) {
           Delete
         </button>
       </div>
-      <pre v-if="selectedKey.value !== undefined" class="ss-dash-cache-value">{{ JSON.stringify(selectedKey.value, null, 2) }}</pre>
+      <pre v-if="selectedKey.value !== undefined" class="ss-dash-cache-value">{{
+        JSON.stringify(selectedKey.value, null, 2)
+      }}</pre>
     </div>
 
     <!-- Key list -->
     <template v-else>
-      <div v-if="keys.length === 0" class="ss-dash-empty">
-        No cache keys found
-      </div>
+      <div v-if="keys.length === 0" class="ss-dash-empty">No cache keys found</div>
 
       <table v-else class="ss-dash-table">
         <thead>
           <tr>
             <th>Key</th>
-            <th style="width: 60px;">Type</th>
-            <th style="width: 80px;">TTL</th>
-            <th style="width: 80px;">Size</th>
+            <th style="width: 60px">Type</th>
+            <th style="width: 80px">TTL</th>
+            <th style="width: 80px">Size</th>
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="k in keys"
-            :key="k.key"
-            style="cursor: pointer;"
-            @click="selectedKey = k"
-          >
-            <td style="color: var(--ss-sql-color);">{{ k.key }}</td>
-            <td style="color: var(--ss-muted);">{{ k.type }}</td>
-            <td style="color: var(--ss-dim);">{{ formatTtl(k.ttl) }}</td>
-            <td style="color: var(--ss-dim);">{{ formatSize(k.size) }}</td>
+          <tr v-for="k in keys" :key="k.key" style="cursor: pointer" @click="selectedKey = k">
+            <td style="color: var(--ss-sql-color)">{{ k.key }}</td>
+            <td style="color: var(--ss-muted)">{{ k.type }}</td>
+            <td style="color: var(--ss-dim)">{{ formatTtl(k.ttl) }}</td>
+            <td style="color: var(--ss-dim)">{{ formatSize(k.size) }}</td>
           </tr>
         </tbody>
       </table>

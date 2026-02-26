@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import type { DashboardSection, DashboardHookOptions, PaginatedResponse } from '../../core/types.js'
+
 import { ApiClient, UnauthorizedError } from '../../core/api-client.js'
-import { buildQueryParams } from '../../core/pagination.js'
-import { DashboardApi } from '../../core/dashboard-api.js'
 import { OVERVIEW_REFRESH_MS, SECTION_REFRESH_MS } from '../../core/constants.js'
+import { DashboardApi } from '../../core/dashboard-api.js'
+import { buildQueryParams } from '../../core/pagination.js'
+
+import type { DashboardSection, DashboardHookOptions, PaginatedResponse } from '../../core/types.js'
 
 /**
  * React hook for fetching dashboard section data.
@@ -119,8 +121,7 @@ export function useDashboardData<T = any>(
       const client = getClient()
       const url = `${dashboardEndpoint}/${path}`
       try {
-        const result =
-          method === 'post' ? await client.post(url, body) : await client.delete(url)
+        const result = method === 'post' ? await client.post(url, body) : await client.delete(url)
         // Refresh after mutation
         await fetchData()
         return result

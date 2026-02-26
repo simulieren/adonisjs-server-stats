@@ -102,26 +102,24 @@ function handleSearch(term: string) {
 
     <!-- List view -->
     <template v-if="viewMode === 'list'">
-      <div v-if="queries.length === 0" class="ss-dash-empty">
-        No queries found
-      </div>
+      <div v-if="queries.length === 0" class="ss-dash-empty">No queries found</div>
 
       <table v-else class="ss-dash-table">
         <thead>
           <tr>
-            <th style="width: 30px;">#</th>
+            <th style="width: 30px">#</th>
             <th>SQL</th>
-            <th style="width: 60px;">Method</th>
-            <th style="width: 80px;">Model</th>
-            <th style="width: 70px;">Duration</th>
-            <th style="width: 80px;">Time</th>
-            <th style="width: 60px;"></th>
+            <th style="width: 60px">Method</th>
+            <th style="width: 80px">Model</th>
+            <th style="width: 70px">Duration</th>
+            <th style="width: 80px">Time</th>
+            <th style="width: 60px"></th>
           </tr>
         </thead>
         <tbody>
           <template v-for="q in queries" :key="q.id">
             <tr>
-              <td style="color: var(--ss-dim);">{{ q.id }}</td>
+              <td style="color: var(--ss-dim)">{{ q.id }}</td>
               <td>
                 <span
                   :class="['ss-dash-sql', { 'ss-dash-expanded': expandedIds.has(q.id) }]"
@@ -135,7 +133,7 @@ function handleSearch(term: string) {
                   {{ q.method }}
                 </span>
               </td>
-              <td style="color: var(--ss-text-secondary);">{{ q.model || '-' }}</td>
+              <td style="color: var(--ss-text-secondary)">{{ q.model || '-' }}</td>
               <td>
                 <span :class="['ss-dash-duration', durationClass(q.duration)]">
                   {{ formatDuration(q.duration) }}
@@ -154,8 +152,10 @@ function handleSearch(term: string) {
             </tr>
             <!-- EXPLAIN result -->
             <tr v-if="explainQueryId === q.id && explainResult">
-              <td colspan="7" style="padding: 8px 12px;">
-                <pre class="ss-dash-explain-result">{{ JSON.stringify(explainResult, null, 2) }}</pre>
+              <td colspan="7" style="padding: 8px 12px">
+                <pre class="ss-dash-explain-result">{{
+                  JSON.stringify(explainResult, null, 2)
+                }}</pre>
               </td>
             </tr>
           </template>
@@ -172,31 +172,29 @@ function handleSearch(term: string) {
 
     <!-- Grouped view -->
     <template v-if="viewMode === 'grouped'">
-      <div v-if="groupedData.length === 0" class="ss-dash-empty">
-        No query patterns found
-      </div>
+      <div v-if="groupedData.length === 0" class="ss-dash-empty">No query patterns found</div>
 
       <table v-else class="ss-dash-table">
         <thead>
           <tr>
             <th>Pattern</th>
-            <th style="width: 60px;">Count</th>
-            <th style="width: 70px;">Avg</th>
-            <th style="width: 70px;">Min</th>
-            <th style="width: 70px;">Max</th>
-            <th style="width: 80px;">Total</th>
-            <th style="width: 60px;">% Time</th>
+            <th style="width: 60px">Count</th>
+            <th style="width: 70px">Avg</th>
+            <th style="width: 70px">Min</th>
+            <th style="width: 70px">Max</th>
+            <th style="width: 80px">Total</th>
+            <th style="width: 60px">% Time</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="(g, i) in groupedData" :key="i">
             <td class="ss-dash-sql">{{ g.pattern }}</td>
-            <td style="text-align: center;">{{ g.count }}</td>
+            <td style="text-align: center">{{ g.count }}</td>
             <td class="ss-dash-duration">{{ formatDuration(g.avgDuration) }}</td>
             <td class="ss-dash-duration">{{ formatDuration(g.minDuration) }}</td>
             <td class="ss-dash-duration">{{ formatDuration(g.maxDuration) }}</td>
             <td class="ss-dash-duration">{{ formatDuration(g.totalDuration) }}</td>
-            <td style="text-align: center;">{{ g.percentOfTotal.toFixed(1) }}%</td>
+            <td style="text-align: center">{{ g.percentOfTotal.toFixed(1) }}%</td>
           </tr>
         </tbody>
       </table>

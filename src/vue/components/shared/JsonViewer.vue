@@ -49,10 +49,7 @@ function copyToClipboard() {
 
 <template>
   <div class="ss-dbg-event-data">
-    <span
-      class="ss-dbg-data-preview"
-      @click="toggle"
-    >
+    <span class="ss-dbg-data-preview" @click="toggle">
       {{ preview }}
     </span>
     <button
@@ -63,10 +60,6 @@ function copyToClipboard() {
     >
       &#x2398;
     </button>
-    <pre
-      v-if="expanded"
-      class="ss-dbg-data-full"
-      @click="toggle"
-    >{{ fullJson }}</pre>
+    <pre v-if="expanded" class="ss-dbg-data-full" @click="toggle">{{ fullJson }}</pre>
   </div>
 </template>
