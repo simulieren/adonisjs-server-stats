@@ -1,15 +1,12 @@
 import { mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
-
+import type { DevToolbarConfig, EmailRecord, EventRecord, QueryRecord, TraceRecord } from '../debug/types.js'
 import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
 import { extractAddresses } from '../utils/mail_helpers.js'
 import { round } from '../utils/math_helpers.js'
 import { rangeToCutoff, rangeToMinutes, roundBucket } from '../utils/time_helpers.js'
 import { ChartAggregator } from './chart_aggregator.js'
 import { autoMigrate, runRetentionCleanup } from './migrator.js'
-
-import type { DevToolbarConfig } from '../debug/types.js'
-import type { QueryRecord, EventRecord, EmailRecord, TraceRecord } from '../debug/types.js'
 
 // ---------------------------------------------------------------------------
 // Filter types
@@ -196,20 +193,25 @@ export class DashboardStore {
     statusCode: number,
     duration: number,
     spanCount: number = 0,
-    warningCount: number = 0
+    warningCount: number = 0,
+    httpRequestId: string | null = null
   ): Promise<number | null> {
     if (!this.db) return null
     if (url.startsWith(this.dashboardPath)) return null
 
     try {
-      const [id] = await this.db('server_stats_requests').insert({
+      const row: Record<string, unknown> = {
         method,
         url,
         status_code: statusCode,
         duration: round(duration),
         span_count: spanCount,
         warning_count: warningCount,
-      })
+      }
+      if (httpRequestId) {
+        row.http_request_id = String(httpRequestId)
+      }
+      const [id] = await this.db('server_stats_requests').insert(row)
       return id
     } catch {
       return null
@@ -292,13 +294,12 @@ export class DashboardStore {
     if (!this.db) return
 
     try {
-      const levelName =
-        typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
+      const levelName = typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
 
       await this.db('server_stats_logs').insert({
         level: levelName,
         message: String(entry.msg || entry.message || ''),
-        request_id: entry.requestId ? String(entry.requestId) : null,
+        request_id: entry.request_id || entry.requestId ? String(entry.request_id || entry.requestId) : null,
         data: JSON.stringify(entry),
       })
     } catch {
@@ -336,7 +337,8 @@ export class DashboardStore {
     statusCode: number,
     duration: number,
     queries: QueryRecord[],
-    trace: TraceRecord | null
+    trace: TraceRecord | null,
+    httpRequestId: string | null = null
   ): Promise<number | null> {
     const requestId = await this.recordRequest(
       method,
@@ -344,7 +346,8 @@ export class DashboardStore {
       statusCode,
       duration,
       trace?.spanCount ?? 0,
-      trace?.warnings?.length ?? 0
+      trace?.warnings?.length ?? 0,
+      httpRequestId
     )
 
     if (requestId === null) return null
@@ -362,11 +365,7 @@ export class DashboardStore {
   // =========================================================================
 
   /** Paginated request history with optional filters. */
-  async getRequests(
-    page: number = 1,
-    perPage: number = 50,
-    filters?: RequestFilters
-  ): Promise<PaginatedResult<any>> {
+  async getRequests(page: number = 1, perPage: number = 50, filters?: RequestFilters): Promise<PaginatedResult<any>> {
     return this.paginate('server_stats_requests', page, perPage, (query) => {
       if (filters?.method) query.where('method', filters.method)
       if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
@@ -379,11 +378,7 @@ export class DashboardStore {
   }
 
   /** Paginated query history with optional filters. */
-  async getQueries(
-    page: number = 1,
-    perPage: number = 50,
-    filters?: QueryFilters
-  ): Promise<PaginatedResult<any>> {
+  async getQueries(page: number = 1, perPage: number = 50, filters?: QueryFilters): Promise<PaginatedResult<any>> {
     return this.paginate('server_stats_queries', page, perPage, (query) => {
       if (filters?.method) query.where('method', filters.method)
       if (filters?.model) query.where('model', filters.model)
@@ -423,11 +418,7 @@ export class DashboardStore {
   }
 
   /** Paginated event history with optional filters. */
-  async getEvents(
-    page: number = 1,
-    perPage: number = 50,
-    filters?: EventFilters
-  ): Promise<PaginatedResult<any>> {
+  async getEvents(page: number = 1, perPage: number = 50, filters?: EventFilters): Promise<PaginatedResult<any>> {
     return this.paginate('server_stats_events', page, perPage, (query) => {
       if (filters?.eventName) query.where('event_name', 'like', `%${filters.eventName}%`)
     })
@@ -467,10 +458,7 @@ export class DashboardStore {
   /** Get email HTML body for preview (falls back to text_body). */
   async getEmailHtml(id: number): Promise<string | null> {
     if (!this.db) return null
-    const row = await this.db('server_stats_emails')
-      .where('id', id)
-      .select('html', 'text_body')
-      .first()
+    const row = await this.db('server_stats_emails').where('id', id).select('html', 'text_body').first()
     if (!row) return null
     return row.html || row.text_body || null
   }
@@ -481,11 +469,7 @@ export class DashboardStore {
    * Structured filters query into the JSON `data` column using
    * SQLite's `json_extract()`.
    */
-  async getLogs(
-    page: number = 1,
-    perPage: number = 50,
-    filters?: LogFilters
-  ): Promise<PaginatedResult<any>> {
+  async getLogs(page: number = 1, perPage: number = 50, filters?: LogFilters): Promise<PaginatedResult<any>> {
     return this.paginate('server_stats_logs', page, perPage, (query) => {
       if (filters?.level) query.where('level', filters.level)
       if (filters?.requestId) query.where('request_id', filters.requestId)
@@ -512,11 +496,7 @@ export class DashboardStore {
   }
 
   /** Paginated trace history with optional filters. */
-  async getTraces(
-    page: number = 1,
-    perPage: number = 50,
-    filters?: TraceFilters
-  ): Promise<PaginatedResult<any>> {
+  async getTraces(page: number = 1, perPage: number = 50, filters?: TraceFilters): Promise<PaginatedResult<any>> {
     return this.paginate('server_stats_traces', page, perPage, (query) => {
       if (filters?.method) query.where('method', filters.method)
       if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
@@ -525,21 +505,48 @@ export class DashboardStore {
     })
   }
 
-  /** Single trace with full span data. */
+  /** Single trace with full span data and correlated logs. */
   async getTraceDetail(id: number): Promise<any | null> {
     if (!this.db) return null
 
     const row = await this.db('server_stats_traces').where('id', id).first()
     if (!row) return null
 
-    return {
+    let logs: any[] = []
+    let httpReqId: string | null = null
+    try {
+      // Try precise correlation via http_request_id first
+      if (row.request_id) {
+        const req = await this.db('server_stats_requests').select('http_request_id').where('id', row.request_id).first()
+        httpReqId = req?.http_request_id || null
+      }
+      if (httpReqId) {
+        logs = await this.db('server_stats_logs').where('request_id', httpReqId).orderBy('created_at', 'asc').limit(100)
+      }
+      if (logs.length === 0) {
+        // Fallback: time-window correlation
+        const paddingSec = Math.ceil((row.total_duration || 0) / 1000) + 2
+        logs = await this.db('server_stats_logs')
+          .whereRaw("created_at >= datetime(?, '-' || ? || ' seconds')", [row.created_at, paddingSec])
+          .whereRaw("created_at <= datetime(?, '+' || ? || ' seconds')", [row.created_at, paddingSec])
+          .orderBy('created_at', 'asc')
+          .limit(100)
+      }
+    } catch {
+      // Silently ignore — logs correlation is best-effort
+    }
+
+    const result: any = {
       ...row,
       spans: safeParseJson(row.spans) ?? [],
       warnings: safeParseJsonArray(row.warnings),
+      logs,
     }
+    if (httpReqId) result.http_request_id = httpReqId
+    return result
   }
 
-  /** Single request with associated queries, events, and trace. */
+  /** Single request with associated queries, events, trace, and correlated logs. */
   async getRequestDetail(id: number): Promise<any | null> {
     if (!this.db) return null
 
@@ -552,10 +559,32 @@ export class DashboardStore {
       this.db('server_stats_traces').where('request_id', id).first(),
     ])
 
+    // Fetch correlated logs — prefer precise http_request_id match, fall back to time-window.
+    let logs: any[] = []
+    try {
+      if (request.http_request_id) {
+        logs = await this.db('server_stats_logs')
+          .where('request_id', request.http_request_id)
+          .orderBy('created_at', 'asc')
+          .limit(100)
+      }
+      if (logs.length === 0) {
+        const paddingSec = Math.ceil((request.duration || 0) / 1000) + 2
+        logs = await this.db('server_stats_logs')
+          .whereRaw("created_at >= datetime(?, '-' || ? || ' seconds')", [request.created_at, paddingSec])
+          .whereRaw("created_at <= datetime(?, '+' || ? || ' seconds')", [request.created_at, paddingSec])
+          .orderBy('created_at', 'asc')
+          .limit(100)
+      }
+    } catch {
+      // Silently ignore — logs correlation is best-effort
+    }
+
     return {
       ...request,
       queries,
       events,
+      logs,
       trace: trace
         ? {
             ...trace,
@@ -610,11 +639,7 @@ export class DashboardStore {
     // Slowest endpoints (top 5 by average duration)
     const slowestEndpoints = await this.db('server_stats_requests')
       .where('created_at', '>=', cutoff)
-      .select(
-        'url',
-        this.db.raw('COUNT(*) as count'),
-        this.db.raw('ROUND(AVG(duration), 2) as avg_duration')
-      )
+      .select('url', this.db.raw('COUNT(*) as count'), this.db.raw('ROUND(AVG(duration), 2) as avg_duration'))
       .groupBy('url')
       .orderBy('avg_duration', 'desc')
       .limit(5)
@@ -622,10 +647,7 @@ export class DashboardStore {
     // Query stats
     const queryStats: any = await this.db('server_stats_queries')
       .where('created_at', '>=', cutoff)
-      .select(
-        this.db.raw('COUNT(*) as total'),
-        this.db.raw('ROUND(AVG(duration), 2) as avg_duration')
-      )
+      .select(this.db.raw('COUNT(*) as total'), this.db.raw('ROUND(AVG(duration), 2) as avg_duration'))
       .first()
 
     // Recent errors (last 5 log entries with level error/fatal)
@@ -671,9 +693,7 @@ export class DashboardStore {
 
     // For 1h/6h, use the per-minute metrics table.
     // For 24h/7d, aggregate metrics into larger buckets.
-    const rows = await this.db('server_stats_metrics')
-      .where('bucket', '>=', cutoff)
-      .orderBy('bucket', 'asc')
+    const rows = await this.db('server_stats_metrics').where('bucket', '>=', cutoff).orderBy('bucket', 'asc')
 
     if (range === '1h' || range === '6h') {
       return rows
@@ -743,59 +763,50 @@ export class DashboardStore {
     const cutoff = rangeToCutoff(range)
 
     try {
-      const [topEventsRaw, emailStatusRaw, logLevelsRaw, statusRaw, slowQueriesRaw] =
-        await Promise.all([
-          // Top 5 events by count
-          this.db('server_stats_events')
-            .select('event_name', this.db.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('event_name')
-            .orderBy('count', 'desc')
-            .limit(5),
+      const [topEventsRaw, emailStatusRaw, logLevelsRaw, statusRaw, slowQueriesRaw] = await Promise.all([
+        // Top 5 events by count
+        this.db('server_stats_events')
+          .select('event_name', this.db.raw('COUNT(*) as count'))
+          .where('created_at', '>=', cutoff)
+          .groupBy('event_name')
+          .orderBy('count', 'desc')
+          .limit(5),
 
-          // Email activity by status
-          this.db('server_stats_emails')
-            .select('status', this.db.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('status'),
+        // Email activity by status
+        this.db('server_stats_emails')
+          .select('status', this.db.raw('COUNT(*) as count'))
+          .where('created_at', '>=', cutoff)
+          .groupBy('status'),
 
-          // Log level breakdown
-          this.db('server_stats_logs')
-            .select('level', this.db.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('level'),
+        // Log level breakdown
+        this.db('server_stats_logs')
+          .select('level', this.db.raw('COUNT(*) as count'))
+          .where('created_at', '>=', cutoff)
+          .groupBy('level'),
 
-          // Status code distribution bucketed into 2xx/3xx/4xx/5xx
-          this.db('server_stats_requests')
-            .select(
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
-              ),
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
-              ),
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
-              ),
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
-              )
-            )
-            .where('created_at', '>=', cutoff)
-            .first(),
+        // Status code distribution bucketed into 2xx/3xx/4xx/5xx
+        this.db('server_stats_requests')
+          .select(
+            this.db.raw(`SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`),
+            this.db.raw(`SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`),
+            this.db.raw(`SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`),
+            this.db.raw(`SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`)
+          )
+          .where('created_at', '>=', cutoff)
+          .first(),
 
-          // Slowest queries by avg duration (top 5)
-          this.db('server_stats_queries')
-            .select(
-              'sql_normalized',
-              this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
-              this.db.raw('COUNT(*) as count')
-            )
-            .where('created_at', '>=', cutoff)
-            .groupBy('sql_normalized')
-            .orderBy('avg_duration', 'desc')
-            .limit(5),
-        ])
+        // Slowest queries by avg duration (top 5)
+        this.db('server_stats_queries')
+          .select(
+            'sql_normalized',
+            this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
+            this.db.raw('COUNT(*) as count')
+          )
+          .where('created_at', '>=', cutoff)
+          .groupBy('sql_normalized')
+          .orderBy('avg_duration', 'desc')
+          .limit(5),
+      ])
 
       // Map top events
       const topEvents = (topEventsRaw || []).map((r: any) => ({
@@ -866,11 +877,7 @@ export class DashboardStore {
     return query
   }
 
-  async createSavedFilter(
-    name: string,
-    section: string,
-    filterConfig: Record<string, any>
-  ): Promise<any> {
+  async createSavedFilter(name: string, section: string, filterConfig: Record<string, any>): Promise<any> {
     if (!this.db) return null
 
     const [id] = await this.db('server_stats_saved_filters').insert({

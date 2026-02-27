@@ -1267,7 +1267,7 @@
         'ms</span>'
     }
 
-    if (waterfallEl) renderWaterfall(waterfallEl, trace)
+    if (waterfallEl) renderWaterfall(waterfallEl, trace, trace.logs)
   }
 
   // Back button for requests detail
@@ -1278,6 +1278,14 @@
       var detailEl = document.getElementById('ss-dash-requests-detail')
       if (listEl) listEl.style.display = ''
       if (detailEl) {
+        // Clean up split pane
+        var h = detailEl.querySelector('.ss-dash-split-handle')
+        var lp = detailEl.querySelector('.ss-dash-related-logs-pane')
+        if (h) h.remove()
+        if (lp) lp.remove()
+        detailEl.classList.remove('ss-dash-split-active')
+        var wf = detailEl.querySelector('.ss-dash-tl-waterfall')
+        if (wf) { wf.style.flex = ''; wf.style.height = '' }
         detailEl.style.display = 'none'
         detailEl.classList.remove('ss-dash-active')
       }
@@ -1783,6 +1791,84 @@
   var logDeepLevelFilter = ''
   var logStructuredFilters = []
   var logSavedFilters = []
+  var currentLogItems = []
+
+  // ── Structured log detail helpers ──────────────────────────────
+
+  var STANDARD_LOG_KEYS = {
+    level: 1, time: 1, pid: 1, hostname: 1, msg: 1, message: 1,
+    v: 1, name: 1, request_id: 1, 'x-request-id': 1, levelName: 1,
+    level_name: 1, timestamp: 1, id: 1, createdAt: 1, created_at: 1,
+    requestId: 1
+  }
+
+  var getStructuredData = function (entry) {
+    if (!entry || !entry.data || typeof entry.data !== 'object') return null
+    var result = {}
+    var count = 0
+    Object.keys(entry.data).forEach(function (k) {
+      if (!STANDARD_LOG_KEYS[k]) {
+        result[k] = entry.data[k]
+        count++
+      }
+    })
+    return count > 0 ? result : null
+  }
+
+  var renderJsonValue = function (val, indent) {
+    indent = indent || 0
+    var pad = new Array(indent * 2 + 1).join(' ')
+    if (val === null) return '<span class="ss-json-null">null</span>'
+    if (typeof val === 'boolean') return '<span class="ss-json-bool">' + val + '</span>'
+    if (typeof val === 'number') return '<span class="ss-json-num">' + val + '</span>'
+    if (typeof val === 'string') return '<span class="ss-json-str">&quot;' + esc(val) + '&quot;</span>'
+    if (Array.isArray(val)) {
+      if (val.length === 0) return '[]'
+      var items = val.map(function (v) { return pad + '  ' + renderJsonValue(v, indent + 1) })
+      return '[\n' + items.join(',\n') + '\n' + pad + ']'
+    }
+    if (typeof val === 'object') {
+      var keys = Object.keys(val)
+      if (keys.length === 0) return '{}'
+      var entries = keys.map(function (k) {
+        return pad + '  <span class="ss-json-key">&quot;' + esc(k) + '&quot;</span>: ' + renderJsonValue(val[k], indent + 1)
+      })
+      return '{\n' + entries.join(',\n') + '\n' + pad + '}'
+    }
+    return esc(String(val))
+  }
+
+  var toggleLogDetail = function (idx, entryEl) {
+    var detailId = 'ss-dash-log-detail-' + idx
+    var existing = document.getElementById(detailId)
+    if (existing) {
+      existing.remove()
+      entryEl.classList.remove('ss-dash-log-expanded')
+      var ic = entryEl.querySelector('.ss-dash-log-expand-icon')
+      if (ic) ic.innerHTML = '&#x25B6;'
+      return
+    }
+    // Collapse any other open detail
+    document.querySelectorAll('.ss-dash-log-detail').forEach(function (el) { el.remove() })
+    document.querySelectorAll('.ss-dash-log-expanded').forEach(function (el) {
+      el.classList.remove('ss-dash-log-expanded')
+      var i2 = el.querySelector('.ss-dash-log-expand-icon')
+      if (i2) i2.innerHTML = '&#x25B6;'
+    })
+    var entry = currentLogItems[idx]
+    if (!entry) return
+    var sd = getStructuredData(entry)
+    if (!sd) return
+    entryEl.classList.add('ss-dash-log-expanded')
+    var icon = entryEl.querySelector('.ss-dash-log-expand-icon')
+    if (icon) icon.innerHTML = '&#x25BC;'
+    var detail = document.createElement('div')
+    detail.id = detailId
+    detail.className = 'ss-dash-log-detail'
+    detail.innerHTML = '<pre class="ss-dash-log-json">' + renderJsonValue(sd) + '</pre>'
+    detail.addEventListener('click', function (ev) { ev.stopPropagation() })
+    entryEl.parentNode.insertBefore(detail, entryEl.nextSibling)
+  }
 
   var fetchLogs = function () {
     var ps = getPage('logs')
@@ -1814,6 +1900,7 @@
 
   var renderLogs = function (data) {
     var items = data.data || data.logs || data.entries || []
+    currentLogItems = items
     var ps = getPage('logs')
     ps.total = data.meta ? data.meta.total : data.total || items.length
 
@@ -1827,14 +1914,18 @@
     }
 
     var html = ''
-    items.forEach(function (e) {
+    items.forEach(function (e, idx) {
       var level = (e.level || e.levelName || e.level_name || 'info').toLowerCase()
       var msg = e.message || e.msg || ''
       var ts = e.createdAt || e.created_at || e.time || e.timestamp || 0
       var reqId = e.request_id || e['x-request-id'] || ''
+      var hasData = e.data && typeof e.data === 'object' && Object.keys(e.data).length > 0
+      var sd = hasData ? getStructuredData(e) : null
 
       html +=
-        '<div class="ss-dash-log-entry">' +
+        '<div class="ss-dash-log-entry' +
+        (sd ? ' ss-dash-log-expandable' : '') +
+        '" data-log-idx="' + idx + '">' +
         '<span class="ss-dash-log-level ss-dash-log-level-' +
         esc(level) +
         '">' +
@@ -1855,6 +1946,7 @@
         '<span class="ss-dash-log-msg">' +
         esc(msg) +
         '</span>' +
+        (sd ? '<span class="ss-dash-log-expand-icon">&#x25B6;</span>' : '') +
         '</div>'
     })
 
@@ -1866,7 +1958,8 @@
     var logBody = document.getElementById('ss-dash-logs-body')
     if (logBody) {
       logBody.querySelectorAll('.ss-dash-log-reqid').forEach(function (el) {
-        el.addEventListener('click', function () {
+        el.addEventListener('click', function (ev) {
+          ev.stopPropagation()
           logReqIdFilter = el.getAttribute('data-reqid') || ''
           var input = document.getElementById('ss-dash-log-reqid-input')
           if (input) input.value = logReqIdFilter
@@ -1874,6 +1967,15 @@
           if (clearBtn) clearBtn.style.display = logReqIdFilter ? '' : 'none'
           getPage('logs').page = 1
           fetchLogs()
+        })
+      })
+
+      // Click log entry to expand structured data
+      logBody.querySelectorAll('.ss-dash-log-expandable').forEach(function (el) {
+        el.addEventListener('click', function (ev) {
+          if (ev.target.classList.contains('ss-dash-log-reqid')) return
+          var idx = parseInt(el.getAttribute('data-log-idx'), 10)
+          toggleLogDetail(idx, el)
         })
       })
     }
@@ -2332,7 +2434,7 @@
         ' spans</span>'
     }
 
-    if (waterfallEl) renderWaterfall(waterfallEl, trace)
+    if (waterfallEl) renderWaterfall(waterfallEl, trace, trace.logs)
   }
 
   var timelineBackBtn = document.getElementById('ss-dash-timeline-back')
@@ -2342,6 +2444,14 @@
       var detailEl = document.getElementById('ss-dash-timeline-detail')
       if (listEl) listEl.style.display = ''
       if (detailEl) {
+        // Clean up split pane
+        var h = detailEl.querySelector('.ss-dash-split-handle')
+        var lp = detailEl.querySelector('.ss-dash-related-logs-pane')
+        if (h) h.remove()
+        if (lp) lp.remove()
+        detailEl.classList.remove('ss-dash-split-active')
+        var wf = detailEl.querySelector('.ss-dash-tl-waterfall')
+        if (wf) { wf.style.flex = ''; wf.style.height = '' }
         detailEl.style.display = 'none'
         detailEl.classList.remove('ss-dash-active')
       }
@@ -2349,7 +2459,7 @@
   }
 
   // ── Waterfall renderer (shared) ───────────────────────────────
-  var renderWaterfall = function (container, trace) {
+  var renderWaterfall = function (container, trace, logs) {
     var spans = trace.spans || []
     if (typeof spans === 'string') {
       try {
@@ -2467,6 +2577,138 @@
     }
 
     container.innerHTML = html
+
+    // Remove any previous related-logs pane & resize handle from the parent
+    var parent = container.parentNode
+    var oldHandle = parent.querySelector('.ss-dash-split-handle')
+    var oldLogsPane = parent.querySelector('.ss-dash-related-logs-pane')
+    if (oldHandle) oldHandle.remove()
+    if (oldLogsPane) oldLogsPane.remove()
+    parent.classList.remove('ss-dash-split-active')
+
+    // Related Logs — render into a separate sibling pane for 50/50 split
+    if (logs && logs.length > 0) {
+      parent.classList.add('ss-dash-split-active')
+
+      // Create resize handle
+      var handle = document.createElement('div')
+      handle.className = 'ss-dash-split-handle'
+      handle.title = 'Drag to resize'
+      parent.appendChild(handle)
+
+      // Create logs pane
+      var logsPane = document.createElement('div')
+      logsPane.className = 'ss-dash-related-logs-pane'
+      var logsHtml =
+        '<div class="ss-dash-tl-related-logs-title">Related Logs (' +
+        logs.length + ')</div>'
+      logs.forEach(function (e, idx) {
+        var level = (e.level || e.levelName || e.level_name || 'info').toLowerCase()
+        var msg = e.message || e.msg || ''
+        var ts = e.createdAt || e.created_at || e.time || e.timestamp || 0
+        var reqId = e.requestId || e.request_id || e['x-request-id'] || ''
+        var hasData = e.data && typeof e.data === 'object' && Object.keys(e.data).length > 0
+        var sd = hasData ? getStructuredData(e) : null
+
+        logsHtml +=
+          '<div class="ss-dash-log-entry' +
+          (sd ? ' ss-dash-log-expandable' : '') +
+          '" data-wf-log-idx="' + idx + '">' +
+          '<span class="ss-dash-log-level ss-dash-log-level-' + esc(level) + '">' +
+          esc(level.toUpperCase()) +
+          '</span>' +
+          '<span class="ss-dash-log-time">' + (ts ? formatTime(ts) : '-') + '</span>' +
+          (reqId
+            ? '<span class="ss-dash-log-reqid" title="' + esc(reqId) + '">' + esc(shortReqId(reqId)) + '</span>'
+            : '') +
+          '<span class="ss-dash-log-msg">' + esc(msg) + '</span>' +
+          (sd ? '<span class="ss-dash-log-expand-icon">&#x25B6;</span>' : '') +
+          '</div>'
+      })
+      logsPane.innerHTML = logsHtml
+      parent.appendChild(logsPane)
+
+      // Attach expand handlers for related logs
+      logsPane.querySelectorAll('[data-wf-log-idx]').forEach(function (el) {
+        el.addEventListener('click', function (ev) {
+          if (ev.target.classList.contains('ss-dash-log-reqid')) return
+          var idx = parseInt(el.getAttribute('data-wf-log-idx'), 10)
+          var entry = logs[idx]
+          if (!entry) return
+          var sd = getStructuredData(entry)
+          if (!sd) return
+          var detailId = 'ss-dash-wf-log-detail-' + idx
+          var existing = document.getElementById(detailId)
+          if (existing) {
+            existing.remove()
+            el.classList.remove('ss-dash-log-expanded')
+            var ic = el.querySelector('.ss-dash-log-expand-icon')
+            if (ic) ic.innerHTML = '&#x25B6;'
+            return
+          }
+          // Collapse any other open detail in this logs pane
+          logsPane.querySelectorAll('.ss-dash-log-detail').forEach(function (d) { d.remove() })
+          logsPane.querySelectorAll('.ss-dash-log-expanded').forEach(function (d) {
+            d.classList.remove('ss-dash-log-expanded')
+            var i2 = d.querySelector('.ss-dash-log-expand-icon')
+            if (i2) i2.innerHTML = '&#x25B6;'
+          })
+          el.classList.add('ss-dash-log-expanded')
+          var icon = el.querySelector('.ss-dash-log-expand-icon')
+          if (icon) icon.innerHTML = '&#x25BC;'
+          var detail = document.createElement('div')
+          detail.id = detailId
+          detail.className = 'ss-dash-log-detail'
+          detail.innerHTML = '<pre class="ss-dash-log-json">' + renderJsonValue(sd) + '</pre>'
+          detail.addEventListener('click', function (ev2) { ev2.stopPropagation() })
+          el.parentNode.insertBefore(detail, el.nextSibling)
+        })
+      })
+
+      // Restore saved split ratio from localStorage
+      var savedRatio = parseFloat(localStorage.getItem('ss-stats-split-ratio'))
+      if (savedRatio && savedRatio > 0 && savedRatio < 1) {
+        var initParentH = parent.getBoundingClientRect().height - 6
+        var initTopH = Math.max(60, Math.min(initParentH - 60, initParentH * savedRatio))
+        container.style.flex = 'none'
+        container.style.height = initTopH + 'px'
+        logsPane.style.flex = '1'
+      }
+
+      // Draggable resize handle
+      var dragging = false
+      var startY = 0
+      var startTopH = 0
+      handle.addEventListener('mousedown', function (ev) {
+        ev.preventDefault()
+        dragging = true
+        startY = ev.clientY
+        startTopH = container.getBoundingClientRect().height
+        document.body.style.cursor = 'row-resize'
+        document.body.style.userSelect = 'none'
+      })
+      document.addEventListener('mousemove', function (ev) {
+        if (!dragging) return
+        var delta = ev.clientY - startY
+        var parentH = parent.getBoundingClientRect().height - 6 // minus header and handle
+        var newTopH = Math.max(60, Math.min(parentH - 60, startTopH + delta))
+        container.style.flex = 'none'
+        container.style.height = newTopH + 'px'
+        logsPane.style.flex = '1'
+      })
+      document.addEventListener('mouseup', function () {
+        if (!dragging) return
+        dragging = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        // Save split ratio to localStorage
+        var totalH = parent.getBoundingClientRect().height - 6
+        if (totalH > 0) {
+          var ratio = container.getBoundingClientRect().height / totalH
+          localStorage.setItem('ss-stats-split-ratio', ratio.toFixed(3))
+        }
+      })
+    }
   }
 
   // ── Cache ─────────────────────────────────────────────────────
