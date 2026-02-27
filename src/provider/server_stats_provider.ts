@@ -44,6 +44,14 @@ export default class ServerStatsProvider {
   private statsController: ServerStatsController | null = null
   private debugController: DebugController | null = null
 
+  // Diagnostics tracking
+  private pinoHookActive: boolean = false
+  private edgePluginActive: boolean = false
+  private prometheusActive: boolean = false
+  private transmitAvailable: boolean = false
+  private transmitChannels: string[] = []
+  private resolvedConfig: ServerStatsConfig | null = null
+
   constructor(protected app: ApplicationService) {}
 
   async boot() {
@@ -130,6 +138,7 @@ export default class ServerStatsProvider {
       const edge = await import('edge.js')
       const { edgePluginServerStats } = await import('../edge/plugin.js')
       edge.default.use(edgePluginServerStats(config))
+      this.edgePluginActive = true
     } catch (err) {
       log.warn(
         'could not register Edge plugin — @serverStats() tag will not work: ' +
@@ -236,6 +245,7 @@ export default class ServerStatsProvider {
       return originalWrite(chunk, ...args)
     }
 
+    this.pinoHookActive = true
     log.info('log collector hooked into AdonisJS logger (zero-config)')
   }
 
@@ -245,6 +255,7 @@ export default class ServerStatsProvider {
 
     if (this.app.inTest && config.skipInTest !== false) return
 
+    this.resolvedConfig = config
     this.engine = new StatsEngine(config.collectors)
 
     // Bind engine to container so the controller can access it
@@ -300,6 +311,12 @@ export default class ServerStatsProvider {
     if (config.transport === 'transmit') {
       try {
         transmit = await this.app.container.make('transmit')
+        if (transmit) {
+          this.transmitAvailable = true
+          if (config.channelName) {
+            this.transmitChannels.push(config.channelName)
+          }
+        }
       } catch {
         log.info(
           'transport is "transmit" but @adonisjs/transmit is not installed — falling back to polling'
@@ -316,6 +333,7 @@ export default class ServerStatsProvider {
     }
 
     if (prometheusCollector) {
+      this.prometheusActive = true
       log.info('Prometheus integration active')
     }
 
@@ -381,7 +399,11 @@ export default class ServerStatsProvider {
     const logPath = this.app.makePath('logs', 'adonisjs.log')
     const serverConfig = this.app.config.get<ServerStatsConfig>('server_stats')
     const DebugControllerClass = (await import('../controller/debug_controller.js')).default
-    this.debugController = new DebugControllerClass(this.debugStore, logPath, serverConfig)
+    this.debugController = new DebugControllerClass(this.debugStore, logPath, serverConfig, {
+      getEngine: () => this.engine,
+      getDashboardStore: () => this.dashboardStore,
+      getProviderDiagnostics: () => this.getDiagnostics(),
+    })
 
     // Wire trace collector into the request tracking middleware
     if (this.debugStore.traces) {
@@ -408,7 +430,11 @@ export default class ServerStatsProvider {
     }
 
     if (debugTransmit) {
+      this.transmitAvailable = true
       const debugChannel = 'server-stats/debug'
+      if (!this.transmitChannels.includes(debugChannel)) {
+        this.transmitChannels.push(debugChannel)
+      }
       const pendingTypes = new Set<string>()
       this.debugStore.onNewItem((type) => {
         // Debounce: coalesce rapid events into a single broadcast
@@ -558,16 +584,102 @@ export default class ServerStatsProvider {
     }
 
     if (transmit) {
+      this.transmitAvailable = true
       const dashChannel = 'server-stats/dashboard'
+      if (!this.transmitChannels.includes(dashChannel)) {
+        this.transmitChannels.push(dashChannel)
+      }
       this.dashboardBroadcastTimer = setInterval(async () => {
         try {
           if (!dashStore.isReady()) return
           const overview = await dashStore.getOverviewMetrics('1h')
-          ;(transmit as { broadcast: Function }).broadcast(dashChannel, overview)
+          const diagnostics = {
+            collectors: this.engine!.getCollectorHealth(),
+            buffers: this.debugStore!.getBufferStats(),
+          }
+          ;(transmit as { broadcast: Function }).broadcast(dashChannel, {
+            ...overview,
+            diagnostics,
+          })
         } catch {
           // Silently ignore
         }
       }, 5_000)
+    }
+  }
+
+  /** Return diagnostics state for the Internals endpoint. */
+  getDiagnostics() {
+    const config = this.resolvedConfig
+    const toolbarConfig = config?.devToolbar
+
+    return {
+      timers: {
+        collectionInterval: {
+          active: this.intervalId !== null,
+          intervalMs: config?.intervalMs ?? 0,
+        },
+        dashboardBroadcast: {
+          active: this.dashboardBroadcastTimer !== null,
+          intervalMs: 5000,
+        },
+        debugBroadcast: {
+          active: this.debugBroadcastTimer !== null,
+          debounceMs: 200,
+        },
+        persistFlush: {
+          active: this.flushTimer !== null,
+          intervalMs: 30_000,
+        },
+        retentionCleanup: {
+          active: this.dashboardStore?.isReady() ?? false,
+          intervalMs: 60 * 60 * 1000,
+        },
+      },
+      transmit: {
+        available: this.transmitAvailable,
+        channels: this.transmitChannels,
+      },
+      integrations: {
+        prometheus: { active: this.prometheusActive },
+        pinoHook: {
+          active: this.pinoHookActive,
+          mode: this.pinoHookActive ? 'stream' : toolbarConfig?.enabled ? 'none' : 'none',
+        },
+        edgePlugin: { active: this.edgePluginActive },
+        cacheInspector: {
+          available: (config?.collectors ?? []).some((c) => c.name === 'redis'),
+        },
+        queueInspector: {
+          available: (config?.collectors ?? []).some((c) => c.name === 'queue'),
+        },
+      },
+      config: {
+        intervalMs: config?.intervalMs ?? 0,
+        transport: config?.transport ?? 'none',
+        channelName: config?.channelName ?? '',
+        endpoint: config?.endpoint ?? false,
+        skipInTest: config?.skipInTest !== false,
+        hasOnStatsCallback: typeof config?.onStats === 'function',
+        hasShouldShowCallback: typeof config?.shouldShow === 'function',
+      },
+      devToolbar: {
+        enabled: !!toolbarConfig?.enabled,
+        maxQueries: toolbarConfig?.maxQueries ?? 500,
+        maxEvents: toolbarConfig?.maxEvents ?? 200,
+        maxEmails: toolbarConfig?.maxEmails ?? 100,
+        maxTraces: toolbarConfig?.maxTraces ?? 200,
+        slowQueryThresholdMs: toolbarConfig?.slowQueryThresholdMs ?? 100,
+        tracing: toolbarConfig?.tracing ?? false,
+        dashboard: toolbarConfig?.dashboard ?? false,
+        dashboardPath: toolbarConfig?.dashboardPath ?? '/__stats',
+        debugEndpoint: toolbarConfig?.debugEndpoint ?? '/admin/api/debug',
+        retentionDays: toolbarConfig?.retentionDays ?? 7,
+        dbPath: toolbarConfig?.dbPath ?? '.adonisjs/server-stats/dashboard.sqlite3',
+        persistDebugData: toolbarConfig?.persistDebugData ?? false,
+        excludeFromTracing: toolbarConfig?.excludeFromTracing ?? [],
+        customPaneCount: toolbarConfig?.panes?.length ?? 0,
+      },
     }
   }
 

@@ -56,6 +56,10 @@ export class RingBuffer<T> {
     return this.count
   }
 
+  getCapacity(): number {
+    return this.capacity
+  }
+
   clear(): void {
     this.buffer = Array.from<T | undefined>({ length: this.capacity })
     this.head = 0

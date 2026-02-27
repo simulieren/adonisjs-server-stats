@@ -1,6 +1,9 @@
 import { readFile, stat } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 
+import type { DashboardStore } from '../dashboard/dashboard_store.js'
 import type { DebugStore } from '../debug/debug_store.js'
+import type { StatsEngine } from '../engine/stats_engine.js'
 import type { ServerStatsConfig } from '../types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
@@ -13,15 +16,24 @@ const LEVEL_NAMES: Record<number, string> = {
   60: 'fatal',
 }
 
+interface DiagnosticsDeps {
+  getEngine?: () => StatsEngine | null
+  getDashboardStore?: () => DashboardStore | null
+  getProviderDiagnostics?: () => Record<string, unknown>
+}
+
 export default class DebugController {
   private logPath: string
+  private diagnosticsDeps: DiagnosticsDeps
 
   constructor(
     private store: DebugStore,
     logPath: string,
-    private serverConfig?: ServerStatsConfig
+    private serverConfig?: ServerStatsConfig,
+    diagnosticsDeps?: DiagnosticsDeps
   ) {
     this.logPath = logPath
+    this.diagnosticsDeps = diagnosticsDeps ?? {}
   }
 
   async config({ response }: HttpContext) {
@@ -126,6 +138,70 @@ export default class DebugController {
       return response.notFound({ error: 'Trace not found' })
     }
     return response.json(trace)
+  }
+
+  async diagnostics({ response }: HttpContext) {
+    const engine = this.diagnosticsDeps.getEngine?.()
+    const dashboardStore = this.diagnosticsDeps.getDashboardStore?.()
+    const providerDiag = this.diagnosticsDeps.getProviderDiagnostics?.() ?? {}
+
+    // Package version — read from disk since createRequire resolves from
+    // the compiled output directory where ../../package.json doesn't exist.
+    let packageVersion = 'unknown'
+    try {
+      const pkgPath = fileURLToPath(new URL('../../../package.json', import.meta.url))
+      const pkgJson = JSON.parse(await readFile(pkgPath, 'utf-8'))
+      packageVersion = pkgJson.version
+    } catch {
+      // Fallback
+    }
+
+    // AdonisJS version
+    let adonisVersion = 'unknown'
+    try {
+      const { createRequire } = await import('node:module')
+      const require = createRequire(import.meta.url)
+      const adonisPkg = require('@adonisjs/core/package.json')
+      adonisVersion = adonisPkg.version
+    } catch {
+      // Not installed or not resolvable
+    }
+
+    // Collector health + configs
+    const healthList = engine?.getCollectorHealth() ?? []
+    const configList = engine?.getCollectorConfigs() ?? []
+    const configMap = new Map(configList.map((c) => [c.name, c.config]))
+
+    const collectors = healthList.map((h) => ({
+      ...h,
+      config: configMap.get(h.name) ?? {},
+    }))
+
+    // Buffer stats
+    const buffers = this.store.getBufferStats()
+
+    // Storage stats (if dashboard is active)
+    let storage = null
+    if (dashboardStore) {
+      try {
+        storage = await dashboardStore.getStorageStats()
+      } catch {
+        // Dashboard store not ready
+      }
+    }
+
+    return response.json({
+      package: {
+        version: packageVersion,
+        nodeVersion: process.version,
+        adonisVersion,
+        uptime: process.uptime(),
+      },
+      ...providerDiag,
+      collectors,
+      buffers,
+      storage,
+    })
   }
 
   async logs({ response }: HttpContext) {

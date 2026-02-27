@@ -24,6 +24,10 @@ export function appCollector(): MetricCollector {
     name: 'app',
     label: 'app — users, webhooks, emails',
 
+    getConfig() {
+      return {}
+    },
+
     async collect() {
       try {
         const { default: db } = await import('@adonisjs/lucid/services/db')

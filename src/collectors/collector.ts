@@ -63,6 +63,15 @@ export interface MetricCollector {
   stop?(): void | Promise<void>
 
   /**
+   * Return collector-specific configuration for diagnostics.
+   *
+   * Used by the Internals diagnostics endpoint to show resolved
+   * configuration for each collector. Sensitive values (e.g. passwords)
+   * should be redacted.
+   */
+  getConfig?(): Record<string, unknown>
+
+  /**
    * Collect metrics and return them as a flat key-value record.
    *
    * Called every tick (default: every 3 seconds). The engine calls

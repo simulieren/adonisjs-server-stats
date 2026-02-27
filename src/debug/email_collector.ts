@@ -105,6 +105,10 @@ export class EmailCollector {
     return this.buffer.size()
   }
 
+  getBufferInfo(): { current: number; max: number } {
+    return { current: this.buffer.size(), max: this.buffer.getCapacity() }
+  }
+
   clear(): void {
     this.buffer.clear()
   }

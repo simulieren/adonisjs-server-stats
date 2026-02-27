@@ -73,6 +73,13 @@ export function logCollector(opts?: LogCollectorOptions): MetricCollector {
     name: 'log',
     label: opts?.logPath ? `log — file: ${opts.logPath}` : 'log — pino stream (zero-config)',
 
+    getConfig() {
+      return {
+        logPath: opts?.logPath ?? null,
+        mode: opts?.logPath ? 'file' : 'stream',
+      }
+    },
+
     async start() {
       if (opts?.logPath) {
         // File-based mode

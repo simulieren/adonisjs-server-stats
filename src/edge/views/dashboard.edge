@@ -103,6 +103,12 @@
             <span class="ss-dash-nav-label">Config</span>
           </button>
 
+          {{-- Internals --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="internals">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+            <span class="ss-dash-nav-label">Internals</span>
+          </button>
+
           {{-- Separator before custom panes --}}
           @if(customPanes && customPanes.length)
             <div class="ss-dash-nav-sep"></div>
@@ -331,6 +337,15 @@
             </div>
             <div id="ss-dash-config-body">
               <div class="ss-dash-empty">Loading config...</div>
+            </div>
+          </div>
+        </div>
+
+        {{-- ═══ Internals ═══ --}}
+        <div id="ss-dash-pane-internals" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div id="ss-dash-internals-body">
+              <div class="ss-dash-empty">Loading internals...</div>
             </div>
           </div>
         </div>

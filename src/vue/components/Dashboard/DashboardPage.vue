@@ -24,6 +24,7 @@ const TimelineSection = defineAsyncComponent(() => import('./sections/TimelineSe
 const CacheSection = defineAsyncComponent(() => import('./sections/CacheSection.vue'))
 const JobsSection = defineAsyncComponent(() => import('./sections/JobsSection.vue'))
 const ConfigSection = defineAsyncComponent(() => import('./sections/ConfigSection.vue'))
+const InternalsSection = defineAsyncComponent(() => import('./sections/InternalsSection.vue'))
 
 const props = withDefaults(defineProps<DashboardConfig>(), {
   baseUrl: '',
@@ -106,6 +107,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'cache', label: 'Cache', icon: '\u26C1' },
   { id: 'jobs', label: 'Jobs', icon: '\u2699' },
   { id: 'config', label: 'Config', icon: '\u2699' },
+  { id: 'internals', label: 'Internals', icon: '\u2318' },
 ]
 
 const visibleSections = computed(() =>
@@ -280,6 +282,14 @@ const themeAttr = computed(() => theme.value)
           />
 
           <ConfigSection v-else-if="activeSection === 'config'" :data="data" />
+
+          <InternalsSection
+            v-else-if="activeSection === 'internals'"
+            :data="data"
+            :base-url="baseUrl"
+            :dashboard-endpoint="dashboardEndpoint"
+            :auth-token="authToken"
+          />
         </template>
       </main>
     </div>

@@ -22,6 +22,7 @@ const LogsTab = defineAsyncComponent(() => import('./tabs/LogsTab.vue'))
 const TimelineTab = defineAsyncComponent(() => import('./tabs/TimelineTab.vue'))
 const CacheTab = defineAsyncComponent(() => import('./tabs/CacheTab.vue'))
 const JobsTab = defineAsyncComponent(() => import('./tabs/JobsTab.vue'))
+const InternalsTab = defineAsyncComponent(() => import('./tabs/InternalsTab.vue'))
 const CustomPaneTab = defineAsyncComponent(() => import('./tabs/CustomPaneTab.vue'))
 
 const props = withDefaults(defineProps<DebugPanelConfig>(), {
@@ -78,6 +79,8 @@ const TABS = computed<TabDef[]>(() => {
   if (features.value.queues) {
     tabs.push({ id: 'jobs', label: 'Jobs', icon: 'J' })
   }
+
+  tabs.push({ id: 'internals', label: 'Internals', icon: 'I' })
 
   // Add custom panes
   for (const pane of features.value.customPanes) {
@@ -207,6 +210,7 @@ defineExpose({ toggle, open, close })
         />
         <CacheTab v-else-if="activeTab === 'cache'" :data="data" />
         <JobsTab v-else-if="activeTab === 'jobs'" :data="data" />
+        <InternalsTab v-else-if="activeTab === 'internals'" :data="data" />
         <CustomPaneTab
           v-else-if="activeTab.startsWith('custom-')"
           :pane="getCustomPane(activeTab)!"

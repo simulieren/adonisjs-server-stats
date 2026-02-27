@@ -40,6 +40,21 @@ export class DebugStore {
     this.traces?.onNewItem(cb ? () => cb('trace') : null)
   }
 
+  /** Return buffer utilization stats for all debug collectors. */
+  getBufferStats(): {
+    queries: { current: number; max: number }
+    events: { current: number; max: number }
+    emails: { current: number; max: number }
+    traces: { current: number; max: number }
+  } {
+    return {
+      queries: this.queries.getBufferInfo(),
+      events: this.events.getBufferInfo(),
+      emails: this.emails.getBufferInfo(),
+      traces: this.traces?.getBufferInfo() ?? { current: 0, max: 0 },
+    }
+  }
+
   async start(emitter: unknown, router: unknown): Promise<void> {
     // Runtime-check the emitter before passing to collectors.
     // The container returns `unknown`; collectors guard internally too.

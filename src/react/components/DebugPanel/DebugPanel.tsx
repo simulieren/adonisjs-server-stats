@@ -19,6 +19,7 @@ const LogsTab = lazy(() => import('./tabs/LogsTab.js'))
 const TimelineTab = lazy(() => import('./tabs/TimelineTab.js'))
 const CacheTab = lazy(() => import('./tabs/CacheTab.js'))
 const JobsTab = lazy(() => import('./tabs/JobsTab.js'))
+const InternalsTab = lazy(() => import('./tabs/InternalsTab.js'))
 const CustomPaneTab = lazy(() => import('./tabs/CustomPaneTab.js'))
 
 interface DebugPanelProps extends DebugPanelPropsBase {
@@ -84,6 +85,20 @@ const TAB_ICONS: Record<string, React.ReactNode> = {
       <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
     </svg>
   ),
+  internals: (
+    <svg className="ss-dbg-tab-icon" viewBox="0 0 24 24">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <rect x="9" y="9" width="6" height="6" />
+      <line x1="9" y1="1" x2="9" y2="4" />
+      <line x1="15" y1="1" x2="15" y2="4" />
+      <line x1="9" y1="20" x2="9" y2="23" />
+      <line x1="15" y1="20" x2="15" y2="23" />
+      <line x1="20" y1="9" x2="23" y2="9" />
+      <line x1="20" y1="14" x2="23" y2="14" />
+      <line x1="1" y1="9" x2="4" y2="9" />
+      <line x1="1" y1="14" x2="4" y2="14" />
+    </svg>
+  ),
 }
 
 export function DebugPanel(props: DebugPanelProps) {
@@ -106,6 +121,7 @@ export function DebugPanel(props: DebugPanelProps) {
       { id: 'timeline', label: 'Timeline', visible: features.tracing },
       { id: 'cache', label: 'Cache', visible: features.cache },
       { id: 'jobs', label: 'Jobs', visible: features.queues },
+      { id: 'internals', label: 'Internals', visible: true },
     ],
     [features]
   )
@@ -143,6 +159,7 @@ export function DebugPanel(props: DebugPanelProps) {
       timeline: <TimelineTab {...tabProps} />,
       cache: <CacheTab {...tabProps} />,
       jobs: <JobsTab {...tabProps} />,
+      internals: <InternalsTab {...tabProps} />,
     }
 
     return (

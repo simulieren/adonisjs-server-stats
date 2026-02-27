@@ -82,6 +82,14 @@ export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
     name: 'queue',
     label: `queue — ${queueName} @ ${opts.connection?.host ?? '?'}:${opts.connection?.port ?? '?'}`,
 
+    getConfig() {
+      return {
+        queueName,
+        connectionHost: opts.connection?.host ?? '?',
+        connectionPort: opts.connection?.port ?? '?',
+      }
+    },
+
     async collect() {
       if (!opts.connection) {
         if (!warnedMissingConnection) {

@@ -599,6 +599,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--ss-text);
 }
 /* Column resize handles */
 .ss-col-resize {
@@ -1920,4 +1921,116 @@ tr:hover .ss-dash-copy-row-btn {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--ss-text);
+}
+
+/* ── Utility color classes ─────────────────────────────────────── */
+.ss-dash-c-dim {
+  color: var(--ss-dim);
+}
+.ss-dash-c-muted {
+  color: var(--ss-muted);
+}
+.ss-dash-c-red {
+  color: var(--ss-red-fg);
+}
+.ss-dash-c-green {
+  color: var(--ss-green-fg);
+}
+.ss-dash-c-amber {
+  color: var(--ss-amber-fg);
+}
+
+/* ── Section title (reused by internals + Vue) ────────────────── */
+.ss-dash-section-title {
+  margin: 20px 0 6px;
+  padding: 0 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  border-bottom: 1px solid var(--ss-border);
+}
+.ss-dash-section-title:first-child {
+  margin-top: 4px;
+}
+
+/* ── Compact info cards ───────────────────────────────────────── */
+.ss-dash-info-cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ss-dash-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--ss-surface-alt);
+  border-radius: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+.ss-dash-info-card-label {
+  font-size: 10px;
+  color: var(--ss-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ss-dash-info-card-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ss-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Status indicator dot ─────────────────────────────────────── */
+.ss-dash-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--ss-dim);
+}
+.ss-dash-dot-ok {
+  background: var(--ss-green-fg);
+}
+.ss-dash-dot-err {
+  background: var(--ss-red-fg);
+}
+
+/* ── Progress bar ─────────────────────────────────────────────── */
+.ss-dash-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ss-dash-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--ss-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ss-dash-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--ss-blue-fg);
+  transition: width 0.3s;
+}
+.ss-dash-bar-fill-warn {
+  background: var(--ss-amber-fg);
+}
+.ss-dash-bar-pct {
+  font-size: 11px;
+  min-width: 36px;
+  text-align: right;
+  color: var(--ss-dim);
+}
+.ss-dash-bar-pct-warn {
+  color: var(--ss-amber-fg);
 }

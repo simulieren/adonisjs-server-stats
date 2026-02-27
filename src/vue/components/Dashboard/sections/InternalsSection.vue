@@ -1,0 +1,745 @@
+<script setup lang="ts">
+/**
+ * Internals diagnostics section for the dashboard.
+ *
+ * Fetches from the debug endpoint ({debugEndpoint}/diagnostics)
+ * and renders 7 grouped tables showing runtime state.
+ */
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ApiClient } from '../../../../core/index.js'
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface CollectorInfo {
+  name: string
+  label: string
+  status: 'healthy' | 'errored' | 'stopped'
+  lastError: string | null
+  lastErrorAt: number | null
+  config: Record<string, unknown>
+}
+
+interface BufferInfo {
+  current: number
+  max: number
+}
+
+interface TimerInfo {
+  active: boolean
+  intervalMs?: number
+  debounceMs?: number
+}
+
+interface DiagnosticsResponse {
+  package: {
+    version: string
+    nodeVersion: string
+    adonisVersion: string
+  }
+  config: {
+    intervalMs: number
+    transport: string
+    channelName: string
+    endpoint: string | false
+    skipInTest: boolean
+    hasOnStatsCallback: boolean
+    hasShouldShowCallback: boolean
+  }
+  devToolbar: {
+    enabled: boolean
+    maxQueries: number
+    maxEvents: number
+    maxEmails: number
+    maxTraces: number
+    slowQueryThresholdMs: number
+    tracing: boolean
+    dashboard: boolean
+    dashboardPath: string
+    debugEndpoint: string
+    retentionDays: number
+    dbPath: string
+    persistDebugData: boolean | string
+    excludeFromTracing: string[]
+    customPaneCount: number
+  }
+  collectors: CollectorInfo[]
+  buffers: Record<string, BufferInfo>
+  timers: Record<string, TimerInfo>
+  transmit: {
+    available: boolean
+    channels: string[]
+  }
+  integrations: Record<string, { active?: boolean; available?: boolean; mode?: string }>
+  storage: {
+    ready: boolean
+    dbPath: string
+    fileSizeMb: number
+    walSizeMb: number
+    retentionDays: number
+    tables: Array<{ name: string; rowCount: number }>
+    lastCleanupAt: number | null
+  } | null
+  uptime?: number
+}
+
+// ---------------------------------------------------------------------------
+// Props
+// ---------------------------------------------------------------------------
+
+const props = defineProps<{
+  data: unknown
+  baseUrl?: string
+  dashboardEndpoint?: string
+  authToken?: string
+}>()
+
+// ---------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------
+
+const diagnostics = ref<DiagnosticsResponse | null>(null)
+const loading = ref(true)
+const error = ref<Error | null>(null)
+const revealedKeys = ref(new Set<string>())
+
+// ---------------------------------------------------------------------------
+// Data fetching
+// ---------------------------------------------------------------------------
+
+const debugEndpoint = computed(() => {
+  const ep = props.dashboardEndpoint || '/__stats/api'
+  return ep.replace(/\/api$/, '')
+})
+
+let client: ApiClient
+let timer: ReturnType<typeof setInterval> | null = null
+
+async function fetchDiagnostics() {
+  try {
+    const result = await client.fetch<DiagnosticsResponse>(`${debugEndpoint.value}/diagnostics`)
+    diagnostics.value = result
+    error.value = null
+  } catch (err) {
+    error.value = err as Error
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  client = new ApiClient({ baseUrl: props.baseUrl || '', authToken: props.authToken })
+  fetchDiagnostics()
+  timer = setInterval(fetchDiagnostics, 10000)
+})
+
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function toggleReveal(key: string) {
+  if (revealedKeys.value.has(key)) {
+    revealedKeys.value.delete(key)
+  } else {
+    revealedKeys.value.add(key)
+  }
+}
+
+function formatMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${ms / 1000}s`
+  if (ms < 3_600_000) return `${ms / 60_000}m`
+  return `${ms / 3_600_000}h`
+}
+
+function formatUptime(seconds?: number): string {
+  if (!seconds && seconds !== 0) return '-'
+  const s = Math.floor(seconds)
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  if (d > 0) return `${d}d ${h}h`
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s % 60}s`
+  return `${s}s`
+}
+
+function timeAgo(ts: number | null): string {
+  if (!ts) return '-'
+  const diff = Math.floor((Date.now() - ts) / 1000)
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+function fillPercent(buf: BufferInfo): number {
+  if (!buf.max) return 0
+  return Math.round((buf.current / buf.max) * 100)
+}
+
+function formatConfigValue(value: unknown): string {
+  if (value === null || value === undefined) return '-'
+  if (typeof value === 'boolean') return value ? 'true' : 'false'
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value.join(', ') || '-'
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return String(value)
+  }
+}
+
+function isSecret(key: string): boolean {
+  const lower = key.toLowerCase()
+  return (
+    lower.includes('password') ||
+    lower.includes('secret') ||
+    lower.includes('token') ||
+    lower.includes('key')
+  )
+}
+
+function formatCollectorConfig(
+  config: Record<string, unknown>
+): Array<{ key: string; value: string; secret: boolean }> {
+  return Object.entries(config).map(([k, v]) => ({
+    key: k,
+    value: formatConfigValue(v),
+    secret: isSecret(k),
+  }))
+}
+
+const TIMER_LABELS: Record<string, string> = {
+  collectionInterval: 'Stats Collection',
+  dashboardBroadcast: 'Dashboard Broadcast',
+  debugBroadcast: 'Debug Broadcast',
+  persistFlush: 'Persist Flush',
+  retentionCleanup: 'Retention Cleanup',
+}
+
+function formatTimerInterval(t: TimerInfo): string {
+  if (t.debounceMs !== undefined) return `${formatMs(t.debounceMs)} (debounce)`
+  if (t.intervalMs !== undefined) return formatMs(t.intervalMs)
+  return '-'
+}
+
+const INTEGRATION_LABELS: Record<string, string> = {
+  prometheus: 'Prometheus',
+  pinoHook: 'Pino Log Hook',
+  edgePlugin: 'Edge Plugin',
+  cacheInspector: 'Cache Inspector',
+  queueInspector: 'Queue Inspector',
+}
+
+function integrationStatus(info: { active?: boolean; available?: boolean }): string {
+  if ('active' in info) return info.active ? 'active' : 'inactive'
+  if ('available' in info) return info.available ? 'available' : 'unavailable'
+  return 'unknown'
+}
+
+function dotClass(status: string): string {
+  if (['healthy', 'active', 'connected', 'available', 'ready'].includes(status))
+    return 'ss-dash-dot-ok'
+  if (['errored', 'unavailable'].includes(status)) return 'ss-dash-dot-err'
+  return ''
+}
+
+function integrationDetails(key: string, info: Record<string, unknown>): string {
+  if (key === 'pinoHook' && info.mode) return `Mode: ${info.mode}`
+  if (key === 'edgePlugin' && info.active) return '@serverStats() tag registered'
+  if (key === 'cacheInspector')
+    return info.available ? 'Redis dependency detected' : 'Redis not installed'
+  if (key === 'queueInspector')
+    return info.available ? 'Queue dependency detected' : '@rlanz/bull-queue not installed'
+  return '-'
+}
+
+// ---------------------------------------------------------------------------
+// Computed
+// ---------------------------------------------------------------------------
+
+const bufferEntries = computed(() => {
+  if (!diagnostics.value?.buffers) return []
+  return Object.entries(diagnostics.value.buffers).map(([name, buf]) => ({
+    name: name.charAt(0).toUpperCase() + name.slice(1),
+    ...buf,
+    percent: fillPercent(buf),
+  }))
+})
+
+const timerEntries = computed(() => {
+  if (!diagnostics.value?.timers) return []
+  return Object.entries(diagnostics.value.timers).map(([key, t]) => ({
+    key,
+    label: TIMER_LABELS[key] || key,
+    ...t,
+    interval: formatTimerInterval(t),
+  }))
+})
+
+const integrationEntries = computed(() => {
+  if (!diagnostics.value) return []
+  const entries: Array<{ key: string; label: string; status: string; details: string }> = []
+
+  // Transmit first
+  if (diagnostics.value.transmit) {
+    entries.push({
+      key: 'transmit',
+      label: 'Transmit (SSE)',
+      status: diagnostics.value.transmit.available ? 'connected' : 'unavailable',
+      details: diagnostics.value.transmit.available
+        ? `Channels: ${diagnostics.value.transmit.channels.join(', ')}`
+        : 'Not installed',
+    })
+  }
+
+  // Other integrations
+  if (diagnostics.value.integrations) {
+    for (const [key, info] of Object.entries(diagnostics.value.integrations)) {
+      entries.push({
+        key,
+        label: INTEGRATION_LABELS[key] || key,
+        status: integrationStatus(info),
+        details: integrationDetails(key, info as Record<string, unknown>),
+      })
+    }
+  }
+
+  return entries
+})
+</script>
+
+<template>
+  <div>
+    <!-- Loading -->
+    <div v-if="loading && !diagnostics" class="ss-dash-empty">Loading diagnostics...</div>
+
+    <!-- Error -->
+    <div v-else-if="error && !diagnostics" class="ss-dash-empty ss-dash-c-red">
+      Error: {{ error.message }}
+    </div>
+
+    <template v-else-if="diagnostics">
+      <!-- 1. Package Info — compact card row -->
+      <h3 class="ss-dash-section-title">Package Info</h3>
+      <div class="ss-dash-info-cards">
+        <div
+          v-for="card in [
+            { label: 'Version', value: diagnostics.package?.version || '-' },
+            { label: 'Node.js', value: diagnostics.package?.nodeVersion || '-' },
+            { label: 'AdonisJS', value: diagnostics.package?.adonisVersion || '-' },
+            { label: 'Uptime', value: formatUptime(diagnostics.package?.uptime) },
+          ]"
+          :key="card.label"
+          class="ss-dash-info-card"
+        >
+          <span class="ss-dash-info-card-label">{{ card.label }}</span>
+          <span class="ss-dash-info-card-value">{{ card.value }}</span>
+        </div>
+      </div>
+
+      <!-- 2. Collectors -->
+      <h3 class="ss-dash-section-title">Collectors</h3>
+      <div v-if="!diagnostics.collectors?.length" class="ss-dash-empty">No collectors</div>
+      <table v-else class="ss-dash-table">
+        <thead>
+          <tr>
+            <th>Collector</th>
+            <th>Status</th>
+            <th>Last Error</th>
+            <th>Config</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="c in diagnostics.collectors" :key="c.name">
+            <td>
+              <span style="font-family: monospace; font-size: 11px">{{ c.name }}</span>
+              <span
+                v-if="c.label && c.label !== c.name"
+                class="ss-dash-c-dim"
+                style="margin-left: 6px; font-size: 11px"
+                >{{ c.label }}</span
+              >
+            </td>
+            <td>
+              <span :class="['ss-dash-dot', dotClass(c.status)]"></span>
+              {{ c.status }}
+            </td>
+            <td :class="c.lastError ? 'ss-dash-c-red' : ''">
+              <template v-if="c.lastError">
+                {{ c.lastError }}
+                <span class="ss-dash-c-dim" style="margin-left: 4px">{{
+                  timeAgo(c.lastErrorAt)
+                }}</span>
+              </template>
+              <template v-else>-</template>
+            </td>
+            <td style="font-size: 11px">
+              <template v-if="Object.keys(c.config || {}).length">
+                <span
+                  v-for="item in formatCollectorConfig(c.config)"
+                  :key="item.key"
+                  style="margin-right: 8px"
+                >
+                  {{ item.key }}=<template
+                    v-if="item.secret && !revealedKeys.has(`collector-${c.name}-${item.key}`)"
+                    ><span
+                      class="ss-dash-c-muted"
+                      style="cursor: pointer"
+                      @click="toggleReveal(`collector-${c.name}-${item.key}`)"
+                      >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
+                    ></template
+                  ><template v-else
+                    ><span>{{ item.value }}</span
+                    ><button
+                      v-if="item.secret"
+                      style="
+                        background: none;
+                        border: none;
+                        color: var(--ss-link-color, #3b82f6);
+                        cursor: pointer;
+                        font-size: 10px;
+                        margin-left: 4px;
+                        padding: 0;
+                      "
+                      @click="toggleReveal(`collector-${c.name}-${item.key}`)"
+                    >
+                      Hide
+                    </button></template
+                  >
+                </span>
+              </template>
+              <template v-else>-</template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 3. Buffers -->
+      <h3 class="ss-dash-section-title">Buffers</h3>
+      <div v-if="!bufferEntries.length" class="ss-dash-empty">No buffer data</div>
+      <table v-else class="ss-dash-table">
+        <thead>
+          <tr>
+            <th>Buffer</th>
+            <th>Usage</th>
+            <th>Fill %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="b in bufferEntries" :key="b.name">
+            <td>{{ b.name }}</td>
+            <td>{{ b.current.toLocaleString() }} / {{ b.max.toLocaleString() }}</td>
+            <td>
+              <div class="ss-dash-bar">
+                <div class="ss-dash-bar-track" style="max-width: 120px">
+                  <div
+                    :class="['ss-dash-bar-fill', b.percent >= 100 ? 'ss-dash-bar-fill-warn' : '']"
+                    :style="{ width: b.percent + '%' }"
+                  ></div>
+                </div>
+                <span :class="['ss-dash-bar-pct', b.percent >= 100 ? 'ss-dash-bar-pct-warn' : '']"
+                  >{{ b.percent }}%</span
+                >
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 4. Timers -->
+      <h3 class="ss-dash-section-title">Timers</h3>
+      <div v-if="!timerEntries.length" class="ss-dash-empty">No timer data</div>
+      <table v-else class="ss-dash-table">
+        <thead>
+          <tr>
+            <th>Timer</th>
+            <th>Status</th>
+            <th>Interval</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="t in timerEntries" :key="t.key">
+            <td>{{ t.label }}</td>
+            <td>
+              <span :class="['ss-dash-dot', dotClass(t.active ? 'active' : 'inactive')]"></span>
+              {{ t.active ? 'active' : 'inactive' }}
+            </td>
+            <td class="ss-dash-c-dim">{{ t.interval }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 5. Integrations -->
+      <h3 class="ss-dash-section-title">Integrations</h3>
+      <div v-if="!integrationEntries.length" class="ss-dash-empty">No integration data</div>
+      <table v-else class="ss-dash-table">
+        <thead>
+          <tr>
+            <th>Integration</th>
+            <th>Status</th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="i in integrationEntries" :key="i.key">
+            <td>{{ i.label }}</td>
+            <td>
+              <span :class="['ss-dash-dot', dotClass(i.status)]"></span>
+              {{ i.status }}
+            </td>
+            <td class="ss-dash-c-dim" style="font-size: 11px">{{ i.details }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- 6. Storage -->
+      <template v-if="diagnostics.storage">
+        <h3 class="ss-dash-section-title">Storage</h3>
+        <table class="ss-dash-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Status</td>
+              <td>
+                <span
+                  :class="[
+                    'ss-dash-dot',
+                    dotClass(diagnostics.storage!.ready ? 'ready' : 'unavailable'),
+                  ]"
+                ></span>
+                {{ diagnostics.storage!.ready ? 'ready' : 'not ready' }}
+              </td>
+            </tr>
+            <tr>
+              <td>DB Path</td>
+              <td style="font-family: monospace; font-size: 11px">
+                {{ diagnostics.storage!.dbPath }}
+              </td>
+            </tr>
+            <tr>
+              <td>File Size</td>
+              <td>{{ diagnostics.storage!.fileSizeMb.toFixed(1) }} MB</td>
+            </tr>
+            <tr>
+              <td>WAL Size</td>
+              <td>{{ diagnostics.storage!.walSizeMb.toFixed(1) }} MB</td>
+            </tr>
+            <tr>
+              <td>Retention</td>
+              <td>{{ diagnostics.storage!.retentionDays }} days</td>
+            </tr>
+            <tr>
+              <td>Last Cleanup</td>
+              <td>{{ timeAgo(diagnostics.storage!.lastCleanupAt) }}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Per-table breakdown -->
+        <table
+          v-if="diagnostics.storage!.tables?.length"
+          class="ss-dash-table"
+          style="margin-top: 8px"
+        >
+          <thead>
+            <tr>
+              <th>Table</th>
+              <th>Rows</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="t in diagnostics.storage!.tables" :key="t.name">
+              <td style="font-family: monospace; font-size: 11px">{{ t.name }}</td>
+              <td>{{ t.rowCount.toLocaleString() }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+
+      <!-- 7. Resolved Config -->
+      <h3 class="ss-dash-section-title">Resolved Config</h3>
+      <table class="ss-dash-table">
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>intervalMs</td>
+            <td>{{ diagnostics.config?.intervalMs }}</td>
+          </tr>
+          <tr>
+            <td>transport</td>
+            <td>{{ diagnostics.config?.transport }}</td>
+          </tr>
+          <tr>
+            <td>channelName</td>
+            <td>{{ diagnostics.config?.channelName }}</td>
+          </tr>
+          <tr>
+            <td>endpoint</td>
+            <td>
+              {{ diagnostics.config?.endpoint === false ? 'false' : diagnostics.config?.endpoint }}
+            </td>
+          </tr>
+          <tr>
+            <td>skipInTest</td>
+            <td>{{ diagnostics.config?.skipInTest }}</td>
+          </tr>
+          <tr>
+            <td>onStats callback</td>
+            <td>{{ diagnostics.config?.hasOnStatsCallback ? 'defined' : 'not defined' }}</td>
+          </tr>
+          <tr>
+            <td>shouldShow callback</td>
+            <td>{{ diagnostics.config?.hasShouldShowCallback ? 'defined' : 'not defined' }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- DevToolbar sub-table -->
+      <h4 class="ss-dash-section-title">DevToolbar</h4>
+      <table class="ss-dash-table">
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>enabled</td>
+            <td>{{ diagnostics.devToolbar?.enabled }}</td>
+          </tr>
+          <tr>
+            <td>tracing</td>
+            <td>{{ diagnostics.devToolbar?.tracing }}</td>
+          </tr>
+          <tr>
+            <td>dashboard</td>
+            <td>{{ diagnostics.devToolbar?.dashboard }}</td>
+          </tr>
+          <tr>
+            <td>dashboardPath</td>
+            <td style="font-family: monospace; font-size: 11px">
+              {{ diagnostics.devToolbar?.dashboardPath }}
+            </td>
+          </tr>
+          <tr>
+            <td>debugEndpoint</td>
+            <td style="font-family: monospace; font-size: 11px">
+              <template v-if="!revealedKeys.has('cfg-debugEndpoint')">
+                <span
+                  class="ss-dash-c-muted"
+                  style="cursor: pointer"
+                  @click="toggleReveal('cfg-debugEndpoint')"
+                  >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
+                >
+              </template>
+              <template v-else>
+                {{ diagnostics.devToolbar?.debugEndpoint }}
+                <button
+                  style="
+                    background: none;
+                    border: none;
+                    color: var(--ss-link-color, #3b82f6);
+                    cursor: pointer;
+                    font-size: 10px;
+                    margin-left: 4px;
+                    padding: 0;
+                  "
+                  @click="toggleReveal('cfg-debugEndpoint')"
+                >
+                  Hide
+                </button>
+              </template>
+            </td>
+          </tr>
+          <tr>
+            <td>maxQueries</td>
+            <td>{{ diagnostics.devToolbar?.maxQueries }}</td>
+          </tr>
+          <tr>
+            <td>maxEvents</td>
+            <td>{{ diagnostics.devToolbar?.maxEvents }}</td>
+          </tr>
+          <tr>
+            <td>maxEmails</td>
+            <td>{{ diagnostics.devToolbar?.maxEmails }}</td>
+          </tr>
+          <tr>
+            <td>maxTraces</td>
+            <td>{{ diagnostics.devToolbar?.maxTraces }}</td>
+          </tr>
+          <tr>
+            <td>slowQueryThresholdMs</td>
+            <td>{{ diagnostics.devToolbar?.slowQueryThresholdMs }}</td>
+          </tr>
+          <tr>
+            <td>retentionDays</td>
+            <td>{{ diagnostics.devToolbar?.retentionDays }}</td>
+          </tr>
+          <tr>
+            <td>dbPath</td>
+            <td style="font-family: monospace; font-size: 11px">
+              <template v-if="!revealedKeys.has('cfg-dbPath')">
+                <span
+                  class="ss-dash-c-muted"
+                  style="cursor: pointer"
+                  @click="toggleReveal('cfg-dbPath')"
+                  >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
+                >
+              </template>
+              <template v-else>
+                {{ diagnostics.devToolbar?.dbPath }}
+                <button
+                  style="
+                    background: none;
+                    border: none;
+                    color: var(--ss-link-color, #3b82f6);
+                    cursor: pointer;
+                    font-size: 10px;
+                    margin-left: 4px;
+                    padding: 0;
+                  "
+                  @click="toggleReveal('cfg-dbPath')"
+                >
+                  Hide
+                </button>
+              </template>
+            </td>
+          </tr>
+          <tr>
+            <td>persistDebugData</td>
+            <td>{{ diagnostics.devToolbar?.persistDebugData }}</td>
+          </tr>
+          <tr>
+            <td>excludeFromTracing</td>
+            <td style="font-size: 11px">
+              {{ diagnostics.devToolbar?.excludeFromTracing?.join(', ') || '-' }}
+            </td>
+          </tr>
+          <tr>
+            <td>customPanes</td>
+            <td>{{ diagnostics.devToolbar?.customPaneCount ?? 0 }} registered</td>
+          </tr>
+        </tbody>
+      </table>
+    </template>
+  </div>
+</template>

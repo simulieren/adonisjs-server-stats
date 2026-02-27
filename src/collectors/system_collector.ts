@@ -18,6 +18,10 @@ export function systemCollector(): MetricCollector {
     name: 'system',
     label: 'system — load avg, memory, uptime',
 
+    getConfig() {
+      return {}
+    },
+
     collect() {
       const loadAvg = os.loadavg()
       return {

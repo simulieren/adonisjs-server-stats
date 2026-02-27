@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, stat as fsStat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
@@ -119,6 +119,8 @@ export class DashboardStore {
   private retentionTimer: ReturnType<typeof setInterval> | null = null
   private chartAggregator: ChartAggregator | null = null
   private handlers: { event: string; fn: (...args: unknown[]) => void }[] = []
+  private dbFilePath: string = ''
+  private lastCleanupAt: number | null = null
 
   constructor(config: DevToolbarConfig) {
     this.config = config
@@ -136,7 +138,8 @@ export class DashboardStore {
   async start(_lucidDb: unknown, emitter: EventEmitter | null, appRoot: string): Promise<void> {
     this.emitter = emitter
 
-    const dbFilePath = appRoot + '/' + this.config.dbPath
+    this.dbFilePath = appRoot + '/' + this.config.dbPath
+    const dbFilePath = this.dbFilePath
     await mkdir(dirname(dbFilePath), { recursive: true })
 
     // Create a standalone Knex connection to SQLite — bypasses Lucid's
@@ -154,12 +157,16 @@ export class DashboardStore {
 
     await autoMigrate(this.db)
     await runRetentionCleanup(this.db, this.config.retentionDays)
+    this.lastCleanupAt = Date.now()
 
     // Hourly retention cleanup
     this.retentionTimer = setInterval(
       async () => {
         try {
-          if (this.db) await runRetentionCleanup(this.db, this.config.retentionDays)
+          if (this.db) {
+            await runRetentionCleanup(this.db, this.config.retentionDays)
+            this.lastCleanupAt = Date.now()
+          }
         } catch (err) {
           log.warn('dashboard: retention cleanup failed — ' + (err as Error)?.message)
         }
@@ -211,6 +218,75 @@ export class DashboardStore {
   /** Whether the store is initialized and ready. */
   isReady(): boolean {
     return this.db !== null
+  }
+
+  /** Get SQLite storage statistics for the diagnostics endpoint. */
+  async getStorageStats(): Promise<{
+    ready: boolean
+    dbPath: string
+    fileSizeMb: number
+    walSizeMb: number
+    retentionDays: number
+    tables: Array<{ name: string; rowCount: number }>
+    lastCleanupAt: number | null
+  }> {
+    if (!this.db) {
+      return {
+        ready: false,
+        dbPath: this.config.dbPath,
+        fileSizeMb: 0,
+        walSizeMb: 0,
+        retentionDays: this.config.retentionDays,
+        tables: [],
+        lastCleanupAt: null,
+      }
+    }
+
+    let fileSizeMb = 0
+    let walSizeMb = 0
+    try {
+      const s = await fsStat(this.dbFilePath)
+      fileSizeMb = Math.round((s.size / (1024 * 1024)) * 100) / 100
+    } catch {
+      // File may not exist yet
+    }
+    try {
+      const ws = await fsStat(this.dbFilePath + '-wal')
+      walSizeMb = Math.round((ws.size / (1024 * 1024)) * 100) / 100
+    } catch {
+      // WAL file may not exist
+    }
+
+    const tableNames = [
+      'server_stats_requests',
+      'server_stats_queries',
+      'server_stats_events',
+      'server_stats_emails',
+      'server_stats_logs',
+      'server_stats_traces',
+      'server_stats_metrics',
+      'server_stats_saved_filters',
+    ]
+
+    const tables: Array<{ name: string; rowCount: number }> = []
+    for (const name of tableNames) {
+      try {
+        const [row] = await this.db(name).count('* as count')
+        tables.push({ name, rowCount: Number(row.count) })
+      } catch {
+        tables.push({ name, rowCount: 0 })
+      }
+    }
+
+    return {
+      ready: true,
+      dbPath: this.config.dbPath,
+      fileSizeMb,
+      walSizeMb,
+      retentionDays: this.config.retentionDays,
+      tables,
+      lastCleanupAt: this.lastCleanupAt,
+    }
   }
 
   // =========================================================================

@@ -26,6 +26,10 @@ export function redisCollector(): MetricCollector {
     name: 'redis',
     label: 'redis — memory, clients, keys, hit rate',
 
+    getConfig() {
+      return {}
+    },
+
     async collect() {
       const defaults = {
         redisOk: false,

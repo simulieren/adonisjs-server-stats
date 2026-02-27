@@ -39,6 +39,10 @@ export function processCollector(): MetricCollector {
     name: 'process',
     label: 'process — cpu, memory, event loop, uptime',
 
+    getConfig() {
+      return {}
+    },
+
     start() {
       if (!started) {
         histogram.enable()

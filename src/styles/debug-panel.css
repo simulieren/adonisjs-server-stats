@@ -326,6 +326,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: var(--ss-text);
 }
 .ss-dbg-table tr:hover td {
   background: var(--ss-hover);
@@ -1284,6 +1285,105 @@
 .ss-dbg-c-red {
   color: var(--ss-red-fg);
 }
+.ss-dbg-c-green {
+  color: var(--ss-green-fg);
+}
 .ss-dbg-c-border {
   color: var(--ss-border);
+}
+
+/* ── Internals section title ──────────────────────────────────── */
+.ss-dbg-internals-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  margin: 16px 0 4px;
+  padding: 0 0 4px;
+  border-bottom: 1px solid var(--ss-border);
+}
+.ss-dbg-internals-title:first-child {
+  margin-top: 0;
+}
+
+/* ── Compact info cards ───────────────────────────────────────── */
+.ss-dbg-info-cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ss-dbg-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--ss-surface-alt);
+  border-radius: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+.ss-dbg-info-card-label {
+  font-size: 10px;
+  color: var(--ss-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ss-dbg-info-card-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ss-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Status indicator dot ─────────────────────────────────────── */
+.ss-dbg-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--ss-dim);
+}
+.ss-dbg-dot-ok {
+  background: var(--ss-green-fg);
+}
+.ss-dbg-dot-err {
+  background: var(--ss-red-fg);
+}
+
+/* ── Progress bar ─────────────────────────────────────────────── */
+.ss-dbg-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ss-dbg-bar-track {
+  flex: 1;
+  max-width: 120px;
+  height: 8px;
+  background: var(--ss-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ss-dbg-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--ss-blue-fg);
+  transition: width 0.3s;
+}
+.ss-dbg-bar-fill-warn {
+  background: var(--ss-amber-fg);
+}
+.ss-dbg-bar-pct {
+  font-size: 11px;
+  min-width: 36px;
+  text-align: right;
+  color: var(--ss-dim);
+}
+.ss-dbg-bar-pct-warn {
+  color: var(--ss-amber-fg);
 }

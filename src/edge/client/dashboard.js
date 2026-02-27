@@ -391,6 +391,9 @@
       case 'config':
         if (!sectionLoaded.config) fetchConfig()
         break
+      case 'internals':
+        fetchInternals()
+        break
       default: {
         var cp = customPanes.find(function (p) {
           return p.id === name
@@ -2820,6 +2823,447 @@
     })
   })
 
+  // ── Internals ───────────────────────────────────────────────────
+  var debugEndpoint = (dashConfig.debugEndpoint || '/admin/api/debug').replace(/\/+$/, '')
+
+  var formatMs = function (ms) {
+    if (ms < 1000) return ms + 'ms'
+    if (ms < 60000) return ms / 1000 + 's'
+    if (ms < 3600000) return ms / 60000 + 'm'
+    return ms / 3600000 + 'h'
+  }
+
+  var formatUptime = function (seconds) {
+    if (!seconds && seconds !== 0) return '-'
+    var s = Math.floor(seconds)
+    var d = Math.floor(s / 86400)
+    var h = Math.floor((s % 86400) / 3600)
+    var m = Math.floor((s % 3600) / 60)
+    if (d > 0) return d + 'd ' + h + 'h'
+    if (h > 0) return h + 'h ' + m + 'm'
+    if (m > 0) return m + 'm ' + (s % 60) + 's'
+    return s + 's'
+  }
+
+  var statusDot = function (status) {
+    var cls = 'ss-dash-dot'
+    if (
+      status === 'healthy' ||
+      status === 'active' ||
+      status === 'connected' ||
+      status === 'available' ||
+      status === 'ready'
+    ) {
+      cls += ' ss-dash-dot-ok'
+    } else if (status === 'errored' || status === 'unavailable') {
+      cls += ' ss-dash-dot-err'
+    }
+    return '<span class="' + cls + '"></span>'
+  }
+
+  var renderInternalsRedacted = function (val) {
+    var display = esc(String(val))
+    var id = 'ss-int-r-' + Math.random().toString(36).slice(2, 8)
+    return (
+      '<span class="ss-dash-redacted-wrap" id="' +
+      id +
+      '">' +
+      '<span class="ss-dash-redacted-display">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</span>' +
+      '<span class="ss-dash-redacted-real" style="display:none">' +
+      display +
+      '</span>' +
+      '<button type="button" class="ss-dash-redacted-reveal ss-internals-reveal" data-target="' +
+      id +
+      '" title="Reveal value" style="background:none;border:none;cursor:pointer;padding:2px;vertical-align:middle">' +
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>' +
+      '</button></span>'
+    )
+  }
+
+  var renderCollectorConfig = function (config) {
+    if (!config || typeof config !== 'object') return '-'
+    var keys = Object.keys(config)
+    if (keys.length === 0) return '-'
+    var parts = []
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i]
+      var v = config[k]
+      if (typeof v === 'object' && v && v.__redacted) {
+        parts.push(esc(k) + ': ' + renderInternalsRedacted(v.value || v.display || ''))
+      } else if (
+        typeof v === 'string' &&
+        (k.toLowerCase().indexOf('password') !== -1 ||
+          k.toLowerCase().indexOf('secret') !== -1 ||
+          k.toLowerCase().indexOf('token') !== -1)
+      ) {
+        parts.push(esc(k) + ': ' + renderInternalsRedacted(v))
+      } else {
+        parts.push(esc(k) + ': ' + esc(String(v)))
+      }
+    }
+    return parts.join(', ')
+  }
+
+  var fetchInternals = function () {
+    fetchJSON(debugEndpoint + '/diagnostics')
+      .then(function (data) {
+        renderInternals(data)
+      })
+      .catch(function () {
+        setInner(
+          'ss-dash-internals-body',
+          '<div class="ss-dash-empty">Failed to load internals</div>'
+        )
+      })
+  }
+
+  var renderInternals = function (data) {
+    var body = document.getElementById('ss-dash-internals-body')
+    if (!body) return
+
+    var html = '<div>'
+
+    // 1. Package Info — compact card row
+    var pkg = data.package || {}
+    html += '<div>'
+    html += '<h3 class="ss-dash-section-title">Package Info</h3>'
+    html += '<div class="ss-dash-info-cards">'
+    var cards = [
+      ['Version', pkg.version || '-'],
+      ['Node.js', pkg.nodeVersion || '-'],
+      ['AdonisJS', pkg.adonisVersion || '-'],
+      ['Uptime', formatUptime(pkg.uptime)],
+    ]
+    for (var ci = 0; ci < cards.length; ci++) {
+      html += '<div class="ss-dash-info-card">'
+      html += '<span class="ss-dash-info-card-label">' + esc(cards[ci][0]) + '</span>'
+      html += '<span class="ss-dash-info-card-value">' + esc(cards[ci][1]) + '</span>'
+      html += '</div>'
+    }
+    html += '</div></div>'
+
+    // 2. Collectors
+    var collectors = data.collectors || []
+    if (collectors.length > 0) {
+      html += '<div>'
+      html += '<h3 class="ss-dash-section-title">Collectors</h3>'
+      html += '<table class="ss-dash-table"><thead><tr>'
+      html += '<th>Collector</th><th>Status</th><th>Last Error</th><th>Config</th>'
+      html += '</tr></thead><tbody>'
+      for (var c = 0; c < collectors.length; c++) {
+        var col = collectors[c]
+        var errMsg = col.lastError
+          ? esc(col.lastError) +
+            ' <span class="ss-dash-c-dim">' +
+            timeAgo(col.lastErrorAt) +
+            '</span>'
+          : '<span class="ss-dash-c-dim">\u2014</span>'
+        html += '<tr>'
+        html += '<td><code>' + esc(col.name) + '</code>'
+        if (col.label && col.label !== col.name) {
+          html += ' <span class="ss-dash-c-dim">' + esc(col.label) + '</span>'
+        }
+        html += '</td>'
+        html += '<td>' + statusDot(col.status) + esc(col.status) + '</td>'
+        html += '<td>' + errMsg + '</td>'
+        html += '<td>' + renderCollectorConfig(col.config) + '</td>'
+        html += '</tr>'
+      }
+      html += '</tbody></table></div>'
+    }
+
+    // 3. Buffers
+    var buffers = data.buffers
+    if (buffers) {
+      var bufferKeys = ['queries', 'events', 'emails', 'traces']
+      html += '<div>'
+      html += '<h3 class="ss-dash-section-title">Buffers</h3>'
+      html += '<table class="ss-dash-table"><thead><tr>'
+      html += '<th>Buffer</th><th>Usage</th><th style="width:200px">Fill %</th>'
+      html += '</tr></thead><tbody>'
+      for (var b = 0; b < bufferKeys.length; b++) {
+        var bk = bufferKeys[b]
+        var buf = buffers[bk]
+        if (!buf) continue
+        var pct = buf.max > 0 ? Math.round((buf.current / buf.max) * 100) : 0
+        html += '<tr>'
+        html += '<td style="text-transform:capitalize">' + esc(bk) + '</td>'
+        html += '<td>' + buf.current + ' / ' + buf.max + '</td>'
+        html += '<td><div class="ss-dash-bar">'
+        html += '<div class="ss-dash-bar-track">'
+        html +=
+          '<div class="ss-dash-bar-fill' +
+          (pct >= 100 ? ' ss-dash-bar-fill-warn' : '') +
+          '" style="width:' +
+          Math.min(pct, 100) +
+          '%"></div></div>'
+        html +=
+          '<span class="ss-dash-bar-pct' +
+          (pct >= 100 ? ' ss-dash-bar-pct-warn' : '') +
+          '">' +
+          pct +
+          '%</span>'
+        html += '</div></td>'
+        html += '</tr>'
+      }
+      html += '</tbody></table></div>'
+    }
+
+    // 4. Timers
+    var timers = data.timers
+    if (timers) {
+      var timerLabels = {
+        collectionInterval: 'Stats Collection',
+        dashboardBroadcast: 'Dashboard Broadcast',
+        debugBroadcast: 'Debug Broadcast',
+        persistFlush: 'Persist Flush',
+        retentionCleanup: 'Retention Cleanup',
+      }
+      html += '<div>'
+      html += '<h3 class="ss-dash-section-title">Timers</h3>'
+      html += '<table class="ss-dash-table"><thead><tr>'
+      html += '<th>Timer</th><th>Status</th><th>Interval</th>'
+      html += '</tr></thead><tbody>'
+      var timerKeys = Object.keys(timers)
+      for (var t = 0; t < timerKeys.length; t++) {
+        var tk = timerKeys[t]
+        var timer = timers[tk]
+        var label = timerLabels[tk] || tk
+        var intervalStr = '-'
+        if (timer.intervalMs) intervalStr = formatMs(timer.intervalMs)
+        else if (timer.debounceMs) intervalStr = formatMs(timer.debounceMs) + ' (debounce)'
+        html += '<tr>'
+        html += '<td>' + esc(label) + '</td>'
+        html +=
+          '<td>' +
+          statusDot(timer.active ? 'active' : 'inactive') +
+          (timer.active ? 'active' : 'inactive') +
+          '</td>'
+        html +=
+          '<td>' +
+          (timer.active ? esc(intervalStr) : '<span class="ss-dash-c-dim">\u2014</span>') +
+          '</td>'
+        html += '</tr>'
+      }
+      html += '</tbody></table></div>'
+    }
+
+    // 5. Integrations
+    var integrations = data.integrations
+    var transmit = data.transmit
+    if (integrations || transmit) {
+      html += '<div>'
+      html += '<h3 class="ss-dash-section-title">Integrations</h3>'
+      html += '<table class="ss-dash-table"><thead><tr>'
+      html += '<th>Integration</th><th>Status</th><th>Details</th>'
+      html += '</tr></thead><tbody>'
+      if (transmit) {
+        var txStatus = transmit.available ? 'connected' : 'unavailable'
+        var txDetails =
+          transmit.channels && transmit.channels.length
+            ? 'Channels: ' +
+              transmit.channels
+                .map(function (ch) {
+                  return esc(ch)
+                })
+                .join(', ')
+            : '-'
+        html +=
+          '<tr><td>Transmit (SSE)</td><td>' +
+          statusDot(txStatus) +
+          esc(txStatus) +
+          '</td><td>' +
+          txDetails +
+          '</td></tr>'
+      }
+      if (integrations) {
+        if (integrations.prometheus) {
+          html +=
+            '<tr><td>Prometheus</td><td>' +
+            statusDot(integrations.prometheus.active ? 'active' : 'inactive') +
+            (integrations.prometheus.active ? 'active' : 'inactive') +
+            '</td><td>-</td></tr>'
+        }
+        if (integrations.pinoHook) {
+          var pinoMode = integrations.pinoHook.mode || 'none'
+          html +=
+            '<tr><td>Pino Log Hook</td><td>' +
+            statusDot(integrations.pinoHook.active ? 'active' : 'inactive') +
+            (integrations.pinoHook.active ? 'active' : 'inactive') +
+            '</td><td>Mode: ' +
+            esc(pinoMode) +
+            '</td></tr>'
+        }
+        if (integrations.edgePlugin) {
+          html +=
+            '<tr><td>Edge Plugin</td><td>' +
+            statusDot(integrations.edgePlugin.active ? 'active' : 'inactive') +
+            (integrations.edgePlugin.active ? 'active' : 'inactive') +
+            '</td><td>' +
+            (integrations.edgePlugin.active ? '@serverStats() tag registered' : '-') +
+            '</td></tr>'
+        }
+        if (integrations.cacheInspector) {
+          html +=
+            '<tr><td>Cache Inspector</td><td>' +
+            statusDot(integrations.cacheInspector.available ? 'available' : 'unavailable') +
+            (integrations.cacheInspector.available ? 'available' : 'unavailable') +
+            '</td><td>' +
+            (integrations.cacheInspector.available ? 'Redis dependency detected' : '-') +
+            '</td></tr>'
+        }
+        if (integrations.queueInspector) {
+          html +=
+            '<tr><td>Queue Inspector</td><td>' +
+            statusDot(integrations.queueInspector.available ? 'available' : 'unavailable') +
+            (integrations.queueInspector.available ? 'available' : 'unavailable') +
+            '</td><td>' +
+            (integrations.queueInspector.available ? 'Queue dependency detected' : '-') +
+            '</td></tr>'
+        }
+      }
+      html += '</tbody></table></div>'
+    }
+
+    // 6. Storage (SQLite) — conditional
+    var storage = data.storage
+    if (storage) {
+      html += '<div>'
+      html += '<h3 class="ss-dash-section-title">Storage (SQLite)</h3>'
+      html +=
+        '<table class="ss-dash-table"><thead><tr><th style="width:200px">Metric</th><th>Value</th></tr></thead><tbody>'
+      html +=
+        '<tr><td>Status</td><td>' +
+        statusDot(storage.ready ? 'ready' : 'not ready') +
+        (storage.ready ? 'ready' : 'not ready') +
+        '</td></tr>'
+      html += '<tr><td>DB Path</td><td><code>' + esc(storage.dbPath || '-') + '</code></td></tr>'
+      html +=
+        '<tr><td>File Size</td><td>' +
+        (typeof storage.fileSizeMb === 'number' ? storage.fileSizeMb.toFixed(1) + ' MB' : '-') +
+        '</td></tr>'
+      html +=
+        '<tr><td>WAL Size</td><td>' +
+        (typeof storage.walSizeMb === 'number' ? storage.walSizeMb.toFixed(1) + ' MB' : '-') +
+        '</td></tr>'
+      html += '<tr><td>Retention</td><td>' + (storage.retentionDays || '-') + ' days</td></tr>'
+      html += '<tr><td>Last Cleanup</td><td>' + timeAgo(storage.lastCleanupAt) + '</td></tr>'
+      html += '</tbody></table>'
+
+      // Storage table breakdown
+      var tables = storage.tables
+      if (tables && tables.length > 0) {
+        html +=
+          '<table class="ss-dash-table" style="margin-top:8px"><thead><tr><th>Table</th><th>Rows</th></tr></thead><tbody>'
+        for (var st = 0; st < tables.length; st++) {
+          html += '<tr><td><code>' + esc(tables[st].name) + '</code></td>'
+          html +=
+            '<td>' +
+            (typeof tables[st].rowCount === 'number' ? tables[st].rowCount.toLocaleString() : '-') +
+            '</td></tr>'
+        }
+        html += '</tbody></table>'
+      }
+      html += '</div>'
+    }
+
+    // 7. Resolved Config
+    var cfg = data.config
+    var devToolbar = data.devToolbar
+    if (cfg || devToolbar) {
+      html += '<div>'
+      html += '<h3 class="ss-dash-section-title">Resolved Config</h3>'
+
+      if (cfg) {
+        html +=
+          '<table class="ss-dash-table"><thead><tr><th style="width:200px">Setting</th><th>Value</th></tr></thead><tbody>'
+        html += '<tr><td>intervalMs</td><td>' + esc(cfg.intervalMs) + '</td></tr>'
+        html += '<tr><td>transport</td><td>' + esc(cfg.transport) + '</td></tr>'
+        html += '<tr><td>channelName</td><td>' + esc(cfg.channelName) + '</td></tr>'
+        html += '<tr><td>endpoint</td><td>' + esc(String(cfg.endpoint)) + '</td></tr>'
+        html += '<tr><td>skipInTest</td><td>' + esc(String(cfg.skipInTest)) + '</td></tr>'
+        html +=
+          '<tr><td>onStats callback</td><td>' +
+          (cfg.hasOnStatsCallback ? 'defined' : 'not defined') +
+          '</td></tr>'
+        html +=
+          '<tr><td>shouldShow callback</td><td>' +
+          (cfg.hasShouldShowCallback ? 'defined' : 'not defined') +
+          '</td></tr>'
+        html += '</tbody></table>'
+      }
+
+      if (devToolbar) {
+        html += '<h4 class="ss-dash-section-title">DevToolbar</h4>'
+        html +=
+          '<table class="ss-dash-table"><thead><tr><th style="width:200px">Setting</th><th>Value</th></tr></thead><tbody>'
+        var dtKeys = [
+          'enabled',
+          'tracing',
+          'dashboard',
+          'dashboardPath',
+          'debugEndpoint',
+          'maxQueries',
+          'maxEvents',
+          'maxEmails',
+          'maxTraces',
+          'slowQueryThresholdMs',
+          'retentionDays',
+          'dbPath',
+          'persistDebugData',
+        ]
+        for (var dk = 0; dk < dtKeys.length; dk++) {
+          var dtk = dtKeys[dk]
+          if (devToolbar[dtk] !== undefined) {
+            html +=
+              '<tr><td>' + esc(dtk) + '</td><td>' + esc(String(devToolbar[dtk])) + '</td></tr>'
+          }
+        }
+        if (devToolbar.excludeFromTracing && devToolbar.excludeFromTracing.length) {
+          html +=
+            '<tr><td>excludeFromTracing</td><td>' +
+            devToolbar.excludeFromTracing
+              .map(function (p) {
+                return esc(p)
+              })
+              .join(', ') +
+            '</td></tr>'
+        }
+        if (typeof devToolbar.customPaneCount === 'number') {
+          html +=
+            '<tr><td>customPanes</td><td>' + devToolbar.customPaneCount + ' registered</td></tr>'
+        }
+        html += '</tbody></table>'
+      }
+      html += '</div>'
+    }
+
+    html += '</div>'
+
+    body.innerHTML = html
+
+    // Bind click-to-reveal for redacted values
+    body.querySelectorAll('.ss-internals-reveal').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation()
+        var targetId = btn.getAttribute('data-target')
+        if (!targetId) return
+        var wrap = document.getElementById(targetId)
+        if (!wrap) return
+        var display = wrap.querySelector('.ss-dash-redacted-display')
+        var real = wrap.querySelector('.ss-dash-redacted-real')
+        if (!display || !real) return
+        var isHidden = real.style.display === 'none'
+        display.style.display = isHidden ? 'none' : ''
+        real.style.display = isHidden ? '' : 'none'
+        btn.innerHTML = isHidden
+          ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>'
+          : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
+        btn.title = isHidden ? 'Hide value' : 'Reveal value'
+      })
+    })
+  }
+
   // ── Config ────────────────────────────────────────────────────
   // ── Config: state ─────────────────────────────────────────────
   var configRawData = null
@@ -3682,6 +4126,7 @@
       'cache',
       'jobs',
       'config',
+      'internals',
     ]
     customPanes.forEach(function (cp) {
       valid.push(cp.id)

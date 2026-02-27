@@ -56,6 +56,10 @@ export function dbPoolCollector(opts?: DbPoolCollectorOptions): MetricCollector 
     name: 'db_pool',
     label: `db_pool — connection: ${connectionName}`,
 
+    getConfig() {
+      return { connectionName }
+    },
+
     async collect() {
       try {
         const { default: db } = await import('@adonisjs/lucid/services/db')

@@ -111,6 +111,7 @@ export default class DashboardController {
       dashConfig: {
         basePath: dashPath,
         tracing: !!toolbarConfig.tracing,
+        debugEndpoint: toolbarConfig.debugEndpoint || '/admin/api/debug',
         panes: (toolbarConfig.panes || []).map((p: { id: string; label: string }) => ({
           id: p.id,
           label: p.label,
