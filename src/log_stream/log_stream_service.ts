@@ -40,12 +40,24 @@ export class LogStreamService {
   private recentEntries: LogTimestamp[] = []
   private lastSize = 0
   private intervalId: ReturnType<typeof setInterval> | null = null
-  private logPath: string
+  private logPath: string | null
   private onEntry?: (entry: Record<string, unknown>) => void
 
-  constructor(logPath: string, onEntry?: (entry: Record<string, unknown>) => void) {
-    this.logPath = logPath
+  constructor(logPath?: string, onEntry?: (entry: Record<string, unknown>) => void) {
+    this.logPath = logPath ?? null
     this.onEntry = onEntry
+  }
+
+  /**
+   * Ingest a parsed log entry directly (no file needed).
+   *
+   * Used by the Pino stream interceptor to feed entries
+   * in real-time without file polling.
+   */
+  ingest(entry: Record<string, unknown>) {
+    const level = typeof entry.level === 'number' ? entry.level : 30
+    this.recentEntries.push({ time: Date.now(), level })
+    this.onEntry?.(entry)
   }
 
   getLogStats(): LogStats {
@@ -76,6 +88,11 @@ export class LogStreamService {
   }
 
   async start() {
+    if (!this.logPath) {
+      // Stream-only mode — entries arrive via ingest(), no file polling
+      return
+    }
+
     // Initialize with current file size so we only process new entries
     try {
       const stats = await stat(this.logPath)
@@ -96,6 +113,7 @@ export class LogStreamService {
   }
 
   private async pollNewEntries() {
+    if (!this.logPath) return
     try {
       warnedPollFailure = false
       const stats = await stat(this.logPath)

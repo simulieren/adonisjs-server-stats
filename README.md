@@ -152,8 +152,10 @@ export default defineConfig({
       },
     }),
 
-    // Log file stats: errors/warnings in a 5-minute window, entries/minute
-    logCollector({ logPath: 'logs/adonisjs.log' }),
+    // Log stats: errors/warnings in a 5-minute window, entries/minute
+    // Zero-config: auto-hooks into AdonisJS Pino logger, no file path needed
+    logCollector(),
+    // Or file-based fallback: logCollector({ logPath: 'logs/adonisjs.log' }),
 
     // App-level metrics: online users, pending webhooks, pending emails
     // Requires @adonisjs/lucid
@@ -232,7 +234,7 @@ Each collector is a factory function that returns a `MetricCollector`. All colle
 | `dbPoolCollector(opts?)` | Pool used/free/pending/max connections                          | optional     | `@adonisjs/lucid` |
 | `redisCollector()`       | Status, memory, clients, keys, hit rate                         | none         | `@adonisjs/redis` |
 | `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count                | **required** | `bullmq`          |
-| `logCollector(opts)`     | Errors/warnings/entries (5m window), entries/minute             | **required** | --                |
+| `logCollector(opts?)`    | Errors/warnings/entries (5m window), entries/minute             | optional     | --                |
 | `appCollector()`         | Online users, pending webhooks, pending emails                  | none         | `@adonisjs/lucid` |
 
 ### Collector Options
@@ -256,9 +258,11 @@ queueCollector({
   },
 })
 
-logCollector({
-  logPath: 'logs/adonisjs.log',
-})
+// Zero-config: hooks into AdonisJS Pino logger automatically
+logCollector()
+
+// Or file-based fallback:
+logCollector({ logPath: 'logs/adonisjs.log' })
 ```
 
 ### Custom Collectors

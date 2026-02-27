@@ -12,6 +12,7 @@ import {
   setExcludedPrefixes,
   setOnRequestComplete,
 } from '../middleware/request_tracking_middleware.js'
+import { getLogStreamService } from '../collectors/log_collector.js'
 import { registerDebugRoutes } from '../routes/debug_routes.js'
 import { registerStatsRoutes } from '../routes/stats_routes.js'
 import { log, dim, bold } from '../utils/logger.js'
@@ -186,6 +187,49 @@ export default class ServerStatsProvider {
     return found
   }
 
+  /**
+   * Hook into the AdonisJS logger's Pino stream to feed log entries
+   * directly into the LogStreamService — no file path needed.
+   *
+   * Uses `Symbol.for('pino.stream')` (documented Pino API) to access
+   * the underlying destination stream, then wraps its `write` method
+   * to tee entries into the log collector.
+   */
+  private async hookPinoLogger() {
+    const logStream = getLogStreamService()
+    if (!logStream) return // logCollector() not in the config
+
+    let logger: any
+    try {
+      logger = await this.app.container.make('logger')
+    } catch {
+      // Logger not available
+    }
+
+    const pino = logger?.pino
+    if (!pino) return
+
+    const streamSym = Symbol.for('pino.stream')
+    const stream = pino[streamSym]
+    if (!stream || typeof stream.write !== 'function') return
+
+    const originalWrite = stream.write.bind(stream)
+    stream.write = function (chunk: any, ...args: any[]) {
+      try {
+        const str = typeof chunk === 'string' ? chunk : chunk.toString()
+        const entry = JSON.parse(str)
+        if (entry && typeof entry.level === 'number') {
+          logStream.ingest(entry)
+        }
+      } catch {
+        // Not valid JSON — ignore (e.g. pino-pretty output)
+      }
+      return originalWrite(chunk, ...args)
+    }
+
+    log.info('log collector hooked into AdonisJS logger (zero-config)')
+  }
+
   async ready() {
     const config = this.app.config.get<ServerStatsConfig>('server_stats')
     if (!config) return
@@ -198,6 +242,9 @@ export default class ServerStatsProvider {
     ;(this.app.container as any).singleton('server_stats.engine', () => this.engine!)
 
     await this.engine.start()
+
+    // Auto-hook log collector into the AdonisJS Pino logger (zero-config)
+    await this.hookPinoLogger()
 
     // Create the stats controller (makes the stats route functional)
     const StatsControllerClass = (await import('../controller/server_stats_controller.js')).default
@@ -410,11 +457,24 @@ export default class ServerStatsProvider {
     )
 
     // ── Log piping ────────────────────────────────────────────────
-    const logPath = this.app.makePath('logs', 'adonisjs.log')
-    this.dashboardLogStream = new LogStreamService(logPath, (entry) => {
-      this.dashboardStore?.recordLog(entry)
-    })
-    await this.dashboardLogStream.start()
+    // If the log collector is already hooked into Pino (zero-config mode),
+    // piggyback on it instead of creating a separate file poller.
+    const existingLogStream = getLogStreamService()
+    if (existingLogStream && !existingLogStream['logPath']) {
+      // Stream mode — add a listener for dashboard persistence
+      const origOnEntry = existingLogStream['onEntry']
+      existingLogStream['onEntry'] = (entry: Record<string, unknown>) => {
+        origOnEntry?.(entry)
+        this.dashboardStore?.recordLog(entry)
+      }
+    } else {
+      // File-based fallback
+      const logPath = this.app.makePath('logs', 'adonisjs.log')
+      this.dashboardLogStream = new LogStreamService(logPath, (entry) => {
+        this.dashboardStore?.recordLog(entry)
+      })
+      await this.dashboardLogStream.start()
+    }
 
     // ── Per-request data piping ────────────────────────────────────
     const debugStore = this.debugStore!
