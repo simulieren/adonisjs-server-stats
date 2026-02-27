@@ -1,4 +1,4 @@
-import type { ApplicationService } from '@adonisjs/core/types'
+import type { ApplicationService } from "@adonisjs/core/types";
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -6,86 +6,106 @@ import type { ApplicationService } from '@adonisjs/core/types'
 
 export interface QueueOverview {
   /** Total jobs currently being processed. */
-  active: number
+  active: number;
 
   /** Jobs waiting to be picked up by a worker. */
-  waiting: number
+  waiting: number;
 
   /** Jobs scheduled for future execution. */
-  delayed: number
+  delayed: number;
 
   /** Jobs that completed successfully. */
-  completed: number
+  completed: number;
 
   /** Jobs that permanently failed. */
-  failed: number
+  failed: number;
 
   /** Jobs paused in the queue. */
-  paused: number
+  paused: number;
 }
 
 export interface QueueJobSummary {
   /** Bull job ID. */
-  id: string
+  id: string;
 
-  /** Job name / type. */
-  name: string
+  /** Human-readable job name (cleaned from file URLs). */
+  name: string;
 
   /** Current job status. */
-  status: 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'paused'
+  status: "active" | "waiting" | "delayed" | "completed" | "failed" | "paused";
 
   /** Job payload (data). */
-  data: any
+  data: any;
+
+  /** Alias for `data` — used by some frontends. */
+  payload: any;
 
   /** Number of attempts so far. */
-  attempts: number
+  attempts: number;
 
   /** Maximum allowed attempts. */
-  maxAttempts: number
+  maxAttempts: number;
 
   /** Job progress (0-100 or custom). */
-  progress: number | object
+  progress: number | object;
 
   /** Error message if the job failed, or null. */
-  failedReason: string | null
+  failedReason: string | null;
 
   /** When the job was added (Unix timestamp ms). */
-  createdAt: number
+  createdAt: number;
+
+  /** Alias for `createdAt` — BullMQ compat. */
+  timestamp: number;
 
   /** When processing started (Unix timestamp ms), or null. */
-  processedAt: number | null
+  processedAt: number | null;
 
   /** When the job finished (Unix timestamp ms), or null. */
-  finishedAt: number | null
+  finishedAt: number | null;
 
   /** Processing duration in ms, or null if not finished. */
-  duration: number | null
+  duration: number | null;
 }
 
 export interface QueueJobDetail extends QueueJobSummary {
   /** Full stack trace if the job failed. */
-  stackTrace: string[]
+  stackTrace: string[];
 
   /** Return value from the job handler, if any. */
-  returnValue: any
+  returnValue: any;
 
   /** Job options (delay, priority, repeat, etc.). */
-  opts: Record<string, any>
+  opts: Record<string, any>;
 }
 
 export interface QueueJobListResult {
   /** Jobs for the requested page. */
-  jobs: QueueJobSummary[]
+  jobs: QueueJobSummary[];
 
   /** Total number of jobs matching the status filter. */
-  total: number
+  total: number;
 }
 
 // ---------------------------------------------------------------------------
 // QueueInspector
 // ---------------------------------------------------------------------------
 
-type JobStatus = 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'paused'
+type JobStatus =
+  | "active"
+  | "waiting"
+  | "delayed"
+  | "completed"
+  | "failed"
+  | "paused";
+const ALL_STATUSES: JobStatus[] = [
+  "active",
+  "waiting",
+  "delayed",
+  "completed",
+  "failed",
+  "paused",
+];
 
 /**
  * Inspects Bull Queue jobs, counts, and allows retrying failed jobs.
@@ -102,10 +122,10 @@ export class QueueInspector {
    */
   static async isAvailable(app: ApplicationService): Promise<boolean> {
     try {
-      await app.container.make('queue')
-      return true
+      await app.container.make("rlanz/queue");
+      return true;
     } catch {
-      return false
+      return false;
     }
   }
 
@@ -120,20 +140,20 @@ export class QueueInspector {
       completed: 0,
       failed: 0,
       paused: 0,
-    }
+    };
 
     try {
-      const queue = this.getQueue()
-      if (!queue) return defaults
+      const queue = this.getQueue();
+      if (!queue) return defaults;
 
       const counts = await queue.getJobCounts(
-        'active',
-        'waiting',
-        'delayed',
-        'completed',
-        'failed',
-        'paused'
-      )
+        "active",
+        "waiting",
+        "delayed",
+        "completed",
+        "failed",
+        "paused",
+      );
 
       return {
         active: counts.active ?? 0,
@@ -142,46 +162,57 @@ export class QueueInspector {
         completed: counts.completed ?? 0,
         failed: counts.failed ?? 0,
         paused: counts.paused ?? 0,
-      }
+      };
     } catch {
-      return defaults
+      return defaults;
     }
   }
 
   /**
    * List jobs filtered by status with pagination.
    *
-   * @param status   Job status to filter by.
+   * @param status   Job status to filter by, or `'all'` for every status.
    * @param page     Page number (1-based).
    * @param perPage  Jobs per page.
    */
   async listJobs(
-    status: JobStatus = 'active',
+    status: JobStatus | "all" = "all",
     page = 1,
-    perPage = 25
+    perPage = 25,
   ): Promise<QueueJobListResult> {
     try {
-      const queue = this.getQueue()
-      if (!queue) return { jobs: [], total: 0 }
+      const queue = this.getQueue();
+      if (!queue) return { jobs: [], total: 0 };
 
-      const start = (page - 1) * perPage
-      const end = start + perPage - 1
+      const start = (page - 1) * perPage;
+      const end = start + perPage - 1;
+
+      const statuses: JobStatus[] = status === "all" ? ALL_STATUSES : [status];
 
       const [rawJobs, counts] = await Promise.all([
-        queue.getJobs([status], start, end) as Promise<any[]>,
-        queue.getJobCounts(status) as Promise<Record<string, number>>,
-      ])
+        queue.getJobs(statuses, start, end) as Promise<any[]>,
+        queue.getJobCounts(...ALL_STATUSES) as Promise<Record<string, number>>,
+      ]);
 
       const jobs: QueueJobSummary[] = (rawJobs ?? [])
         .filter((job: any) => job !== null && job !== undefined)
-        .map((job: any) => this.formatJobSummary(job, status))
+        .map((job: any) => {
+          const jobState =
+            this.inferStatus(job) ?? (status === "all" ? "completed" : status);
+          return this.formatJobSummary(job, jobState);
+        });
 
-      return {
-        jobs,
-        total: counts[status] ?? 0,
-      }
+      // Sort by creation time descending (newest first)
+      jobs.sort((a, b) => b.createdAt - a.createdAt);
+
+      const total =
+        status === "all"
+          ? ALL_STATUSES.reduce((sum, s) => sum + (counts[s] ?? 0), 0)
+          : (counts[status] ?? 0);
+
+      return { jobs, total };
     } catch {
-      return { jobs: [], total: 0 }
+      return { jobs: [], total: 0 };
     }
   }
 
@@ -190,22 +221,22 @@ export class QueueInspector {
    */
   async getJob(id: string): Promise<QueueJobDetail | null> {
     try {
-      const queue = this.getQueue()
-      if (!queue) return null
+      const queue = this.getQueue();
+      if (!queue) return null;
 
-      const job = await queue.getJob(id)
-      if (!job) return null
+      const job = await queue.getJob(id);
+      if (!job) return null;
 
-      const state = (await job.getState()) as JobStatus
+      const state = (await job.getState()) as JobStatus;
 
       return {
         ...this.formatJobSummary(job, state),
         stackTrace: job.stacktrace ?? [],
         returnValue: job.returnvalue ?? null,
         opts: job.opts ?? {},
-      }
+      };
     } catch {
-      return null
+      return null;
     }
   }
 
@@ -216,19 +247,19 @@ export class QueueInspector {
    */
   async retryJob(id: string): Promise<boolean> {
     try {
-      const queue = this.getQueue()
-      if (!queue) return false
+      const queue = this.getQueue();
+      if (!queue) return false;
 
-      const job = await queue.getJob(id)
-      if (!job) return false
+      const job = await queue.getJob(id);
+      if (!job) return false;
 
-      const state = await job.getState()
-      if (state !== 'failed') return false
+      const state = await job.getState();
+      if (state !== "failed") return false;
 
-      await job.retry()
-      return true
+      await job.retry();
+      return true;
     } catch {
-      return false
+      return false;
     }
   }
 
@@ -237,55 +268,97 @@ export class QueueInspector {
   // ---------------------------------------------------------------------------
 
   /**
-   * Get the underlying Bull Queue instance from the queue manager.
+   * Get the underlying BullMQ Queue instance from the queue manager.
    *
-   * `@rlanz/bull-queue` exposes the BullMQ Queue via `.queue` on the manager
-   * or via `.useQueue()`. We try both patterns for compatibility.
+   * `@rlanz/bull-queue` exposes queues via `.get(name)` or `.getOrSet(name)`.
    */
   private getQueue(): any {
     try {
-      // @rlanz/bull-queue v3+ exposes queue directly
-      if (this.queueManager.queue) {
-        return this.queueManager.queue
+      // @rlanz/bull-queue: .get(name) returns the BullMQ Queue instance
+      if (typeof this.queueManager.get === "function") {
+        return this.queueManager.get("default") ?? null;
       }
 
-      // Try getting the default queue
-      if (typeof this.queueManager.useQueue === 'function') {
-        return this.queueManager.useQueue('default')
+      // Fallback: .getOrSet(name) lazily creates the queue if needed
+      if (typeof this.queueManager.getOrSet === "function") {
+        return this.queueManager.getOrSet("default");
       }
 
-      // Fallback: the manager itself may be a Queue instance
-      if (typeof this.queueManager.getJobCounts === 'function') {
-        return this.queueManager
+      // Last resort: the manager itself is already a Queue instance
+      if (typeof this.queueManager.getJobCounts === "function") {
+        return this.queueManager;
       }
 
-      return null
+      return null;
     } catch {
-      return null
+      return null;
     }
+  }
+
+  /**
+   * Infer a job's status from its internal fields (avoids async getState() call).
+   */
+  private inferStatus(job: any): JobStatus | null {
+    if (job.failedReason || job.stacktrace?.length) return "failed";
+    if (job.finishedOn) return "completed";
+    if (job.processedOn) return "active";
+    if (job.delay && job.delay > 0 && !job.processedOn) return "delayed";
+    return null;
+  }
+
+  /**
+   * Extract a human-readable job name from a raw Bull job name.
+   *
+   * `@rlanz/bull-queue` often stores the full file URL as the job name
+   * (e.g. `file:///Users/…/app/jobs/send_email.ts`). We extract just
+   * the class-style name from the filename.
+   */
+  private static cleanJobName(raw: string): string {
+    if (!raw || raw === "__default__") return "default";
+
+    // Strip file:// URLs down to the filename
+    if (raw.startsWith("file://") || raw.startsWith("/")) {
+      const filename = raw.split("/").pop() ?? raw;
+      // Remove extension and convert snake_case/kebab-case to PascalCase
+      const base = filename.replace(/\.(ts|js|mjs|cjs)$/, "");
+      return base
+        .split(/[-_]/)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join("");
+    }
+
+    return raw;
   }
 
   /**
    * Format a Bull job into our summary shape.
    */
   private formatJobSummary(job: any, status: JobStatus): QueueJobSummary {
-    const processedAt = job.processedOn ?? null
-    const finishedAt = job.finishedOn ?? null
-    const duration = processedAt != null && finishedAt != null ? finishedAt - processedAt : null
+    const processedAt = job.processedOn ?? null;
+    const finishedAt = job.finishedOn ?? null;
+    const duration =
+      processedAt != null && finishedAt != null
+        ? finishedAt - processedAt
+        : null;
+    const createdAt = job.timestamp ?? 0;
+
+    const data = job.data ?? null;
 
     return {
       id: String(job.id),
-      name: job.name ?? 'unknown',
+      name: QueueInspector.cleanJobName(job.name ?? "unknown"),
       status,
-      data: job.data ?? null,
+      data,
+      payload: data,
       attempts: job.attemptsMade ?? 0,
       maxAttempts: job.opts?.attempts ?? 1,
       progress: job.progress ?? 0,
       failedReason: job.failedReason ?? null,
-      createdAt: job.timestamp ?? 0,
+      createdAt,
+      timestamp: createdAt,
       processedAt,
       finishedAt,
       duration,
-    }
+    };
   }
 }

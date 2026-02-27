@@ -2,48 +2,60 @@
 /**
  * Queue management tab for the debug panel.
  */
-import { ref, computed } from 'vue'
-import { timeAgo, formatDuration } from '../../../../core/index.js'
-import JsonViewer from '../../shared/JsonViewer.vue'
+import { ref, computed } from "vue";
+import { timeAgo, formatDuration } from "../../../../core/index.js";
+import JsonViewer from "../../shared/JsonViewer.vue";
 
 interface JobEntry {
-  id: string
-  name: string
-  status: string
-  payload?: any
-  attempts: number
-  duration: number | null
-  error?: string
-  timestamp: number
+  id: string;
+  name: string;
+  status: string;
+  data?: any;
+  payload?: any;
+  attempts: number;
+  duration: number | null;
+  error?: string;
+  failedReason?: string | null;
+  timestamp: number;
+  createdAt?: number;
 }
 
 const props = defineProps<{
-  data: any
-}>()
+  data: any;
+}>();
 
 const emit = defineEmits<{
-  retryJob: [jobId: string]
-}>()
+  retryJob: [jobId: string];
+}>();
 
-const activeFilter = ref('all')
+const activeFilter = ref("all");
 
-const FILTERS = ['all', 'active', 'waiting', 'delayed', 'completed', 'failed'] as const
+const FILTERS = [
+  "all",
+  "active",
+  "waiting",
+  "delayed",
+  "completed",
+  "failed",
+] as const;
 
-const jobData = computed(() => props.data || {})
-const stats = computed(() => jobData.value.stats || {})
+const jobData = computed(() => props.data || {});
+const stats = computed(
+  () => jobData.value.stats || jobData.value.overview || {},
+);
 
 const jobs = computed<JobEntry[]>(() => {
-  const arr = jobData.value.jobs || []
-  if (activeFilter.value === 'all') return arr
-  return arr.filter((j: JobEntry) => j.status === activeFilter.value)
-})
+  const arr = jobData.value.jobs || [];
+  if (activeFilter.value === "all") return arr;
+  return arr.filter((j: JobEntry) => j.status === activeFilter.value);
+});
 
 function statusClass(status: string): string {
-  return `ss-dbg-badge ss-dbg-job-status-${status}`
+  return `ss-dbg-badge ss-dbg-job-status-${status}`;
 }
 
 function handleRetry(jobId: string) {
-  emit('retryJob', jobId)
+  emit("retryJob", jobId);
 }
 </script>
 
@@ -53,23 +65,23 @@ function handleRetry(jobId: string) {
       <div class="ss-dbg-job-stats">
         <span class="ss-dbg-job-stat">
           <span class="ss-dbg-job-stat-label">Active:</span>
-          <span class="ss-dbg-job-stat-value">{{ stats.active || 0 }}</span>
+          <span class="ss-dbg-job-stat-value">{{ stats.active ?? 0 }}</span>
         </span>
         <span class="ss-dbg-job-stat">
           <span class="ss-dbg-job-stat-label">Waiting:</span>
-          <span class="ss-dbg-job-stat-value">{{ stats.waiting || 0 }}</span>
+          <span class="ss-dbg-job-stat-value">{{ stats.waiting ?? 0 }}</span>
         </span>
         <span class="ss-dbg-job-stat">
           <span class="ss-dbg-job-stat-label">Delayed:</span>
-          <span class="ss-dbg-job-stat-value">{{ stats.delayed || 0 }}</span>
+          <span class="ss-dbg-job-stat-value">{{ stats.delayed ?? 0 }}</span>
         </span>
         <span class="ss-dbg-job-stat">
           <span class="ss-dbg-job-stat-label">Completed:</span>
-          <span class="ss-dbg-job-stat-value">{{ stats.completed || 0 }}</span>
+          <span class="ss-dbg-job-stat-value">{{ stats.completed ?? 0 }}</span>
         </span>
         <span class="ss-dbg-job-stat">
           <span class="ss-dbg-job-stat-label">Failed:</span>
-          <span class="ss-dbg-job-stat-value">{{ stats.failed || 0 }}</span>
+          <span class="ss-dbg-job-stat-value">{{ stats.failed ?? 0 }}</span>
         </span>
       </div>
 
@@ -77,7 +89,10 @@ function handleRetry(jobId: string) {
         <button
           v-for="f in FILTERS"
           :key="f"
-          :class="['ss-dbg-job-filter', { 'ss-dbg-active': activeFilter === f }]"
+          :class="[
+            'ss-dbg-job-filter',
+            { 'ss-dbg-active': activeFilter === f },
+          ]"
           @click="activeFilter = f"
         >
           {{ f }}
@@ -108,13 +123,17 @@ function handleRetry(jobId: string) {
             <span :class="statusClass(j.status)">{{ j.status }}</span>
           </td>
           <td>
-            <JsonViewer :value="j.payload" />
+            <JsonViewer :value="j.payload || j.data" />
           </td>
-          <td style="color: var(--ss-muted); text-align: center">{{ j.attempts }}</td>
+          <td style="color: var(--ss-muted); text-align: center">
+            {{ j.attempts }}
+          </td>
           <td class="ss-dbg-duration">
-            {{ j.duration !== null ? formatDuration(j.duration) : '-' }}
+            {{ j.duration !== null ? formatDuration(j.duration) : "-" }}
           </td>
-          <td class="ss-dbg-event-time">{{ timeAgo(j.timestamp) }}</td>
+          <td class="ss-dbg-event-time">
+            {{ timeAgo(j.timestamp || j.createdAt) }}
+          </td>
           <td>
             <button
               v-if="j.status === 'failed'"
