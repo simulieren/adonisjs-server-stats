@@ -138,6 +138,7 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
       return colorClass(getRatioColor(used, total))
     },
     historyKey: '_sysMemUsed',
+    show: (s) => s.systemMemoryTotalMb != null,
   },
 
   // ── HTTP group ────────────────────────────────────────────────────────────

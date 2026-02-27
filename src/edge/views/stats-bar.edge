@@ -28,9 +28,13 @@
 
 <button type="button" id="ss-toggle" class="ss-toggle ss-visible">
   <span id="ss-toggle-summary" class="ss-toggle-summary" style="display:none">
-    <span data-ts="cpu" class="ss-value ss-green">...</span>
-    <span data-ts="mem" class="ss-value ss-green">...</span>
-    <span data-ts="redis" class="ss-value ss-green">...</span>
+    @if(hasProcess)
+      <span data-ts="cpu" class="ss-value ss-green">...</span>
+      <span data-ts="mem" class="ss-value ss-green">...</span>
+    @end
+    @if(hasRedis)
+      <span data-ts="redis" class="ss-value ss-green">...</span>
+    @end
   </span>
   <span class="ss-toggle-label" style="color:#737373">hide stats</span>
   <span class="ss-toggle-arrow">▼</span>

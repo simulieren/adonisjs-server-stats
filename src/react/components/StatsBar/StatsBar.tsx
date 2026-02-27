@@ -107,7 +107,7 @@ export function StatsBar(props: StatsBarProps) {
       >
         <span className="ss-toggle-arrow">{visible ? '\u25BC' : '\u25B2'}</span>
         {visible && <span className="ss-toggle-label">hide stats</span>}
-        {!visible && stats && (
+        {!visible && stats && features.process && (
           <div className="ss-toggle-summary" style={{ display: 'flex' }}>
             <span className="ss-label">CPU</span>
             <span

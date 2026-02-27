@@ -356,11 +356,12 @@
   })
 
   // ── Badge definitions ─────────────────────────────────────────────
-  // Compact badge defs: val (getValue), color (getColor→class), title, detail, hist (historyKey), unit, show (showIf), href
+  // Compact badge defs: val (getValue), color (getColor→class), title, detail, hist (historyKey), unit, show (showIf), href, group
   const BADGES = [
     // Process
     {
       id: 'node',
+      group: 'process',
       label: 'NODE',
       val: (s) => s.nodeVersion,
       title: 'Node.js Runtime',
@@ -368,6 +369,7 @@
     },
     {
       id: 'up',
+      group: 'process',
       label: 'UP',
       val: (s) => formatUptime(s.uptime),
       title: 'Process Uptime',
@@ -376,6 +378,7 @@
     },
     {
       id: 'cpu',
+      group: 'process',
       label: 'CPU',
       val: (s) => s.cpuPercent.toFixed(1) + '%',
       color: (s) => thresh(s.cpuPercent, 50, 80),
@@ -386,6 +389,7 @@
     },
     {
       id: 'evt',
+      group: 'process',
       label: 'EVT',
       val: (s) => s.eventLoopLag.toFixed(1) + 'ms',
       color: (s) => thresh(s.eventLoopLag, 20, 50),
@@ -397,6 +401,7 @@
     // Memory
     {
       id: 'mem',
+      group: 'memory',
       label: 'MEM',
       val: (s) => formatBytes(s.memHeapUsed),
       unit: 'bytes',
@@ -411,6 +416,7 @@
     },
     {
       id: 'rss',
+      group: 'memory',
       label: 'RSS',
       val: (s) => formatBytes(s.memRss),
       unit: 'bytes',
@@ -420,6 +426,7 @@
     },
     {
       id: 'sys',
+      group: 'memory',
       label: 'SYS',
       val: (s) =>
         formatMb(s.systemMemoryTotalMb - s.systemMemoryFreeMb) +
@@ -434,6 +441,7 @@
     // HTTP
     {
       id: 'rps',
+      group: 'http',
       label: 'REQ/s',
       val: (s) => s.requestsPerSecond.toFixed(1),
       unit: '/s',
@@ -443,6 +451,7 @@
     },
     {
       id: 'avg',
+      group: 'http',
       label: 'AVG',
       val: (s) => s.avgResponseTimeMs.toFixed(0) + 'ms',
       color: (s) => thresh(s.avgResponseTimeMs, 200, 500),
@@ -453,6 +462,7 @@
     },
     {
       id: 'err',
+      group: 'http',
       label: 'ERR',
       val: (s) => s.errorRate.toFixed(1) + '%',
       color: (s) => thresh(s.errorRate, 1, 5),
@@ -463,6 +473,7 @@
     },
     {
       id: 'conn',
+      group: 'http',
       label: 'CONN',
       val: (s) => '' + s.activeHttpConnections,
       title: 'Active Connections',
@@ -472,6 +483,7 @@
     // DB
     {
       id: 'db',
+      group: 'db',
       label: 'DB',
       val: (s) => s.dbPoolUsed + '/' + s.dbPoolFree + '/' + s.dbPoolMax,
       color: (s) => ratioColor(s.dbPoolUsed, s.dbPoolMax),
@@ -490,6 +502,7 @@
     // Redis
     {
       id: 'redis',
+      group: 'redis',
       label: 'REDIS',
       val: (s) => (s.redisOk ? '\u2713' : '\u2717'),
       color: (s) => (s.redisOk ? 'ss-green' : 'ss-red'),
@@ -498,6 +511,7 @@
     },
     {
       id: 'rmem',
+      group: 'redis',
       label: 'MEM',
       val: (s) => s.redisMemoryUsedMb.toFixed(1) + 'M',
       unit: 'MB',
@@ -508,6 +522,7 @@
     },
     {
       id: 'rkeys',
+      group: 'redis',
       label: 'KEYS',
       val: (s) => formatCount(s.redisKeysCount),
       title: 'Redis Keys',
@@ -517,6 +532,7 @@
     },
     {
       id: 'rhit',
+      group: 'redis',
       label: 'HIT',
       val: (s) => s.redisHitRate.toFixed(0) + '%',
       color: (s) => threshInverse(s.redisHitRate, 90, 70),
@@ -529,6 +545,7 @@
     // Queue
     {
       id: 'q',
+      group: 'queue',
       label: 'Q',
       val: (s) => s.queueActive + '/' + s.queueWaiting + '/' + s.queueDelayed,
       color: (s) => (s.queueFailed > 0 ? 'ss-amber' : 'ss-green'),
@@ -546,6 +563,7 @@
     },
     {
       id: 'workers',
+      group: 'queue',
       label: 'WORKERS',
       val: (s) => '' + s.queueWorkerCount,
       title: 'Queue Workers',
@@ -554,6 +572,7 @@
     // App
     {
       id: 'users',
+      group: 'app',
       label: 'USERS',
       val: (s) => '' + s.onlineUsers,
       title: 'Online Users',
@@ -562,6 +581,7 @@
     },
     {
       id: 'hooks',
+      group: 'app',
       label: 'HOOKS',
       val: (s) => '' + s.pendingWebhooks,
       color: (s) => (s.pendingWebhooks > 100 ? 'ss-amber' : 'ss-green'),
@@ -571,6 +591,7 @@
     },
     {
       id: 'mail',
+      group: 'app',
       label: 'MAIL',
       val: (s) => '' + s.pendingEmails,
       color: (s) => (s.pendingEmails > 100 ? 'ss-amber' : 'ss-green'),
@@ -581,6 +602,7 @@
     // Logs
     {
       id: 'logerr',
+      group: 'log',
       label: 'LOG ERR',
       val: (s) => '' + s.logErrorsLast5m,
       color: (s) =>
@@ -596,6 +618,7 @@
     },
     {
       id: 'lograte',
+      group: 'log',
       label: 'LOG/m',
       val: (s) => '' + s.logEntriesPerMinute,
       unit: '/m',

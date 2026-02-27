@@ -36,9 +36,15 @@ export default class DebugController {
       debugPanel: !!toolbarConfig?.enabled,
       dashboard: !!toolbarConfig?.dashboard,
       tracing: !!toolbarConfig?.tracing,
+      process: collectorNames.has('process'),
+      system: collectorNames.has('system'),
+      http: collectorNames.has('http'),
+      db: collectorNames.has('db_pool'),
       redis: collectorNames.has('redis'),
       queues: collectorNames.has('queue'),
       cache: collectorNames.has('redis'),
+      app: collectorNames.has('app'),
+      log: collectorNames.has('log'),
       emails: !!toolbarConfig?.enabled,
     }
 

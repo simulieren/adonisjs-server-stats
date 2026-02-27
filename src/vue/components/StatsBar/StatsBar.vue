@@ -10,7 +10,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useServerStats } from '../../composables/useServerStats.js'
 import { useFeatures } from '../../composables/useFeatures.js'
 import { useTheme } from '../../composables/useTheme.js'
-import { METRIC_DEFINITIONS, getMetricsByGroup, formatBytes } from '../../../core/index.js'
+import {
+  getMetricsByGroup,
+  getVisibleMetricGroups,
+  formatBytes,
+} from '../../../core/index.js'
 import type { StatsBarConfig } from '../../../core/index.js'
 import MetricCard from './MetricCard.vue'
 
@@ -59,13 +63,16 @@ watch(isUnauthorized, (unauthorized) => {
   if (unauthorized) visible.value = false
 })
 
-// Group metrics for rendering with separators
+// Group metrics for rendering with separators, filtered by enabled features
 const metricGroups = computed(() => {
+  const visibleGroups = getVisibleMetricGroups(features.value)
   const groups = getMetricsByGroup()
-  return Array.from(groups.entries()).map(([name, metrics]) => ({
-    name,
-    metrics,
-  }))
+  return Array.from(groups.entries())
+    .filter(([name]) => visibleGroups.has(name))
+    .map(([name, metrics]) => ({
+      name,
+      metrics,
+    }))
 })
 
 function getMetricHistory(historyKey?: string): number[] {
@@ -139,9 +146,9 @@ const themeAttr = computed(() => theme.value)
     @click="toggleVisibility"
   >
     <span v-if="!visible" class="ss-toggle-summary">
-      <span class="ss-value ss-green">{{ cpuSummary }}</span>
-      <span class="ss-value ss-green">{{ memSummary }}</span>
-      <span :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']">{{ redisSummary }}</span>
+      <span v-if="features.process" class="ss-value ss-green">{{ cpuSummary }}</span>
+      <span v-if="features.process" class="ss-value ss-green">{{ memSummary }}</span>
+      <span v-if="features.redis" :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']">{{ redisSummary }}</span>
     </span>
     <span v-if="visible" class="ss-toggle-label" style="color: #737373">hide stats</span>
     <span class="ss-toggle-arrow">{{ visible ? '\u25BC' : '\u25B2' }}</span>

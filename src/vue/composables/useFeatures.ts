@@ -26,9 +26,15 @@ export interface UseFeaturesOptions {
 function toFeatureConfig(flags: FeatureFlags): FeatureConfig {
   return {
     tracing: flags.features?.tracing ?? false,
+    process: flags.features?.process ?? false,
+    system: flags.features?.system ?? false,
+    http: flags.features?.http ?? false,
+    db: flags.features?.db ?? false,
     redis: flags.features?.redis ?? false,
     queues: flags.features?.queues ?? false,
     cache: flags.features?.cache ?? false,
+    app: flags.features?.app ?? false,
+    log: flags.features?.log ?? false,
     emails: flags.features?.emails ?? false,
     dashboard: flags.features?.dashboard ?? false,
     customPanes: flags.customPanes ?? [],

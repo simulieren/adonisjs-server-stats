@@ -19,9 +19,15 @@ const DEFAULT_DEBUG_ENDPOINT = '/admin/api/debug'
  */
 export const DEFAULT_FEATURES: FeatureConfig = {
   tracing: false,
+  process: false,
+  system: false,
+  http: false,
+  db: false,
   redis: false,
   queues: false,
   cache: false,
+  app: false,
+  log: false,
   emails: false,
   dashboard: false,
   customPanes: [],
@@ -33,9 +39,15 @@ export const DEFAULT_FEATURES: FeatureConfig = {
 function flattenFlags(flags: FeatureFlags): FeatureConfig {
   return {
     tracing: flags.features?.tracing ?? false,
+    process: flags.features?.process ?? false,
+    system: flags.features?.system ?? false,
+    http: flags.features?.http ?? false,
+    db: flags.features?.db ?? false,
     redis: flags.features?.redis ?? false,
     queues: flags.features?.queues ?? false,
     cache: flags.features?.cache ?? false,
+    app: flags.features?.app ?? false,
+    log: flags.features?.log ?? false,
     emails: flags.features?.emails ?? false,
     dashboard: flags.features?.dashboard ?? false,
     customPanes: flags.customPanes ?? [],
@@ -98,7 +110,7 @@ export async function detectFeatures(options: {
  * @returns A set of visible metric group names.
  */
 export function getVisibleMetricGroups(features: FeatureFlags | FeatureConfig): Set<string> {
-  const groups = new Set<string>(['process', 'memory', 'http', 'db', 'app', 'log'])
+  const groups = new Set<string>()
 
   // Handle both nested FeatureFlags and flat FeatureConfig
   const ff =
@@ -106,8 +118,17 @@ export function getVisibleMetricGroups(features: FeatureFlags | FeatureConfig): 
       ? (features as FeatureFlags).features
       : (features as FeatureConfig)
 
+  if ('process' in ff && ff.process) groups.add('process')
+  // Memory group shows if process (heap/rss) or system (SYS) collector is present
+  if (('process' in ff && ff.process) || ('system' in ff && (ff as any).system)) {
+    groups.add('memory')
+  }
+  if ('http' in ff && ff.http) groups.add('http')
+  if ('db' in ff && ff.db) groups.add('db')
   if ('redis' in ff && ff.redis) groups.add('redis')
   if ('queues' in ff && (ff as any).queues) groups.add('queue')
+  if ('app' in ff && ff.app) groups.add('app')
+  if ('log' in ff && ff.log) groups.add('log')
 
   return groups
 }

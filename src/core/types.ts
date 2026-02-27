@@ -108,9 +108,15 @@ export interface FeatureFlags {
     debugPanel: boolean
     dashboard: boolean
     tracing: boolean
+    process: boolean
+    system: boolean
+    http: boolean
+    db: boolean
     redis: boolean
     queues: boolean
     cache: boolean
+    app: boolean
+    log: boolean
     emails: boolean
   }
   customPanes: import('../debug/types.js').DebugPane[]
@@ -133,9 +139,15 @@ export interface FeatureFlags {
  */
 export interface FeatureConfig {
   tracing: boolean
+  process: boolean
+  system: boolean
+  http: boolean
+  db: boolean
   redis: boolean
   queues: boolean
   cache: boolean
+  app: boolean
+  log: boolean
   emails: boolean
   dashboard: boolean
   customPanes: import('../debug/types.js').DebugPane[]
