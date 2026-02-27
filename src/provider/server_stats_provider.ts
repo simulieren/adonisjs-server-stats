@@ -85,12 +85,7 @@ export default class ServerStatsProvider {
         // ── Auto-register dashboard routes ─────────────────────────
         if (toolbarConfig.dashboard) {
           const dashPath = toolbarConfig.dashboardPath ?? '/__stats'
-          registerDashboardRoutes(
-            r,
-            dashPath,
-            () => this.dashboardController,
-            config.shouldShow
-          )
+          registerDashboardRoutes(r, dashPath, () => this.dashboardController, config.shouldShow)
           registeredPaths.push(dashPath + '/*')
         }
       }
@@ -136,7 +131,10 @@ export default class ServerStatsProvider {
       const { edgePluginServerStats } = await import('../edge/plugin.js')
       edge.default.use(edgePluginServerStats(config))
     } catch (err) {
-      log.warn('could not register Edge plugin — @serverStats() tag will not work: ' + (err as Error)?.message)
+      log.warn(
+        'could not register Edge plugin — @serverStats() tag will not work: ' +
+          (err as Error)?.message
+      )
     }
   }
 
@@ -250,7 +248,10 @@ export default class ServerStatsProvider {
     this.engine = new StatsEngine(config.collectors)
 
     // Bind engine to container so the controller can access it
-    ;(this.app.container as unknown as ContainerWithSingleton).singleton('server_stats.engine', () => this.engine!)
+    ;(this.app.container as unknown as ContainerWithSingleton).singleton(
+      'server_stats.engine',
+      () => this.engine!
+    )
 
     await this.engine.start()
 
@@ -323,7 +324,10 @@ export default class ServerStatsProvider {
         const stats = await this.engine!.collect()
 
         if (transmit && config.channelName) {
-          ;(transmit as { broadcast: Function }).broadcast(config.channelName, JSON.parse(JSON.stringify(stats)))
+          ;(transmit as { broadcast: Function }).broadcast(
+            config.channelName,
+            JSON.parse(JSON.stringify(stats))
+          )
         }
 
         if (prometheusCollector) {
@@ -341,7 +345,10 @@ export default class ServerStatsProvider {
     this.debugStore = new DebugStore(toolbarConfig)
 
     // Bind debug store to container
-    ;(this.app.container as unknown as ContainerWithSingleton).singleton('debug.store', () => this.debugStore!)
+    ;(this.app.container as unknown as ContainerWithSingleton).singleton(
+      'debug.store',
+      () => this.debugStore!
+    )
 
     // Load persisted data before starting collectors
     if (toolbarConfig.persistDebugData) {
@@ -438,7 +445,11 @@ export default class ServerStatsProvider {
     this.dashboardStore = new DashboardStore(toolbarConfig)
     const appRoot = this.app.makePath('')
     try {
-      await this.dashboardStore.start(null, emitter as Parameters<DashboardStore['start']>[1], appRoot)
+      await this.dashboardStore.start(
+        null,
+        emitter as Parameters<DashboardStore['start']>[1],
+        appRoot
+      )
     } catch (err) {
       const msg = (err as Error)?.message || ''
       if (msg.includes('better-sqlite3') || msg.includes('Cannot find module')) {
@@ -454,7 +465,10 @@ export default class ServerStatsProvider {
     }
 
     // Bind to container
-    ;(this.app.container as unknown as ContainerWithSingleton).singleton('dashboard.store', () => this.dashboardStore!)
+    ;(this.app.container as unknown as ContainerWithSingleton).singleton(
+      'dashboard.store',
+      () => this.dashboardStore!
+    )
 
     // Set dashboard path in middleware for self-exclusion
     setDashboardPath(toolbarConfig.dashboardPath)
@@ -514,7 +528,14 @@ export default class ServerStatsProvider {
 
       // Persist asynchronously (fire-and-forget)
       dashStore
-        .persistRequest({ method, url, statusCode, duration, queries: newQueries, trace: trace ?? null })
+        .persistRequest({
+          method,
+          url,
+          statusCode,
+          duration,
+          queries: newQueries,
+          trace: trace ?? null,
+        })
         .then((requestId) => {
           if (requestId !== null && newEvents.length > 0) {
             return dashStore.recordEvents(requestId, newEvents)

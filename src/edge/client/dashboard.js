@@ -1570,8 +1570,10 @@
     var metrics = []
     if (node['Startup Cost'] !== null && node['Startup Cost'] !== undefined)
       metrics.push('cost=' + node['Startup Cost'] + '..' + node['Total Cost'])
-    if (node['Plan Rows'] !== null && node['Plan Rows'] !== undefined) metrics.push('rows=' + node['Plan Rows'])
-    if (node['Plan Width'] !== null && node['Plan Width'] !== undefined) metrics.push('width=' + node['Plan Width'])
+    if (node['Plan Rows'] !== null && node['Plan Rows'] !== undefined)
+      metrics.push('rows=' + node['Plan Rows'])
+    if (node['Plan Width'] !== null && node['Plan Width'] !== undefined)
+      metrics.push('width=' + node['Plan Width'])
     if (node['Filter']) metrics.push('filter: ' + esc(node['Filter']))
     if (node['Index Cond']) metrics.push('cond: ' + esc(node['Index Cond']))
     if (node['Hash Cond']) metrics.push('hash: ' + esc(node['Hash Cond']))

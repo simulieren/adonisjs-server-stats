@@ -9,10 +9,9 @@ import { rangeToCutoff, rangeToMinutes, roundBucket } from '../utils/time_helper
 import { ChartAggregator } from './chart_aggregator.js'
 import { autoMigrate, runRetentionCleanup } from './migrator.js'
 
-import type { Knex } from 'knex'
-
 import type { DevToolbarConfig } from '../debug/types.js'
 import type { QueryRecord, EventRecord, EmailRecord, TraceRecord } from '../debug/types.js'
+import type { Knex } from 'knex'
 
 // ---------------------------------------------------------------------------
 // Minimal interface for an AdonisJS-style event emitter
@@ -441,7 +440,10 @@ export class DashboardStore {
    * Grouped query patterns: aggregated by sql_normalized
    * with count, avg/min/max/total duration.
    */
-  async getQueriesGrouped(limit: number = 200, sort: string = 'total_duration'): Promise<Record<string, unknown>[]> {
+  async getQueriesGrouped(
+    limit: number = 200,
+    sort: string = 'total_duration'
+  ): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
     const validSorts: Record<string, string> = {
@@ -970,7 +972,9 @@ export class DashboardStore {
     }
 
     try {
-      const result = await (appDb as { rawQuery: (sql: string) => Promise<{ rows?: unknown[] }> }).rawQuery(`EXPLAIN ${sql}`)
+      const result = await (
+        appDb as { rawQuery: (sql: string) => Promise<{ rows?: unknown[] }> }
+      ).rawQuery(`EXPLAIN ${sql}`)
       return { plan: result.rows || result }
     } catch (err) {
       return { error: (err as Error).message || 'EXPLAIN failed' }
@@ -1033,8 +1037,13 @@ export class DashboardStore {
         text: (msg?.text as string) || null,
         mailer: (d?.mailerName as string) || (d?.mailer as string) || 'unknown',
         status,
-        messageId: (d?.response as Record<string, unknown>)?.messageId as string || (d?.messageId as string) || null,
-        attachmentCount: Array.isArray(msg?.attachments) ? (msg.attachments as unknown[]).length : 0,
+        messageId:
+          ((d?.response as Record<string, unknown>)?.messageId as string) ||
+          (d?.messageId as string) ||
+          null,
+        attachmentCount: Array.isArray(msg?.attachments)
+          ? (msg.attachments as unknown[]).length
+          : 0,
         timestamp: Date.now(),
       }
       this.recordEmail(record)

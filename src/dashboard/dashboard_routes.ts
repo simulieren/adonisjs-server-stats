@@ -1,11 +1,14 @@
 import { createAccessMiddleware } from '../routes/access_middleware.js'
 
-import type { HttpContext } from '@adonisjs/core/http'
 import type DashboardController from './dashboard_controller.js'
+import type { HttpContext } from '@adonisjs/core/http'
 
 /** Minimal interface for the AdonisJS router used in route registration. */
 interface AdonisRouter {
-  get(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute; where(key: string, matcher: RegExp): AdonisRoute }
+  get(
+    pattern: string,
+    handler: (ctx: HttpContext) => unknown
+  ): { as(name: string): AdonisRoute; where(key: string, matcher: RegExp): AdonisRoute }
   post(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute }
   delete(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute }
   group(callback: () => void): { prefix(path: string): { use(middleware: unknown[]): void } }

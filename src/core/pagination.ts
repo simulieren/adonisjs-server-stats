@@ -165,7 +165,8 @@ export function buildQueryParams(options: {
   const params = new URLSearchParams()
 
   if (options.page !== null && options.page !== undefined) params.set('page', String(options.page))
-  if (options.perPage !== null && options.perPage !== undefined) params.set('limit', String(options.perPage))
+  if (options.perPage !== null && options.perPage !== undefined)
+    params.set('limit', String(options.perPage))
   if (options.search) params.set('search', options.search)
   if (options.sort) params.set('sort', options.sort)
   if (options.sortDir) params.set('direction', options.sortDir)

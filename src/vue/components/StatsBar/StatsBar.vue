@@ -10,11 +10,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useServerStats } from '../../composables/useServerStats.js'
 import { useFeatures } from '../../composables/useFeatures.js'
 import { useTheme } from '../../composables/useTheme.js'
-import {
-  getMetricsByGroup,
-  getVisibleMetricGroups,
-  formatBytes,
-} from '../../../core/index.js'
+import { getMetricsByGroup, getVisibleMetricGroups, formatBytes } from '../../../core/index.js'
 import type { StatsBarConfig } from '../../../core/index.js'
 import MetricCard from './MetricCard.vue'
 
@@ -148,7 +144,9 @@ const themeAttr = computed(() => theme.value)
     <span v-if="!visible" class="ss-toggle-summary">
       <span v-if="features.process" class="ss-value ss-green">{{ cpuSummary }}</span>
       <span v-if="features.process" class="ss-value ss-green">{{ memSummary }}</span>
-      <span v-if="features.redis" :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']">{{ redisSummary }}</span>
+      <span v-if="features.redis" :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']">{{
+        redisSummary
+      }}</span>
     </span>
     <span v-if="visible" class="ss-toggle-label" style="color: #737373">hide stats</span>
     <span class="ss-toggle-arrow">{{ visible ? '\u25BC' : '\u25B2' }}</span>

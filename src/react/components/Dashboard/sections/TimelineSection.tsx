@@ -37,7 +37,13 @@ export function TimelineSection({ options = {} }: TimelineSectionProps) {
     statusCode?: number
     total_duration?: number
     totalDuration?: number
-    spans?: Array<{ id: string; label: string; startOffset: number; duration: number; category: string }>
+    spans?: Array<{
+      id: string
+      label: string
+      startOffset: number
+      duration: number
+      category: string
+    }>
     warnings?: string[]
   }
 

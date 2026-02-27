@@ -109,7 +109,11 @@ export class EmailCollector {
     this.buffer.clear()
   }
 
-  private buildRecord(msg: MailMessage, status: EmailRecord['status'], data: MailEventData): EmailRecord {
+  private buildRecord(
+    msg: MailMessage,
+    status: EmailRecord['status'],
+    data: MailEventData
+  ): EmailRecord {
     return {
       id: this.buffer.getNextId(),
       from: extractAddresses(msg?.from) || 'unknown',

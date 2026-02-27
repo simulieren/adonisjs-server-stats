@@ -73,7 +73,9 @@ export class StatsEngine {
         } catch (err) {
           if (!this.warnedCollectors.has(collector.name)) {
             this.warnedCollectors.add(collector.name)
-            log.warn(`collector "${collector.name}" threw during collect() — ${(err as Error).message}`)
+            log.warn(
+              `collector "${collector.name}" threw during collect() — ${(err as Error).message}`
+            )
           }
           return {}
         }

@@ -71,7 +71,7 @@ const metricCards = computed(() => {
 async function handleRangeChange(range: TimeRange) {
   emit('changeTimeRange', range)
   if (props.onFetchChart) {
-    const result = await props.onFetchChart(range) as { data?: ChartDataPoint[] } | null
+    const result = (await props.onFetchChart(range)) as { data?: ChartDataPoint[] } | null
     if (result?.data) chartData.value = result.data
   }
 }
@@ -88,7 +88,7 @@ function barHeight(count: number): number {
 
 onMounted(async () => {
   if (props.onFetchChart) {
-    const result = await props.onFetchChart(props.timeRange) as { data?: ChartDataPoint[] } | null
+    const result = (await props.onFetchChart(props.timeRange)) as { data?: ChartDataPoint[] } | null
     if (result?.data) chartData.value = result.data
   }
 })

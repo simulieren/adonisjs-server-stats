@@ -43,7 +43,9 @@ export class DashboardApi {
    * @param range - Time range identifier (e.g. `'1h'`, `'24h'`).
    */
   async fetchChart(range: string) {
-    return this.client.fetch<Record<string, unknown>>(`${this.basePath}/overview/chart?range=${range}`)
+    return this.client.fetch<Record<string, unknown>>(
+      `${this.basePath}/overview/chart?range=${range}`
+    )
   }
 
   /**
@@ -68,7 +70,9 @@ export class DashboardApi {
    * @param id - Job record ID.
    */
   async retryJob(id: string) {
-    return this.client.fetch<{ message: string }>(`${this.basePath}/jobs/${id}/retry`, { method: 'POST' })
+    return this.client.fetch<{ message: string }>(`${this.basePath}/jobs/${id}/retry`, {
+      method: 'POST',
+    })
   }
 
   /**
@@ -77,9 +81,12 @@ export class DashboardApi {
    * @param key - Cache key (will be URI-encoded).
    */
   async deleteCacheKey(key: string) {
-    return this.client.fetch<{ deleted: boolean }>(`${this.basePath}/cache/${encodeURIComponent(key)}`, {
-      method: 'DELETE',
-    })
+    return this.client.fetch<{ deleted: boolean }>(
+      `${this.basePath}/cache/${encodeURIComponent(key)}`,
+      {
+        method: 'DELETE',
+      }
+    )
   }
 
   /**

@@ -19,7 +19,7 @@ export default class LogStreamProvider {
 
     let transmit: TransmitService
     try {
-      transmit = await this.app.container.make('transmit') as TransmitService
+      transmit = (await this.app.container.make('transmit')) as TransmitService
     } catch {
       log.info('@adonisjs/transmit not available — live log streaming disabled')
       return

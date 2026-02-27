@@ -48,7 +48,9 @@ export class ChartAggregator {
     // Get requests from the last 60 seconds
     const cutoff = toSqliteTimestamp(new Date(Date.now() - 60_000))
 
-    const requests: { duration: number; status_code: number }[] = await this.db('server_stats_requests')
+    const requests: { duration: number; status_code: number }[] = await this.db(
+      'server_stats_requests'
+    )
       .where('created_at', '>=', cutoff)
       .select('duration', 'status_code')
 
@@ -77,13 +79,14 @@ export class ChartAggregator {
     const errorCount = requests.filter((r) => r.status_code >= 400).length
 
     // Get query stats for the same window
-    const queryStats: { query_count: number; avg_query_duration: number } | undefined = await this.db('server_stats_queries')
-      .where('created_at', '>=', cutoff)
-      .select(
-        this.db.raw('COUNT(*) as query_count'),
-        this.db.raw('AVG(duration) as avg_query_duration')
-      )
-      .first()
+    const queryStats: { query_count: number; avg_query_duration: number } | undefined =
+      await this.db('server_stats_queries')
+        .where('created_at', '>=', cutoff)
+        .select(
+          this.db.raw('COUNT(*) as query_count'),
+          this.db.raw('AVG(duration) as avg_query_duration')
+        )
+        .first()
 
     await this.db('server_stats_metrics').insert({
       bucket,

@@ -12,7 +12,15 @@ interface RedactedValue {
   __value: string | number | boolean | null
 }
 
-type ConfigValue = string | number | boolean | null | undefined | RedactedValue | ConfigValue[] | { [key: string]: ConfigValue }
+type ConfigValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | RedactedValue
+  | ConfigValue[]
+  | { [key: string]: ConfigValue }
 
 interface ConfigNode {
   key: string
@@ -56,7 +64,12 @@ function flattenConfig(obj: Record<string, unknown>, prefix = ''): ConfigNode[] 
   const nodes: ConfigNode[] = []
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key
-    const isRedacted = value !== null && typeof value === 'object' && !Array.isArray(value) && '__redacted' in value && (value as RedactedValue).__redacted
+    const isRedacted =
+      value !== null &&
+      typeof value === 'object' &&
+      !Array.isArray(value) &&
+      '__redacted' in value &&
+      (value as RedactedValue).__redacted
     if (value && typeof value === 'object' && !Array.isArray(value) && !isRedacted) {
       nodes.push({
         key: fullKey,

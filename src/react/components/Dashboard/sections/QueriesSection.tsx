@@ -140,12 +140,17 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                       className={`ss-dash-sql ${expandedSql === (row.id as number) ? 'ss-dash-sql-expanded' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        setExpandedSql(expandedSql === (row.id as number) ? null : (row.id as number))
+                        setExpandedSql(
+                          expandedSql === (row.id as number) ? null : (row.id as number)
+                        )
                       }}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) =>
-                        e.key === 'Enter' && setExpandedSql(expandedSql === (row.id as number) ? null : (row.id as number))
+                        e.key === 'Enter' &&
+                        setExpandedSql(
+                          expandedSql === (row.id as number) ? null : (row.id as number)
+                        )
                       }
                     >
                       {v}

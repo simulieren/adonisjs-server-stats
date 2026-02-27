@@ -22,7 +22,10 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
   const [search, setSearch] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
-  const { data, isLoading, mutate } = useDashboardData<CacheResponse>('cache', { ...options, search })
+  const { data, isLoading, mutate } = useDashboardData<CacheResponse>('cache', {
+    ...options,
+    search,
+  })
   const cacheData = data
 
   const handleDelete = useCallback(
@@ -104,7 +107,9 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
           ]}
           data={cacheData.keys || []}
           keyField="key"
-          onRowClick={(row: Record<string, unknown>) => setSelectedKey(selectedKey === row.key ? null : row.key as string)}
+          onRowClick={(row: Record<string, unknown>) =>
+            setSelectedKey(selectedKey === row.key ? null : (row.key as string))
+          }
           emptyMessage="No cache keys found"
         />
       )}

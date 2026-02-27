@@ -71,7 +71,8 @@
   /** Build a deep link anchor element HTML string. */
   const deepLink = (section, id) => {
     if (!dashboardPath) return ''
-    const href = dashboardPath + '#' + section + (id !== null && id !== undefined ? '?id=' + id : '')
+    const href =
+      dashboardPath + '#' + section + (id !== null && id !== undefined ? '?id=' + id : '')
     return (
       ' <a href="' +
       esc(href) +

@@ -45,11 +45,15 @@ export class RouteInspector {
         }
       }
     } catch (err) {
-      log.warn(`route inspector: could not read routes — ${(err as Error)?.message || 'unknown error'}`)
+      log.warn(
+        `route inspector: could not read routes — ${(err as Error)?.message || 'unknown error'}`
+      )
     }
   }
 
-  private resolveHandler(handler: string | ((...args: unknown[]) => unknown) | RouteHandler | undefined): string {
+  private resolveHandler(
+    handler: string | ((...args: unknown[]) => unknown) | RouteHandler | undefined
+  ): string {
     if (!handler) return 'unknown'
     if (typeof handler === 'string') return handler
     if (typeof handler === 'function') return handler.name || 'closure'

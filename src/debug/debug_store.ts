@@ -84,7 +84,9 @@ export class DebugStore {
       raw = await readFile(filePath, 'utf-8')
     } catch (error) {
       if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
-        log.warn(`Failed to read persisted debug data from ${bold(filePath)}: ${(error as Error)?.message}`)
+        log.warn(
+          `Failed to read persisted debug data from ${bold(filePath)}: ${(error as Error)?.message}`
+        )
       }
       return
     }

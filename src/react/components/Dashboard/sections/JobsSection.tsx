@@ -34,12 +34,24 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
   interface JobsResponse {
     jobs?: Array<Record<string, unknown>>
     stats?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
-    overview?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
+    overview?: {
+      active: number
+      waiting: number
+      delayed: number
+      completed: number
+      failed: number
+    }
   }
 
   const jobsData = data as JobsResponse | Array<Record<string, unknown>> | null
-  const jobs = (jobsData && !Array.isArray(jobsData) ? jobsData.jobs : Array.isArray(jobsData) ? jobsData : null) || []
-  const stats = jobsData && !Array.isArray(jobsData) ? (jobsData.stats || jobsData.overview) : undefined
+  const jobs =
+    (jobsData && !Array.isArray(jobsData)
+      ? jobsData.jobs
+      : Array.isArray(jobsData)
+        ? jobsData
+        : null) || []
+  const stats =
+    jobsData && !Array.isArray(jobsData) ? jobsData.stats || jobsData.overview : undefined
 
   const handleRetry = useCallback(
     async (jobId: string) => {
@@ -169,7 +181,9 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                 label: 'Time',
                 width: '70px',
                 render: (v: unknown, row: Record<string, unknown>) => (
-                  <span className="ss-dash-event-time">{timeAgo((v || row?.createdAt) as string)}</span>
+                  <span className="ss-dash-event-time">
+                    {timeAgo((v || row?.createdAt) as string)}
+                  </span>
                 ),
               },
               {

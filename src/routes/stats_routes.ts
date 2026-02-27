@@ -5,7 +5,10 @@ import type { HttpContext } from '@adonisjs/core/http'
 
 /** Minimal interface for the AdonisJS router used in route registration. */
 interface AdonisRouter {
-  get(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): { use(middleware: unknown[]): void } }
+  get(
+    pattern: string,
+    handler: (ctx: HttpContext) => unknown
+  ): { as(name: string): { use(middleware: unknown[]): void } }
 }
 
 /**

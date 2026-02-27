@@ -268,7 +268,10 @@
     hideCurrentTooltip()
   }
 
-  const showTooltip = (badge, { historyData, color, title, unit, currentValue, details, pinned }) => {
+  const showTooltip = (
+    badge,
+    { historyData, color, title, unit, currentValue, details, pinned }
+  ) => {
     hideCurrentTooltip()
     const tip = document.createElement('div')
     tip.className = pinned ? 'ss-tooltip ss-pinned' : 'ss-tooltip'
@@ -339,7 +342,15 @@
     const color = b.color ? hexFromClass(b.color(window.__ssLatest)) : '#34d399'
     const title = typeof b.title === 'string' ? b.title : b.label
     const details = typeof b.detail === 'function' ? b.detail(window.__ssLatest) : b.detail || ''
-    showTooltip(pinnedBadge, { historyData: hist, color, title, unit: b.unit, currentValue: currentVal, details, pinned: true })
+    showTooltip(pinnedBadge, {
+      historyData: hist,
+      color,
+      title,
+      unit: b.unit,
+      currentValue: currentVal,
+      details,
+      pinned: true,
+    })
   }
 
   // Close pinned tooltip on click outside
@@ -775,7 +786,15 @@
     el.addEventListener('mouseenter', () => {
       if (pinnedBadge) return
       const d = getBadgeTooltipData(b, el)
-      showTooltip(el, { historyData: d.hist, color: d.color, title: d.title, unit: d.unit, currentValue: d.currentVal, details: d.details, pinned: false })
+      showTooltip(el, {
+        historyData: d.hist,
+        color: d.color,
+        title: d.title,
+        unit: d.unit,
+        currentValue: d.currentVal,
+        details: d.details,
+        pinned: false,
+      })
     })
     el.addEventListener('mouseleave', () => {
       if (pinnedBadge) return
@@ -797,7 +816,15 @@
       pinnedBadge = el
       el.classList.add('ss-pinned')
       const d = getBadgeTooltipData(b, el)
-      showTooltip(el, { historyData: d.hist, color: d.color, title: d.title, unit: d.unit, currentValue: d.currentVal, details: d.details, pinned: true })
+      showTooltip(el, {
+        historyData: d.hist,
+        color: d.color,
+        title: d.title,
+        unit: d.unit,
+        currentValue: d.currentVal,
+        details: d.details,
+        pinned: true,
+      })
     })
   })
 

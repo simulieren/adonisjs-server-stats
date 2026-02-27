@@ -135,8 +135,7 @@ export default class RequestTrackingMiddleware {
     // Skip tracing and dashboard persistence for the debug panel's own requests
     // (e.g. /admin/api/debug/*, /admin/api/server-stats) so they don't flood
     // the timeline. HTTP metrics (req/s, avg latency) are still recorded.
-    const skipTracing =
-      excludedPrefixes.some((prefix) => requestUrl.startsWith(prefix))
+    const skipTracing = excludedPrefixes.some((prefix) => requestUrl.startsWith(prefix))
 
     const runRequest = async () => {
       try {

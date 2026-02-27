@@ -11,10 +11,10 @@ import { ConfigInspector } from './integrations/config_inspector.js'
 import { QueueInspector } from './integrations/queue_inspector.js'
 
 import type { DebugStore } from '../debug/debug_store.js'
+import type { DevToolbarOptions, ServerStatsConfig } from '../types.js'
 import type { DashboardStore } from './dashboard_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
-import type { DevToolbarOptions, ServerStatsConfig } from '../types.js'
 
 /** Minimal interface for Edge.js view rendering on the HTTP context. */
 interface EdgeViewContext {
@@ -146,7 +146,9 @@ export default class DashboardController {
           p95ResponseTime: sparklineData.map((m: Record<string, unknown>) => m.p95_duration),
           requestsPerMinute: sparklineData.map((m: Record<string, unknown>) => m.request_count),
           errorRate: sparklineData.map((m: Record<string, unknown>) =>
-            (m.request_count as number) > 0 ? round(((m.error_count as number) / (m.request_count as number)) * 100) : 0
+            (m.request_count as number) > 0
+              ? round(((m.error_count as number) / (m.request_count as number)) * 100)
+              : 0
           ),
         },
         ...widgets,
@@ -261,7 +263,10 @@ export default class DashboardController {
 
       const groups = await this.dashboardStore.getQueriesGrouped(limit, sort)
 
-      const totalTime = groups.reduce((sum: number, g: Record<string, unknown>) => sum + ((g.total_duration as number) || 0), 0)
+      const totalTime = groups.reduce(
+        (sum: number, g: Record<string, unknown>) => sum + ((g.total_duration as number) || 0),
+        0
+      )
 
       return {
         groups: groups.map((g: Record<string, unknown>) => ({
@@ -271,7 +276,8 @@ export default class DashboardController {
           minDuration: round(g.min_duration as number),
           maxDuration: round(g.max_duration as number),
           totalDuration: round(g.total_duration as number),
-          percentOfTotal: totalTime > 0 ? round(((g.total_duration as number) / totalTime) * 100) : 0,
+          percentOfTotal:
+            totalTime > 0 ? round(((g.total_duration as number) / totalTime) * 100) : 0,
         })),
       }
     })
@@ -286,7 +292,9 @@ export default class DashboardController {
       const db = this.dashboardStore.getDb()
       if (!db) return response.notFound({ error: 'Not found' })
       const id = Number(params.id)
-      const query: Record<string, unknown> | undefined = await db('server_stats_queries').where('id', id).first()
+      const query: Record<string, unknown> | undefined = await db('server_stats_queries')
+        .where('id', id)
+        .first()
       if (!query) return response.notFound({ error: 'Query not found' })
 
       const sqlTrimmed = (query.sql_text as string).trim().toUpperCase()
@@ -299,7 +307,9 @@ export default class DashboardController {
       let appDb: unknown
       try {
         const lucid: unknown = await this.app.container.make('lucid.db')
-        appDb = (lucid as { connection: () => { getWriteClient: () => unknown } }).connection().getWriteClient()
+        appDb = (lucid as { connection: () => { getWriteClient: () => unknown } })
+          .connection()
+          .getWriteClient()
       } catch {
         return response.serviceUnavailable({
           error: 'App database connection not available',
@@ -315,10 +325,14 @@ export default class DashboardController {
         }
       }
 
-      const explainResult = await (appDb as { raw: (sql: string, bindings: unknown[]) => Promise<Record<string, unknown>> }).raw(`EXPLAIN (FORMAT JSON) ${query.sql_text}`, bindings)
+      const explainResult = await (
+        appDb as { raw: (sql: string, bindings: unknown[]) => Promise<Record<string, unknown>> }
+      ).raw(`EXPLAIN (FORMAT JSON) ${query.sql_text}`, bindings)
 
       let plan: unknown[] = []
-      const rawRows = (explainResult?.rows as Record<string, unknown>[]) ?? (Array.isArray(explainResult) ? explainResult : [])
+      const rawRows =
+        (explainResult?.rows as Record<string, unknown>[]) ??
+        (Array.isArray(explainResult) ? explainResult : [])
       if (rawRows.length > 0 && rawRows[0]['QUERY PLAN']) {
         plan = rawRows[0]['QUERY PLAN'] as unknown[]
       } else {

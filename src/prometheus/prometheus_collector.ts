@@ -1,10 +1,10 @@
 import { configProvider } from '@adonisjs/core'
 
-import type { Gauge } from 'prom-client'
 import type { ServerStats } from '../types.js'
 import type { ConfigProvider } from '@adonisjs/core/types'
-import type { CommonCollectorOptions } from '@julr/adonisjs-prometheus/types'
 import type { Collector } from '@julr/adonisjs-prometheus/collectors/collector'
+import type { CommonCollectorOptions } from '@julr/adonisjs-prometheus/types'
+import type { Gauge } from 'prom-client'
 
 export function serverStatsCollector(): ConfigProvider<Collector> {
   return configProvider.create(async (app) => {
