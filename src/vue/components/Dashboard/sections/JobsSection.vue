@@ -174,7 +174,7 @@ function handleSearch(term: string) {
               {{ j.duration !== null ? formatDuration(j.duration) : "-" }}
             </td>
             <td class="ss-dash-event-time">
-              {{ timeAgo(j.timestamp || j.createdAt) }}
+              {{ timeAgo(j.timestamp || j.createdAt || 0) }}
             </td>
             <td>
               <button
