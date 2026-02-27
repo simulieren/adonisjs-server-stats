@@ -156,7 +156,7 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                 key: 'duration',
                 label: 'Duration',
                 width: '75px',
-                render: (v: number | null) => (v != null ? formatDuration(v) : '-'),
+                render: (v: number | null) => (v !== null ? formatDuration(v) : '-'),
               },
               {
                 key: 'timestamp',

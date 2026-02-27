@@ -71,7 +71,7 @@
   /** Build a deep link anchor element HTML string. */
   const deepLink = (section, id) => {
     if (!dashboardPath) return ''
-    const href = dashboardPath + '#' + section + (id != null ? '?id=' + id : '')
+    const href = dashboardPath + '#' + section + (id !== null && id !== undefined ? '?id=' + id : '')
     return (
       ' <a href="' +
       esc(href) +
@@ -113,7 +113,7 @@
   }
 
   const formatDuration = (ms) => {
-    if (ms == null) return '-'
+    if (ms === null || ms === undefined) return '-'
     if (ms >= 1000) return (ms / 1000).toFixed(2) + 's'
     if (ms >= 1) return ms.toFixed(0) + 'ms'
     return ms.toFixed(2) + 'ms'
@@ -1209,7 +1209,7 @@
         const catLabel = s.category === 'db' ? 'DB' : s.category
         const metaStr = s.metadata
           ? Object.entries(s.metadata)
-              .filter(([, v]) => v != null)
+              .filter(([, v]) => v !== null && v !== undefined)
               .map(([k, v]) => k + '=' + v)
               .join(', ')
           : ''
@@ -1283,7 +1283,7 @@
 
   // ── Mini Stats Bar ─────────────────────────────────────────────
   const miniStatsEl = document.getElementById('ss-dbg-mini-stats')
-  let miniStatsTimer = null
+  let _miniStatsTimer = null
 
   const fetchMiniStats = () => {
     if (!DASH_API || !miniStatsEl) return
@@ -1406,10 +1406,10 @@
         esc(k.type || '-') +
         '</td>' +
         '<td class="ss-dbg-c-muted">' +
-        (k.ttl != null ? k.ttl + 's' : '-') +
+        (k.ttl !== null && k.ttl !== undefined ? k.ttl + 's' : '-') +
         '</td>' +
         '<td class="ss-dbg-c-dim">' +
-        (k.size != null ? k.size + 'B' : '-') +
+        (k.size !== null && k.size !== undefined ? k.size + 'B' : '-') +
         '</td>' +
         '</tr>'
     }
@@ -1477,7 +1477,7 @@
     const items = cachedJobsData.data || cachedJobsData.jobs || []
     const stats = cachedJobsData.stats || cachedJobsData.overview || {}
 
-    const statNum = (v) => (v != null ? v : 0)
+    const statNum = (v) => (v !== null && v !== undefined ? v : 0)
 
     // Stats area
     if (jobsStatsArea) {
@@ -1967,7 +1967,7 @@
     const parts = path.split('.')
     let cur = obj
     for (let i = 0; i < parts.length; i++) {
-      if (cur == null) return undefined
+      if (cur === null || cur === undefined) return undefined
       cur = cur[parts[i]]
     }
     return cur
@@ -2010,7 +2010,7 @@
         rows = rows.filter((row) =>
           searchCols.some((c) => {
             const v = row[c.key]
-            return v != null && String(v).toLowerCase().indexOf(filter) !== -1
+            return v !== null && v !== undefined && String(v).toLowerCase().indexOf(filter) !== -1
           })
         )
       }
@@ -2039,7 +2039,7 @@
         const col = pane.columns[c]
         const val = rows[r][col.key]
         const cellHtml = formatCell(val, col)
-        if (col.filterable && val != null) {
+        if (col.filterable && val !== null && val !== undefined) {
           html +=
             '<td class="ss-dbg-filterable" data-ss-filter-key="' +
             esc(col.key) +

@@ -19,7 +19,7 @@ interface CustomPaneTabProps {
  */
 export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
   // Build custom endpoint options
-  const paneOptions: DebugPanelProps = {
+  const _paneOptions: DebugPanelProps = {
     ...options,
     debugEndpoint: '', // Direct endpoint
   }
@@ -54,7 +54,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     return rows.filter((row: any) =>
       searchableKeys.some((key) => {
         const val = row[key]
-        return val != null && String(val).toLowerCase().includes(lower)
+        return val !== null && String(val).toLowerCase().includes(lower)
       })
     )
   }, [rows, search, pane.columns])

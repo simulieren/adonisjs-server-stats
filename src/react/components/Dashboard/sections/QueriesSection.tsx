@@ -50,7 +50,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
           alert(JSON.stringify(result.plan, null, 2))
         }
       } catch (err) {
-        // Silently fail
+        console.warn('[ss] Query explain failed:', err)
       }
     },
     [mutate]

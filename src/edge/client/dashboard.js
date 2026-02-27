@@ -23,7 +23,7 @@
     var cfgEl = document.getElementById('ss-dash-config')
     if (cfgEl) dashConfig = JSON.parse(cfgEl.textContent || '{}')
   } catch (e) {
-    /* ignore */
+    console.warn('[ss] Failed to parse dashboard config:', e)
   }
 
   var customPanes = dashConfig.customPanes || []
@@ -50,7 +50,7 @@
   }
 
   var formatDuration = function (ms) {
-    if (ms == null) return '-'
+    if (ms === null || ms === undefined) return '-'
     if (ms >= 1000) return (ms / 1000).toFixed(2) + 's'
     if (ms >= 1) return ms.toFixed(0) + 'ms'
     return ms.toFixed(2) + 'ms'
@@ -174,6 +174,7 @@
       var parsed = typeof data === 'string' ? JSON.parse(data) : data
       return compactPreview(parsed, 100)
     } catch (e) {
+      console.debug('[ss] JSON preview parse failed:', e)
       return data.length > 100 ? data.slice(0, 100) + '...' : data
     }
   }
@@ -220,7 +221,7 @@
           try {
             value = JSON.parse(value)
           } catch (e) {
-            /* use as-is */
+            console.debug('[ss] JSON column parse failed, using raw value:', e)
           }
         }
         var preview = typeof value === 'object' ? compactPreview(value, 100) : String(value)
@@ -1016,7 +1017,7 @@
     data.forEach(function (d, i) {
       var total = (d.requestCount || 0) + (d.request_count || 0)
       var errors = (d.errorCount || 0) + (d.error_count || 0)
-      var success = total - errors
+      var _success = total - errors
       var cx = totalPoints[i].x
       var cy = totalPoints[i].y
 
@@ -1104,7 +1105,7 @@
         if (!d) return
         var total = (d.requestCount || 0) + (d.request_count || 0)
         var errors = (d.errorCount || 0) + (d.error_count || 0)
-        var success = total - errors
+        var _success = total - errors
         var time = ''
         if (d.bucket) {
           var bd = new Date(d.bucket)
@@ -1160,7 +1161,7 @@
       zones.forEach(function (zone) {
         zone.addEventListener('mouseenter', function () {
           var idx = parseInt(zone.getAttribute('data-idx'), 10)
-          var rect = container.getBoundingClientRect()
+          var _rect = container.getBoundingClientRect()
           var px = totalPoints[idx] ? totalPoints[idx].x : 0
           showTip(idx, px)
         })
@@ -1567,10 +1568,10 @@
 
     // Key metrics row
     var metrics = []
-    if (node['Startup Cost'] != null)
+    if (node['Startup Cost'] !== null && node['Startup Cost'] !== undefined)
       metrics.push('cost=' + node['Startup Cost'] + '..' + node['Total Cost'])
-    if (node['Plan Rows'] != null) metrics.push('rows=' + node['Plan Rows'])
-    if (node['Plan Width'] != null) metrics.push('width=' + node['Plan Width'])
+    if (node['Plan Rows'] !== null && node['Plan Rows'] !== undefined) metrics.push('rows=' + node['Plan Rows'])
+    if (node['Plan Width'] !== null && node['Plan Width'] !== undefined) metrics.push('width=' + node['Plan Width'])
     if (node['Filter']) metrics.push('filter: ' + esc(node['Filter']))
     if (node['Index Cond']) metrics.push('cond: ' + esc(node['Index Cond']))
     if (node['Hash Cond']) metrics.push('hash: ' + esc(node['Hash Cond']))
@@ -1617,7 +1618,7 @@
       plan.forEach(function (r) {
         tbl += '<tr>'
         cols.forEach(function (c) {
-          tbl += '<td>' + esc(r[c] != null ? String(r[c]) : '-') + '</td>'
+          tbl += '<td>' + esc(r[c] !== null && r[c] !== undefined ? String(r[c]) : '-') + '</td>'
         })
         tbl += '</tr>'
       })
@@ -1678,7 +1679,7 @@
             btn.disabled = false
             btn.classList.add('ss-dash-explain-btn-active')
           })
-          .catch(function (err) {
+          .catch(function (_err) {
             btn.textContent = 'EXPLAIN'
             btn.disabled = false
           })
@@ -2083,7 +2084,7 @@
           getPage('logs').page = 1
           fetchLogs()
         } catch (e) {
-          /* ignore */
+          console.warn('[ss] Failed to apply saved filter:', e)
         }
       }
       savedFilterSelect.value = ''
@@ -2445,6 +2446,7 @@
       try {
         spans = JSON.parse(spans)
       } catch (e) {
+        console.debug('[ss] Failed to parse trace spans:', e)
         spans = []
       }
     }
@@ -2482,7 +2484,7 @@
         var metaStr = sp.metadata
           ? Object.entries(sp.metadata)
               .filter(function (e) {
-                return e[1] != null
+                return e[1] !== null && e[1] !== undefined
               })
               .map(function (e) {
                 return e[0] + '=' + e[1]
@@ -2541,6 +2543,7 @@
       try {
         warnings = JSON.parse(warnings)
       } catch (e) {
+        console.debug('[ss] Failed to parse trace warnings:', e)
         warnings = []
       }
     }
@@ -2621,10 +2624,10 @@
         esc(k.type || '-') +
         '</td>' +
         '<td style="color:var(--ss-muted)">' +
-        (k.ttl != null ? k.ttl + 's' : '-') +
+        (k.ttl !== null && k.ttl !== undefined ? k.ttl + 's' : '-') +
         '</td>' +
         '<td style="color:var(--ss-dim)">' +
-        (k.size != null ? k.size + 'B' : '-') +
+        (k.size !== null && k.size !== undefined ? k.size + 'B' : '-') +
         '</td>' +
         '</tr>'
     })
@@ -2682,7 +2685,7 @@
     ps.total = data.meta ? data.meta.total : data.total || items.length
 
     var statNum = function (v) {
-      return v != null ? v : 0
+      return v !== null && v !== undefined ? v : 0
     }
     var statsHtml =
       '<div class="ss-dash-job-stats">' +
@@ -3177,6 +3180,7 @@
           try {
             return JSON.stringify(item)
           } catch (e) {
+            console.debug('[ss] JSON.stringify failed for item:', e)
             return String(item)
           }
         }
@@ -3188,7 +3192,7 @@
       try {
         return '<span style="color:var(--ss-dim)">' + esc(JSON.stringify(val, null, 2)) + '</span>'
       } catch (e) {
-        /* fall through */
+        console.debug('[ss] JSON.stringify failed for value:', e)
       }
     }
     return esc(String(val))
@@ -3287,7 +3291,7 @@
     var parts = path.split('.')
     var cur = obj
     for (var i = 0; i < parts.length; i++) {
-      if (cur == null) return undefined
+      if (cur === null || cur === undefined) return undefined
       cur = cur[parts[i]]
     }
     return cur
@@ -3330,7 +3334,7 @@
         rows = rows.filter(function (row) {
           return searchCols.some(function (c) {
             var v = row[c.key]
-            return v != null && String(v).toLowerCase().indexOf(filter) !== -1
+            return v !== null && v !== undefined && String(v).toLowerCase().indexOf(filter) !== -1
           })
         })
       }
@@ -3423,7 +3427,7 @@
   // ── Badge updates ─────────────────────────────────────────────
   var updateBadge = function (section, count) {
     var badge = root.querySelector('[data-ss-section="' + section + '"] .ss-dash-nav-badge')
-    if (badge && count != null) badge.textContent = count
+    if (badge && count !== null && count !== undefined) badge.textContent = count
   }
 
   // ── DOM helpers ───────────────────────────────────────────────
@@ -3565,7 +3569,7 @@
           ssLog('Live event received: ' + kind)
           handleLiveEvent(event)
         } catch (e) {
-          /* ignore */
+          console.warn('[ss] Failed to handle live event:', e)
         }
       })
 

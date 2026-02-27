@@ -77,7 +77,7 @@ export class ApiClient {
 
     const mergedHeaders: Record<string, string> = {
       ...headers,
-      ...((init?.headers as Record<string, string>) ?? {}),
+      ...(init?.headers as Record<string, string>),
     }
 
     const response = await globalThis.fetch(`${this.baseUrl}${path}`, {

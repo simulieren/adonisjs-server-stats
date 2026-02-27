@@ -130,7 +130,6 @@ export default class RequestTrackingMiddleware {
     // (e.g. /admin/api/debug/*, /admin/api/server-stats) so they don't flood
     // the timeline. HTTP metrics (req/s, avg latency) are still recorded.
     const skipTracing =
-      excludedPrefixes.length > 0 &&
       excludedPrefixes.some((prefix) => requestUrl.startsWith(prefix))
 
     const runRequest = async () => {

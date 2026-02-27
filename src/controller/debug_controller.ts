@@ -90,7 +90,7 @@ export default class DebugController {
   async emails({ response }: HttpContext) {
     const emails = this.store.emails.getLatest(100)
     // Strip html/text from list response to keep it lightweight
-    const stripped = emails.map(({ html, text, ...rest }) => rest)
+    const stripped = emails.map(({ html: _html, text: _text, ...rest }) => rest)
     return response.json({ emails: stripped, total: this.store.emails.getTotalCount() })
   }
 
@@ -109,7 +109,7 @@ export default class DebugController {
     }
     const traces = this.store.traces.getLatest(100)
     // Strip spans from list view to keep it lightweight
-    const list = traces.map(({ spans, warnings, ...rest }) => ({
+    const list = traces.map(({ spans: _spans, warnings, ...rest }) => ({
       ...rest,
       warningCount: warnings.length,
     }))

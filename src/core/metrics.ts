@@ -46,7 +46,7 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
     title: 'Node.js Runtime',
     unit: '',
     group: 'process',
-    extract: (s) => 0,
+    extract: (_s) => 0,
     format: (s) => s.nodeVersion,
     color: () => '',
   },
@@ -138,7 +138,7 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
       return colorClass(getRatioColor(used, total))
     },
     historyKey: '_sysMemUsed',
-    show: (s) => s.systemMemoryTotalMb != null,
+    show: (s) => s.systemMemoryTotalMb !== null && s.systemMemoryTotalMb !== undefined,
   },
 
   // ── HTTP group ────────────────────────────────────────────────────────────

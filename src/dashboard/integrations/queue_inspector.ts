@@ -322,7 +322,7 @@ export class QueueInspector {
   private formatJobSummary(job: any, status: JobStatus): QueueJobSummary {
     const processedAt = job.processedOn ?? null
     const finishedAt = job.finishedOn ?? null
-    const duration = processedAt != null && finishedAt != null ? finishedAt - processedAt : null
+    const duration = processedAt !== null && finishedAt !== null ? finishedAt - processedAt : null
     const createdAt = job.timestamp ?? 0
 
     const data = job.data ?? null

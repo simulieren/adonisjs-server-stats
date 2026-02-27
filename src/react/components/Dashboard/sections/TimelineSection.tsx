@@ -8,7 +8,7 @@ import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 import { WaterfallChart } from '../shared/WaterfallChart.js'
 
-import type { DashboardHookOptions, TraceRecord } from '../../../../core/types.js'
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface TimelineSectionProps {
   options?: DashboardHookOptions

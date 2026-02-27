@@ -58,7 +58,7 @@ export class TraceCollector {
 
   constructor(maxTraces: number = 200) {
     this.buffer = new RingBuffer<TraceRecord>(maxTraces)
-    globalTraceCollector = this
+    globalTraceCollector = this // eslint-disable-line @typescript-eslint/no-this-alias
   }
 
   /** Start a new trace context for an HTTP request. */
@@ -173,13 +173,12 @@ export class TraceCollector {
 
     // Intercept console.warn to capture warnings per-request
     this.originalConsoleWarn = console.warn
-    const self = this
-    console.warn = function (...args: any[]) {
-      const ctx = self.als.getStore()
+    console.warn = (...args: any[]) => {
+      const ctx = this.als.getStore()
       if (ctx) {
         ctx.warnings.push(args.map(String).join(' '))
       }
-      self.originalConsoleWarn!.apply(console, args)
+      this.originalConsoleWarn!.apply(console, args)
     }
   }
 

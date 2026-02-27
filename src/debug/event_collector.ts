@@ -22,8 +22,7 @@ export class EventCollector {
     this.emitter = emitter
     this.originalEmit = emitter.emit.bind(emitter)
 
-    const self = this
-    emitter.emit = function (event: string | Function, data?: any) {
+    emitter.emit = (event: string | Function, data?: any) => {
       // Resolve event name: class-based events use the class name, string events are used as-is
       const eventName = typeof event === 'string' ? event : event?.name || 'unknown'
 
@@ -39,15 +38,15 @@ export class EventCollector {
         !isExcludedRequest()
       ) {
         const record: EventRecord = {
-          id: self.buffer.getNextId(),
+          id: this.buffer.getNextId(),
           event: eventName,
-          data: self.summarizeData(data),
+          data: this.summarizeData(data),
           timestamp: Date.now(),
         }
-        self.buffer.push(record)
+        this.buffer.push(record)
       }
 
-      return self.originalEmit!.call(emitter, event, data)
+      return this.originalEmit!.call(emitter, event, data)
     }
   }
 
