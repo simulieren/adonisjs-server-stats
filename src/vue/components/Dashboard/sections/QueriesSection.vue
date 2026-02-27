@@ -4,8 +4,9 @@
  *
  * Supports list view, grouped view, and EXPLAIN.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { formatDuration, durationSeverity, timeAgo } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { QueryRecord, GroupedQuery } from '../../../../core/index.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
@@ -73,6 +74,42 @@ function handleSearch(term: string) {
   search.value = term
   emit('search', term)
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+const groupedTableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+let cleanupGroupedResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+function attachGroupedResize() {
+  if (cleanupGroupedResize) cleanupGroupedResize()
+  cleanupGroupedResize = null
+  nextTick(() => {
+    if (groupedTableRef.value) {
+      cleanupGroupedResize = initResizableColumns(groupedTableRef.value)
+    }
+  })
+}
+
+watch(queries, attachResize)
+watch(groupedData, attachGroupedResize)
+onMounted(() => {
+  attachResize()
+  attachGroupedResize()
+})
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+  if (cleanupGroupedResize) cleanupGroupedResize()
+})
 </script>
 
 <template>
@@ -104,16 +141,16 @@ function handleSearch(term: string) {
     <template v-if="viewMode === 'list'">
       <div v-if="queries.length === 0" class="ss-dash-empty">No queries found</div>
 
-      <table v-else class="ss-dash-table">
+      <table v-else ref="tableRef" class="ss-dash-table">
         <thead>
           <tr>
-            <th style="width: 30px">#</th>
+            <th>#</th>
             <th>SQL</th>
-            <th style="width: 60px">Method</th>
-            <th style="width: 80px">Model</th>
-            <th style="width: 70px">Duration</th>
-            <th style="width: 80px">Time</th>
-            <th style="width: 60px"></th>
+            <th>Method</th>
+            <th>Model</th>
+            <th>Duration</th>
+            <th>Time</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -174,16 +211,16 @@ function handleSearch(term: string) {
     <template v-if="viewMode === 'grouped'">
       <div v-if="groupedData.length === 0" class="ss-dash-empty">No query patterns found</div>
 
-      <table v-else class="ss-dash-table">
+      <table v-else ref="groupedTableRef" class="ss-dash-table">
         <thead>
           <tr>
             <th>Pattern</th>
-            <th style="width: 60px">Count</th>
-            <th style="width: 70px">Avg</th>
-            <th style="width: 70px">Min</th>
-            <th style="width: 70px">Max</th>
-            <th style="width: 80px">Total</th>
-            <th style="width: 60px">% Time</th>
+            <th>Count</th>
+            <th>Avg</th>
+            <th>Min</th>
+            <th>Max</th>
+            <th>Total</th>
+            <th>% Time</th>
           </tr>
         </thead>
         <tbody>

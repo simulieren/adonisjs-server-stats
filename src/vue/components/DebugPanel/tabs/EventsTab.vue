@@ -2,8 +2,9 @@
 /**
  * Events table tab for the debug panel.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { timeAgo } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { EventRecord } from '../../../../core/index.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
@@ -28,6 +29,25 @@ const summary = computed(() => {
   const arr = props.data?.events || props.data || []
   return `${arr.length} events`
 })
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(events, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -39,13 +59,13 @@ const summary = computed(() => {
 
     <div v-if="events.length === 0" class="ss-dbg-empty">No events captured</div>
 
-    <table v-else class="ss-dbg-table">
+    <table v-else ref="tableRef" class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 30px">#</th>
+          <th>#</th>
           <th>Event</th>
           <th>Data</th>
-          <th style="width: 80px">Time</th>
+          <th>Time</th>
         </tr>
       </thead>
       <tbody>

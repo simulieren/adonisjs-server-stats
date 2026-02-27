@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 
 import { formatTime, timeAgo, formatDuration, compactPreview } from '../../../../core/formatters.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
 import type { DebugPane, DebugPanelProps } from '../../../../core/types.js'
@@ -108,6 +109,13 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     }
   }
 
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current)
+    }
+  }, [filteredRows])
+
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading {pane.label}...</div>
   }
@@ -141,13 +149,11 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
       {filteredRows.length === 0 ? (
         <div className="ss-dbg-empty">No data</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
               {pane.columns.map((col) => (
-                <th key={col.key} style={col.width ? { width: col.width } : undefined}>
-                  {col.label}
-                </th>
+                <th key={col.key}>{col.label}</th>
               ))}
             </tr>
           </thead>

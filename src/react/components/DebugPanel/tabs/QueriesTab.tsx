@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 
 import { formatTime, formatDuration } from '../../../../core/formatters.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
 import type { QueryRecord, DebugPanelProps } from '../../../../core/types.js'
@@ -39,6 +40,13 @@ export function QueriesTab({ options }: QueriesTabProps) {
     setExpandedId((prev) => (prev === id ? null : id))
   }, [])
 
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current)
+    }
+  }, [queries])
+
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading queries...</div>
   }
@@ -63,15 +71,15 @@ export function QueriesTab({ options }: QueriesTabProps) {
       {queries.length === 0 ? (
         <div className="ss-dbg-empty">No queries captured</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
-              <th style={{ width: '40px' }}>#</th>
+              <th>#</th>
               <th>SQL</th>
-              <th style={{ width: '70px' }}>Duration</th>
-              <th style={{ width: '60px' }}>Method</th>
-              <th style={{ width: '90px' }}>Model</th>
-              <th style={{ width: '80px' }}>Time</th>
+              <th>Duration</th>
+              <th>Method</th>
+              <th>Model</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody>

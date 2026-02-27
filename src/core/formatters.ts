@@ -6,7 +6,7 @@
 // Pure functions with no DOM or framework dependencies.
 // ---------------------------------------------------------------------------
 
-import type { ThresholdColor } from "./types.js";
+import type { ThresholdColor } from './types.js'
 
 // ---------------------------------------------------------------------------
 // Uptime
@@ -20,12 +20,12 @@ import type { ThresholdColor } from "./types.js";
  * @param seconds - Uptime in seconds.
  */
 export function formatUptime(seconds: number): string {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (d > 0) return `${d}d ${h}h`
+  if (h > 0) return `${h}h ${m}m`
+  return `${m}m`
 }
 
 // ---------------------------------------------------------------------------
@@ -40,9 +40,9 @@ export function formatUptime(seconds: number): string {
  * @param bytes - Value in bytes.
  */
 export function formatBytes(bytes: number): string {
-  const mb = bytes / (1024 * 1024);
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)}G`;
-  return `${mb.toFixed(0)}M`;
+  const mb = bytes / (1024 * 1024)
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)}G`
+  return `${mb.toFixed(0)}M`
 }
 
 /**
@@ -53,8 +53,8 @@ export function formatBytes(bytes: number): string {
  * @param mb - Value in megabytes.
  */
 export function formatMb(mb: number): string {
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)}G`;
-  return `${mb.toFixed(1)}M`;
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)}G`
+  return `${mb.toFixed(1)}M`
 }
 
 // ---------------------------------------------------------------------------
@@ -69,9 +69,9 @@ export function formatMb(mb: number): string {
  * @param n - Numeric count.
  */
 export function formatCount(n: number): string {
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
-  return `${n}`;
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}K`
+  return `${n}`
 }
 
 // ---------------------------------------------------------------------------
@@ -88,9 +88,9 @@ export function formatCount(n: number): string {
  * @param ms - Duration in milliseconds.
  */
 export function formatDuration(ms: number): string {
-  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
-  if (ms >= 1) return `${ms.toFixed(0)}ms`;
-  return `${ms.toFixed(2)}ms`;
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`
+  if (ms >= 1) return `${ms.toFixed(0)}ms`
+  return `${ms.toFixed(2)}ms`
 }
 
 // ---------------------------------------------------------------------------
@@ -105,19 +105,19 @@ export function formatDuration(ms: number): string {
  * @param ts - Unix timestamp in milliseconds, or an ISO date string.
  */
 export function formatTime(ts: number | string): string {
-  if (!ts) return "-";
-  const d = typeof ts === "string" ? new Date(ts) : new Date(ts);
-  if (Number.isNaN(d.getTime())) return "-";
+  if (!ts) return '-'
+  const d = typeof ts === 'string' ? new Date(ts) : new Date(ts)
+  if (Number.isNaN(d.getTime())) return '-'
   return (
-    d.toLocaleTimeString("en-US", {
+    d.toLocaleTimeString('en-US', {
       hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
     }) +
-    "." +
-    String(d.getMilliseconds()).padStart(3, "0")
-  );
+    '.' +
+    String(d.getMilliseconds()).padStart(3, '0')
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -134,14 +134,14 @@ export function formatTime(ts: number | string): string {
  * @param ts - Unix timestamp in milliseconds, or an ISO date string.
  */
 export function timeAgo(ts: number | string): string {
-  if (!ts) return "-";
-  const d = typeof ts === "string" ? new Date(ts).getTime() : ts;
-  const diff = Math.floor((Date.now() - d) / 1000);
-  if (diff < 0) return "just now";
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (!ts) return '-'
+  const d = typeof ts === 'string' ? new Date(ts).getTime() : ts
+  const diff = Math.floor((Date.now() - d) / 1000)
+  if (diff < 0) return 'just now'
+  if (diff < 60) return `${diff}s ago`
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
 }
 
 // ---------------------------------------------------------------------------
@@ -158,19 +158,19 @@ export function timeAgo(ts: number | string): string {
  */
 export function formatStatNum(value: number, unit: string): string {
   switch (unit) {
-    case "%":
-      return `${value.toFixed(1)}%`;
-    case "ms":
-      return `${value.toFixed(0)}ms`;
-    case "MB":
-      return `${value.toFixed(1)}M`;
-    case "bytes":
-      return formatBytes(value);
-    case "/s":
-    case "/m":
-      return value.toFixed(1);
+    case '%':
+      return `${value.toFixed(1)}%`
+    case 'ms':
+      return `${value.toFixed(0)}ms`
+    case 'MB':
+      return `${value.toFixed(1)}M`
+    case 'bytes':
+      return formatBytes(value)
+    case '/s':
+    case '/m':
+      return value.toFixed(1)
     default:
-      return value.toFixed(1);
+      return value.toFixed(1)
   }
 }
 
@@ -192,11 +192,11 @@ export function formatStatNum(value: number, unit: string): string {
 export function getThresholdColor(
   value: number,
   warnThreshold: number,
-  critThreshold: number,
+  critThreshold: number
 ): ThresholdColor {
-  if (value > critThreshold) return "red";
-  if (value > warnThreshold) return "amber";
-  return "green";
+  if (value > critThreshold) return 'red'
+  if (value > warnThreshold) return 'amber'
+  return 'green'
 }
 
 /**
@@ -214,11 +214,11 @@ export function getThresholdColor(
 export function getThresholdColorInverse(
   value: number,
   warnThreshold: number,
-  critThreshold: number,
+  critThreshold: number
 ): ThresholdColor {
-  if (value < critThreshold) return "red";
-  if (value < warnThreshold) return "amber";
-  return "green";
+  if (value < critThreshold) return 'red'
+  if (value < warnThreshold) return 'amber'
+  return 'green'
 }
 
 // ---------------------------------------------------------------------------
@@ -237,11 +237,11 @@ export function getThresholdColorInverse(
  * @param max  - Maximum capacity.
  */
 export function getRatioColor(used: number, max: number): ThresholdColor {
-  if (max === 0) return "green";
-  const ratio = used / max;
-  if (ratio > 0.8) return "red";
-  if (ratio > 0.5) return "amber";
-  return "green";
+  if (max === 0) return 'green'
+  const ratio = used / max
+  if (ratio > 0.8) return 'red'
+  if (ratio > 0.5) return 'amber'
+  return 'green'
 }
 
 // ---------------------------------------------------------------------------
@@ -253,30 +253,30 @@ export function getRatioColor(used: number, max: number): ThresholdColor {
  * Components can use this to apply the same visual styling.
  */
 export const THRESHOLD_CSS_CLASS: Record<ThresholdColor, string> = {
-  green: "ss-green",
-  amber: "ss-amber",
-  red: "ss-red",
-};
+  green: 'ss-green',
+  amber: 'ss-amber',
+  red: 'ss-red',
+}
 
 /**
  * Fallback hex colors for each threshold level.
  * Used when CSS custom properties are not available.
  */
 export const THRESHOLD_HEX_FALLBACK: Record<ThresholdColor, string> = {
-  green: "#34d399",
-  amber: "#fbbf24",
-  red: "#f87171",
-};
+  green: '#34d399',
+  amber: '#fbbf24',
+  red: '#f87171',
+}
 
 /**
  * CSS custom property names for each threshold color.
  * Components should read these from `getComputedStyle()` when available.
  */
 export const THRESHOLD_CSS_VAR: Record<ThresholdColor, string> = {
-  green: "--ss-accent",
-  amber: "--ss-amber-fg",
-  red: "--ss-red-fg",
-};
+  green: '--ss-accent',
+  amber: '--ss-amber-fg',
+  red: '--ss-red-fg',
+}
 
 // ---------------------------------------------------------------------------
 // Status color (HTTP status code -> threshold color)
@@ -294,9 +294,9 @@ export const THRESHOLD_CSS_VAR: Record<ThresholdColor, string> = {
  * @param statusCode - HTTP status code.
  */
 export function statusColor(statusCode: number): ThresholdColor {
-  if (statusCode >= 500) return "red";
-  if (statusCode >= 400) return "amber";
-  return "green";
+  if (statusCode >= 500) return 'red'
+  if (statusCode >= 400) return 'amber'
+  return 'green'
 }
 
 // ---------------------------------------------------------------------------
@@ -312,10 +312,10 @@ export function statusColor(statusCode: number): ThresholdColor {
  *
  * @param ms - Duration in milliseconds.
  */
-export function durationSeverity(ms: number): "normal" | "slow" | "very-slow" {
-  if (ms > 500) return "very-slow";
-  if (ms > 100) return "slow";
-  return "normal";
+export function durationSeverity(ms: number): 'normal' | 'slow' | 'very-slow' {
+  if (ms > 500) return 'very-slow'
+  if (ms > 100) return 'slow'
+  return 'normal'
 }
 
 // ---------------------------------------------------------------------------
@@ -330,9 +330,9 @@ export function durationSeverity(ms: number): "normal" | "slow" | "very-slow" {
  * @param reqId - Full request ID string.
  */
 export function shortReqId(reqId: string): string {
-  if (!reqId) return "--";
-  if (reqId.length <= 8) return reqId;
-  return reqId.slice(0, 8) + "\u2026";
+  if (!reqId) return '--'
+  if (reqId.length <= 8) return reqId
+  return reqId.slice(0, 8) + '\u2026'
 }
 
 // ---------------------------------------------------------------------------
@@ -354,45 +354,30 @@ export function shortReqId(reqId: string): string {
  * @param maxLen - Maximum preview length (default 100).
  */
 export function compactPreview(value: unknown, maxLen: number = 100): string {
-  if (value === null) return "null";
-  if (value === undefined) return "-";
-  if (typeof value === "string") {
-    return '"' + (value.length > 40 ? value.slice(0, 40) + "..." : value) + '"';
+  if (value === null) return 'null'
+  if (value === undefined) return '-'
+  if (typeof value === 'string') {
+    return '"' + (value.length > 40 ? value.slice(0, 40) + '...' : value) + '"'
   }
-  if (typeof value === "number" || typeof value === "boolean")
-    return String(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) {
-    if (value.length === 0) return "[]";
-    const items = value.slice(0, 3).map((v) => compactPreview(v, 30));
+    if (value.length === 0) return '[]'
+    const items = value.slice(0, 3).map((v) => compactPreview(v, 30))
     const s =
-      "[" +
-      items.join(", ") +
-      (value.length > 3 ? ", ..." + value.length + " items" : "") +
-      "]";
-    return s.length > maxLen ? "[" + value.length + " items]" : s;
+      '[' + items.join(', ') + (value.length > 3 ? ', ...' + value.length + ' items' : '') + ']'
+    return s.length > maxLen ? '[' + value.length + ' items]' : s
   }
-  if (typeof value === "object") {
-    const keys = Object.keys(value as Record<string, unknown>);
-    if (keys.length === 0) return "{}";
-    const pairs: string[] = [];
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>)
+    if (keys.length === 0) return '{}'
+    const pairs: string[] = []
     for (let i = 0; i < Math.min(keys.length, 4); i++) {
-      pairs.push(
-        keys[i] +
-          ": " +
-          compactPreview((value as Record<string, unknown>)[keys[i]], 30),
-      );
+      pairs.push(keys[i] + ': ' + compactPreview((value as Record<string, unknown>)[keys[i]], 30))
     }
-    const s =
-      "{ " +
-      pairs.join(", ") +
-      (keys.length > 4 ? ", ...+" + (keys.length - 4) : "") +
-      " }";
+    const s = '{ ' + pairs.join(', ') + (keys.length > 4 ? ', ...+' + (keys.length - 4) : '') + ' }'
     return s.length > maxLen
-      ? "{ " +
-          keys.slice(0, 6).join(", ") +
-          (keys.length > 6 ? ", ..." : "") +
-          " }"
-      : s;
+      ? '{ ' + keys.slice(0, 6).join(', ') + (keys.length > 6 ? ', ...' : '') + ' }'
+      : s
   }
-  return String(value);
+  return String(value)
 }

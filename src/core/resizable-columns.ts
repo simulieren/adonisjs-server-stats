@@ -9,8 +9,8 @@
  * Shared across Edge JS, React, and Vue frontends.
  */
 
-const HANDLE_CLASS = "ss-col-resize";
-const RESIZING_CLASS = "ss-resizing";
+const HANDLE_CLASS = 'ss-col-resize'
+const RESIZING_CLASS = 'ss-resizing'
 
 /**
  * Attach drag-to-resize handles to every `<th>` in a table.
@@ -19,67 +19,65 @@ const RESIZING_CLASS = "ss-resizing";
  * @returns A cleanup function that removes all handles and listeners.
  */
 export function initResizableColumns(table: HTMLTableElement): () => void {
-  const headers = Array.from(
-    table.querySelectorAll<HTMLTableCellElement>("thead th"),
-  );
-  if (headers.length === 0) return () => {};
+  const headers = Array.from(table.querySelectorAll<HTMLTableCellElement>('thead th'))
+  if (headers.length === 0) return () => {}
 
-  const cleanups: (() => void)[] = [];
+  const cleanups: (() => void)[] = []
 
   // Snapshot current computed widths into explicit px values on first resize
-  let frozen = false;
+  let frozen = false
   function freezeWidths() {
-    if (frozen) return;
-    frozen = true;
+    if (frozen) return
+    frozen = true
     for (const th of headers) {
-      th.style.width = th.offsetWidth + "px";
+      th.style.width = th.offsetWidth + 'px'
     }
-    table.style.tableLayout = "fixed";
+    table.style.tableLayout = 'fixed'
   }
 
   for (const th of headers) {
     // Skip empty action columns (no label)
-    if (!th.textContent?.trim()) continue;
+    if (!th.textContent?.trim()) continue
 
-    const handle = document.createElement("div");
-    handle.className = HANDLE_CLASS;
-    th.appendChild(handle);
+    const handle = document.createElement('div')
+    handle.className = HANDLE_CLASS
+    th.appendChild(handle)
 
     function onPointerDown(e: PointerEvent) {
-      e.preventDefault();
-      e.stopPropagation();
-      freezeWidths();
+      e.preventDefault()
+      e.stopPropagation()
+      freezeWidths()
 
-      const startX = e.clientX;
-      const startWidth = th.offsetWidth;
-      handle.classList.add(RESIZING_CLASS);
-      handle.setPointerCapture(e.pointerId);
+      const startX = e.clientX
+      const startWidth = th.offsetWidth
+      handle.classList.add(RESIZING_CLASS)
+      handle.setPointerCapture(e.pointerId)
 
       function onPointerMove(ev: PointerEvent) {
-        const delta = ev.clientX - startX;
-        const newWidth = Math.max(30, startWidth + delta);
-        th.style.width = newWidth + "px";
+        const delta = ev.clientX - startX
+        const newWidth = Math.max(30, startWidth + delta)
+        th.style.width = newWidth + 'px'
       }
 
       function onPointerUp() {
-        handle.classList.remove(RESIZING_CLASS);
-        handle.removeEventListener("pointermove", onPointerMove);
-        handle.removeEventListener("pointerup", onPointerUp);
+        handle.classList.remove(RESIZING_CLASS)
+        handle.removeEventListener('pointermove', onPointerMove)
+        handle.removeEventListener('pointerup', onPointerUp)
       }
 
-      handle.addEventListener("pointermove", onPointerMove);
-      handle.addEventListener("pointerup", onPointerUp);
+      handle.addEventListener('pointermove', onPointerMove)
+      handle.addEventListener('pointerup', onPointerUp)
     }
 
-    handle.addEventListener("pointerdown", onPointerDown);
+    handle.addEventListener('pointerdown', onPointerDown)
 
     cleanups.push(() => {
-      handle.removeEventListener("pointerdown", onPointerDown);
-      handle.remove();
-    });
+      handle.removeEventListener('pointerdown', onPointerDown)
+      handle.remove()
+    })
   }
 
   return () => {
-    for (const fn of cleanups) fn();
-  };
+    for (const fn of cleanups) fn()
+  }
 }

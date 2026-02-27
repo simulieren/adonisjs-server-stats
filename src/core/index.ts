@@ -3,19 +3,16 @@
 // ---------------------------------------------------------------------------
 
 // -- API client -------------------------------------------------------------
-export { ApiClient, UnauthorizedError, ApiError } from "./api-client.js";
-export type { ApiClientConfig } from "./api-client.js";
+export { ApiClient, UnauthorizedError, ApiError } from './api-client.js'
+export type { ApiClientConfig } from './api-client.js'
 
 // -- Transmit adapter -------------------------------------------------------
-export {
-  createTransmitSubscription,
-  subscribeToChannel,
-} from "./transmit-adapter.js";
+export { createTransmitSubscription, subscribeToChannel } from './transmit-adapter.js'
 export type {
   TransmitSubscriptionConfig,
   TransmitSubscriptionHandle,
   ChannelSubscriptionConfig,
-} from "./transmit-adapter.js";
+} from './transmit-adapter.js'
 
 // -- Types ------------------------------------------------------------------
 export type {
@@ -78,10 +75,10 @@ export type {
   PaginationState,
   FilterState,
   SortState,
-} from "./types.js";
+} from './types.js'
 
 // -- Theme ------------------------------------------------------------------
-export { getTheme, setTheme, toggleTheme, onThemeChange } from "./theme.js";
+export { getTheme, setTheme, toggleTheme, onThemeChange } from './theme.js'
 
 // -- Sparkline --------------------------------------------------------------
 export {
@@ -90,8 +87,8 @@ export {
   generateGradientId,
   computeStats,
   buildSparklineData,
-} from "./sparkline.js";
-export type { SparklineStats, SparklineData } from "./sparkline.js";
+} from './sparkline.js'
+export type { SparklineStats, SparklineData } from './sparkline.js'
 
 // -- Formatters -------------------------------------------------------------
 export {
@@ -113,7 +110,7 @@ export {
   THRESHOLD_CSS_CLASS,
   THRESHOLD_HEX_FALLBACK,
   THRESHOLD_CSS_VAR,
-} from "./formatters.js";
+} from './formatters.js'
 
 // -- Pagination -------------------------------------------------------------
 export {
@@ -126,8 +123,8 @@ export {
   createFilterState,
   createSortState,
   getPageNumbers,
-} from "./pagination.js";
-export type { RawPaginatedResponse } from "./pagination.js";
+} from './pagination.js'
+export type { RawPaginatedResponse } from './pagination.js'
 
 // -- Feature detection ------------------------------------------------------
 export {
@@ -135,7 +132,7 @@ export {
   detectFeatures,
   DEFAULT_FEATURES,
   getVisibleMetricGroups,
-} from "./feature-detect.js";
+} from './feature-detect.js'
 
 // -- Metrics ----------------------------------------------------------------
 export {
@@ -144,7 +141,7 @@ export {
   getMetricsByGroup,
   MAX_HISTORY,
   STALE_MS,
-} from "./metrics.js";
+} from './metrics.js'
 
 // -- Routes / tab-to-path mappings ------------------------------------------
 export {
@@ -152,21 +149,17 @@ export {
   getDashboardSectionPath,
   DEBUG_TAB_PATHS,
   DASHBOARD_SECTION_PATHS,
-} from "./routes.js";
+} from './routes.js'
 
 // -- History buffer ---------------------------------------------------------
-export { createHistoryBuffer } from "./history-buffer.js";
-export type { HistoryBuffer } from "./history-buffer.js";
+export { createHistoryBuffer } from './history-buffer.js'
+export type { HistoryBuffer } from './history-buffer.js'
 
 // -- Dashboard API ----------------------------------------------------------
-export { DashboardApi } from "./dashboard-api.js";
+export { DashboardApi } from './dashboard-api.js'
 
 // -- Constants --------------------------------------------------------------
-export {
-  OVERVIEW_REFRESH_MS,
-  SECTION_REFRESH_MS,
-  DEBUG_REFRESH_MS,
-} from "./constants.js";
+export { OVERVIEW_REFRESH_MS, SECTION_REFRESH_MS, DEBUG_REFRESH_MS } from './constants.js'
 
 // -- Resizable columns ------------------------------------------------------
-export { initResizableColumns } from "./resizable-columns.js";
+export { initResizableColumns } from './resizable-columns.js'

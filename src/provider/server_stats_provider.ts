@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 
+import { getLogStreamService } from '../collectors/log_collector.js'
 import { registerDashboardRoutes } from '../dashboard/dashboard_routes.js'
 import { DashboardStore } from '../dashboard/dashboard_store.js'
 import { DebugStore } from '../debug/debug_store.js'
@@ -12,7 +13,6 @@ import {
   setExcludedPrefixes,
   setOnRequestComplete,
 } from '../middleware/request_tracking_middleware.js'
-import { getLogStreamService } from '../collectors/log_collector.js'
 import { registerDebugRoutes } from '../routes/debug_routes.js'
 import { registerStatsRoutes } from '../routes/stats_routes.js'
 import { log, dim, bold } from '../utils/logger.js'

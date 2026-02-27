@@ -77,7 +77,7 @@ export function httpCollector(opts?: HttpCollectorOptions): MetricCollector {
 
   return {
     name: 'http',
-    label: `http — buffer: ${(opts?.maxRecords ?? 10_000).toLocaleString()}, window: ${((opts?.windowMs ?? 60_000) / 1000)}s`,
+    label: `http — buffer: ${(opts?.maxRecords ?? 10_000).toLocaleString()}, window: ${(opts?.windowMs ?? 60_000) / 1000}s`,
 
     collect() {
       try {

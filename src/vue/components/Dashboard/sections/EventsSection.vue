@@ -2,8 +2,9 @@
 /**
  * Events section for the dashboard.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { timeAgo } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { EventRecord } from '../../../../core/index.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
@@ -33,6 +34,25 @@ function handleSearch(term: string) {
   search.value = term
   emit('search', term)
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(events, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -46,13 +66,13 @@ function handleSearch(term: string) {
 
     <div v-if="events.length === 0" class="ss-dash-empty">No events found</div>
 
-    <table v-else class="ss-dash-table">
+    <table v-else ref="tableRef" class="ss-dash-table">
       <thead>
         <tr>
-          <th style="width: 30px">#</th>
-          <th style="width: 250px">Event</th>
+          <th>#</th>
+          <th>Event</th>
           <th>Data</th>
-          <th style="width: 100px">Time</th>
+          <th>Time</th>
         </tr>
       </thead>
       <tbody>

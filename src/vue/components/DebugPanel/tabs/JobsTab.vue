@@ -2,88 +2,72 @@
 /**
  * Queue management tab for the debug panel.
  */
-import {
-  ref,
-  computed,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-  nextTick,
-} from "vue";
-import { timeAgo, formatDuration } from "../../../../core/index.js";
-import { initResizableColumns } from "../../../../core/resizable-columns.js";
-import JsonViewer from "../../shared/JsonViewer.vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { timeAgo, formatDuration } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import JsonViewer from '../../shared/JsonViewer.vue'
 
 interface JobEntry {
-  id: string;
-  name: string;
-  status: string;
-  data?: any;
-  payload?: any;
-  attempts: number;
-  duration: number | null;
-  error?: string;
-  failedReason?: string | null;
-  timestamp: number;
-  createdAt?: number;
+  id: string
+  name: string
+  status: string
+  data?: any
+  payload?: any
+  attempts: number
+  duration: number | null
+  error?: string
+  failedReason?: string | null
+  timestamp: number
+  createdAt?: number
 }
 
 const props = defineProps<{
-  data: any;
-}>();
+  data: any
+}>()
 
 const emit = defineEmits<{
-  retryJob: [jobId: string];
-}>();
+  retryJob: [jobId: string]
+}>()
 
-const activeFilter = ref("all");
+const activeFilter = ref('all')
 
-const FILTERS = [
-  "all",
-  "active",
-  "waiting",
-  "delayed",
-  "completed",
-  "failed",
-] as const;
+const FILTERS = ['all', 'active', 'waiting', 'delayed', 'completed', 'failed'] as const
 
-const jobData = computed(() => props.data || {});
-const stats = computed(
-  () => jobData.value.stats || jobData.value.overview || {},
-);
+const jobData = computed(() => props.data || {})
+const stats = computed(() => jobData.value.stats || jobData.value.overview || {})
 
 const jobs = computed<JobEntry[]>(() => {
-  const arr = jobData.value.jobs || [];
-  if (activeFilter.value === "all") return arr;
-  return arr.filter((j: JobEntry) => j.status === activeFilter.value);
-});
+  const arr = jobData.value.jobs || []
+  if (activeFilter.value === 'all') return arr
+  return arr.filter((j: JobEntry) => j.status === activeFilter.value)
+})
 
 function statusClass(status: string): string {
-  return `ss-dbg-badge ss-dbg-job-status-${status}`;
+  return `ss-dbg-badge ss-dbg-job-status-${status}`
 }
 
 function handleRetry(jobId: string) {
-  emit("retryJob", jobId);
+  emit('retryJob', jobId)
 }
 
-const tableRef = ref<HTMLTableElement | null>(null);
-let cleanupResize: (() => void) | null = null;
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
 
 function attachResize() {
-  if (cleanupResize) cleanupResize();
-  cleanupResize = null;
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
   nextTick(() => {
     if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value);
+      cleanupResize = initResizableColumns(tableRef.value)
     }
-  });
+  })
 }
 
-watch(jobs, attachResize);
-onMounted(attachResize);
+watch(jobs, attachResize)
+onMounted(attachResize)
 onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize();
-});
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -116,10 +100,7 @@ onBeforeUnmount(() => {
         <button
           v-for="f in FILTERS"
           :key="f"
-          :class="[
-            'ss-dbg-job-filter',
-            { 'ss-dbg-active': activeFilter === f },
-          ]"
+          :class="['ss-dbg-job-filter', { 'ss-dbg-active': activeFilter === f }]"
           @click="activeFilter = f"
         >
           {{ f }}
@@ -156,7 +137,7 @@ onBeforeUnmount(() => {
             {{ j.attempts }}
           </td>
           <td class="ss-dbg-duration">
-            {{ j.duration !== null ? formatDuration(j.duration) : "-" }}
+            {{ j.duration !== null ? formatDuration(j.duration) : '-' }}
           </td>
           <td class="ss-dbg-event-time">
             {{ timeAgo(j.timestamp || j.createdAt) }}

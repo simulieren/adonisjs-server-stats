@@ -2,12 +2,7 @@
 // Re-exports from the main package
 // ---------------------------------------------------------------------------
 
-export type {
-  ServerStats,
-  MetricValue,
-  ServerStatsConfig,
-  DevToolbarOptions,
-} from "../types.js";
+export type { ServerStats, MetricValue, ServerStatsConfig, DevToolbarOptions } from '../types.js'
 export type {
   DebugPane,
   DebugPaneColumn,
@@ -20,7 +15,7 @@ export type {
   RouteRecord,
   TraceRecord,
   TraceSpan,
-} from "../debug/types.js";
+} from '../debug/types.js'
 
 // ---------------------------------------------------------------------------
 // Component prop types
@@ -31,17 +26,17 @@ export type {
  */
 export interface StatsBarProps {
   /** Base URL for API calls. Defaults to `''` (same origin). */
-  baseUrl?: string;
+  baseUrl?: string
   /** Stats endpoint path. Defaults to `'/admin/api/server-stats'`. */
-  endpoint?: string;
+  endpoint?: string
   /** Transmit channel name. Defaults to `'admin/server-stats'`. */
-  channelName?: string;
+  channelName?: string
   /** Optional auth token for Bearer auth (auto-detects cookies if omitted). */
-  authToken?: string;
+  authToken?: string
   /** Polling interval fallback in ms. Defaults to `3000`. */
-  pollInterval?: number;
+  pollInterval?: number
   /** CSS class overrides for the root element. */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -49,13 +44,13 @@ export interface StatsBarProps {
  */
 export interface DebugPanelProps {
   /** Base URL for API calls. Defaults to `''` (same origin). */
-  baseUrl?: string;
+  baseUrl?: string
   /** Debug API base path. Defaults to `'/admin/api/debug'`. */
-  debugEndpoint?: string;
+  debugEndpoint?: string
   /** Optional auth token for Bearer auth. */
-  authToken?: string;
+  authToken?: string
   /** CSS class overrides for panel container. */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -63,13 +58,13 @@ export interface DebugPanelProps {
  */
 export interface DashboardPageProps {
   /** Base URL for API calls. Defaults to `''` (same origin). */
-  baseUrl?: string;
+  baseUrl?: string
   /** Dashboard API base path. Defaults to `'/__stats/api'`. */
-  dashboardEndpoint?: string;
+  dashboardEndpoint?: string
   /** Optional auth token for Bearer auth. */
-  authToken?: string;
+  authToken?: string
   /** CSS class overrides for the root element. */
-  className?: string;
+  className?: string
 }
 
 /**
@@ -77,7 +72,7 @@ export interface DashboardPageProps {
  */
 export interface StatsBarConfig extends StatsBarProps {
   /** Debug API endpoint path (used for feature detection). */
-  debugEndpoint?: string;
+  debugEndpoint?: string
 }
 
 /**
@@ -85,9 +80,9 @@ export interface StatsBarConfig extends StatsBarProps {
  */
 export interface DebugPanelConfig extends DebugPanelProps {
   /** Path to the full dashboard page. */
-  dashboardPath?: string;
+  dashboardPath?: string
   /** Whether tracing is enabled. */
-  tracingEnabled?: boolean;
+  tracingEnabled?: boolean
 }
 
 /**
@@ -95,7 +90,7 @@ export interface DebugPanelConfig extends DebugPanelProps {
  */
 export interface DashboardConfig extends DashboardPageProps {
   /** Whether tracing is enabled. */
-  tracingEnabled?: boolean;
+  tracingEnabled?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -109,24 +104,24 @@ export interface DashboardConfig extends DashboardPageProps {
  */
 export interface FeatureFlags {
   features: {
-    statsBar: boolean;
-    debugPanel: boolean;
-    dashboard: boolean;
-    tracing: boolean;
-    redis: boolean;
-    queues: boolean;
-    cache: boolean;
-    emails: boolean;
-  };
-  customPanes: import("../debug/types.js").DebugPane[];
+    statsBar: boolean
+    debugPanel: boolean
+    dashboard: boolean
+    tracing: boolean
+    redis: boolean
+    queues: boolean
+    cache: boolean
+    emails: boolean
+  }
+  customPanes: import('../debug/types.js').DebugPane[]
   endpoints: {
-    stats: string;
-    debug: string;
-    dashboard: string;
-  };
+    stats: string
+    debug: string
+    dashboard: string
+  }
   transmit: {
-    channelName: string;
-  };
+    channelName: string
+  }
 }
 
 /**
@@ -137,25 +132,25 @@ export interface FeatureFlags {
  * instead of `features.features.tracing`).
  */
 export interface FeatureConfig {
-  tracing: boolean;
-  redis: boolean;
-  queues: boolean;
-  cache: boolean;
-  emails: boolean;
-  dashboard: boolean;
-  customPanes: import("../debug/types.js").DebugPane[];
+  tracing: boolean
+  redis: boolean
+  queues: boolean
+  cache: boolean
+  emails: boolean
+  dashboard: boolean
+  customPanes: import('../debug/types.js').DebugPane[]
 }
 
 // ---------------------------------------------------------------------------
 // Metric definition (drives the stats bar layout)
 // ---------------------------------------------------------------------------
 
-import type { ServerStats } from "../types.js";
+import type { ServerStats } from '../types.js'
 
 /**
  * Threshold color result.
  */
-export type ThresholdColor = "green" | "amber" | "red";
+export type ThresholdColor = 'green' | 'amber' | 'red'
 
 /**
  * Definition for a single metric displayed in the stats bar.
@@ -166,92 +161,92 @@ export type ThresholdColor = "green" | "amber" | "red";
  */
 export interface MetricDefinition {
   /** Unique metric identifier (e.g. `'cpu'`, `'memory'`). */
-  id: string;
+  id: string
 
   /** Short display label (e.g. `'CPU'`, `'MEM'`). */
-  label: string;
+  label: string
 
   /**
    * Longer display title for tooltips (e.g. `'CPU Usage'`, `'Memory'`).
    * Falls back to `label` if not provided.
    */
-  title?: string;
+  title?: string
 
   /**
    * Unit string for display and tooltip (e.g. `'%'`, `'ms'`, `'bytes'`).
    * Empty string for unitless metrics.
    */
-  unit: string;
+  unit: string
 
   /**
    * Metric group for layout grouping in the stats bar.
    * Standard groups: `'core'`, `'db'`, `'redis'`, `'queue'`, `'log'`.
    * Defaults to `'core'` if not specified.
    */
-  group?: string;
+  group?: string
 
   /**
    * Value at or above which the metric turns amber.
    * For inverse metrics (higher is better), this is the *below* threshold.
    * `undefined` means no threshold coloring.
    */
-  warnThreshold?: number;
+  warnThreshold?: number
 
   /**
    * Value at or above which the metric turns red.
    * For inverse metrics (higher is better), this is the *below* threshold.
    * `undefined` means no threshold coloring.
    */
-  critThreshold?: number;
+  critThreshold?: number
 
   /**
    * Whether the threshold logic is inverted (lower values are worse).
    * Used for metrics like cache hit rate where <90% is amber and <70% is red.
    */
-  inverseThreshold?: boolean;
+  inverseThreshold?: boolean
 
   /**
    * Extract the numeric value from a stats snapshot.
    * Returns `undefined` if the metric is not available in this snapshot.
    */
-  extract: (stats: ServerStats) => number | undefined;
+  extract: (stats: ServerStats) => number | undefined
 
   /**
    * Format the extracted value for display (e.g. `"52.3%"`, `"128M"`).
    * Alias: `value` (same function, alternate name for React).
    */
-  format: (stats: ServerStats) => string;
+  format: (stats: ServerStats) => string
 
   /**
    * Alias for {@link format}. Returns the formatted display string.
    */
-  value?: (stats: ServerStats) => string;
+  value?: (stats: ServerStats) => string
 
   /**
    * Return a CSS class name for threshold coloring (e.g. `'ss-green'`).
    * Used by React components. When not provided, the component should
    * compute the color from `warnThreshold`/`critThreshold`.
    */
-  color?: (stats: ServerStats) => string;
+  color?: (stats: ServerStats) => string
 
   /**
    * Additional detail text (or a function returning detail text)
    * shown in the tooltip below the main value.
    */
-  detail?: string | ((stats: ServerStats) => string | null);
+  detail?: string | ((stats: ServerStats) => string | null)
 
   /**
    * Key on `ServerStats` to track in the sparkline history buffer.
    * `undefined` means no sparkline for this metric.
    * A leading `_` prefix indicates a computed value (e.g. `'_sysMemUsed'`).
    */
-  historyKey?: string | undefined;
+  historyKey?: string | undefined
 
   /**
    * Optional predicate to conditionally show/hide this metric
    * based on the current stats snapshot.
    */
-  show?: (stats: ServerStats) => boolean;
+  show?: (stats: ServerStats) => boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -263,19 +258,19 @@ export interface MetricDefinition {
  */
 export interface SparklineOptions {
   /** Stroke color (CSS color string). Defaults to `'#34d399'`. */
-  color?: string;
+  color?: string
   /** Fill gradient top opacity (0-1). Defaults to `0.25`. */
-  fillOpacityTop?: number;
+  fillOpacityTop?: number
   /** Fill gradient bottom opacity (0-1). Defaults to `0.02`. */
-  fillOpacityBottom?: number;
+  fillOpacityBottom?: number
   /** Line stroke width. Defaults to `1.5`. */
-  strokeWidth?: number;
+  strokeWidth?: number
   /** SVG viewBox width. Defaults to `120`. */
-  width?: number;
+  width?: number
   /** SVG viewBox height. Defaults to `32`. */
-  height?: number;
+  height?: number
   /** Inner padding in px. Defaults to `2`. */
-  padding?: number;
+  padding?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -287,13 +282,13 @@ export interface SparklineOptions {
  * Extends {@link DashboardPageProps} with pagination, sort, filter, and time range options.
  */
 export interface DashboardHookOptions extends DashboardPageProps {
-  page?: number;
-  perPage?: number;
-  search?: string;
-  sort?: string;
-  sortDir?: "asc" | "desc";
-  filters?: Record<string, string>;
-  timeRange?: TimeRange;
+  page?: number
+  perPage?: number
+  search?: string
+  sort?: string
+  sortDir?: 'asc' | 'desc'
+  filters?: Record<string, string>
+  timeRange?: TimeRange
 }
 
 // ---------------------------------------------------------------------------
@@ -306,15 +301,15 @@ export interface DashboardHookOptions extends DashboardPageProps {
  * Known tabs are provided for autocomplete; any custom string is also accepted.
  */
 export type DebugTab =
-  | "timeline"
-  | "queries"
-  | "events"
-  | "routes"
-  | "logs"
-  | "emails"
-  | "cache"
-  | "jobs"
-  | (string & {});
+  | 'timeline'
+  | 'queries'
+  | 'events'
+  | 'routes'
+  | 'logs'
+  | 'emails'
+  | 'cache'
+  | 'jobs'
+  | (string & {})
 
 /**
  * Built-in dashboard section identifiers.
@@ -322,18 +317,18 @@ export type DebugTab =
  * Known sections are provided for autocomplete; any custom string is also accepted.
  */
 export type DashboardSection =
-  | "overview"
-  | "requests"
-  | "queries"
-  | "events"
-  | "routes"
-  | "logs"
-  | "emails"
-  | "timeline"
-  | "cache"
-  | "jobs"
-  | "config"
-  | (string & {});
+  | 'overview'
+  | 'requests'
+  | 'queries'
+  | 'events'
+  | 'routes'
+  | 'logs'
+  | 'emails'
+  | 'timeline'
+  | 'cache'
+  | 'jobs'
+  | 'config'
+  | (string & {})
 
 // ---------------------------------------------------------------------------
 // Time range
@@ -342,7 +337,7 @@ export type DashboardSection =
 /**
  * Pre-defined time range options for dashboard queries.
  */
-export type TimeRange = "1h" | "6h" | "24h" | "7d";
+export type TimeRange = '1h' | '6h' | '24h' | '7d'
 
 // ---------------------------------------------------------------------------
 // Paginated response envelope
@@ -352,13 +347,13 @@ export type TimeRange = "1h" | "6h" | "24h" | "7d";
  * Generic paginated API response shape.
  */
 export interface PaginatedResponse<T> {
-  data: T[];
+  data: T[]
   meta: {
-    total: number;
-    page: number;
-    perPage: number;
-    lastPage: number;
-  };
+    total: number
+    page: number
+    perPage: number
+    lastPage: number
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -369,20 +364,20 @@ export interface PaginatedResponse<T> {
  * Aggregate cache statistics returned by the debug cache endpoint.
  */
 export interface CacheStats {
-  hitRate: number;
-  totalHits: number;
-  totalMisses: number;
-  keys: CacheEntry[];
+  hitRate: number
+  totalHits: number
+  totalMisses: number
+  keys: CacheEntry[]
 }
 
 /**
  * Individual cache key metadata.
  */
 export interface CacheEntry {
-  key: string;
-  type: string;
-  ttl: number;
-  size: number;
+  key: string
+  type: string
+  ttl: number
+  size: number
 }
 
 // ---------------------------------------------------------------------------
@@ -393,29 +388,29 @@ export interface CacheEntry {
  * Aggregate queue statistics.
  */
 export interface JobStats {
-  active: number;
-  waiting: number;
-  delayed: number;
-  completed: number;
-  failed: number;
+  active: number
+  waiting: number
+  delayed: number
+  completed: number
+  failed: number
 }
 
 /**
  * Individual job record from the queue inspector.
  */
 export interface JobRecord {
-  id: string;
-  name: string;
-  status: string;
-  data: unknown;
-  payload: unknown;
-  attempts: number;
-  duration: number | null;
-  timestamp: number | string;
-  createdAt: number | string;
-  processedAt: number | string | null;
-  finishedAt: number | string | null;
-  failedReason: string | null;
+  id: string
+  name: string
+  status: string
+  data: unknown
+  payload: unknown
+  attempts: number
+  duration: number | null
+  timestamp: number | string
+  createdAt: number | string
+  processedAt: number | string | null
+  finishedAt: number | string | null
+  failedReason: string | null
 }
 
 // ---------------------------------------------------------------------------
@@ -426,13 +421,13 @@ export interface JobRecord {
  * Aggregated overview metrics returned by the dashboard overview endpoint.
  */
 export interface OverviewMetrics {
-  avgResponseTime: number;
-  p95ResponseTime: number;
-  requestsPerMinute: number;
-  errorRate: number;
-  slowestEndpoints: { url: string; avgDuration: number; count: number }[];
-  queryStats: { total: number; avgDuration: number; perRequest: number };
-  recentErrors: { level: string; message: string }[];
+  avgResponseTime: number
+  p95ResponseTime: number
+  requestsPerMinute: number
+  errorRate: number
+  slowestEndpoints: { url: string; avgDuration: number; count: number }[]
+  queryStats: { total: number; avgDuration: number; perRequest: number }
+  recentErrors: { level: string; message: string }[]
 }
 
 /**
@@ -440,52 +435,52 @@ export interface OverviewMetrics {
  * Extends {@link OverviewMetrics} with sparkline time-series data.
  */
 export interface OverviewData extends OverviewMetrics {
-  avgResponseTimeSeries?: number[];
-  p95ResponseTimeSeries?: number[];
-  requestsPerMinuteSeries?: number[];
-  errorRateSeries?: number[];
+  avgResponseTimeSeries?: number[]
+  p95ResponseTimeSeries?: number[]
+  requestsPerMinuteSeries?: number[]
+  errorRateSeries?: number[]
   recentErrors: {
-    id?: number;
-    level: string;
-    message: string;
-    timestamp: number | string;
-  }[];
+    id?: number
+    level: string
+    message: string
+    timestamp: number | string
+  }[]
 }
 
 /**
  * Single data point for dashboard time-series charts.
  */
 export interface ChartDataPoint {
-  bucket: string;
-  total: number;
-  count2xx: number;
-  count3xx: number;
-  count4xx: number;
-  count5xx: number;
-  requestCount?: number;
-  errorCount?: number;
-  avgDuration?: number;
-  p95Duration?: number;
+  bucket: string
+  total: number
+  count2xx: number
+  count3xx: number
+  count4xx: number
+  count5xx: number
+  requestCount?: number
+  errorCount?: number
+  avgDuration?: number
+  p95Duration?: number
 }
 
 /**
  * A grouped/aggregated query pattern for the dashboard queries section.
  */
 export interface GroupedQuery {
-  pattern: string;
-  count: number;
-  avgDuration: number;
-  minDuration: number;
-  maxDuration: number;
-  totalDuration: number;
-  percentOfTotal: number;
+  pattern: string
+  count: number
+  avgDuration: number
+  minDuration: number
+  maxDuration: number
+  totalDuration: number
+  percentOfTotal: number
 }
 
 // ---------------------------------------------------------------------------
 // Theme type (re-exported for convenience)
 // ---------------------------------------------------------------------------
 
-export type { Theme } from "./theme.js";
+export type { Theme } from './theme.js'
 
 // ---------------------------------------------------------------------------
 // Pagination / filter / sort state
@@ -496,13 +491,13 @@ export type { Theme } from "./theme.js";
  */
 export interface PaginationState {
   /** Current page number (1-based). */
-  page: number;
+  page: number
   /** Number of items per page. */
-  perPage: number;
+  perPage: number
   /** Total number of items across all pages. */
-  total: number;
+  total: number
   /** Total number of pages. */
-  totalPages: number;
+  totalPages: number
 }
 
 /**
@@ -510,9 +505,9 @@ export interface PaginationState {
  */
 export interface FilterState {
   /** Free-text search query. */
-  search: string;
+  search: string
   /** Key-value filter pairs (e.g. `{ status: '500', method: 'GET' }`). */
-  filters: Record<string, string>;
+  filters: Record<string, string>
 }
 
 /**
@@ -520,7 +515,7 @@ export interface FilterState {
  */
 export interface SortState {
   /** Column field name to sort by. */
-  field: string;
+  field: string
   /** Sort direction. */
-  direction: "asc" | "desc";
+  direction: 'asc' | 'desc'
 }

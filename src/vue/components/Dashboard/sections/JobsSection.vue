@@ -2,125 +2,109 @@
 /**
  * Queue manager section for the dashboard.
  */
-import {
-  ref,
-  computed,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-  nextTick,
-} from "vue";
-import { timeAgo, formatDuration } from "../../../../core/index.js";
-import { initResizableColumns } from "../../../../core/resizable-columns.js";
-import FilterBar from "../shared/FilterBar.vue";
-import PaginationControls from "../shared/PaginationControls.vue";
-import JsonViewer from "../../shared/JsonViewer.vue";
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { timeAgo, formatDuration } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import FilterBar from '../shared/FilterBar.vue'
+import PaginationControls from '../shared/PaginationControls.vue'
+import JsonViewer from '../../shared/JsonViewer.vue'
 
 interface JobEntry {
-  id: string;
-  name: string;
-  status: string;
-  data?: any;
-  payload?: any;
-  attempts: number;
-  duration: number | null;
-  error?: string;
-  failedReason?: string | null;
-  timestamp: number;
-  createdAt?: number;
+  id: string
+  name: string
+  status: string
+  data?: any
+  payload?: any
+  attempts: number
+  duration: number | null
+  error?: string
+  failedReason?: string | null
+  timestamp: number
+  createdAt?: number
 }
 
 const props = defineProps<{
-  data: any;
-  page: number;
-  perPage: number;
-  total: number;
-  onRetryJob?: (jobId: string) => Promise<boolean>;
-}>();
+  data: any
+  page: number
+  perPage: number
+  total: number
+  onRetryJob?: (jobId: string) => Promise<boolean>
+}>()
 
 const emit = defineEmits<{
-  goToPage: [page: number];
-  search: [term: string];
-  filter: [key: string, value: string | number | boolean];
-}>();
+  goToPage: [page: number]
+  search: [term: string]
+  filter: [key: string, value: string | number | boolean]
+}>()
 
-const search = ref("");
-const activeFilter = ref("all");
-const expandedJobId = ref<string | null>(null);
+const search = ref('')
+const activeFilter = ref('all')
+const expandedJobId = ref<string | null>(null)
 
-const FILTERS = [
-  "all",
-  "active",
-  "waiting",
-  "delayed",
-  "completed",
-  "failed",
-] as const;
+const FILTERS = ['all', 'active', 'waiting', 'delayed', 'completed', 'failed'] as const
 
-const jobData = computed(() => props.data || {});
-const stats = computed(
-  () => jobData.value.stats || jobData.value.overview || {},
-);
+const jobData = computed(() => props.data || {})
+const stats = computed(() => jobData.value.stats || jobData.value.overview || {})
 
 const jobs = computed<JobEntry[]>(() => {
-  const d = props.data;
-  if (!d) return [];
-  return d.data || d.jobs || d || [];
-});
+  const d = props.data
+  if (!d) return []
+  return d.data || d.jobs || d || []
+})
 
 function statusClass(status: string): string {
   const map: Record<string, string> = {
-    completed: "ss-dash-badge-green",
-    failed: "ss-dash-badge-red",
-    active: "ss-dash-badge-blue",
-    waiting: "ss-dash-badge-amber",
-    delayed: "ss-dash-badge-purple",
-  };
-  return map[status] || "ss-dash-badge-muted";
+    completed: 'ss-dash-badge-green',
+    failed: 'ss-dash-badge-red',
+    active: 'ss-dash-badge-blue',
+    waiting: 'ss-dash-badge-amber',
+    delayed: 'ss-dash-badge-purple',
+  }
+  return map[status] || 'ss-dash-badge-muted'
 }
 
 function handleFilterChange(filter: string) {
-  activeFilter.value = filter;
-  if (filter === "all") {
-    emit("filter", "status", "");
+  activeFilter.value = filter
+  if (filter === 'all') {
+    emit('filter', 'status', '')
   } else {
-    emit("filter", "status", filter);
+    emit('filter', 'status', filter)
   }
 }
 
 async function handleRetry(jobId: string) {
   if (props.onRetryJob) {
-    await props.onRetryJob(jobId);
+    await props.onRetryJob(jobId)
   }
 }
 
 function toggleExpand(jobId: string) {
-  expandedJobId.value = expandedJobId.value === jobId ? null : jobId;
+  expandedJobId.value = expandedJobId.value === jobId ? null : jobId
 }
 
 function handleSearch(term: string) {
-  search.value = term;
-  emit("search", term);
+  search.value = term
+  emit('search', term)
 }
 
-const tableRef = ref<HTMLTableElement | null>(null);
-let cleanupResize: (() => void) | null = null;
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
 
 function attachResize() {
-  if (cleanupResize) cleanupResize();
-  cleanupResize = null;
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
   nextTick(() => {
     if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value);
+      cleanupResize = initResizableColumns(tableRef.value)
     }
-  });
+  })
 }
 
-watch(jobs, attachResize);
-onMounted(attachResize);
+watch(jobs, attachResize)
+onMounted(attachResize)
 onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize();
-});
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -153,10 +137,7 @@ onBeforeUnmount(() => {
       <button
         v-for="f in FILTERS"
         :key="f"
-        :class="[
-          'ss-dash-job-filter',
-          { 'ss-dash-active': activeFilter === f },
-        ]"
+        :class="['ss-dash-job-filter', { 'ss-dash-active': activeFilter === f }]"
         @click="handleFilterChange(f)"
       >
         {{ f }}
@@ -191,9 +172,7 @@ onBeforeUnmount(() => {
             <td style="color: var(--ss-dim)">{{ j.id }}</td>
             <td style="color: var(--ss-text)">{{ j.name }}</td>
             <td>
-              <span :class="['ss-dash-badge', statusClass(j.status)]">{{
-                j.status
-              }}</span>
+              <span :class="['ss-dash-badge', statusClass(j.status)]">{{ j.status }}</span>
             </td>
             <td>
               <JsonViewer :value="j.payload || j.data" :max-len="60" />
@@ -202,7 +181,7 @@ onBeforeUnmount(() => {
               {{ j.attempts }}
             </td>
             <td class="ss-dash-duration">
-              {{ j.duration !== null ? formatDuration(j.duration) : "-" }}
+              {{ j.duration !== null ? formatDuration(j.duration) : '-' }}
             </td>
             <td class="ss-dash-event-time">
               {{ timeAgo(j.timestamp || j.createdAt) }}
@@ -220,19 +199,11 @@ onBeforeUnmount(() => {
           <!-- Expanded detail -->
           <tr v-if="expandedJobId === j.id">
             <td colspan="8" style="padding: 8px 12px">
-              <div
-                v-if="j.failedReason || j.error"
-                style="color: var(--ss-red-fg)"
-              >
+              <div v-if="j.failedReason || j.error" style="color: var(--ss-red-fg)">
                 <strong>Error:</strong>
-                <pre
-                  style="
-                    white-space: pre-wrap;
-                    word-break: break-all;
-                    margin-top: 4px;
-                  "
-                  >{{ j.failedReason || j.error }}</pre
-                >
+                <pre style="white-space: pre-wrap; word-break: break-all; margin-top: 4px">{{
+                  j.failedReason || j.error
+                }}</pre>
               </div>
             </td>
           </tr>

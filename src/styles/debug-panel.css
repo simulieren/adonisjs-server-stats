@@ -55,7 +55,7 @@
 
 /* ── Theme: Light (auto via system preference) ────────────────── */
 @media (prefers-color-scheme: light) {
-  .ss-dbg-panel:not([data-ss-theme="dark"]) {
+  .ss-dbg-panel:not([data-ss-theme='dark']) {
     --ss-bg: #fafafa;
     --ss-surface: #ffffff;
     --ss-surface-alt: #f5f5f5;
@@ -93,7 +93,7 @@
 }
 
 /* ── Theme: Light (manual override) ───────────────────────────── */
-.ss-dbg-panel[data-ss-theme="light"] {
+.ss-dbg-panel[data-ss-theme='light'] {
   --ss-bg: #fafafa;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;
@@ -938,6 +938,7 @@
 .ss-dbg-mini-stat-value {
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  color: var(--ss-text);
 }
 .ss-dbg-mini-stat-value.ss-dbg-stat-green {
   color: var(--ss-green-fg);
@@ -1170,7 +1171,7 @@
 .ss-dbg-redacted-real {
   font-style: normal;
   color: var(--ss-text-secondary);
-  font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, monospace;
+  font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
   font-size: 11px;
   word-break: break-all;
 }

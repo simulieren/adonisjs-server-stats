@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
@@ -45,6 +46,13 @@ export function CacheTab({ options }: CacheTabProps) {
     },
     [selectedKey, options]
   )
+
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current)
+    }
+  }, [keys])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading cache data...</div>
@@ -108,13 +116,13 @@ export function CacheTab({ options }: CacheTabProps) {
       {keys.length === 0 ? (
         <div className="ss-dbg-empty">No cache keys found</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
               <th>Key</th>
-              <th style={{ width: '60px' }}>Type</th>
-              <th style={{ width: '60px' }}>TTL</th>
-              <th style={{ width: '60px' }}>Size</th>
+              <th>Type</th>
+              <th>TTL</th>
+              <th>Size</th>
             </tr>
           </thead>
           <tbody>

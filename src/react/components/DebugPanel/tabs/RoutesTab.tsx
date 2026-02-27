@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
 import type { RouteRecord, DebugPanelProps } from '../../../../core/types.js'
@@ -26,6 +27,13 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
     )
   }, [data, search])
 
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current)
+    }
+  }, [routes])
+
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading routes...</div>
   }
@@ -50,12 +58,12 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
       {routes.length === 0 ? (
         <div className="ss-dbg-empty">No routes found</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
-              <th style={{ width: '70px' }}>Method</th>
+              <th>Method</th>
               <th>Pattern</th>
-              <th style={{ width: '90px' }}>Name</th>
+              <th>Name</th>
               <th>Handler</th>
               <th>Middleware</th>
             </tr>

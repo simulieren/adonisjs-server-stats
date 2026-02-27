@@ -2,8 +2,9 @@
 /**
  * Route table tab for the debug panel.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import type { RouteRecord } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 
 const props = defineProps<{
   data: any
@@ -34,6 +35,25 @@ function isCurrentRoute(route: RouteRecord): boolean {
   if (!props.currentUrl) return false
   return props.currentUrl.includes(route.pattern.replace(/:[^/]+/g, ''))
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(routes, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -45,12 +65,12 @@ function isCurrentRoute(route: RouteRecord): boolean {
 
     <div v-if="routes.length === 0" class="ss-dbg-empty">No routes found</div>
 
-    <table v-else class="ss-dbg-table">
+    <table v-else ref="tableRef" class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 70px">Method</th>
+          <th>Method</th>
           <th>Pattern</th>
-          <th style="width: 100px">Name</th>
+          <th>Name</th>
           <th>Handler</th>
           <th>Middleware</th>
         </tr>

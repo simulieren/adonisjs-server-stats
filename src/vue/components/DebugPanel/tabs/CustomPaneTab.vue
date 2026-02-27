@@ -5,7 +5,7 @@
  * Renders a table based on DebugPane column definitions
  * with support for search, formatting, and badge colors.
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import {
   ApiClient,
   compactPreview,
@@ -14,6 +14,7 @@ import {
   formatDuration,
 } from '../../../../core/index.js'
 import type { DebugPane, DebugPaneColumn } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 
 const props = defineProps<{
   pane: DebugPane
@@ -114,7 +115,27 @@ function handleClear() {
   data.value = []
 }
 
-onMounted(fetchData)
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(filteredData, attachResize)
+onMounted(() => {
+  fetchData()
+  attachResize()
+})
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -133,14 +154,10 @@ onMounted(fetchData)
     <div v-if="loading" class="ss-dbg-empty">Loading...</div>
     <div v-else-if="filteredData.length === 0" class="ss-dbg-empty">No data</div>
 
-    <table v-else class="ss-dbg-table">
+    <table v-else ref="tableRef" class="ss-dbg-table">
       <thead>
         <tr>
-          <th
-            v-for="col in pane.columns"
-            :key="col.key"
-            :style="col.width ? { width: col.width } : {}"
-          >
+          <th v-for="col in pane.columns" :key="col.key">
             {{ col.label }}
           </th>
         </tr>

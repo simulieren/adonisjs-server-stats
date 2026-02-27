@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 
 import { timeAgo } from '../../../../core/formatters.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
 import type { EmailRecord, DebugPanelProps } from '../../../../core/types.js'
@@ -36,6 +37,13 @@ export function EmailsTab({ options }: EmailsTabProps) {
     queued: 'ss-dbg-email-status-queued',
     failed: 'ss-dbg-email-status-failed',
   }
+
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current)
+    }
+  }, [emails])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading emails...</div>
@@ -102,15 +110,15 @@ export function EmailsTab({ options }: EmailsTabProps) {
       {emails.length === 0 ? (
         <div className="ss-dbg-empty">No emails captured</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
-              <th style={{ width: '40px' }}>#</th>
+              <th>#</th>
               <th>Subject</th>
-              <th style={{ width: '150px' }}>To</th>
-              <th style={{ width: '70px' }}>Mailer</th>
-              <th style={{ width: '70px' }}>Status</th>
-              <th style={{ width: '80px' }}>Time</th>
+              <th>To</th>
+              <th>Mailer</th>
+              <th>Status</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody>

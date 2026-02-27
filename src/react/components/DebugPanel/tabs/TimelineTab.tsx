@@ -1,6 +1,7 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 
 import { timeAgo, formatDuration } from '../../../../core/formatters.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
 import type { TraceRecord, TraceSpan, DebugPanelProps } from '../../../../core/types.js'
@@ -49,6 +50,13 @@ export function TimelineTab({ options }: TimelineTabProps) {
     if (code >= 300) return 'ss-dbg-status-3xx'
     return 'ss-dbg-status-2xx'
   }, [])
+
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current)
+    }
+  }, [traces])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading traces...</div>
@@ -137,15 +145,15 @@ export function TimelineTab({ options }: TimelineTabProps) {
       {traces.length === 0 ? (
         <div className="ss-dbg-empty">No traces captured. Enable tracing in config.</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
-              <th style={{ width: '70px' }}>Method</th>
+              <th>Method</th>
               <th>URL</th>
-              <th style={{ width: '60px' }}>Status</th>
-              <th style={{ width: '80px' }}>Duration</th>
-              <th style={{ width: '50px' }}>Spans</th>
-              <th style={{ width: '80px' }}>Time</th>
+              <th>Status</th>
+              <th>Duration</th>
+              <th>Spans</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody>

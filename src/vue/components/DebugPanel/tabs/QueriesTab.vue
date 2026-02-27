@@ -2,8 +2,9 @@
 /**
  * SQL queries table tab for the debug panel.
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { formatDuration, durationSeverity, timeAgo } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { QueryRecord } from '../../../../core/index.js'
 
 const props = defineProps<{
@@ -50,6 +51,25 @@ function durationClass(ms: number): string {
   if (sev === 'slow') return 'ss-dbg-slow'
   return ''
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(queries, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -61,15 +81,15 @@ function durationClass(ms: number): string {
 
     <div v-if="queries.length === 0" class="ss-dbg-empty">No queries captured</div>
 
-    <table v-else class="ss-dbg-table">
+    <table v-else ref="tableRef" class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 30px">#</th>
+          <th>#</th>
           <th>SQL</th>
-          <th style="width: 60px">Method</th>
-          <th style="width: 80px">Model</th>
-          <th style="width: 70px">Duration</th>
-          <th style="width: 80px">Time</th>
+          <th>Method</th>
+          <th>Model</th>
+          <th>Duration</th>
+          <th>Time</th>
         </tr>
       </thead>
       <tbody>

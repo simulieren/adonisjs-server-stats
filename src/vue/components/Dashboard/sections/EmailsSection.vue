@@ -2,8 +2,9 @@
 /**
  * Emails section for the dashboard.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { timeAgo } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { EmailRecord } from '../../../../core/index.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
@@ -59,6 +60,25 @@ function handleSearch(term: string) {
   search.value = term
   emit('search', term)
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(emails, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -95,17 +115,17 @@ function handleSearch(term: string) {
 
       <div v-if="emails.length === 0" class="ss-dash-empty">No emails found</div>
 
-      <table v-else class="ss-dash-table">
+      <table v-else ref="tableRef" class="ss-dash-table">
         <thead>
           <tr>
-            <th style="width: 30px">#</th>
+            <th>#</th>
             <th>Subject</th>
-            <th style="width: 150px">From</th>
-            <th style="width: 150px">To</th>
-            <th style="width: 70px">Mailer</th>
-            <th style="width: 70px">Status</th>
-            <th style="width: 30px">Att.</th>
-            <th style="width: 100px">Time</th>
+            <th>From</th>
+            <th>To</th>
+            <th>Mailer</th>
+            <th>Status</th>
+            <th>Att.</th>
+            <th>Time</th>
           </tr>
         </thead>
         <tbody>

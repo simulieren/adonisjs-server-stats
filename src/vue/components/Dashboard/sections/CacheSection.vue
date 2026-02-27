@@ -2,7 +2,8 @@
 /**
  * Redis browser section for the dashboard.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import FilterBar from '../shared/FilterBar.vue'
 
 interface CacheKey {
@@ -53,6 +54,25 @@ async function handleDelete(key: string) {
     }
   }
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(keys, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -109,13 +129,13 @@ async function handleDelete(key: string) {
     <template v-else>
       <div v-if="keys.length === 0" class="ss-dash-empty">No cache keys found</div>
 
-      <table v-else class="ss-dash-table">
+      <table v-else ref="tableRef" class="ss-dash-table">
         <thead>
           <tr>
             <th>Key</th>
-            <th style="width: 60px">Type</th>
-            <th style="width: 80px">TTL</th>
-            <th style="width: 80px">Size</th>
+            <th>Type</th>
+            <th>TTL</th>
+            <th>Size</th>
           </tr>
         </thead>
         <tbody>

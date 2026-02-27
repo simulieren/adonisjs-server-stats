@@ -2,8 +2,9 @@
 /**
  * Routes section for the dashboard.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import type { RouteRecord } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import FilterBar from '../shared/FilterBar.vue'
 
 const props = defineProps<{
@@ -45,6 +46,25 @@ function toggleGroup(controller: string) {
     collapsedGroups.value.add(controller)
   }
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(routes, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -57,12 +77,12 @@ function toggleGroup(controller: string) {
 
     <div v-if="routes.length === 0" class="ss-dash-empty">No routes found</div>
 
-    <table v-else class="ss-dash-table">
+    <table v-else ref="tableRef" class="ss-dash-table">
       <thead>
         <tr>
-          <th style="width: 70px">Method</th>
+          <th>Method</th>
           <th>Pattern</th>
-          <th style="width: 120px">Name</th>
+          <th>Name</th>
           <th>Handler</th>
           <th>Middleware</th>
         </tr>

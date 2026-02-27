@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 
 import { timeAgo } from '../../../../core/formatters.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
@@ -20,6 +21,13 @@ export function EventsTab({ options }: EventsTabProps) {
     const lower = search.toLowerCase()
     return items.filter((e) => e.event.toLowerCase().includes(lower))
   }, [data, search])
+
+  const tableRef = useRef<HTMLTableElement>(null)
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current)
+    }
+  }, [events])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading events...</div>
@@ -45,13 +53,13 @@ export function EventsTab({ options }: EventsTabProps) {
       {events.length === 0 ? (
         <div className="ss-dbg-empty">No events captured</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
-              <th style={{ width: '40px' }}>#</th>
+              <th>#</th>
               <th>Event</th>
               <th>Data</th>
-              <th style={{ width: '80px' }}>Time</th>
+              <th>Time</th>
             </tr>
           </thead>
           <tbody>

@@ -2,8 +2,9 @@
 /**
  * Emails table with preview tab for the debug panel.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { timeAgo } from '../../../../core/index.js'
+import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { EmailRecord } from '../../../../core/index.js'
 
 const props = defineProps<{
@@ -48,6 +49,25 @@ function openPreview(email: EmailRecord) {
 function closePreview() {
   previewEmail.value = null
 }
+
+const tableRef = ref<HTMLTableElement | null>(null)
+let cleanupResize: (() => void) | null = null
+
+function attachResize() {
+  if (cleanupResize) cleanupResize()
+  cleanupResize = null
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value)
+    }
+  })
+}
+
+watch(emails, attachResize)
+onMounted(attachResize)
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize()
+})
 </script>
 
 <template>
@@ -86,16 +106,16 @@ function closePreview() {
 
       <div v-if="emails.length === 0" class="ss-dbg-empty">No emails captured</div>
 
-      <table v-else class="ss-dbg-table">
+      <table v-else ref="tableRef" class="ss-dbg-table">
         <thead>
           <tr>
-            <th style="width: 30px">#</th>
+            <th>#</th>
             <th>Subject</th>
-            <th style="width: 150px">To</th>
-            <th style="width: 60px">Mailer</th>
-            <th style="width: 70px">Status</th>
-            <th style="width: 30px">Att.</th>
-            <th style="width: 80px">Time</th>
+            <th>To</th>
+            <th>Mailer</th>
+            <th>Status</th>
+            <th>Att.</th>
+            <th>Time</th>
           </tr>
         </thead>
         <tbody>
