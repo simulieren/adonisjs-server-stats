@@ -11,8 +11,13 @@ import type { QueryRecord, GroupedQuery } from '../../../../core/index.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 
+interface QueriesData {
+  data?: QueryRecord[]
+  queries?: QueryRecord[]
+}
+
 const props = defineProps<{
-  data: any
+  data: QueriesData | QueryRecord[] | null
   page: number
   perPage: number
   total: number

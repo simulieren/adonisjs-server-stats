@@ -11,8 +11,8 @@ interface JobEntry {
   id: string
   name: string
   status: string
-  data?: any
-  payload?: any
+  data?: unknown
+  payload?: unknown
   attempts: number
   duration: number | null
   error?: string
@@ -21,8 +21,14 @@ interface JobEntry {
   createdAt?: number
 }
 
+interface JobTabData {
+  stats?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
+  overview?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
+  jobs?: JobEntry[]
+}
+
 const props = defineProps<{
-  data: any
+  data: JobTabData | null
 }>()
 
 const emit = defineEmits<{

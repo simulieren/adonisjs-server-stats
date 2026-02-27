@@ -10,8 +10,13 @@ import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
+interface EventsData {
+  data?: EventRecord[]
+  events?: EventRecord[]
+}
+
 const props = defineProps<{
-  data: any
+  data: EventsData | EventRecord[] | null
   page: number
   perPage: number
   total: number

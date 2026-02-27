@@ -1,7 +1,7 @@
 import { isExcludedRequest } from '../middleware/request_tracking_middleware.js'
 import { RingBuffer } from './ring_buffer.js'
 
-import type { EventRecord } from './types.js'
+import type { EventRecord, Emitter } from './types.js'
 
 /**
  * Wraps the AdonisJS emitter to log all events with timestamps.
@@ -9,20 +9,20 @@ import type { EventRecord } from './types.js'
  */
 export class EventCollector {
   private buffer: RingBuffer<EventRecord>
-  private originalEmit: ((...args: unknown[]) => unknown) | null = null
-  private emitter: any = null
+  private originalEmit: Emitter['emit'] | null = null
+  private emitter: Emitter | null = null
 
   constructor(maxEvents: number = 200) {
     this.buffer = new RingBuffer<EventRecord>(maxEvents)
   }
 
-  start(emitter: any): void {
+  start(emitter: Emitter): void {
     if (!emitter || typeof emitter.emit !== 'function') return
 
     this.emitter = emitter
-    this.originalEmit = emitter.emit.bind(emitter)
+    this.originalEmit = emitter.emit.bind(emitter) as Emitter['emit']
 
-    emitter.emit = (event: string | Function, data?: any) => {
+    emitter.emit = (event: string | ((...args: unknown[]) => unknown), data?: unknown) => {
       // Resolve event name: class-based events use the class name, string events are used as-is
       const eventName = typeof event === 'string' ? event : event?.name || 'unknown'
 

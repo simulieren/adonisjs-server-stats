@@ -9,6 +9,11 @@ import type { TraceRecord } from '../debug/types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
 
+/** Minimal interface for Edge.js view sharing on the HTTP context. */
+interface EdgeViewShare {
+  share(data: Record<string, unknown>): void
+}
+
 /**
  * AsyncLocalStorage that marks the current request as "excluded" from
  * debug collection. Checked by QueryCollector and EventCollector to
@@ -108,8 +113,9 @@ export default class RequestTrackingMiddleware {
     // runs BEFORE router middleware like initialize_auth_middleware and
     // silentAuth — so ctx.auth isn't populated yet. The function is called
     // at Edge render time (inside the controller), when auth is available.
-    if (shouldShowFn && typeof (ctx as any).view?.share === 'function') {
-      ;(ctx as any).view.share({
+    const ctxView = (ctx as unknown as { view?: EdgeViewShare }).view
+    if (shouldShowFn && typeof ctxView?.share === 'function') {
+      ctxView.share({
         __ssShowFn: () => {
           try {
             return shouldShowFn!(ctx)

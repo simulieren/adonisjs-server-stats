@@ -10,8 +10,13 @@ import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import WaterfallChart from '../shared/WaterfallChart.vue'
 
+interface TracesData {
+  data?: TraceRecord[]
+  traces?: TraceRecord[]
+}
+
 const props = defineProps<{
-  data: any
+  data: TracesData | TraceRecord[] | null
   page: number
   perPage: number
   total: number

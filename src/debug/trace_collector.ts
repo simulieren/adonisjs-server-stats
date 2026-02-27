@@ -4,7 +4,7 @@ import { performance } from 'node:perf_hooks'
 import { round } from '../utils/math_helpers.js'
 import { RingBuffer } from './ring_buffer.js'
 
-import type { TraceSpan, TraceRecord } from './types.js'
+import type { TraceSpan, TraceRecord, Emitter, DbQueryEvent } from './types.js'
 
 /**
  * Per-request trace context stored in AsyncLocalStorage.
@@ -52,8 +52,8 @@ export async function trace<T>(label: string, fn: () => Promise<T>): Promise<T> 
 export class TraceCollector {
   private buffer: RingBuffer<TraceRecord>
   private als = new AsyncLocalStorage<TraceContext>()
-  private emitter: any = null
-  private dbHandler: ((data: any) => void) | null = null
+  private emitter: Emitter | null = null
+  private dbHandler: ((data: DbQueryEvent) => void) | null = null
   private originalConsoleWarn: typeof console.warn | null = null
 
   constructor(maxTraces: number = 200) {
@@ -145,11 +145,11 @@ export class TraceCollector {
   }
 
   /** Hook into db:query events and console.warn to auto-create spans. */
-  start(emitter: any): void {
+  start(emitter: Emitter): void {
     this.emitter = emitter
 
     if (emitter && typeof emitter.on === 'function') {
-      this.dbHandler = (data: any) => {
+      this.dbHandler = (data: DbQueryEvent) => {
         const ctx = this.als.getStore()
         if (!ctx) return
 

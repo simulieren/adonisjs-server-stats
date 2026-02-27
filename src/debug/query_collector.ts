@@ -2,7 +2,7 @@ import { isExcludedRequest } from '../middleware/request_tracking_middleware.js'
 import { round } from '../utils/math_helpers.js'
 import { RingBuffer } from './ring_buffer.js'
 
-import type { QueryRecord } from './types.js'
+import type { QueryRecord, Emitter, DbQueryEvent } from './types.js'
 
 /**
  * Listens to Lucid's `db:query` event and stores queries in a ring buffer.
@@ -13,17 +13,17 @@ import type { QueryRecord } from './types.js'
 export class QueryCollector {
   private buffer: RingBuffer<QueryRecord>
   private slowThresholdMs: number
-  private emitter: any = null
-  private handler: ((data: any) => void) | null = null
+  private emitter: Emitter | null = null
+  private handler: ((data: DbQueryEvent) => void) | null = null
 
   constructor(maxQueries: number = 500, slowThresholdMs: number = 100) {
     this.buffer = new RingBuffer<QueryRecord>(maxQueries)
     this.slowThresholdMs = slowThresholdMs
   }
 
-  async start(emitter: any): Promise<void> {
+  async start(emitter: Emitter): Promise<void> {
     this.emitter = emitter
-    this.handler = (data: any) => {
+    this.handler = (data: DbQueryEvent) => {
       // Self-exclude: skip queries from the dashboard's dedicated SQLite connection
       if (data.connection === 'server_stats') return
       // Self-exclude: skip queries triggered by debug panel polling requests

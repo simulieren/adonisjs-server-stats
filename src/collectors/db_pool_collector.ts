@@ -2,6 +2,14 @@ import { log, dim, bold } from '../utils/logger.js'
 
 import type { MetricCollector } from './collector.js'
 
+/** Minimal interface for a Knex connection pool. */
+interface KnexPool {
+  numUsed?(): number
+  numFree?(): number
+  numPendingAcquires?(): number
+  max?: number
+}
+
 /**
  * Options for {@link dbPoolCollector}.
  */
@@ -64,7 +72,7 @@ export function dbPoolCollector(opts?: DbPoolCollectorOptions): MetricCollector 
           }
           return { dbPoolUsed: 0, dbPoolFree: 0, dbPoolPending: 0, dbPoolMax: 0 }
         }
-        const pool = (connection.connection as any)?.pool
+        const pool = (connection.connection as unknown as { pool?: KnexPool })?.pool
         if (!pool) {
           if (!warnedPoolUnavailable) {
             warnedPoolUnavailable = true

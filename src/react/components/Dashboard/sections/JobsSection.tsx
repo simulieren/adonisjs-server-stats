@@ -31,9 +31,15 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
     filters,
   })
 
-  const jobsData = data as any
-  const jobs = jobsData?.jobs || (Array.isArray(data) ? data : [])
-  const stats = jobsData?.stats || jobsData?.overview
+  interface JobsResponse {
+    jobs?: Array<Record<string, unknown>>
+    stats?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
+    overview?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
+  }
+
+  const jobsData = data as JobsResponse | Array<Record<string, unknown>> | null
+  const jobs = (jobsData && !Array.isArray(jobsData) ? jobsData.jobs : Array.isArray(jobsData) ? jobsData : null) || []
+  const stats = jobsData && !Array.isArray(jobsData) ? (jobsData.stats || jobsData.overview) : undefined
 
   const handleRetry = useCallback(
     async (jobId: string) => {

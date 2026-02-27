@@ -13,11 +13,16 @@ interface LogEntry {
   message: string
   requestId?: string
   timestamp: number
-  data?: any
+  data?: Record<string, unknown>
+}
+
+interface LogsData {
+  data?: LogEntry[]
+  logs?: LogEntry[]
 }
 
 const props = defineProps<{
-  data: any
+  data: LogsData | LogEntry[] | null
   page: number
   perPage: number
   total: number

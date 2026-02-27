@@ -3,6 +3,11 @@ import { createAccessMiddleware } from './access_middleware.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
+/** Minimal interface for the AdonisJS router used in route registration. */
+interface AdonisRouter {
+  get(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): { use(middleware: unknown[]): void } }
+}
+
 /**
  * Register the stats bar API endpoint.
  *
@@ -15,7 +20,7 @@ import type { HttpContext } from '@adonisjs/core/http'
  * @param shouldShow  Optional access-control callback.
  */
 export function registerStatsRoutes(
-  router: any,
+  router: AdonisRouter,
   endpoint: string,
   getController: () => ServerStatsController | null,
   shouldShow?: (ctx: HttpContext) => boolean

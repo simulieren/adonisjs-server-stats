@@ -10,8 +10,21 @@ import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import WaterfallChart from '../shared/WaterfallChart.vue'
 
+interface RequestRecord extends TraceRecord {
+  status_code?: number
+  duration?: number
+  span_count?: number
+  createdAt?: number
+  created_at?: number
+}
+
+interface RequestsData {
+  data?: RequestRecord[]
+  requests?: RequestRecord[]
+}
+
 const props = defineProps<{
-  data: any
+  data: RequestsData | RequestRecord[] | null
   page: number
   perPage: number
   total: number

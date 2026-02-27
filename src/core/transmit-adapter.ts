@@ -38,11 +38,23 @@ export interface TransmitSubscriptionHandle {
  * @param config - Subscription configuration.
  * @returns A handle with `subscribe()` and `unsubscribe()` methods.
  */
+/** Minimal interface for a Transmit client instance. */
+interface TransmitClient {
+  subscription(channel: string): TransmitSubscription
+}
+
+/** Minimal interface for a Transmit channel subscription. */
+interface TransmitSubscription {
+  onMessage(callback: (data: unknown) => void): void
+  create(): Promise<void>
+  delete(): Promise<void>
+}
+
 export function createTransmitSubscription(
   config: TransmitSubscriptionConfig
 ): TransmitSubscriptionHandle {
-  let transmit: any = null
-  let subscription: any = null
+  let transmit: TransmitClient | null = null
+  let subscription: TransmitSubscription | null = null
   let disposed = false
 
   const subscribe = async (): Promise<void> => {

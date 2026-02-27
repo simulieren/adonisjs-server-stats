@@ -8,8 +8,10 @@ interface ConfigSectionProps {
   options?: DashboardHookOptions
 }
 
+type ConfigValue = string | number | boolean | null | undefined | ConfigValue[] | { [key: string]: ConfigValue }
+
 /** Recursive config tree renderer. */
-function ConfigNode({ obj, path = '', search = '' }: { obj: any; path?: string; search?: string }) {
+function ConfigNode({ obj, path = '', search = '' }: { obj: ConfigValue; path?: string; search?: string }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const toggleExpand = useCallback((key: string) => {
@@ -98,8 +100,8 @@ export function ConfigSection({ options = {} }: ConfigSectionProps) {
   const [search, setSearch] = useState('')
   const [activeTab, setActiveTab] = useState<'app' | 'env'>('app')
 
-  const { data, isLoading } = useDashboardData('config', options)
-  const config = data as any
+  const { data, isLoading } = useDashboardData<{ app?: Record<string, ConfigValue>; env?: Record<string, ConfigValue> }>('config', options)
+  const config = data
 
   const handleCopy = useCallback(async () => {
     if (!config) return

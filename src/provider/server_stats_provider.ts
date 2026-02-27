@@ -24,6 +24,12 @@ import type { DevToolbarConfig } from '../debug/types.js'
 import type { ServerStatsConfig } from '../types.js'
 import type { ApplicationService } from '@adonisjs/core/types'
 
+/** Minimal interface for the AdonisJS IoC container with singleton registration. */
+interface ContainerWithSingleton {
+  singleton(binding: string, factory: () => unknown): void
+  make(binding: string): Promise<unknown>
+}
+
 export default class ServerStatsProvider {
   private intervalId: ReturnType<typeof setInterval> | null = null
   private engine: StatsEngine | null = null
@@ -58,10 +64,14 @@ export default class ServerStatsProvider {
 
     if (router && !this.app.inProduction) {
       const registeredPaths: string[] = []
+      // Cast once — the AdonisJS router satisfies all three route-file interfaces
+      const r = router as Parameters<typeof registerStatsRoutes>[0] &
+        Parameters<typeof registerDebugRoutes>[0] &
+        Parameters<typeof registerDashboardRoutes>[0]
 
       // ── Auto-register stats bar endpoint ───────────────────────
       if (typeof config.endpoint === 'string') {
-        registerStatsRoutes(router, config.endpoint, () => this.statsController, config.shouldShow)
+        registerStatsRoutes(r, config.endpoint, () => this.statsController, config.shouldShow)
         registeredPaths.push(config.endpoint)
       }
 
@@ -69,14 +79,14 @@ export default class ServerStatsProvider {
       const toolbarConfig = config.devToolbar
       if (toolbarConfig?.enabled) {
         const debugEndpoint = toolbarConfig.debugEndpoint ?? '/admin/api/debug'
-        registerDebugRoutes(router, debugEndpoint, () => this.debugController, config.shouldShow)
+        registerDebugRoutes(r, debugEndpoint, () => this.debugController, config.shouldShow)
         registeredPaths.push(debugEndpoint + '/*')
 
         // ── Auto-register dashboard routes ─────────────────────────
         if (toolbarConfig.dashboard) {
           const dashPath = toolbarConfig.dashboardPath ?? '/__stats'
           registerDashboardRoutes(
-            router,
+            r,
             dashPath,
             () => this.dashboardController,
             config.shouldShow
@@ -240,7 +250,7 @@ export default class ServerStatsProvider {
     this.engine = new StatsEngine(config.collectors)
 
     // Bind engine to container so the controller can access it
-    ;(this.app.container as any).singleton('server_stats.engine', () => this.engine!)
+    ;(this.app.container as unknown as ContainerWithSingleton).singleton('server_stats.engine', () => this.engine!)
 
     await this.engine.start()
 
@@ -331,7 +341,7 @@ export default class ServerStatsProvider {
     this.debugStore = new DebugStore(toolbarConfig)
 
     // Bind debug store to container
-    ;(this.app.container as any).singleton('debug.store', () => this.debugStore!)
+    ;(this.app.container as unknown as ContainerWithSingleton).singleton('debug.store', () => this.debugStore!)
 
     // Load persisted data before starting collectors
     if (toolbarConfig.persistDebugData) {
@@ -428,7 +438,7 @@ export default class ServerStatsProvider {
     this.dashboardStore = new DashboardStore(toolbarConfig)
     const appRoot = this.app.makePath('')
     try {
-      await this.dashboardStore.start(null, emitter, appRoot)
+      await this.dashboardStore.start(null, emitter as Parameters<DashboardStore['start']>[1], appRoot)
     } catch (err) {
       const msg = (err as Error)?.message || ''
       if (msg.includes('better-sqlite3') || msg.includes('Cannot find module')) {
@@ -444,7 +454,7 @@ export default class ServerStatsProvider {
     }
 
     // Bind to container
-    ;(this.app.container as any).singleton('dashboard.store', () => this.dashboardStore!)
+    ;(this.app.container as unknown as ContainerWithSingleton).singleton('dashboard.store', () => this.dashboardStore!)
 
     // Set dashboard path in middleware for self-exclusion
     setDashboardPath(toolbarConfig.dashboardPath)

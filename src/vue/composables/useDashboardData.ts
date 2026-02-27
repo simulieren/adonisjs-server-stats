@@ -56,7 +56,7 @@ export function useDashboardData(
     totalPages: 1,
   })
 
-  const filter = reactive<{ search: string; [key: string]: any }>({
+  const filter = reactive<{ search: string; [key: string]: string | number | boolean }>({
     search: '',
   })
 
@@ -191,7 +191,7 @@ export function useDashboardData(
   }
 
   function setFilter(key: string, value: string | number | boolean) {
-    ;(filter as any)[key] = value
+    ;(filter as Record<string, string | number | boolean>)[key] = value
     pagination.page = 1
     fetchData()
   }

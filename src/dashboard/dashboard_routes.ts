@@ -3,6 +3,19 @@ import { createAccessMiddleware } from '../routes/access_middleware.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type DashboardController from './dashboard_controller.js'
 
+/** Minimal interface for the AdonisJS router used in route registration. */
+interface AdonisRouter {
+  get(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute; where(key: string, matcher: RegExp): AdonisRoute }
+  post(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute }
+  delete(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute }
+  group(callback: () => void): { prefix(path: string): { use(middleware: unknown[]): void } }
+}
+
+interface AdonisRoute {
+  as(name: string): AdonisRoute
+  where(key: string, matcher: RegExp): AdonisRoute
+}
+
 /**
  * Register all dashboard routes under the configured path.
  *
@@ -17,7 +30,7 @@ import type DashboardController from './dashboard_controller.js'
  *                       are gated by it (returns 403 on denial).
  */
 export function registerDashboardRoutes(
-  router: any,
+  router: AdonisRouter,
   dashboardPath: string,
   getController: () => DashboardController | null,
   shouldShow?: (ctx: HttpContext) => boolean
@@ -33,7 +46,7 @@ export function registerDashboardRoutes(
       if (!controller) {
         return ctx.response.serviceUnavailable({ error: 'Dashboard is starting up, please retry' })
       }
-      return (controller[method] as any).call(controller, ctx)
+      return (controller[method] as (ctx: HttpContext) => Promise<unknown>).call(controller, ctx)
     }
   }
 

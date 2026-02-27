@@ -15,6 +15,15 @@ import type { DevToolbarConfig } from '../debug/types.js'
 import type { QueryRecord, EventRecord, EmailRecord, TraceRecord } from '../debug/types.js'
 
 // ---------------------------------------------------------------------------
+// Minimal interface for an AdonisJS-style event emitter
+// ---------------------------------------------------------------------------
+
+interface EventEmitter {
+  on(event: string, handler: (...args: unknown[]) => void): void
+  off(event: string, handler: (...args: unknown[]) => void): void
+}
+
+// ---------------------------------------------------------------------------
 // Filter types
 // ---------------------------------------------------------------------------
 
@@ -90,8 +99,8 @@ let overviewWidgetWarned = false
  * and self-exclusion of dashboard routes and server_stats connection queries.
  */
 export class DashboardStore {
-  private db: any = null
-  private emitter: any = null
+  private db: Knex | null = null
+  private emitter: EventEmitter | null = null
   private config: DevToolbarConfig
   private dashboardPath: string
   private retentionTimer: ReturnType<typeof setInterval> | null = null
@@ -111,7 +120,7 @@ export class DashboardStore {
    * Initialize the SQLite connection, run migrations and retention
    * cleanup, start chart aggregation, and wire event listeners.
    */
-  async start(_lucidDb: any, emitter: any, appRoot: string): Promise<void> {
+  async start(_lucidDb: unknown, emitter: EventEmitter | null, appRoot: string): Promise<void> {
     this.emitter = emitter
 
     const dbFilePath = appRoot + '/' + this.config.dbPath
@@ -137,7 +146,7 @@ export class DashboardStore {
     this.retentionTimer = setInterval(
       async () => {
         try {
-          await runRetentionCleanup(this.db, this.config.retentionDays)
+          if (this.db) await runRetentionCleanup(this.db, this.config.retentionDays)
         } catch (err) {
           log.warn('dashboard: retention cleanup failed — ' + (err as Error)?.message)
         }
@@ -182,7 +191,7 @@ export class DashboardStore {
   }
 
   /** Get the raw Knex database connection (for DashboardController). */
-  getDb(): any {
+  getDb(): Knex | null {
     return this.db
   }
 
@@ -843,17 +852,18 @@ export class DashboardStore {
 
       // Map top events
       const topEvents = (topEventsRaw || []).map((r: Record<string, unknown>) => ({
-        eventName: r.event_name,
-        count: r.count,
+        eventName: r.event_name as string,
+        count: r.count as number,
       }))
 
       // Map email activity
       const emailActivity = { sent: 0, queued: 0, failed: 0 }
       for (const row of emailStatusRaw || []) {
         const status = row.status as string
-        if (status === 'sent') emailActivity.sent = row.count
-        else if (status === 'queued') emailActivity.queued = row.count
-        else if (status === 'failed') emailActivity.failed = row.count
+        const count = row.count as number
+        if (status === 'sent') emailActivity.sent = count
+        else if (status === 'queued') emailActivity.queued = count
+        else if (status === 'failed') emailActivity.failed = count
       }
 
       // Map log level breakdown
@@ -861,7 +871,7 @@ export class DashboardStore {
       for (const row of logLevelsRaw || []) {
         const level = row.level as string
         if (level in logLevelBreakdown) {
-          logLevelBreakdown[level as keyof typeof logLevelBreakdown] = row.count
+          logLevelBreakdown[level as keyof typeof logLevelBreakdown] = row.count as number
         }
       }
 
@@ -875,9 +885,9 @@ export class DashboardStore {
 
       // Map slowest queries
       const slowestQueries = (slowQueriesRaw || []).map((r: Record<string, unknown>) => ({
-        sqlNormalized: r.sql_normalized,
-        avgDuration: r.avg_duration,
-        count: r.count,
+        sqlNormalized: r.sql_normalized as string,
+        avgDuration: r.avg_duration as number,
+        count: r.count as number,
       }))
 
       return { topEvents, emailActivity, logLevelBreakdown, statusDistribution, slowestQueries }
@@ -985,7 +995,8 @@ export class DashboardStore {
     // Count total
     const countQuery = this.db(table)
     if (applyFilters) applyFilters(countQuery)
-    const [{ count: total }] = await countQuery.count('* as count')
+    const [{ count: totalRaw }] = await countQuery.count('* as count')
+    const total = Number(totalRaw)
 
     // Fetch page
     const offset = (page - 1) * perPage

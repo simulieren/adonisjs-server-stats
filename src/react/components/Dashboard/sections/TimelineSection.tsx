@@ -30,8 +30,19 @@ export function TimelineSection({ options = {} }: TimelineSectionProps) {
 
   const handleBack = useCallback(() => setSelectedId(null), [])
 
+  interface TraceDetail {
+    method?: string
+    url?: string
+    status_code?: number
+    statusCode?: number
+    total_duration?: number
+    totalDuration?: number
+    spans?: Array<{ id: string; label: string; startOffset: number; duration: number; category: string }>
+    warnings?: string[]
+  }
+
   if (selectedId && traceDetail) {
-    const trace = traceDetail as any
+    const trace = traceDetail as TraceDetail
     return (
       <div>
         <div className="ss-dash-detail-header">

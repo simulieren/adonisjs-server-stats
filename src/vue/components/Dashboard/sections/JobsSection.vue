@@ -13,8 +13,8 @@ interface JobEntry {
   id: string
   name: string
   status: string
-  data?: any
-  payload?: any
+  data?: unknown
+  payload?: unknown
   attempts: number
   duration: number | null
   error?: string
@@ -23,8 +23,15 @@ interface JobEntry {
   createdAt?: number
 }
 
+interface JobsData {
+  stats?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
+  overview?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
+  data?: JobEntry[]
+  jobs?: JobEntry[]
+}
+
 const props = defineProps<{
-  data: any
+  data: JobsData | JobEntry[] | null
   page: number
   perPage: number
   total: number

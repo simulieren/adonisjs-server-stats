@@ -4,6 +4,11 @@ import { LogStreamService } from './log_stream_service.js'
 
 import type { ApplicationService } from '@adonisjs/core/types'
 
+/** Minimal interface for the @adonisjs/transmit broadcast service. */
+interface TransmitService {
+  broadcast(channel: string, data: unknown): void
+}
+
 export default class LogStreamProvider {
   private service: LogStreamService | null = null
 
@@ -12,9 +17,9 @@ export default class LogStreamProvider {
   async ready() {
     if (this.app.inTest) return
 
-    let transmit: any
+    let transmit: TransmitService
     try {
-      transmit = await this.app.container.make('transmit')
+      transmit = await this.app.container.make('transmit') as TransmitService
     } catch {
       log.info('@adonisjs/transmit not available — live log streaming disabled')
       return
@@ -34,8 +39,9 @@ export default class LogStreamProvider {
     // piggyback on its stream instead of creating a file poller.
     const existing = getLogStreamService()
     if (existing) {
-      const origOnEntry = (existing as any).onEntry
-      ;(existing as any).onEntry = (entry: Record<string, unknown>) => {
+      const internal = existing as unknown as { onEntry?: (entry: Record<string, unknown>) => void }
+      const origOnEntry = internal.onEntry
+      internal.onEntry = (entry: Record<string, unknown>) => {
         origOnEntry?.(entry)
         broadcast(entry)
       }

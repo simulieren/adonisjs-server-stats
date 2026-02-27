@@ -9,6 +9,40 @@ import { loadTransmitClient } from '../utils/transmit_client.js'
 
 import type { ServerStatsConfig } from '../types.js'
 
+/** Minimal interface for the Edge.js engine used in the plugin. */
+interface EdgeEngine {
+  mount(name: string, path: string): void
+  compiler: unknown
+  globals: Record<string, unknown>
+  processor: unknown
+  registerTag(tag: EdgeTagDefinition): void
+}
+
+/** Minimal interface for an Edge tag definition. */
+interface EdgeTagDefinition {
+  tagName: string
+  block: boolean
+  seekable: boolean
+  compile(parser: EdgeParser, buffer: EdgeBuffer, token: EdgeToken): void
+}
+
+/** Minimal interface for the Edge tag compiler parser. */
+interface EdgeParser {
+  // Parser is unused in our compile but required by the tag signature
+}
+
+/** Minimal interface for the Edge tag compiler buffer. */
+interface EdgeBuffer {
+  writeStatement(statement: string, filename: string, line: number): void
+  outputExpression(expression: string, filename: string, line: number, escape: boolean): void
+}
+
+/** Minimal interface for the Edge tag compiler token. */
+interface EdgeToken {
+  filename: string
+  loc: { start: { line: number } }
+}
+
 const DIR = dirname(fileURLToPath(import.meta.url))
 const read = (rel: string) => readFileSync(join(DIR, rel), 'utf-8')
 
@@ -32,7 +66,7 @@ const read = (rel: string) => readFileSync(join(DIR, rel), 'utf-8')
  * ```
  */
 export function edgePluginServerStats(config: ServerStatsConfig) {
-  return (edge: any) => {
+  return (edge: EdgeEngine) => {
     // Mount Edge views under the `ss` disk (needed for @include resolution)
     edge.mount('ss', join(DIR, 'views'))
 
@@ -166,7 +200,12 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
 
     // Pre-render via Template directly — bypasses edge.createRenderer() which
     // would re-run #executePlugins and cause infinite recursion.
-    const template = new Template(edge.compiler, edge.globals, {}, edge.processor)
+    const template = new Template(
+      edge.compiler as ConstructorParameters<typeof Template>[0],
+      edge.globals,
+      {},
+      edge.processor as ConstructorParameters<typeof Template>[3]
+    )
     const html = template.render<string>('ss::stats-bar', state)
     const escaped = JSON.stringify(html)
 
@@ -177,7 +216,7 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
       tagName: 'serverStats',
       block: false,
       seekable: true,
-      compile(_parser: any, buffer: any, token: any) {
+      compile(_parser: EdgeParser, buffer: EdgeBuffer, token: EdgeToken) {
         if (hasShouldShow) {
           // Guard: call the lazy __ssShowFn at render time (after auth middleware has run)
           buffer.writeStatement(

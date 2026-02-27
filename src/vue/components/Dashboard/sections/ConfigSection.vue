@@ -7,15 +7,31 @@
 import { ref, computed } from 'vue'
 import FilterBar from '../shared/FilterBar.vue'
 
+interface RedactedValue {
+  __redacted: true
+  __value: string | number | boolean | null
+}
+
+type ConfigValue = string | number | boolean | null | undefined | RedactedValue | ConfigValue[] | { [key: string]: ConfigValue }
+
 interface ConfigNode {
   key: string
-  value: any
+  value: ConfigValue
   redacted?: boolean
   type: string
 }
 
+interface ConfigData {
+  config?: Record<string, unknown>
+  env?: Record<string, unknown>
+  data?: {
+    config?: Record<string, unknown>
+    env?: Record<string, unknown>
+  }
+}
+
 const props = defineProps<{
-  data: any
+  data: ConfigData | null
 }>()
 
 const search = ref('')
@@ -40,17 +56,18 @@ function flattenConfig(obj: Record<string, unknown>, prefix = ''): ConfigNode[] 
   const nodes: ConfigNode[] = []
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key
-    if (value && typeof value === 'object' && !Array.isArray(value) && !(value as any).__redacted) {
+    const isRedacted = value !== null && typeof value === 'object' && !Array.isArray(value) && '__redacted' in value && (value as RedactedValue).__redacted
+    if (value && typeof value === 'object' && !Array.isArray(value) && !isRedacted) {
       nodes.push({
         key: fullKey,
-        value,
+        value: value as ConfigValue,
         type: 'section',
       })
     } else {
       nodes.push({
         key: fullKey,
-        value: (value as any)?.__redacted ? (value as any).__value : value,
-        redacted: (value as any)?.__redacted || false,
+        value: isRedacted ? (value as RedactedValue).__value : (value as ConfigValue),
+        redacted: isRedacted || false,
         type: typeof value,
       })
     }

@@ -7,6 +7,13 @@ import { FilterBar } from '../shared/FilterBar.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
 
+interface CacheResponse {
+  hitRate?: number
+  totalHits?: number
+  totalMisses?: number
+  keys?: Array<{ key: string; type: string; ttl: number; size: number }>
+}
+
 interface CacheSectionProps {
   options?: DashboardHookOptions
 }
@@ -15,8 +22,8 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
   const [search, setSearch] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
 
-  const { data, isLoading, mutate } = useDashboardData('cache', { ...options, search })
-  const cacheData = data as any
+  const { data, isLoading, mutate } = useDashboardData<CacheResponse>('cache', { ...options, search })
+  const cacheData = data
 
   const handleDelete = useCallback(
     async (key: string) => {

@@ -16,6 +16,11 @@ import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
 import type { DevToolbarOptions, ServerStatsConfig } from '../types.js'
 
+/** Minimal interface for Edge.js view rendering on the HTTP context. */
+interface EdgeViewContext {
+  render(template: string, data: Record<string, unknown>): Promise<string>
+}
+
 const warnedDbReads = new Set<string>()
 
 const SRC_DIR = dirname(fileURLToPath(import.meta.url))
@@ -96,7 +101,7 @@ export default class DashboardController {
     const toolbarConfig: Partial<DevToolbarOptions> = config?.devToolbar ?? {}
     const dashPath = this.getDashboardPath()
 
-    return (ctx as any).view.render('ss::dashboard', {
+    return (ctx as unknown as { view: EdgeViewContext }).view.render('ss::dashboard', {
       css: this.cachedCss,
       js: this.cachedJs,
       transmitClient: this.cachedTransmitClient,
@@ -279,6 +284,7 @@ export default class DashboardController {
 
     try {
       const db = this.dashboardStore.getDb()
+      if (!db) return response.notFound({ error: 'Not found' })
       const id = Number(params.id)
       const query: Record<string, unknown> | undefined = await db('server_stats_queries').where('id', id).first()
       if (!query) return response.notFound({ error: 'Query not found' })

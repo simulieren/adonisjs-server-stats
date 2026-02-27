@@ -7,7 +7,7 @@ import { compactPreview } from '../../../core/index.js'
 
 const props = defineProps<{
   /** The value to display (object, array, or primitive). */
-  value: any
+  value: unknown
   /** Maximum preview length. */
   maxLen?: number
 }>()

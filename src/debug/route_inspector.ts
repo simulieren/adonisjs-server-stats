@@ -1,6 +1,6 @@
 import { log } from '../utils/logger.js'
 
-import type { RouteRecord } from './types.js'
+import type { RouteRecord, Router, RouteHandler, MiddlewareStore, MiddlewareItem } from './types.js'
 
 /**
  * Reads the router's route table at boot time and caches it.
@@ -13,7 +13,7 @@ export class RouteInspector {
    * Inspect the router and cache all routes.
    * Call this in the provider's `ready()` hook.
    */
-  inspect(router: any): void {
+  inspect(router: Router): void {
     try {
       // AdonisJS router exposes routes via toJSON()
       const routeData = router.toJSON()
@@ -49,7 +49,7 @@ export class RouteInspector {
     }
   }
 
-  private resolveHandler(handler: any): string {
+  private resolveHandler(handler: string | ((...args: unknown[]) => unknown) | RouteHandler | undefined): string {
     if (!handler) return 'unknown'
     if (typeof handler === 'string') return handler
     if (typeof handler === 'function') return handler.name || 'closure'
@@ -69,13 +69,13 @@ export class RouteInspector {
     return 'unknown'
   }
 
-  private resolveMiddleware(middleware: any): string[] {
+  private resolveMiddleware(middleware: MiddlewareStore | MiddlewareItem[] | undefined): string[] {
     if (!middleware) return []
 
     // AdonisJS v6 middleware is a Middleware instance from @poppinss/middleware.
     // Call .all() to get the Set of middleware items.
-    const items: Iterable<any> =
-      typeof middleware.all === 'function'
+    const items: Iterable<string | ((...args: unknown[]) => unknown) | MiddlewareItem> =
+      !Array.isArray(middleware) && typeof middleware.all === 'function'
         ? middleware.all()
         : Array.isArray(middleware)
           ? middleware

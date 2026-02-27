@@ -34,7 +34,7 @@ export class DashboardApi {
   async fetchSection(section: string, queryString?: string) {
     const path = getDashboardSectionPath(section)
     const url = queryString ? `${this.basePath}${path}?${queryString}` : `${this.basePath}${path}`
-    return this.client.fetch<any>(url)
+    return this.client.fetch<Record<string, unknown>>(url)
   }
 
   /**
@@ -59,7 +59,7 @@ export class DashboardApi {
    * @param id - Query record ID.
    */
   async explainQuery(id: number) {
-    return this.client.fetch<any>(`${this.basePath}/queries/${id}/explain`)
+    return this.client.fetch<Record<string, unknown>>(`${this.basePath}/queries/${id}/explain`)
   }
 
   /**

@@ -11,11 +11,23 @@ interface CacheKey {
   type: string
   ttl: number
   size: number
-  value?: any
+  value?: string | number | boolean | Record<string, unknown> | unknown[] | null
+}
+
+interface CacheData {
+  stats?: {
+    hitRate: number
+    totalHits: number
+    totalMisses: number
+    keyCount: number
+    memoryUsedMb: number
+  }
+  data?: CacheKey[]
+  keys?: CacheKey[]
 }
 
 const props = defineProps<{
-  data: any
+  data: CacheData | null
   onDeleteKey?: (key: string) => Promise<boolean>
 }>()
 

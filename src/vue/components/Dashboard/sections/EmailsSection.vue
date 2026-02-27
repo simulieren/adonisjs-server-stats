@@ -9,8 +9,13 @@ import type { EmailRecord } from '../../../../core/index.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 
+interface EmailsData {
+  data?: EmailRecord[]
+  emails?: EmailRecord[]
+}
+
 const props = defineProps<{
-  data: any
+  data: EmailsData | EmailRecord[] | null
   page: number
   perPage: number
   total: number

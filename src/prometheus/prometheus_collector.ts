@@ -1,11 +1,14 @@
 import { configProvider } from '@adonisjs/core'
 
+import type { Gauge } from 'prom-client'
 import type { ServerStats } from '../types.js'
 import type { ConfigProvider } from '@adonisjs/core/types'
+import type { CommonCollectorOptions } from '@julr/adonisjs-prometheus/types'
+import type { Collector } from '@julr/adonisjs-prometheus/collectors/collector'
 
-export function serverStatsCollector(): ConfigProvider<any> {
+export function serverStatsCollector(): ConfigProvider<Collector> {
   return configProvider.create(async (app) => {
-    const config = app.config.get<any>('prometheus', {})
+    const config = app.config.get<CommonCollectorOptions>('prometheus', {})
 
     // Lazy import the Collector base class
     const { Collector } = await import('@julr/adonisjs-prometheus/collectors/collector')
@@ -14,42 +17,44 @@ export function serverStatsCollector(): ConfigProvider<any> {
       static instance: ServerStatsCollectorImpl | null = null
 
       // Process
-      private cpuPercent!: any
-      private eventLoopLag!: any
+      private cpuPercent!: Gauge
+      private eventLoopLag!: Gauge
 
       // DB Pool
-      private dbPoolUsed!: any
-      private dbPoolFree!: any
-      private dbPoolPending!: any
-      private dbPoolMax!: any
+      private dbPoolUsed!: Gauge
+      private dbPoolFree!: Gauge
+      private dbPoolPending!: Gauge
+      private dbPoolMax!: Gauge
 
       // Redis
-      private redisUp!: any
-      private redisMemoryUsedMb!: any
-      private redisConnectedClients!: any
-      private redisKeysCount!: any
-      private redisHitRatePercent!: any
+      private redisUp!: Gauge
+      private redisMemoryUsedMb!: Gauge
+      private redisConnectedClients!: Gauge
+      private redisKeysCount!: Gauge
+      private redisHitRatePercent!: Gauge
 
       // Queue
-      private queueActiveJobs!: any
-      private queueWaitingJobs!: any
-      private queueDelayedJobs!: any
-      private queueFailedJobs!: any
-      private queueWorkerCount!: any
+      private queueActiveJobs!: Gauge
+      private queueWaitingJobs!: Gauge
+      private queueDelayedJobs!: Gauge
+      private queueFailedJobs!: Gauge
+      private queueWorkerCount!: Gauge
 
       // System
-      private systemLoadAvg!: any
-      private systemMemoryUsedMb!: any
-      private systemMemoryTotalMb!: any
+      private systemLoadAvg!: Gauge<'period'>
+      private systemMemoryUsedMb!: Gauge
+      private systemMemoryTotalMb!: Gauge
 
       // App
-      private appOnlineUsers!: any
-      private appPendingWebhooks!: any
-      private appPendingEmails!: any
+      private appOnlineUsers!: Gauge
+      private appPendingWebhooks!: Gauge
+      private appPendingEmails!: Gauge
 
       register() {
         ServerStatsCollectorImpl.instance = this
-        ServerStatsCollector.instance = this as any
+        ServerStatsCollector.instance = this as unknown as {
+          update(stats: Partial<ServerStats>): void
+        }
 
         this.#registerProcessGauges()
         this.#registerDbPoolGauges()

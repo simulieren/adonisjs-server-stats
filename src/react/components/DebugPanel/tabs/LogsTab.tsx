@@ -10,7 +10,7 @@ interface LogEntry {
   msg: string
   time: number
   requestId?: string
-  [key: string]: any
+  [key: string]: string | number | boolean | undefined
 }
 
 interface LogsTabProps {

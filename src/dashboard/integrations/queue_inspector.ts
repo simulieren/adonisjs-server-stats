@@ -1,6 +1,43 @@
 import type { ApplicationService } from '@adonisjs/core/types'
 
 // ---------------------------------------------------------------------------
+// Minimal interfaces for BullMQ types
+// ---------------------------------------------------------------------------
+
+/** Minimal interface for a BullMQ Job as accessed by the inspector. */
+interface BullMQJob {
+  id: string | number
+  name: string
+  data: Record<string, unknown> | null
+  opts: Record<string, unknown>
+  timestamp: number
+  processedOn: number | null
+  finishedOn: number | null
+  failedReason: string | null
+  stacktrace: string[]
+  returnvalue: unknown
+  attemptsMade: number
+  progress: number | object
+  delay?: number
+  getState(): Promise<string>
+  retry(): Promise<void>
+}
+
+/** Minimal interface for a BullMQ Queue as accessed by the inspector. */
+interface BullMQQueue {
+  getJobCounts(...statuses: string[]): Promise<Record<string, number>>
+  getJobs(statuses: string[], start: number, end: number): Promise<(BullMQJob | null)[]>
+  getJob(id: string): Promise<BullMQJob | null>
+}
+
+/** Minimal interface for the @rlanz/bull-queue manager. */
+interface QueueManager {
+  get?(name: string): BullMQQueue | null
+  getOrSet?(name: string): BullMQQueue
+  getJobCounts?(...statuses: string[]): Promise<Record<string, number>>
+}
+
+// ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
 
@@ -102,7 +139,7 @@ const ALL_STATUSES: JobStatus[] = ['active', 'waiting', 'delayed', 'completed', 
  * All methods catch errors and return safe defaults.
  */
 export class QueueInspector {
-  constructor(private queueManager: any) {}
+  constructor(private queueManager: QueueManager) {}
 
   /**
    * Detect whether `@rlanz/bull-queue` is available in the application container.
@@ -177,13 +214,13 @@ export class QueueInspector {
       const statuses: JobStatus[] = status === 'all' ? ALL_STATUSES : [status]
 
       const [rawJobs, counts] = await Promise.all([
-        queue.getJobs(statuses, start, end) as Promise<any[]>,
+        queue.getJobs(statuses, start, end) as Promise<(BullMQJob | null)[]>,
         queue.getJobCounts(...ALL_STATUSES) as Promise<Record<string, number>>,
       ])
 
       const jobs: QueueJobSummary[] = (rawJobs ?? [])
-        .filter((job: any) => job !== null && job !== undefined)
-        .map((job: any) => {
+        .filter((job: BullMQJob | null): job is BullMQJob => job !== null && job !== undefined)
+        .map((job: BullMQJob) => {
           const jobState = this.inferStatus(job) ?? (status === 'all' ? 'completed' : status)
           return this.formatJobSummary(job, jobState)
         })
@@ -258,7 +295,7 @@ export class QueueInspector {
    *
    * `@rlanz/bull-queue` exposes queues via `.get(name)` or `.getOrSet(name)`.
    */
-  private getQueue(): any {
+  private getQueue(): BullMQQueue | null {
     try {
       // @rlanz/bull-queue: .get(name) returns the BullMQ Queue instance
       if (typeof this.queueManager.get === 'function') {
@@ -272,7 +309,7 @@ export class QueueInspector {
 
       // Last resort: the manager itself is already a Queue instance
       if (typeof this.queueManager.getJobCounts === 'function') {
-        return this.queueManager
+        return this.queueManager as unknown as BullMQQueue
       }
 
       return null
@@ -284,7 +321,7 @@ export class QueueInspector {
   /**
    * Infer a job's status from its internal fields (avoids async getState() call).
    */
-  private inferStatus(job: any): JobStatus | null {
+  private inferStatus(job: BullMQJob): JobStatus | null {
     if (job.failedReason || job.stacktrace?.length) return 'failed'
     if (job.finishedOn) return 'completed'
     if (job.processedOn) return 'active'
@@ -319,7 +356,7 @@ export class QueueInspector {
   /**
    * Format a Bull job into our summary shape.
    */
-  private formatJobSummary(job: any, status: JobStatus): QueueJobSummary {
+  private formatJobSummary(job: BullMQJob, status: JobStatus): QueueJobSummary {
     const processedAt = job.processedOn ?? null
     const finishedAt = job.finishedOn ?? null
     const duration = processedAt !== null && finishedAt !== null ? finishedAt - processedAt : null
@@ -334,7 +371,7 @@ export class QueueInspector {
       data,
       payload: data,
       attempts: job.attemptsMade ?? 0,
-      maxAttempts: job.opts?.attempts ?? 1,
+      maxAttempts: (job.opts?.attempts as number) ?? 1,
       progress: job.progress ?? 0,
       failedReason: job.failedReason ?? null,
       createdAt,

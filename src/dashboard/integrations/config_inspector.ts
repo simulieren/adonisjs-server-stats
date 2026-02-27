@@ -92,7 +92,7 @@ export class ConfigInspector {
    */
   getConfig(): SanitizedConfig {
     try {
-      const raw = (this.app as any).config?.all?.() ?? {}
+      const raw = (this.app as unknown as { config?: { all?: () => Record<string, unknown> } }).config?.all?.() ?? {}
       return { config: sanitizeObject(raw) as Record<string, unknown> }
     } catch {
       return { config: {} }

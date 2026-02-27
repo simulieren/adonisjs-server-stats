@@ -9,7 +9,7 @@ import Sparkline from '../../StatsBar/Sparkline.vue'
 import TimeRangeSelector from '../shared/TimeRangeSelector.vue'
 
 const props = defineProps<{
-  data: any
+  data: OverviewData | null
   timeRange: TimeRange
   onFetchChart?: (range: TimeRange) => Promise<unknown>
 }>()

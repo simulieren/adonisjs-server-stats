@@ -11,7 +11,7 @@ interface LogEntry {
   message: string
   requestId?: string
   timestamp: number
-  data?: any
+  data?: Record<string, unknown>
 }
 
 const props = defineProps<{

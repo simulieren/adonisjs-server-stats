@@ -7,8 +7,13 @@ import type { RouteRecord } from '../../../../core/index.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import FilterBar from '../shared/FilterBar.vue'
 
+interface RoutesData {
+  data?: RouteRecord[]
+  routes?: RouteRecord[]
+}
+
 const props = defineProps<{
-  data: any
+  data: RoutesData | RouteRecord[] | null
 }>()
 
 const search = ref('')

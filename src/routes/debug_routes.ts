@@ -3,6 +3,12 @@ import { createAccessMiddleware } from './access_middleware.js'
 import type DebugController from '../controller/debug_controller.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
+/** Minimal interface for the AdonisJS router used in route registration. */
+interface AdonisRouter {
+  get(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): unknown }
+  group(callback: () => void): { prefix(path: string): { use(middleware: unknown[]): void } }
+}
+
 /**
  * Register all debug toolbar API routes under the given base path.
  *
@@ -15,7 +21,7 @@ import type { HttpContext } from '@adonisjs/core/http'
  * @param shouldShow    Optional access-control callback.
  */
 export function registerDebugRoutes(
-  router: any,
+  router: AdonisRouter,
   basePath: string,
   getController: () => DebugController | null,
   shouldShow?: (ctx: HttpContext) => boolean
@@ -31,7 +37,7 @@ export function registerDebugRoutes(
           error: 'Debug toolbar is starting up, please retry',
         })
       }
-      return (controller[method] as any).call(controller, ctx)
+      return (controller[method] as (ctx: HttpContext) => Promise<unknown>).call(controller, ctx)
     }
   }
 

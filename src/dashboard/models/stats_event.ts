@@ -22,7 +22,7 @@ export default class StatsEvent extends BaseModel {
     prepare: (value: unknown) => (value ? JSON.stringify(value) : null),
     consume: (value: string | null) => (value ? JSON.parse(value) : null),
   })
-  declare data: any | null
+  declare data: Record<string, unknown> | null
 
   @column({ columnName: 'created_at' })
   declare createdAt: string
