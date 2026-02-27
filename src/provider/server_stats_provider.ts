@@ -514,7 +514,7 @@ export default class ServerStatsProvider {
 
       // Persist asynchronously (fire-and-forget)
       dashStore
-        .persistRequest(method, url, statusCode, duration, newQueries, trace ?? null)
+        .persistRequest({ method, url, statusCode, duration, queries: newQueries, trace: trace ?? null })
         .then((requestId) => {
           if (requestId !== null && newEvents.length > 0) {
             return dashStore.recordEvents(requestId, newEvents)

@@ -27,6 +27,20 @@ interface EventEmitter {
 // Filter types
 // ---------------------------------------------------------------------------
 
+export interface RequestInput {
+  method: string
+  url: string
+  statusCode: number
+  duration: number
+  spanCount?: number
+  warningCount?: number
+}
+
+export interface PersistRequestInput extends RequestInput {
+  queries: QueryRecord[]
+  trace: TraceRecord | null
+}
+
 export interface RequestFilters {
   method?: string
   url?: string
@@ -208,25 +222,18 @@ export class DashboardStore {
    * Record a completed request. Returns the inserted row ID, or null
    * if the request was self-excluded or an error occurred.
    */
-  async recordRequest(
-    method: string,
-    url: string,
-    statusCode: number,
-    duration: number,
-    spanCount: number = 0,
-    warningCount: number = 0
-  ): Promise<number | null> {
+  async recordRequest(input: RequestInput): Promise<number | null> {
     if (!this.db) return null
-    if (url.startsWith(this.dashboardPath)) return null
+    if (input.url.startsWith(this.dashboardPath)) return null
 
     try {
       const [id] = await this.db('server_stats_requests').insert({
-        method,
-        url,
-        status_code: statusCode,
-        duration: round(duration),
-        span_count: spanCount,
-        warning_count: warningCount,
+        method: input.method,
+        url: input.url,
+        status_code: input.statusCode,
+        duration: round(input.duration),
+        span_count: input.spanCount ?? 0,
+        warning_count: input.warningCount ?? 0,
       })
       return id
     } catch (err) {
@@ -373,28 +380,21 @@ export class DashboardStore {
    * Convenience: persist a full request with associated queries and trace.
    * Calls recordRequest, recordQueries, and recordTrace in sequence.
    */
-  async persistRequest(
-    method: string,
-    url: string,
-    statusCode: number,
-    duration: number,
-    queries: QueryRecord[],
-    trace: TraceRecord | null
-  ): Promise<number | null> {
-    const requestId = await this.recordRequest(
-      method,
-      url,
-      statusCode,
-      duration,
-      trace?.spanCount ?? 0,
-      trace?.warnings?.length ?? 0
-    )
+  async persistRequest(input: PersistRequestInput): Promise<number | null> {
+    const requestId = await this.recordRequest({
+      method: input.method,
+      url: input.url,
+      statusCode: input.statusCode,
+      duration: input.duration,
+      spanCount: input.trace?.spanCount ?? 0,
+      warningCount: input.trace?.warnings?.length ?? 0,
+    })
 
     if (requestId === null) return null
 
-    await this.recordQueries(requestId, queries)
-    if (trace) {
-      await this.recordTrace(requestId, trace)
+    await this.recordQueries(requestId, input.queries)
+    if (input.trace) {
+      await this.recordTrace(requestId, input.trace)
     }
 
     return requestId
