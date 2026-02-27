@@ -8,7 +8,7 @@ import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 
-import type { DashboardHookOptions } from '../../../../core/types.js'
+import type { BadgeColor, DashboardHookOptions } from '../../../../core/types.js'
 
 interface JobsSectionProps {
   options?: DashboardHookOptions
@@ -126,13 +126,13 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                 label: 'Status',
                 width: '90px',
                 render: (v: string) => (
-                  <Badge color={(statusColor[v] || 'muted') as any}>{v}</Badge>
+                  <Badge color={(statusColor[v] || 'muted') as BadgeColor}>{v}</Badge>
                 ),
               },
               {
                 key: 'payload',
                 label: 'Payload',
-                render: (v: any, row: any) => (
+                render: (v: unknown, row: Record<string, unknown>) => (
                   <JsonViewer data={v || row?.data} maxPreviewLength={60} />
                 ),
               },
@@ -162,22 +162,22 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                 key: 'timestamp',
                 label: 'Time',
                 width: '70px',
-                render: (v: any, row: any) => (
-                  <span className="ss-dash-event-time">{timeAgo(v || row?.createdAt)}</span>
+                render: (v: unknown, row: Record<string, unknown>) => (
+                  <span className="ss-dash-event-time">{timeAgo((v || row?.createdAt) as string)}</span>
                 ),
               },
               {
                 key: '_actions',
                 label: '',
                 width: '50px',
-                render: (_: any, row: any) =>
+                render: (_: unknown, row: Record<string, unknown>) =>
                   row.status === 'failed' ? (
                     <button
                       type="button"
                       className="ss-dash-btn-retry"
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleRetry(row.id)
+                        handleRetry(row.id as string)
                       }}
                     >
                       Retry

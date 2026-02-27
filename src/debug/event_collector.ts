@@ -9,7 +9,7 @@ import type { EventRecord } from './types.js'
  */
 export class EventCollector {
   private buffer: RingBuffer<EventRecord>
-  private originalEmit: ((...args: any[]) => any) | null = null
+  private originalEmit: ((...args: unknown[]) => unknown) | null = null
   private emitter: any = null
 
   constructor(maxEvents: number = 200) {
@@ -58,7 +58,7 @@ export class EventCollector {
     this.emitter = null
   }
 
-  private summarizeData(data: any): string | null {
+  private summarizeData(data: unknown): string | null {
     if (data === undefined || data === null) return null
 
     try {
@@ -67,8 +67,9 @@ export class EventCollector {
       // Cap at 4KB per event to avoid memory bloat
       return json.length > 4096 ? json.slice(0, 4096) + '\n...' : json
     } catch {
-      if (typeof data === 'object' && data.constructor?.name) {
-        return `[${data.constructor.name}]`
+      if (typeof data === 'object' && data !== null) {
+        const ctorName = (data as { constructor?: { name?: string } }).constructor?.name
+        if (ctorName) return `[${ctorName}]`
       }
       return typeof data
     }
@@ -76,7 +77,7 @@ export class EventCollector {
 
   private safeReplacer() {
     const seen = new WeakSet()
-    return (_key: string, value: any) => {
+    return (_key: string, value: unknown) => {
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) return '[Circular]'
         seen.add(value)

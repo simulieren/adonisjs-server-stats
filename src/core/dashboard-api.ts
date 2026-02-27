@@ -43,14 +43,14 @@ export class DashboardApi {
    * @param range - Time range identifier (e.g. `'1h'`, `'24h'`).
    */
   async fetchChart(range: string) {
-    return this.client.fetch<any>(`${this.basePath}/overview/chart?range=${range}`)
+    return this.client.fetch<Record<string, unknown>>(`${this.basePath}/overview/chart?range=${range}`)
   }
 
   /**
    * Fetch grouped/aggregated query patterns.
    */
   async fetchGroupedQueries() {
-    return this.client.fetch<any>(`${this.basePath}/queries/grouped`)
+    return this.client.fetch<Record<string, unknown>[]>(`${this.basePath}/queries/grouped`)
   }
 
   /**
@@ -68,7 +68,7 @@ export class DashboardApi {
    * @param id - Job record ID.
    */
   async retryJob(id: string) {
-    return this.client.fetch<any>(`${this.basePath}/jobs/${id}/retry`, { method: 'POST' })
+    return this.client.fetch<{ message: string }>(`${this.basePath}/jobs/${id}/retry`, { method: 'POST' })
   }
 
   /**
@@ -77,7 +77,7 @@ export class DashboardApi {
    * @param key - Cache key (will be URI-encoded).
    */
   async deleteCacheKey(key: string) {
-    return this.client.fetch<any>(`${this.basePath}/cache/${encodeURIComponent(key)}`, {
+    return this.client.fetch<{ deleted: boolean }>(`${this.basePath}/cache/${encodeURIComponent(key)}`, {
       method: 'DELETE',
     })
   }
@@ -88,6 +88,6 @@ export class DashboardApi {
    * @param id - Email record ID.
    */
   async fetchEmailPreview(id: number) {
-    return this.client.fetch<any>(`${this.basePath}/emails/${id}/preview`)
+    return this.client.fetch<string>(`${this.basePath}/emails/${id}/preview`)
   }
 }

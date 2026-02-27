@@ -533,5 +533,5 @@ export interface ServerStatsConfig {
    * shouldShow: () => process.env.NODE_ENV === 'development'
    * ```
    */
-  shouldShow?: (ctx: any) => boolean
+  shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
 }

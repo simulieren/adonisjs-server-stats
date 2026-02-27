@@ -18,7 +18,7 @@ export interface Column {
 
 const props = defineProps<{
   columns: Column[]
-  rows: any[]
+  rows: Record<string, unknown>[]
   sortColumn?: string
   sortDirection?: 'asc' | 'desc'
   emptyMessage?: string
@@ -27,7 +27,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   sort: [column: string]
-  rowClick: [row: any, index: number]
+  rowClick: [row: Record<string, unknown>, index: number]
 }>()
 
 function handleSort(col: Column) {

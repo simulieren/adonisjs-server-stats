@@ -136,7 +136,7 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
       ...(showDebug ? [[{ id: 'dbg-queries', label: 'QRY' }]] : []),
     ]
 
-    const state: Record<string, any> = {
+    const state: Record<string, unknown> = {
       css,
       js,
       endpoint,

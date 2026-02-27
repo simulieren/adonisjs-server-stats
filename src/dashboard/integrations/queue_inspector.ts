@@ -35,10 +35,10 @@ export interface QueueJobSummary {
   status: 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'paused'
 
   /** Job payload (data). */
-  data: any
+  data: Record<string, unknown> | null
 
   /** Alias for `data` — used by some frontends. */
-  payload: any
+  payload: Record<string, unknown> | null
 
   /** Number of attempts so far. */
   attempts: number
@@ -73,10 +73,10 @@ export interface QueueJobDetail extends QueueJobSummary {
   stackTrace: string[]
 
   /** Return value from the job handler, if any. */
-  returnValue: any
+  returnValue: unknown
 
   /** Job options (delay, priority, repeat, etc.). */
-  opts: Record<string, any>
+  opts: Record<string, unknown>
 }
 
 export interface QueueJobListResult {

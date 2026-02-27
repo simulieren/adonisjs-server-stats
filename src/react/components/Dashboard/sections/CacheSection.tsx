@@ -81,13 +81,13 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
               key: '_actions',
               label: '',
               width: '60px',
-              render: (_: any, row: any) => (
+              render: (_: unknown, row: Record<string, unknown>) => (
                 <button
                   type="button"
                   className="ss-dash-btn-danger"
                   onClick={(e) => {
                     e.stopPropagation()
-                    handleDelete(row.key)
+                    handleDelete(row.key as string)
                   }}
                 >
                   Delete
@@ -97,7 +97,7 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
           ]}
           data={cacheData.keys || []}
           keyField="key"
-          onRowClick={(row: any) => setSelectedKey(selectedKey === row.key ? null : row.key)}
+          onRowClick={(row: Record<string, unknown>) => setSelectedKey(selectedKey === row.key ? null : row.key as string)}
           emptyMessage="No cache keys found"
         />
       )}

@@ -9,14 +9,15 @@ import type { EventRecord } from '../../../../core/index.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
 const props = defineProps<{
-  data: any
+  data: { events?: EventRecord[] } | EventRecord[] | null
   dashboardPath?: string
 }>()
 
 const search = ref('')
 
 const events = computed<EventRecord[]>(() => {
-  const arr = props.data?.events || props.data || []
+  const d = props.data
+  const arr = d ? (Array.isArray(d) ? d : d.events) || [] : []
   if (!search.value.trim()) return arr
   const term = search.value.toLowerCase()
   return arr.filter(
@@ -26,7 +27,8 @@ const events = computed<EventRecord[]>(() => {
 })
 
 const summary = computed(() => {
-  const arr = props.data?.events || props.data || []
+  const d = props.data
+  const arr = d ? (Array.isArray(d) ? d : d.events) || [] : []
   return `${arr.length} events`
 })
 

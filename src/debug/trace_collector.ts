@@ -102,7 +102,7 @@ export class TraceCollector {
     category: TraceSpan['category'],
     startOffset: number,
     duration: number,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void {
     const ctx = this.als.getStore()
     if (!ctx) return
@@ -173,7 +173,7 @@ export class TraceCollector {
 
     // Intercept console.warn to capture warnings per-request
     this.originalConsoleWarn = console.warn
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       const ctx = this.als.getStore()
       if (ctx) {
         ctx.warnings.push(args.map(String).join(' '))

@@ -57,7 +57,7 @@ export class DebugStore {
 
   /** Serialize all collector data to a JSON file (atomic write). */
   async saveToDisk(filePath: string): Promise<void> {
-    const data: Record<string, any> = {
+    const data: Record<string, unknown> = {
       queries: this.queries.getQueries(),
       events: this.events.getEvents(),
       emails: this.emails.getEmails(),
@@ -77,9 +77,9 @@ export class DebugStore {
     let raw: string
     try {
       raw = await readFile(filePath, 'utf-8')
-    } catch (error: any) {
-      if (error?.code !== 'ENOENT') {
-        log.warn(`Failed to read persisted debug data from ${bold(filePath)}: ${error?.message}`)
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+        log.warn(`Failed to read persisted debug data from ${bold(filePath)}: ${(error as Error)?.message}`)
       }
       return
     }

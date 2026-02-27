@@ -8,14 +8,16 @@ import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { TraceRecord, TraceSpan } from '../../../../core/index.js'
 
 const props = defineProps<{
-  data: any
+  data: { traces?: TraceRecord[] } | TraceRecord[] | null
   dashboardPath?: string
 }>()
 
 const selectedTrace = ref<TraceRecord | null>(null)
 
 const traces = computed<TraceRecord[]>(() => {
-  return props.data?.traces || props.data || []
+  const d = props.data
+  if (!d) return []
+  return Array.isArray(d) ? d : d.traces || []
 })
 
 const CATEGORY_COLORS: Record<string, string> = {

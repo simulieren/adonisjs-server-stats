@@ -1,6 +1,7 @@
 import { createAccessMiddleware } from './access_middleware.js'
 
 import type DebugController from '../controller/debug_controller.js'
+import type { HttpContext } from '@adonisjs/core/http'
 
 /**
  * Register all debug toolbar API routes under the given base path.
@@ -17,13 +18,13 @@ export function registerDebugRoutes(
   router: any,
   basePath: string,
   getController: () => DebugController | null,
-  shouldShow?: (ctx: any) => boolean
+  shouldShow?: (ctx: HttpContext) => boolean
 ) {
   const base = basePath.replace(/\/+$/, '')
   const middleware = shouldShow ? [createAccessMiddleware(shouldShow)] : []
 
   const bind = (method: keyof DebugController) => {
-    return async (ctx: any) => {
+    return async (ctx: HttpContext) => {
       const controller = getController()
       if (!controller) {
         return ctx.response.serviceUnavailable({

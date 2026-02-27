@@ -12,7 +12,7 @@ export interface RedactedValue {
 
 export interface SanitizedConfig {
   /** App configuration from `app.config.all()` with secrets redacted. */
-  config: Record<string, any>
+  config: Record<string, unknown>
 }
 
 export interface SanitizedEnvVars {
@@ -93,7 +93,7 @@ export class ConfigInspector {
   getConfig(): SanitizedConfig {
     try {
       const raw = (this.app as any).config?.all?.() ?? {}
-      return { config: sanitizeObject(raw) }
+      return { config: sanitizeObject(raw) as Record<string, unknown> }
     } catch {
       return { config: {} }
     }
@@ -150,7 +150,7 @@ function isSensitiveValue(value: string): boolean {
  * Recursively sanitize an object, redacting string values whose keys
  * match sensitive patterns. Booleans and numbers are never redacted.
  */
-function sanitizeObject(obj: any, seen = new WeakSet()): any {
+function sanitizeObject(obj: unknown, seen = new WeakSet<object>()): unknown {
   if (obj === null || obj === undefined) return obj
 
   // Primitive types pass through
@@ -164,9 +164,10 @@ function sanitizeObject(obj: any, seen = new WeakSet()): any {
     return obj.map((item) => sanitizeObject(item, seen))
   }
 
-  const result: Record<string, any> = {}
-  for (const key of Object.keys(obj)) {
-    const value = obj[key]
+  const record = obj as Record<string, unknown>
+  const result: Record<string, unknown> = {}
+  for (const key of Object.keys(record)) {
+    const value = record[key]
 
     if (typeof value === 'string' && (isSensitiveKey(key) || isSensitiveValue(value))) {
       result[key] = redact(value)

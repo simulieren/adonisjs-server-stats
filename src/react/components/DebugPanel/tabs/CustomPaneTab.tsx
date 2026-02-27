@@ -4,7 +4,7 @@ import { formatTime, timeAgo, formatDuration, compactPreview } from '../../../..
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
-import type { DebugPane, DebugPanelProps } from '../../../../core/types.js'
+import type { DebugPane, DebugPanelProps, DebugTab } from '../../../../core/types.js'
 
 interface CustomPaneTabProps {
   pane: DebugPane
@@ -24,8 +24,8 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     debugEndpoint: '', // Direct endpoint
   }
 
-  const { data, isLoading, error, clearData } = useDebugData<any>(
-    pane.endpoint.replace(/^\//, '') as any,
+  const { data, isLoading, error, clearData } = useDebugData<Record<string, unknown>>(
+    pane.endpoint.replace(/^\//, '') as DebugTab,
     {
       ...options,
       debugEndpoint: '', // Use endpoint directly
@@ -38,9 +38,9 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     if (!data) return []
     const key = pane.dataKey || pane.id
     // Support dot notation
-    let result = data
+    let result: unknown = data
     for (const part of key.split('.')) {
-      result = result?.[part]
+      result = (result as Record<string, unknown>)?.[part]
     }
     return Array.isArray(result) ? result : []
   }, [data, pane.dataKey, pane.id])
@@ -51,7 +51,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     const lower = search.toLowerCase()
     const searchableKeys = pane.columns.filter((c) => c.searchable).map((c) => c.key)
     if (searchableKeys.length === 0) return rows
-    return rows.filter((row: any) =>
+    return rows.filter((row: Record<string, unknown>) =>
       searchableKeys.some((key) => {
         const val = row[key]
         return val !== null && String(val).toLowerCase().includes(lower)
@@ -59,7 +59,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     )
   }, [rows, search, pane.columns])
 
-  const formatCell = (value: any, col: (typeof pane.columns)[0]): React.ReactNode => {
+  const formatCell = (value: unknown, col: (typeof pane.columns)[0]): React.ReactNode => {
     if (value === null || value === undefined) {
       return <span style={{ color: 'var(--ss-dim)' }}>-</span>
     }
@@ -69,9 +69,9 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
       case 'time':
         return typeof value === 'number' ? formatTime(value) : String(value)
       case 'timeAgo':
-        return <span className="ss-dbg-event-time">{timeAgo(value)}</span>
+        return <span className="ss-dbg-event-time">{timeAgo(value as string)}</span>
       case 'duration': {
-        const ms = typeof value === 'number' ? value : parseFloat(value)
+        const ms = typeof value === 'number' ? value : parseFloat(String(value))
         if (isNaN(ms)) return String(value)
         return (
           <span
@@ -84,7 +84,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
       case 'method':
         return (
           <span className={`ss-dbg-method ss-dbg-method-${String(value).toLowerCase()}`}>
-            {value}
+            {String(value)}
           </span>
         )
       case 'json': {
@@ -96,13 +96,13 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
             /* use as-is */
           }
         }
-        return compactPreview(parsed, 80)
+        return compactPreview(parsed as Record<string, unknown>, 80)
       }
       case 'badge': {
         const sv = String(value).toLowerCase()
         const colorMap = col.badgeColorMap || {}
         const color = colorMap[sv] || 'muted'
-        return <span className={`ss-dbg-badge ss-dbg-badge-${color}`}>{value}</span>
+        return <span className={`ss-dbg-badge ss-dbg-badge-${color}`}>{String(value)}</span>
       }
       default:
         return String(value)
@@ -158,7 +158,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
             </tr>
           </thead>
           <tbody>
-            {filteredRows.map((row: any, i: number) => (
+            {filteredRows.map((row, i) => (
               <tr key={row.id ?? i}>
                 {pane.columns.map((col) => (
                   <td key={col.key}>{formatCell(row[col.key], col)}</td>

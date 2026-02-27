@@ -70,10 +70,10 @@ export class StatsEngine {
       this.collectors.map(async (collector) => {
         try {
           return await collector.collect()
-        } catch (err: any) {
+        } catch (err) {
           if (!this.warnedCollectors.has(collector.name)) {
             this.warnedCollectors.add(collector.name)
-            log.warn(`collector "${collector.name}" threw during collect() — ${err.message}`)
+            log.warn(`collector "${collector.name}" threw during collect() — ${(err as Error).message}`)
           }
           return {}
         }

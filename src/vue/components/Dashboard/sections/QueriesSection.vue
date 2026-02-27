@@ -16,8 +16,8 @@ const props = defineProps<{
   page: number
   perPage: number
   total: number
-  onExplainQuery?: (queryId: number) => Promise<any>
-  onFetchGrouped?: () => Promise<any>
+  onExplainQuery?: (queryId: number) => Promise<unknown>
+  onFetchGrouped?: () => Promise<unknown>
 }>()
 
 const emit = defineEmits<{
@@ -28,7 +28,7 @@ const emit = defineEmits<{
 const search = ref('')
 const viewMode = ref<'list' | 'grouped'>('list')
 const groupedData = ref<GroupedQuery[]>([])
-const explainResult = ref<any>(null)
+const explainResult = ref<unknown>(null)
 const explainQueryId = ref<number | null>(null)
 const expandedIds = new Set<number>()
 
@@ -54,7 +54,10 @@ async function switchToGrouped() {
   viewMode.value = 'grouped'
   if (props.onFetchGrouped) {
     const result = await props.onFetchGrouped()
-    if (result) groupedData.value = result.data || result || []
+    if (result) {
+      const r = result as Record<string, unknown>
+      groupedData.value = (r.data as GroupedQuery[]) || (result as GroupedQuery[]) || []
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import { createAccessMiddleware } from '../routes/access_middleware.js'
 
+import type { HttpContext } from '@adonisjs/core/http'
 import type DashboardController from './dashboard_controller.js'
 
 /**
@@ -19,7 +20,7 @@ export function registerDashboardRoutes(
   router: any,
   dashboardPath: string,
   getController: () => DashboardController | null,
-  shouldShow?: (ctx: any) => boolean
+  shouldShow?: (ctx: HttpContext) => boolean
 ) {
   // Normalize: strip trailing slash
   const base = dashboardPath.replace(/\/+$/, '')
@@ -27,7 +28,7 @@ export function registerDashboardRoutes(
   // Helper to bind a controller method as a closure route handler.
   // Returns 503 if the controller isn't ready yet (server still booting).
   const bind = (method: keyof DashboardController) => {
-    return async (ctx: any) => {
+    return async (ctx: HttpContext) => {
       const controller = getController()
       if (!controller) {
         return ctx.response.serviceUnavailable({ error: 'Dashboard is starting up, please retry' })

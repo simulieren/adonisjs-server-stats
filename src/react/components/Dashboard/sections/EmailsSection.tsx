@@ -7,7 +7,7 @@ import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 
-import type { DashboardHookOptions } from '../../../../core/types.js'
+import type { BadgeColor, DashboardHookOptions } from '../../../../core/types.js'
 
 interface EmailsSectionProps {
   options?: DashboardHookOptions
@@ -20,13 +20,13 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
 
   const { data, meta, isLoading } = useDashboardData('emails', { ...options, page, search })
-  const emails = (data as any[]) || []
+  const emails = (data as Record<string, unknown>[]) || []
 
   const handlePreview = useCallback(
-    async (email: any) => {
+    async (email: Record<string, unknown>) => {
       if (email.html) {
-        setPreviewId(email.id)
-        setPreviewHtml(email.html)
+        setPreviewId(email.id as number)
+        setPreviewHtml(email.html as string)
         return
       }
       // Fetch preview from API
@@ -37,7 +37,7 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`
         const resp = await fetch(url, { headers, credentials: 'same-origin' })
         const html = await resp.text()
-        setPreviewId(email.id)
+        setPreviewId(email.id as number)
         setPreviewHtml(html)
       } catch {
         // Silently fail
@@ -54,7 +54,7 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
   }
 
   if (previewId && previewHtml) {
-    const email = emails.find((e: any) => e.id === previewId)
+    const email = emails.find((e) => e.id === previewId)
     return (
       <div className="ss-dash-email-preview">
         <div className="ss-dash-email-preview-header">
@@ -62,13 +62,13 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
             {email && (
               <>
                 <div>
-                  <strong>Subject:</strong> {email.subject}
+                  <strong>Subject:</strong> {email.subject as string}
                 </div>
                 <div>
-                  <strong>From:</strong> {email.from_addr || email.from}
+                  <strong>From:</strong> {(email.from_addr || email.from) as string}
                 </div>
                 <div>
-                  <strong>To:</strong> {email.to_addr || email.to}
+                  <strong>To:</strong> {(email.to_addr || email.to) as string}
                 </div>
               </>
             )}
@@ -116,7 +116,7 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                 label: 'Status',
                 width: '80px',
                 render: (v: string) => (
-                  <Badge color={(statusColor[v] || 'muted') as any}>{v}</Badge>
+                  <Badge color={(statusColor[v] || 'muted') as BadgeColor}>{v}</Badge>
                 ),
               },
               {

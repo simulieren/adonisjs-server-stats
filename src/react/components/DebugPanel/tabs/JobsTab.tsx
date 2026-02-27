@@ -78,7 +78,7 @@ export function JobsTab({ options }: JobsTabProps) {
     return <div className="ss-dbg-empty">Queue inspector not available</div>
   }
 
-  const stats = data.stats || (data as any).overview
+  const stats = data.stats || (data as Record<string, unknown>).overview
 
   return (
     <div>
@@ -152,7 +152,7 @@ export function JobsTab({ options }: JobsTabProps) {
                   </span>
                 </td>
                 <td>
-                  <JsonViewer data={(job as any).payload || job.data} maxPreviewLength={60} />
+                  <JsonViewer data={job.payload || job.data} maxPreviewLength={60} />
                 </td>
                 <td style={{ color: 'var(--ss-muted)', textAlign: 'center' }}>{job.attempts}</td>
                 <td className="ss-dbg-duration">

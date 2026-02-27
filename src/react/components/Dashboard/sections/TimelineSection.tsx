@@ -20,7 +20,7 @@ export function TimelineSection({ options = {} }: TimelineSectionProps) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
 
   const { data, meta, isLoading } = useDashboardData('traces', { ...options, page, search })
-  const traces = (data as any[]) || []
+  const traces = (data as Record<string, unknown>[]) || []
 
   // Fetch individual trace detail
   const { data: traceDetail } = useDashboardData(
@@ -104,7 +104,7 @@ export function TimelineSection({ options = {} }: TimelineSectionProps) {
               },
             ]}
             data={traces}
-            onRowClick={(row: any) => setSelectedId(row.id)}
+            onRowClick={(row: Record<string, unknown>) => setSelectedId(row.id as number)}
             emptyMessage="No traces recorded"
           />
           {meta && (

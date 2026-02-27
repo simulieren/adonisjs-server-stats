@@ -18,7 +18,7 @@ export function EventsSection({ options = {} }: EventsSectionProps) {
   const [search, setSearch] = useState('')
 
   const { data, meta, isLoading } = useDashboardData('events', { ...options, page, search })
-  const events = (data as any[]) || []
+  const events = (data as Record<string, unknown>[]) || []
 
   return (
     <div>
@@ -38,7 +38,7 @@ export function EventsSection({ options = {} }: EventsSectionProps) {
               {
                 key: 'data',
                 label: 'Data',
-                render: (v: any) => <JsonViewer data={v} maxPreviewLength={80} />,
+                render: (v: unknown) => <JsonViewer data={v} maxPreviewLength={80} />,
               },
               {
                 key: 'created_at',

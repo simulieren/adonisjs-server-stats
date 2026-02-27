@@ -16,7 +16,7 @@ export interface QueryRecord {
   sql: string
 
   /** Bound parameter values for the query placeholders. */
-  bindings: any[]
+  bindings: unknown[]
 
   /** Query execution time in **milliseconds**. */
   duration: number
@@ -161,7 +161,7 @@ export interface TraceSpan {
   duration: number
 
   /** Optional metadata (query bindings, status code, etc.). */
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 /**

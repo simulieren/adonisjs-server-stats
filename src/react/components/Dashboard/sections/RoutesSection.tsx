@@ -14,7 +14,7 @@ interface RoutesSectionProps {
 export function RoutesSection({ options = {} }: RoutesSectionProps) {
   const [search, setSearch] = useState('')
   const { data, isLoading } = useDashboardData('routes', { ...options, search })
-  const routes = (data as any[]) || []
+  const routes = (data as Record<string, unknown>[]) || []
 
   return (
     <div>

@@ -49,7 +49,7 @@ export default class ServerStatsProvider {
       setShouldShow(config.shouldShow)
     }
 
-    let router: any = null
+    let router: unknown = null
     try {
       router = await this.app.container.make('router')
     } catch {
@@ -125,8 +125,8 @@ export default class ServerStatsProvider {
       const edge = await import('edge.js')
       const { edgePluginServerStats } = await import('../edge/plugin.js')
       edge.default.use(edgePluginServerStats(config))
-    } catch (err: any) {
-      log.warn('could not register Edge plugin — @serverStats() tag will not work: ' + err?.message)
+    } catch (err) {
+      log.warn('could not register Edge plugin — @serverStats() tag will not work: ' + (err as Error)?.message)
     }
   }
 
@@ -199,22 +199,23 @@ export default class ServerStatsProvider {
     const logStream = getLogStreamService()
     if (!logStream) return // logCollector() not in the config
 
-    let logger: any
+    let logger: unknown
     try {
       logger = await this.app.container.make('logger')
     } catch {
       // Logger not available
     }
 
-    const pino = logger?.pino
+    const pino = (logger as Record<string, unknown> | null)?.pino
     if (!pino) return
 
     const streamSym = Symbol.for('pino.stream')
-    const stream = pino[streamSym]
-    if (!stream || typeof stream.write !== 'function') return
+    const rawStream = (pino as Record<symbol, unknown>)[streamSym]
+    if (!rawStream || typeof (rawStream as Record<string, unknown>).write !== 'function') return
 
+    const stream = rawStream as { write: Function; [key: string]: unknown }
     const originalWrite = stream.write.bind(stream)
-    stream.write = function (chunk: any, ...args: any[]) {
+    stream.write = function (chunk: string | Uint8Array, ...args: unknown[]) {
       try {
         const str = typeof chunk === 'string' ? chunk : chunk.toString()
         const entry = JSON.parse(str)
@@ -284,7 +285,7 @@ export default class ServerStatsProvider {
       }
     }
 
-    let transmit: any = null
+    let transmit: unknown = null
     if (config.transport === 'transmit') {
       try {
         transmit = await this.app.container.make('transmit')
@@ -295,7 +296,7 @@ export default class ServerStatsProvider {
       }
     }
 
-    let prometheusCollector: any = null
+    let prometheusCollector: unknown = null
     try {
       const mod = await import('../prometheus/prometheus_collector.js')
       prometheusCollector = mod.ServerStatsCollector.instance
@@ -312,14 +313,14 @@ export default class ServerStatsProvider {
         const stats = await this.engine!.collect()
 
         if (transmit && config.channelName) {
-          transmit.broadcast(config.channelName, JSON.parse(JSON.stringify(stats)))
+          ;(transmit as { broadcast: Function }).broadcast(config.channelName, JSON.parse(JSON.stringify(stats)))
         }
 
         if (prometheusCollector) {
-          prometheusCollector.update(stats)
+          ;(prometheusCollector as { update: Function }).update(stats)
         }
 
-        config.onStats?.(stats as any)
+        config.onStats?.(stats)
       } catch {
         // Silently ignore collection errors
       }
@@ -342,7 +343,7 @@ export default class ServerStatsProvider {
     }
 
     // Get the emitter
-    let emitter: any = null
+    let emitter: unknown = null
     try {
       emitter = await this.app.container.make('emitter')
     } catch {
@@ -350,7 +351,7 @@ export default class ServerStatsProvider {
     }
 
     // Get the router
-    let router: any = null
+    let router: unknown = null
     try {
       router = await this.app.container.make('router')
     } catch {
@@ -382,7 +383,7 @@ export default class ServerStatsProvider {
     }
 
     // ── Transmit broadcasting for debug panel live updates ────────
-    let debugTransmit: any = null
+    let debugTransmit: unknown = null
     try {
       debugTransmit = await this.app.container.make('transmit')
     } catch {
@@ -401,7 +402,7 @@ export default class ServerStatsProvider {
           const types = Array.from(pendingTypes)
           pendingTypes.clear()
           try {
-            debugTransmit.broadcast(debugChannel, { types })
+            ;(debugTransmit as { broadcast: Function }).broadcast(debugChannel, { types })
           } catch {
             // Silently ignore broadcast errors
           }
@@ -422,14 +423,14 @@ export default class ServerStatsProvider {
    * Routes are already registered in boot() with a lazy controller getter.
    * This method creates the controller so those routes become functional.
    */
-  private async setupDashboard(toolbarConfig: DevToolbarConfig, emitter: any) {
+  private async setupDashboard(toolbarConfig: DevToolbarConfig, emitter: unknown) {
     // Create and start the DashboardStore
     this.dashboardStore = new DashboardStore(toolbarConfig)
     const appRoot = this.app.makePath('')
     try {
       await this.dashboardStore.start(null, emitter, appRoot)
-    } catch (err: any) {
-      const msg = err?.message || ''
+    } catch (err) {
+      const msg = (err as Error)?.message || ''
       if (msg.includes('better-sqlite3') || msg.includes('Cannot find module')) {
         log.warn(
           'Dashboard requires better-sqlite3. Install it with:\n' +
@@ -509,7 +510,7 @@ export default class ServerStatsProvider {
             return dashStore.recordEvents(requestId, newEvents)
           }
         })
-        .catch((err: any) => {
+        .catch((err) => {
           if (!warnedPersistOnce) {
             warnedPersistOnce = true
             log.warn('failed to persist request data — ' + (err?.message || 'unknown error'))
@@ -518,7 +519,7 @@ export default class ServerStatsProvider {
     })
 
     // ── Transmit streaming for real-time dashboard updates ────────
-    let transmit: any = null
+    let transmit: unknown = null
     try {
       transmit = await this.app.container.make('transmit')
     } catch {
@@ -531,7 +532,7 @@ export default class ServerStatsProvider {
         try {
           if (!dashStore.isReady()) return
           const overview = await dashStore.getOverviewMetrics('1h')
-          transmit.broadcast(dashChannel, overview)
+          ;(transmit as { broadcast: Function }).broadcast(dashChannel, overview)
         } catch {
           // Silently ignore
         }
@@ -564,8 +565,8 @@ export default class ServerStatsProvider {
     if (this.persistPath && this.debugStore) {
       try {
         await this.debugStore.saveToDisk(this.persistPath)
-      } catch (err: any) {
-        log.warn('could not save debug data on shutdown — ' + err?.message)
+      } catch (err) {
+        log.warn('could not save debug data on shutdown — ' + (err as Error)?.message)
       }
     }
 

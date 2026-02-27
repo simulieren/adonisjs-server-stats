@@ -29,7 +29,7 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
     refreshInterval = 3000,
   } = options
 
-  const data = ref<any>(null)
+  const data = ref<unknown>(null)
   const loading = ref(false)
   const error = ref<Error | null>(null)
   const isUnauthorized = ref(false)

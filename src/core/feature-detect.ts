@@ -120,13 +120,13 @@ export function getVisibleMetricGroups(features: FeatureFlags | FeatureConfig): 
 
   if ('process' in ff && ff.process) groups.add('process')
   // Memory group shows if process (heap/rss) or system (SYS) collector is present
-  if (('process' in ff && ff.process) || ('system' in ff && (ff as any).system)) {
+  if (('process' in ff && ff.process) || ('system' in ff && (ff as FeatureConfig).system)) {
     groups.add('memory')
   }
   if ('http' in ff && ff.http) groups.add('http')
   if ('db' in ff && ff.db) groups.add('db')
   if ('redis' in ff && ff.redis) groups.add('redis')
-  if ('queues' in ff && (ff as any).queues) groups.add('queue')
+  if ('queues' in ff && (ff as FeatureConfig).queues) groups.add('queue')
   if ('app' in ff && ff.app) groups.add('app')
   if ('log' in ff && ff.log) groups.add('log')
 

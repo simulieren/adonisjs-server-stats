@@ -22,7 +22,7 @@ const props = defineProps<{
   authToken?: string
 }>()
 
-const data = ref<any[]>([])
+const data = ref<Record<string, unknown>[]>([])
 const loading = ref(false)
 const search = ref('')
 
@@ -37,9 +37,9 @@ async function fetchData() {
     // Extract data using dataKey or pane id
     const dataKey = props.pane.dataKey || props.pane.id
     const parts = dataKey.split('.')
-    let extracted: any = result
+    let extracted: unknown = result
     for (const part of parts) {
-      extracted = extracted?.[part]
+      extracted = (extracted as Record<string, unknown>)?.[part]
     }
     data.value = Array.isArray(extracted) ? extracted : []
     fetched = true
@@ -64,25 +64,27 @@ const filteredData = computed(() => {
   )
 })
 
-function formatCell(value: any, col: DebugPaneColumn): string {
+function formatCell(value: unknown, col: DebugPaneColumn): string {
   if (value === null || value === undefined) return '-'
   const fmt = col.format || 'text'
   switch (fmt) {
     case 'time':
-      return formatTime(value)
+      return formatTime(value as number | string)
     case 'timeAgo':
-      return timeAgo(value)
+      return timeAgo(value as number | string)
     case 'duration':
-      return formatDuration(typeof value === 'number' ? value : parseFloat(value))
+      return formatDuration(typeof value === 'number' ? value : parseFloat(String(value)))
     case 'method':
       return String(value).toUpperCase()
-    case 'json':
+    case 'json': {
+      let parsed: unknown = value
       if (typeof value === 'string') {
         try {
-          value = JSON.parse(value)
+          parsed = JSON.parse(value)
         } catch {}
       }
-      return compactPreview(value, 100)
+      return compactPreview(parsed, 100)
+    }
     case 'badge':
       return String(value)
     default:
@@ -90,16 +92,16 @@ function formatCell(value: any, col: DebugPaneColumn): string {
   }
 }
 
-function cellClass(value: any, col: DebugPaneColumn): string {
+function cellClass(value: unknown, col: DebugPaneColumn): string {
   if (col.format === 'duration') {
-    const ms = typeof value === 'number' ? value : parseFloat(value)
+    const ms = typeof value === 'number' ? value : parseFloat(String(value))
     if (ms > 500) return 'ss-dbg-very-slow'
     if (ms > 100) return 'ss-dbg-slow'
   }
   return ''
 }
 
-function badgeColor(value: any, col: DebugPaneColumn): string {
+function badgeColor(value: unknown, col: DebugPaneColumn): string {
   if (col.format === 'badge' && col.badgeColorMap) {
     const sv = String(value).toLowerCase()
     return col.badgeColorMap[sv] || 'muted'
@@ -107,7 +109,7 @@ function badgeColor(value: any, col: DebugPaneColumn): string {
   return ''
 }
 
-function methodClass(value: any): string {
+function methodClass(value: unknown): string {
   return `ss-dbg-method ss-dbg-method-${String(value).toLowerCase()}`
 }
 

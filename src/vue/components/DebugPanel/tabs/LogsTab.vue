@@ -15,7 +15,7 @@ interface LogEntry {
 }
 
 const props = defineProps<{
-  data: any
+  data: { logs?: LogEntry[] } | LogEntry[] | null
   dashboardPath?: string
 }>()
 
@@ -29,7 +29,8 @@ const requestIdFilter = ref('')
 const LEVELS = ['all', 'error', 'warn', 'info', 'debug'] as const
 
 const logs = computed<LogEntry[]>(() => {
-  let arr: LogEntry[] = props.data?.logs || props.data || []
+  const d = props.data
+  let arr: LogEntry[] = d ? (Array.isArray(d) ? d : d.logs) || [] : []
 
   if (activeLevel.value !== 'all') {
     const level = activeLevel.value
@@ -48,7 +49,8 @@ const logs = computed<LogEntry[]>(() => {
 })
 
 const summary = computed(() => {
-  const all = props.data?.logs || props.data || []
+  const d = props.data
+  const all = d ? (Array.isArray(d) ? d : d.logs) || [] : []
   return `${logs.value.length} of ${all.length} entries`
 })
 

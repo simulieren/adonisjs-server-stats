@@ -33,7 +33,7 @@ export function appCollector(): MetricCollector {
             .from('sessions')
             .count('* as total')
             .first()
-            .then((r: any) => Number(r?.total ?? 0))
+            .then((r: { total?: number | string } | undefined) => Number(r?.total ?? 0))
             .catch(() => {
               if (!warnedSessionsTable) {
                 warnedSessionsTable = true
@@ -50,14 +50,14 @@ export function appCollector(): MetricCollector {
             .where('status', 'pending')
             .count('* as total')
             .first()
-            .then((r: any) => Number(r?.total ?? 0))
+            .then((r: { total?: number | string } | undefined) => Number(r?.total ?? 0))
             .catch(() => 0),
           db
             .from('scheduled_emails')
             .where('status', 'pending')
             .count('* as total')
             .first()
-            .then((r: any) => Number(r?.total ?? 0))
+            .then((r: { total?: number | string } | undefined) => Number(r?.total ?? 0))
             .catch(() => 0),
         ])
         return {

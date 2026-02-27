@@ -32,11 +32,11 @@ const configData = computed(() => {
   }
 })
 
-function getActiveData(): Record<string, any> {
+function getActiveData(): Record<string, unknown> {
   return activeTab.value === 'config' ? configData.value.config : configData.value.env
 }
 
-function flattenConfig(obj: Record<string, any>, prefix = ''): ConfigNode[] {
+function flattenConfig(obj: Record<string, unknown>, prefix = ''): ConfigNode[] {
   const nodes: ConfigNode[] = []
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key

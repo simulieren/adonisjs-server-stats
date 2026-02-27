@@ -85,7 +85,7 @@ export function MetricCard({ metric, stats, history, className = '' }: MetricCar
       onMouseLeave={() => setHovered(false)}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === 'Enter' && handleClick(e as any)}
+      onKeyDown={(e) => e.key === 'Enter' && handleClick(e as unknown as React.MouseEvent)}
     >
       <span className="ss-label">{metric.label}</span>
       <span className={`ss-value ${colorClass}`}>{value}</span>

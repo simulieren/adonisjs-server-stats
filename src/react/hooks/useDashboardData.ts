@@ -13,7 +13,7 @@ import type { DashboardSection, DashboardHookOptions, PaginatedResponse } from '
  * Supports pagination, search, sort, filters, and time range.
  * Auto-refreshes periodically while active.
  */
-export function useDashboardData<T = any>(
+export function useDashboardData<T = unknown>(
   section: DashboardSection,
   options: DashboardHookOptions = {}
 ) {
@@ -31,7 +31,7 @@ export function useDashboardData<T = any>(
   } = options
 
   const [data, setData] = useState<T | null>(null)
-  const [meta, setMeta] = useState<PaginatedResponse<any>['meta'] | null>(null)
+  const [meta, setMeta] = useState<PaginatedResponse<unknown>['meta'] | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
@@ -117,7 +117,7 @@ export function useDashboardData<T = any>(
 
   /** Execute a mutation (POST/DELETE) against the dashboard API. */
   const mutate = useCallback(
-    async (path: string, method: 'post' | 'delete' = 'post', body?: any) => {
+    async (path: string, method: 'post' | 'delete' = 'post', body?: unknown) => {
       const client = getClient()
       const url = `${dashboardEndpoint}/${path}`
       try {

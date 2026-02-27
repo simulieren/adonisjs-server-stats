@@ -41,7 +41,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
     [sort]
   )
 
-  const requests = (data as any[]) || []
+  const requests = (data as Record<string, unknown>[]) || []
 
   if (selectedTrace) {
     return (
@@ -121,7 +121,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
             sort={sort}
             sortDir={sortDir}
             onSort={handleSort}
-            onRowClick={(row: any) => setSelectedTrace(row)}
+            onRowClick={(row: Record<string, unknown>) => setSelectedTrace(row as unknown as TraceRecord)}
             emptyMessage="No requests recorded"
           />
           {meta && (

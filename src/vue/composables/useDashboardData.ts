@@ -43,7 +43,7 @@ export function useDashboardData(
     perPage = 50,
   } = options
 
-  const data = ref<any>(null)
+  const data = ref<unknown>(null)
   const loading = ref(false)
   const error = ref<Error | null>(null)
   const isUnauthorized = ref(false)
@@ -110,7 +110,7 @@ export function useDashboardData(
   /**
    * Fetch chart data with a specific time range.
    */
-  async function fetchChart(range: TimeRange): Promise<any> {
+  async function fetchChart(range: TimeRange): Promise<unknown> {
     try {
       return await api.fetchChart(range)
     } catch (err) {
@@ -124,7 +124,7 @@ export function useDashboardData(
   /**
    * Fetch grouped query data.
    */
-  async function fetchGroupedQueries(): Promise<any> {
+  async function fetchGroupedQueries(): Promise<unknown> {
     try {
       return await api.fetchGroupedQueries()
     } catch {
@@ -135,7 +135,7 @@ export function useDashboardData(
   /**
    * Run EXPLAIN on a query.
    */
-  async function explainQuery(queryId: number): Promise<any> {
+  async function explainQuery(queryId: number): Promise<unknown> {
     try {
       return await api.explainQuery(queryId)
     } catch {

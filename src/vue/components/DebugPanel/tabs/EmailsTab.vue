@@ -8,7 +8,7 @@ import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { EmailRecord } from '../../../../core/index.js'
 
 const props = defineProps<{
-  data: any
+  data: { emails?: EmailRecord[] } | EmailRecord[] | null
   dashboardPath?: string
 }>()
 
@@ -16,7 +16,8 @@ const search = ref('')
 const previewEmail = ref<EmailRecord | null>(null)
 
 const emails = computed<EmailRecord[]>(() => {
-  const arr = props.data?.emails || props.data || []
+  const d = props.data
+  const arr = d ? (Array.isArray(d) ? d : d.emails) || [] : []
   if (!search.value.trim()) return arr
   const term = search.value.toLowerCase()
   return arr.filter(
@@ -28,7 +29,8 @@ const emails = computed<EmailRecord[]>(() => {
 })
 
 const summary = computed(() => {
-  const arr = props.data?.emails || props.data || []
+  const d = props.data
+  const arr = d ? (Array.isArray(d) ? d : d.emails) || [] : []
   return `${arr.length} emails`
 })
 

@@ -13,7 +13,7 @@ const REFRESH_INTERVAL = 3000
  * Fetches data for the active tab from the debug endpoint,
  * auto-refreshes every 3 seconds while the tab is active.
  */
-export function useDebugData<T = any>(tab: DebugTab, options: DebugPanelProps = {}) {
+export function useDebugData<T = unknown>(tab: DebugTab, options: DebugPanelProps = {}) {
   const { baseUrl = '', debugEndpoint = '/admin/api/debug', authToken } = options
 
   const [data, setData] = useState<T | null>(null)
@@ -22,7 +22,7 @@ export function useDebugData<T = any>(tab: DebugTab, options: DebugPanelProps = 
 
   const clientRef = useRef<ApiClient | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const fetchOnceCache = useRef<Record<string, any>>({})
+  const fetchOnceCache = useRef<Record<string, unknown>>({})
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
@@ -34,7 +34,7 @@ export function useDebugData<T = any>(tab: DebugTab, options: DebugPanelProps = 
   const fetchData = useCallback(async () => {
     // Check cache for fetchOnce tabs (like routes)
     if (fetchOnceCache.current[tab]) {
-      setData(fetchOnceCache.current[tab])
+      setData(fetchOnceCache.current[tab] as T)
       setIsLoading(false)
       return
     }
@@ -90,7 +90,7 @@ export function useDebugData<T = any>(tab: DebugTab, options: DebugPanelProps = 
   }, [])
 
   /** Cache data for fetchOnce tabs. */
-  const cacheForTab = useCallback((tabName: string, tabData: any) => {
+  const cacheForTab = useCallback((tabName: string, tabData: unknown) => {
     fetchOnceCache.current[tabName] = tabData
   }, [])
 

@@ -6,7 +6,7 @@ interface Column<T> {
   key: string
   label: string
   width?: string
-  render?: (value: any, row: T) => React.ReactNode
+  render?: (value: unknown, row: T) => React.ReactNode
   sortable?: boolean
 }
 
@@ -25,7 +25,7 @@ interface DataTableProps<T> {
 /**
  * Reusable data table component for dashboard sections.
  */
-export function DataTable<T extends Record<string, any>>({
+export function DataTable<T extends Record<string, unknown>>({
   columns,
   data,
   keyField = 'id',

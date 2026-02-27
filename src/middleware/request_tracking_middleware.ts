@@ -33,9 +33,9 @@ let warnedShouldShow = false
 /**
  * Module-level `shouldShow` callback, set by the provider at boot.
  */
-let shouldShowFn: ((ctx: any) => boolean) | null = null
+let shouldShowFn: ((ctx: HttpContext) => boolean) | null = null
 
-export function setShouldShow(fn: ((ctx: any) => boolean) | null) {
+export function setShouldShow(fn: ((ctx: HttpContext) => boolean) | null) {
   shouldShowFn = fn
 }
 
@@ -117,7 +117,7 @@ export default class RequestTrackingMiddleware {
             if (!warnedShouldShow) {
               warnedShouldShow = true
               log.warn(
-                'shouldShow callback threw — stats bar will be hidden: ' + (err as any)?.message
+                'shouldShow callback threw — stats bar will be hidden: ' + (err as Error)?.message
               )
             }
             return false

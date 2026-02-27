@@ -6,7 +6,7 @@ import { Badge } from '../../shared/Badge.js'
 import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 
-import type { DashboardHookOptions } from '../../../../core/types.js'
+import type { BadgeColor, DashboardHookOptions } from '../../../../core/types.js'
 
 interface LogsSectionProps {
   options?: DashboardHookOptions
@@ -31,7 +31,7 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
     filters,
   })
 
-  const logs = (data as any[]) || []
+  const logs = (data as Record<string, unknown>[]) || []
 
   const levelColorMap: Record<string, string> = {
     error: 'red',
@@ -81,28 +81,28 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
         <div className="ss-dash-empty">No log entries</div>
       ) : (
         <div className="ss-dash-log-list">
-          {logs.map((log: any, i: number) => (
-            <div key={log.id || i} className="ss-dash-log-entry">
-              <Badge color={(levelColorMap[log.level] || 'muted') as any}>
-                {log.level?.toUpperCase()}
+          {logs.map((log, i) => (
+            <div key={(log.id as string) || i} className="ss-dash-log-entry">
+              <Badge color={(levelColorMap[log.level as string] || 'muted') as BadgeColor}>
+                {(log.level as string)?.toUpperCase()}
               </Badge>
               <span className="ss-dash-log-time">
-                {formatTime(log.created_at || log.timestamp)}
+                {formatTime((log.created_at || log.timestamp) as string)}
               </span>
               {log.request_id ? (
                 <span
                   className="ss-dash-log-reqid"
-                  onClick={() => handleReqIdClick(log.request_id)}
+                  onClick={() => handleReqIdClick(log.request_id as string)}
                   role="button"
                   tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && handleReqIdClick(log.request_id)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleReqIdClick(log.request_id as string)}
                 >
-                  {log.request_id.slice(0, 8)}
+                  {(log.request_id as string).slice(0, 8)}
                 </span>
               ) : (
                 <span className="ss-dash-log-reqid-empty">--</span>
               )}
-              <span className="ss-dash-log-msg">{log.message}</span>
+              <span className="ss-dash-log-msg">{log.message as string}</span>
             </div>
           ))}
         </div>

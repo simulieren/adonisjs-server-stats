@@ -7,14 +7,15 @@ import type { RouteRecord } from '../../../../core/index.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 
 const props = defineProps<{
-  data: any
+  data: { routes?: RouteRecord[] } | RouteRecord[] | null
   currentUrl?: string
 }>()
 
 const search = ref('')
 
 const routes = computed<RouteRecord[]>(() => {
-  const arr = props.data?.routes || props.data || []
+  const d = props.data
+  const arr = d ? (Array.isArray(d) ? d : d.routes) || [] : []
   if (!search.value.trim()) return arr
   const term = search.value.toLowerCase()
   return arr.filter(
@@ -27,7 +28,8 @@ const routes = computed<RouteRecord[]>(() => {
 })
 
 const summary = computed(() => {
-  const arr = props.data?.routes || props.data || []
+  const d = props.data
+  const arr = d ? (Array.isArray(d) ? d : d.routes) || [] : []
   return `${arr.length} routes`
 })
 

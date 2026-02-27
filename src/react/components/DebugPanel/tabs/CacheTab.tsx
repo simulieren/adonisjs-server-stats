@@ -14,7 +14,7 @@ export function CacheTab({ options }: CacheTabProps) {
   const { data, isLoading, error } = useDebugData<CacheStats>('cache', options)
   const [search, setSearch] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
-  const [keyValue, setKeyValue] = useState<any>(null)
+  const [keyValue, setKeyValue] = useState<unknown>(null)
 
   const keys = useMemo(() => {
     const items = data?.keys || []

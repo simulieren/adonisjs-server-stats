@@ -8,7 +8,7 @@ import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { QueryRecord } from '../../../../core/index.js'
 
 const props = defineProps<{
-  data: any
+  data: { queries?: QueryRecord[] } | QueryRecord[] | null
   dashboardPath?: string
 }>()
 
@@ -17,7 +17,8 @@ const expandedIds = new Set<number>()
 
 const queries = computed<QueryRecord[]>(() => {
   if (!props.data) return []
-  const arr = props.data.queries || props.data || []
+  const d = props.data
+  const arr = (Array.isArray(d) ? d : d.queries) || []
   if (!search.value.trim()) return arr
   const term = search.value.toLowerCase()
   return arr.filter(
@@ -29,7 +30,8 @@ const queries = computed<QueryRecord[]>(() => {
 })
 
 const summary = computed(() => {
-  const arr = props.data?.queries || props.data || []
+  const d = props.data
+  const arr = d ? (Array.isArray(d) ? d : d.queries) || [] : []
   return `${arr.length} queries`
 })
 

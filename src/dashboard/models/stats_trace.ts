@@ -3,6 +3,7 @@ import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm'
 import StatsRequest from './stats_request.js'
 
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import type { TraceSpan } from '../../debug/types.js'
 
 export default class StatsTrace extends BaseModel {
   static connection = 'server_stats'
@@ -31,14 +32,14 @@ export default class StatsTrace extends BaseModel {
 
   @column({
     columnName: 'spans',
-    prepare: (value: any) => JSON.stringify(value),
+    prepare: (value: unknown) => JSON.stringify(value),
     consume: (value: string) => JSON.parse(value),
   })
-  declare spans: any[]
+  declare spans: TraceSpan[]
 
   @column({
     columnName: 'warnings',
-    prepare: (value: any) => (value ? JSON.stringify(value) : null),
+    prepare: (value: unknown) => (value ? JSON.stringify(value) : null),
     consume: (value: string | null) => (value ? JSON.parse(value) : null),
   })
   declare warnings: string[] | null

@@ -44,7 +44,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
   const handleExplain = useCallback(
     async (queryId: number) => {
       try {
-        const result = (await mutate(`queries/${queryId}/explain`)) as any
+        const result = (await mutate(`queries/${queryId}/explain`)) as { plan?: unknown }
         // Show in a simple alert or modal
         if (result && result.plan) {
           alert(JSON.stringify(result.plan, null, 2))
@@ -56,7 +56,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
     [mutate]
   )
 
-  const queries = (data as any[]) || []
+  const queries = (data as Record<string, unknown>[]) || []
 
   return (
     <div>
@@ -134,18 +134,18 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
               {
                 key: 'sql_text',
                 label: 'SQL',
-                render: (v: string, row: any) => (
+                render: (v: string, row: Record<string, unknown>) => (
                   <div>
                     <span
-                      className={`ss-dash-sql ${expandedSql === row.id ? 'ss-dash-sql-expanded' : ''}`}
+                      className={`ss-dash-sql ${expandedSql === (row.id as number) ? 'ss-dash-sql-expanded' : ''}`}
                       onClick={(e) => {
                         e.stopPropagation()
-                        setExpandedSql(expandedSql === row.id ? null : row.id)
+                        setExpandedSql(expandedSql === (row.id as number) ? null : (row.id as number))
                       }}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) =>
-                        e.key === 'Enter' && setExpandedSql(expandedSql === row.id ? null : row.id)
+                        e.key === 'Enter' && setExpandedSql(expandedSql === (row.id as number) ? null : (row.id as number))
                       }
                     >
                       {v}
@@ -156,7 +156,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                         className="ss-dash-explain-btn"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleExplain(row.id)
+                          handleExplain(row.id as number)
                         }}
                       >
                         EXPLAIN

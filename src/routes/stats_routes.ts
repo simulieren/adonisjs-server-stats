@@ -1,6 +1,7 @@
 import { createAccessMiddleware } from './access_middleware.js'
 
 import type ServerStatsController from '../controller/server_stats_controller.js'
+import type { HttpContext } from '@adonisjs/core/http'
 
 /**
  * Register the stats bar API endpoint.
@@ -17,12 +18,12 @@ export function registerStatsRoutes(
   router: any,
   endpoint: string,
   getController: () => ServerStatsController | null,
-  shouldShow?: (ctx: any) => boolean
+  shouldShow?: (ctx: HttpContext) => boolean
 ) {
   const middleware = shouldShow ? [createAccessMiddleware(shouldShow)] : []
 
   router
-    .get(endpoint, async (ctx: any) => {
+    .get(endpoint, async (ctx: HttpContext) => {
       const controller = getController()
       if (!controller) {
         return ctx.response.serviceUnavailable({

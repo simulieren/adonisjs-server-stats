@@ -44,8 +44,8 @@ export class RouteInspector {
           }
         }
       }
-    } catch (err: any) {
-      log.warn(`route inspector: could not read routes — ${err?.message || 'unknown error'}`)
+    } catch (err) {
+      log.warn(`route inspector: could not read routes — ${(err as Error)?.message || 'unknown error'}`)
     }
   }
 

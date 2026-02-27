@@ -138,10 +138,10 @@ export class LogStreamService {
           this.onEntry?.(entry)
         }
       }
-    } catch (err: any) {
+    } catch (err) {
       if (!warnedPollFailure) {
         warnedPollFailure = true
-        log.warn('log stream: cannot read log file — ' + err?.message)
+        log.warn('log stream: cannot read log file — ' + (err as Error)?.message)
       }
     }
   }

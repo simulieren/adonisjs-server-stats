@@ -14,6 +14,7 @@ import type { DebugStore } from '../debug/debug_store.js'
 import type { DashboardStore } from './dashboard_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
+import type { DevToolbarOptions, ServerStatsConfig } from '../types.js'
 
 const warnedDbReads = new Set<string>()
 
@@ -91,8 +92,8 @@ export default class DashboardController {
       }
     }
 
-    const config = this.app.config.get<any>('server_stats')
-    const toolbarConfig = config?.devToolbar || {}
+    const config = this.app.config.get<ServerStatsConfig>('server_stats')
+    const toolbarConfig: Partial<DevToolbarOptions> = config?.devToolbar ?? {}
     const dashPath = this.getDashboardPath()
 
     return (ctx as any).view.render('ss::dashboard', {
@@ -105,7 +106,7 @@ export default class DashboardController {
       dashConfig: {
         basePath: dashPath,
         tracing: !!toolbarConfig.tracing,
-        panes: (toolbarConfig.panes || []).map((p: any) => ({
+        panes: (toolbarConfig.panes || []).map((p: { id: string; label: string }) => ({
           id: p.id,
           label: p.label,
         })),
@@ -136,11 +137,11 @@ export default class DashboardController {
       return {
         ...overview,
         sparklines: {
-          avgResponseTime: sparklineData.map((m: any) => m.avg_duration),
-          p95ResponseTime: sparklineData.map((m: any) => m.p95_duration),
-          requestsPerMinute: sparklineData.map((m: any) => m.request_count),
-          errorRate: sparklineData.map((m: any) =>
-            m.request_count > 0 ? round((m.error_count / m.request_count) * 100) : 0
+          avgResponseTime: sparklineData.map((m: Record<string, unknown>) => m.avg_duration),
+          p95ResponseTime: sparklineData.map((m: Record<string, unknown>) => m.p95_duration),
+          requestsPerMinute: sparklineData.map((m: Record<string, unknown>) => m.request_count),
+          errorRate: sparklineData.map((m: Record<string, unknown>) =>
+            (m.request_count as number) > 0 ? round(((m.error_count as number) / (m.request_count as number)) * 100) : 0
           ),
         },
         ...widgets,
@@ -163,13 +164,13 @@ export default class DashboardController {
         return {
           range,
           buckets: buckets.map(
-            (b: any): ChartBucket => ({
-              bucket: b.bucket,
-              requestCount: b.request_count,
-              avgDuration: b.avg_duration,
-              p95Duration: b.p95_duration,
-              errorCount: b.error_count,
-              queryCount: b.query_count,
+            (b: Record<string, unknown>): ChartBucket => ({
+              bucket: b.bucket as string,
+              requestCount: b.request_count as number,
+              avgDuration: b.avg_duration as number,
+              p95Duration: b.p95_duration as number,
+              errorCount: b.error_count as number,
+              queryCount: b.query_count as number,
             })
           ),
         }
@@ -213,8 +214,8 @@ export default class DashboardController {
 
       return response.json({
         ...formatRequest(detail),
-        queries: (detail.queries || []).map(formatQuery),
-        trace: detail.trace ? formatTrace(detail.trace) : null,
+        queries: ((detail.queries as Record<string, unknown>[]) || []).map(formatQuery),
+        trace: detail.trace ? formatTrace(detail.trace as Record<string, unknown>) : null,
       })
     } catch {
       return response.notFound({ error: 'Not found' })
@@ -255,17 +256,17 @@ export default class DashboardController {
 
       const groups = await this.dashboardStore.getQueriesGrouped(limit, sort)
 
-      const totalTime = groups.reduce((sum: number, g: any) => sum + (g.total_duration || 0), 0)
+      const totalTime = groups.reduce((sum: number, g: Record<string, unknown>) => sum + ((g.total_duration as number) || 0), 0)
 
       return {
-        groups: groups.map((g: any) => ({
+        groups: groups.map((g: Record<string, unknown>) => ({
           sqlNormalized: g.sql_normalized,
           count: g.count,
-          avgDuration: round(g.avg_duration),
-          minDuration: round(g.min_duration),
-          maxDuration: round(g.max_duration),
-          totalDuration: round(g.total_duration),
-          percentOfTotal: totalTime > 0 ? round((g.total_duration / totalTime) * 100) : 0,
+          avgDuration: round(g.avg_duration as number),
+          minDuration: round(g.min_duration as number),
+          maxDuration: round(g.max_duration as number),
+          totalDuration: round(g.total_duration as number),
+          percentOfTotal: totalTime > 0 ? round(((g.total_duration as number) / totalTime) * 100) : 0,
         })),
       }
     })
@@ -279,50 +280,50 @@ export default class DashboardController {
     try {
       const db = this.dashboardStore.getDb()
       const id = Number(params.id)
-      const query: any = await db('server_stats_queries').where('id', id).first()
+      const query: Record<string, unknown> | undefined = await db('server_stats_queries').where('id', id).first()
       if (!query) return response.notFound({ error: 'Query not found' })
 
-      const sqlTrimmed = query.sql_text.trim().toUpperCase()
+      const sqlTrimmed = (query.sql_text as string).trim().toUpperCase()
       if (!sqlTrimmed.startsWith('SELECT')) {
         return response.badRequest({
           error: 'EXPLAIN is only supported for SELECT queries',
         })
       }
 
-      let appDb: any
+      let appDb: unknown
       try {
-        const lucid: any = await this.app.container.make('lucid.db')
-        appDb = lucid.connection().getWriteClient()
+        const lucid: unknown = await this.app.container.make('lucid.db')
+        appDb = (lucid as { connection: () => { getWriteClient: () => unknown } }).connection().getWriteClient()
       } catch {
         return response.serviceUnavailable({
           error: 'App database connection not available',
         })
       }
 
-      let bindings: any[] = []
+      let bindings: unknown[] = []
       if (query.bindings) {
         try {
-          bindings = JSON.parse(query.bindings)
+          bindings = JSON.parse(query.bindings as string)
         } catch {
           // If bindings can't be parsed, run without them
         }
       }
 
-      const explainResult = await appDb.raw(`EXPLAIN (FORMAT JSON) ${query.sql_text}`, bindings)
+      const explainResult = await (appDb as { raw: (sql: string, bindings: unknown[]) => Promise<Record<string, unknown>> }).raw(`EXPLAIN (FORMAT JSON) ${query.sql_text}`, bindings)
 
-      let plan: any[] = []
-      const rawRows = explainResult?.rows ?? (Array.isArray(explainResult) ? explainResult : [])
+      let plan: unknown[] = []
+      const rawRows = (explainResult?.rows as Record<string, unknown>[]) ?? (Array.isArray(explainResult) ? explainResult : [])
       if (rawRows.length > 0 && rawRows[0]['QUERY PLAN']) {
-        plan = rawRows[0]['QUERY PLAN']
+        plan = rawRows[0]['QUERY PLAN'] as unknown[]
       } else {
         plan = rawRows
       }
 
       return response.json({ queryId: id, sql: query.sql_text, plan })
-    } catch (error: any) {
+    } catch (error) {
       return response.internalServerError({
         error: 'EXPLAIN failed',
-        message: error?.message ?? 'Unknown error',
+        message: (error as Error)?.message ?? 'Unknown error',
       })
     }
   }
@@ -342,7 +343,7 @@ export default class DashboardController {
       })
 
       return {
-        data: result.data.map((e: any) => ({
+        data: result.data.map((e: Record<string, unknown>) => ({
           id: e.id,
           requestId: e.request_id,
           eventName: e.event_name,
@@ -406,7 +407,7 @@ export default class DashboardController {
       })
 
       return {
-        data: result.data.map((l: any) => ({
+        data: result.data.map((l: Record<string, unknown>) => ({
           id: l.id,
           level: l.level,
           message: l.message,
@@ -481,7 +482,7 @@ export default class DashboardController {
       const result = await this.dashboardStore.getTraces(page, perPage)
 
       return {
-        data: result.data.map((t: any) => ({
+        data: result.data.map((t: Record<string, unknown>) => ({
           id: t.id,
           requestId: t.request_id,
           method: t.method,
@@ -667,7 +668,7 @@ export default class DashboardController {
     return this.withDb(response, 'savedFilters', { filters: [] }, async () => {
       const filters = await this.dashboardStore.getSavedFilters()
       return {
-        filters: filters.map((f: any) => ({
+        filters: filters.map((f: Record<string, unknown>) => ({
           id: f.id,
           name: f.name,
           section: f.section,
@@ -738,17 +739,17 @@ export default class DashboardController {
 
     try {
       return response.json(await fn())
-    } catch (err: any) {
+    } catch (err) {
       if (!warnedDbReads.has(label)) {
         warnedDbReads.add(label)
-        log.warn(`dashboard ${label}: DB read failed — ${err?.message}`)
+        log.warn(`dashboard ${label}: DB read failed — ${(err as Error)?.message}`)
       }
       return response.json(emptyValue)
     }
   }
 
   private checkAccess(ctx: HttpContext): boolean {
-    const config = this.app.config.get<any>('server_stats')
+    const config = this.app.config.get<ServerStatsConfig>('server_stats')
     if (!config?.shouldShow) return true
 
     try {
@@ -759,7 +760,7 @@ export default class DashboardController {
   }
 
   private getDashboardPath(): string {
-    const config = this.app.config.get<any>('server_stats')
+    const config = this.app.config.get<ServerStatsConfig>('server_stats')
     return config?.devToolbar?.dashboardPath ?? '/__stats'
   }
 
@@ -784,9 +785,9 @@ export default class DashboardController {
         const redis = await this.app.container.make('redis')
         this.cacheInspector = new CacheInspector(redis)
         return this.cacheInspector
-      } catch (err: any) {
+      } catch (err) {
         this.cacheAvailable = false
-        log.warn('dashboard: CacheInspector init failed — ' + err?.message)
+        log.warn('dashboard: CacheInspector init failed — ' + (err as Error)?.message)
         return null
       }
     } else {
@@ -804,9 +805,9 @@ export default class DashboardController {
         const queue = await this.app.container.make('rlanz/queue')
         this.queueInspector = new QueueInspector(queue)
         return this.queueInspector
-      } catch (err: any) {
+      } catch (err) {
         this.queueAvailable = false
-        log.warn('dashboard: QueueInspector init failed — ' + err?.message)
+        log.warn('dashboard: QueueInspector init failed — ' + (err as Error)?.message)
         return null
       }
     }
@@ -854,7 +855,7 @@ export default class DashboardController {
 // Formatting helpers (snake_case DB rows → camelCase API response)
 // ---------------------------------------------------------------------------
 
-function formatRequest(r: any) {
+function formatRequest(r: Record<string, unknown>) {
   return {
     id: r.id,
     method: r.method,
@@ -867,7 +868,7 @@ function formatRequest(r: any) {
   }
 }
 
-function formatQuery(q: any) {
+function formatQuery(q: Record<string, unknown>) {
   return {
     id: q.id,
     requestId: q.request_id,
@@ -883,7 +884,7 @@ function formatQuery(q: any) {
   }
 }
 
-function formatTrace(t: any) {
+function formatTrace(t: Record<string, unknown>) {
   return {
     id: t.id,
     requestId: t.request_id,
@@ -898,7 +899,7 @@ function formatTrace(t: any) {
   }
 }
 
-function formatEmail(e: any) {
+function formatEmail(e: Record<string, unknown>) {
   return {
     id: e.id,
     from: e.from_addr,
