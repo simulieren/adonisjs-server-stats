@@ -49,6 +49,13 @@
     return Math.floor(diff / 86400) + "d ago";
   };
 
+  var formatDuration = function (ms) {
+    if (ms == null) return "-";
+    if (ms >= 1000) return (ms / 1000).toFixed(2) + "s";
+    if (ms >= 1) return ms.toFixed(0) + "ms";
+    return ms.toFixed(2) + "ms";
+  };
+
   var formatTime = function (ts) {
     var d = typeof ts === "string" ? new Date(ts) : new Date(ts);
     if (isNaN(d.getTime())) return "-";
@@ -121,6 +128,57 @@
         : s2;
     }
     return String(val);
+  };
+
+  var initResizableColumns = function (table) {
+    if (!table) return function () {};
+    var headers = Array.from(table.querySelectorAll("thead th"));
+    if (!headers.length) return function () {};
+    var cleanups = [];
+    var frozen = false;
+    function freezeWidths() {
+      if (frozen) return;
+      frozen = true;
+      headers.forEach(function (th) {
+        th.style.width = th.offsetWidth + "px";
+      });
+      table.style.tableLayout = "fixed";
+    }
+    headers.forEach(function (th) {
+      if (!th.textContent || !th.textContent.trim()) return;
+      var handle = document.createElement("div");
+      handle.className = "ss-col-resize";
+      th.appendChild(handle);
+      function onDown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        freezeWidths();
+        var startX = e.clientX,
+          startW = th.offsetWidth;
+        handle.classList.add("ss-resizing");
+        handle.setPointerCapture(e.pointerId);
+        function onMove(ev) {
+          th.style.width = Math.max(30, startW + ev.clientX - startX) + "px";
+        }
+        function onUp() {
+          handle.classList.remove("ss-resizing");
+          handle.removeEventListener("pointermove", onMove);
+          handle.removeEventListener("pointerup", onUp);
+        }
+        handle.addEventListener("pointermove", onMove);
+        handle.addEventListener("pointerup", onUp);
+      }
+      handle.addEventListener("pointerdown", onDown);
+      cleanups.push(function () {
+        handle.removeEventListener("pointerdown", onDown);
+        handle.remove();
+      });
+    });
+    return function () {
+      cleanups.forEach(function (fn) {
+        fn();
+      });
+    };
   };
 
   var eventPreview = function (data) {
@@ -2846,15 +2904,15 @@
     }
 
     var html =
-      '<table class="ss-dash-table" style="table-layout:fixed"><thead><tr>' +
-      '<th style="width:50px">ID</th>' +
-      '<th style="width:160px">Name</th>' +
-      '<th style="width:80px">Status</th>' +
+      '<table class="ss-dash-table"><thead><tr>' +
+      "<th>ID</th>" +
+      "<th>Name</th>" +
+      "<th>Status</th>" +
       "<th>Payload</th>" +
-      '<th style="width:55px">Tries</th>' +
-      '<th style="width:75px">Duration</th>' +
-      '<th style="width:60px">Time</th>' +
-      '<th style="width:50px"></th>' +
+      "<th>Tries</th>" +
+      "<th>Duration</th>" +
+      "<th>Time</th>" +
+      "<th></th>" +
       "</tr></thead><tbody>";
 
     items.forEach(function (j) {
@@ -2873,9 +2931,7 @@
         '<td style="color:var(--ss-dim)">' +
         j.id +
         "</td>" +
-        '<td style="color:var(--ss-sql-color);' +
-        TRUNC +
-        '" title="' +
+        '<td style="color:var(--ss-text)" title="' +
         esc(j.name || "") +
         '">' +
         esc(j.name || "") +
@@ -2885,8 +2941,10 @@
         '">' +
         esc(j.status || "") +
         "</span></td>" +
-        '<td style="color:var(--ss-muted);font-size:10px;' +
-        TRUNC +
+        '<td style="color:var(--ss-muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:300px" title="' +
+        esc(
+          j.payload || j.data ? compactPreview(j.payload || j.data, 120) : "",
+        ) +
         '">' +
         esc(
           j.payload || j.data ? compactPreview(j.payload || j.data, 60) : "-",
@@ -2896,7 +2954,7 @@
         (j.attempts || j.attemptsMade || 0) +
         "</td>" +
         '<td class="ss-dash-duration">' +
-        (j.duration != null ? j.duration.toFixed(0) + "ms" : "-") +
+        formatDuration(j.duration) +
         "</td>" +
         '<td class="ss-dash-event-time" style="white-space:nowrap">' +
         timeAgo(j.timestamp || j.createdAt || j.processedAt || j.created_at) +
@@ -2913,6 +2971,8 @@
 
     html += "</tbody></table>";
     setInner("ss-dash-jobs-body", html);
+    var jobsTable = document.querySelector("#ss-dash-jobs-body .ss-dash-table");
+    if (jobsTable) initResizableColumns(jobsTable);
     renderPagination("jobs", ps);
 
     // Retry buttons

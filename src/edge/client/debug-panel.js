@@ -110,10 +110,21 @@
   };
 
   const timeAgo = (ts) => {
-    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (!ts) return "-";
+    var d = typeof ts === "string" ? new Date(ts).getTime() : ts;
+    var diff = Math.floor((Date.now() - d) / 1000);
+    if (diff < 0) return "just now";
     if (diff < 60) return diff + "s ago";
     if (diff < 3600) return Math.floor(diff / 60) + "m ago";
-    return Math.floor(diff / 3600) + "h ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  };
+
+  const formatDuration = (ms) => {
+    if (ms == null) return "-";
+    if (ms >= 1000) return (ms / 1000).toFixed(2) + "s";
+    if (ms >= 1) return ms.toFixed(0) + "ms";
+    return ms.toFixed(2) + "ms";
   };
 
   const formatTime = (ts) => {
@@ -177,6 +188,55 @@
         : s;
     }
     return String(val);
+  };
+
+  const initResizableColumns = (table) => {
+    if (!table) return () => {};
+    const headers = Array.from(table.querySelectorAll("thead th"));
+    if (!headers.length) return () => {};
+    const cleanups = [];
+    let frozen = false;
+    function freezeWidths() {
+      if (frozen) return;
+      frozen = true;
+      headers.forEach((th) => {
+        th.style.width = th.offsetWidth + "px";
+      });
+      table.style.tableLayout = "fixed";
+    }
+    headers.forEach((th) => {
+      if (!th.textContent || !th.textContent.trim()) return;
+      const handle = document.createElement("div");
+      handle.className = "ss-col-resize";
+      th.appendChild(handle);
+      function onDown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        freezeWidths();
+        const startX = e.clientX,
+          startW = th.offsetWidth;
+        handle.classList.add("ss-resizing");
+        handle.setPointerCapture(e.pointerId);
+        function onMove(ev) {
+          th.style.width = Math.max(30, startW + ev.clientX - startX) + "px";
+        }
+        function onUp() {
+          handle.classList.remove("ss-resizing");
+          handle.removeEventListener("pointermove", onMove);
+          handle.removeEventListener("pointerup", onUp);
+        }
+        handle.addEventListener("pointermove", onMove);
+        handle.addEventListener("pointerup", onUp);
+      }
+      handle.addEventListener("pointerdown", onDown);
+      cleanups.push(() => {
+        handle.removeEventListener("pointerdown", onDown);
+        handle.remove();
+      });
+    });
+    return () => {
+      cleanups.forEach((fn) => fn());
+    };
   };
 
   const methodClass = (m) =>
@@ -1543,13 +1603,14 @@
 
     let html =
       '<table class="ss-dbg-table"><thead><tr>' +
-      '<th style="width:40px">ID</th>' +
+      "<th>ID</th>" +
       "<th>Name</th>" +
-      '<th style="width:80px">Status</th>' +
-      '<th style="width:50px">Tries</th>' +
-      '<th style="width:70px">Duration</th>' +
-      '<th style="width:65px">Time</th>' +
-      '<th style="width:45px"></th>' +
+      "<th>Status</th>" +
+      "<th>Payload</th>" +
+      "<th>Tries</th>" +
+      "<th>Duration</th>" +
+      "<th>Time</th>" +
+      "<th></th>" +
       "</tr></thead><tbody>";
 
     for (let i = 0; i < items.length; i++) {
@@ -1562,6 +1623,7 @@
             : j.status === "active"
               ? "blue"
               : "amber";
+      const payload = j.payload || j.data;
       html +=
         "<tr>" +
         '<td class="ss-dbg-c-dim">' +
@@ -1577,11 +1639,16 @@
         '">' +
         esc(j.status || "") +
         "</span></td>" +
+        '<td style="color:var(--ss-muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="' +
+        esc(payload ? compactPreview(payload, 120) : "") +
+        '">' +
+        esc(payload ? compactPreview(payload, 60) : "-") +
+        "</td>" +
         '<td class="ss-dbg-c-muted" style="text-align:center">' +
         (j.attempts || j.attemptsMade || 0) +
         "</td>" +
         '<td class="ss-dbg-duration">' +
-        (j.duration != null ? j.duration.toFixed(0) + "ms" : "-") +
+        formatDuration(j.duration) +
         "</td>" +
         '<td class="ss-dbg-event-time">' +
         timeAgo(j.timestamp || j.createdAt || j.processedAt || j.created_at) +
@@ -1598,6 +1665,9 @@
 
     html += "</tbody></table>";
     jobsBodyEl.innerHTML = html;
+
+    const jobsTable = jobsBodyEl.querySelector(".ss-dbg-table");
+    if (jobsTable) initResizableColumns(jobsTable);
 
     // Retry buttons
     jobsBodyEl.querySelectorAll(".ss-dbg-retry-btn").forEach((btn) => {

@@ -2,8 +2,16 @@
 /**
  * Queue manager section for the dashboard.
  */
-import { ref, computed } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  nextTick,
+} from "vue";
 import { timeAgo, formatDuration } from "../../../../core/index.js";
+import { initResizableColumns } from "../../../../core/resizable-columns.js";
 import FilterBar from "../shared/FilterBar.vue";
 import PaginationControls from "../shared/PaginationControls.vue";
 import JsonViewer from "../../shared/JsonViewer.vue";
@@ -94,6 +102,25 @@ function handleSearch(term: string) {
   search.value = term;
   emit("search", term);
 }
+
+const tableRef = ref<HTMLTableElement | null>(null);
+let cleanupResize: (() => void) | null = null;
+
+function attachResize() {
+  if (cleanupResize) cleanupResize();
+  cleanupResize = null;
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value);
+    }
+  });
+}
+
+watch(jobs, attachResize);
+onMounted(attachResize);
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize();
+});
 </script>
 
 <template>
@@ -145,16 +172,17 @@ function handleSearch(term: string) {
 
     <div v-if="jobs.length === 0" class="ss-dash-empty">No jobs found</div>
 
-    <table v-else class="ss-dash-table">
+    <table v-else ref="tableRef" class="ss-dash-table">
       <thead>
         <tr>
-          <th style="width: 60px">ID</th>
+          <th>ID</th>
           <th>Name</th>
-          <th style="width: 80px">Status</th>
-          <th style="width: 50px">Tries</th>
-          <th style="width: 80px">Duration</th>
-          <th style="width: 100px">Time</th>
-          <th style="width: 60px"></th>
+          <th>Status</th>
+          <th>Payload</th>
+          <th>Tries</th>
+          <th>Duration</th>
+          <th>Time</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -167,6 +195,9 @@ function handleSearch(term: string) {
                 j.status
               }}</span>
             </td>
+            <td>
+              <JsonViewer :value="j.payload || j.data" :max-len="60" />
+            </td>
             <td style="color: var(--ss-muted); text-align: center">
               {{ j.attempts }}
             </td>
@@ -174,7 +205,7 @@ function handleSearch(term: string) {
               {{ j.duration !== null ? formatDuration(j.duration) : "-" }}
             </td>
             <td class="ss-dash-event-time">
-              {{ timeAgo(j.timestamp || j.createdAt || 0) }}
+              {{ timeAgo(j.timestamp || j.createdAt) }}
             </td>
             <td>
               <button
@@ -188,11 +219,7 @@ function handleSearch(term: string) {
           </tr>
           <!-- Expanded detail -->
           <tr v-if="expandedJobId === j.id">
-            <td colspan="7" style="padding: 8px 12px">
-              <div v-if="j.payload || j.data" style="margin-bottom: 8px">
-                <strong style="color: var(--ss-text)">Payload:</strong>
-                <JsonViewer :value="j.payload || j.data" />
-              </div>
+            <td colspan="8" style="padding: 8px 12px">
               <div
                 v-if="j.failedReason || j.error"
                 style="color: var(--ss-red-fg)"

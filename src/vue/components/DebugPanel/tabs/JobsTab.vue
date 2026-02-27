@@ -2,8 +2,16 @@
 /**
  * Queue management tab for the debug panel.
  */
-import { ref, computed } from "vue";
+import {
+  ref,
+  computed,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  nextTick,
+} from "vue";
 import { timeAgo, formatDuration } from "../../../../core/index.js";
+import { initResizableColumns } from "../../../../core/resizable-columns.js";
 import JsonViewer from "../../shared/JsonViewer.vue";
 
 interface JobEntry {
@@ -57,6 +65,25 @@ function statusClass(status: string): string {
 function handleRetry(jobId: string) {
   emit("retryJob", jobId);
 }
+
+const tableRef = ref<HTMLTableElement | null>(null);
+let cleanupResize: (() => void) | null = null;
+
+function attachResize() {
+  if (cleanupResize) cleanupResize();
+  cleanupResize = null;
+  nextTick(() => {
+    if (tableRef.value) {
+      cleanupResize = initResizableColumns(tableRef.value);
+    }
+  });
+}
+
+watch(jobs, attachResize);
+onMounted(attachResize);
+onBeforeUnmount(() => {
+  if (cleanupResize) cleanupResize();
+});
 </script>
 
 <template>
@@ -102,17 +129,17 @@ function handleRetry(jobId: string) {
 
     <div v-if="jobs.length === 0" class="ss-dbg-empty">No jobs found</div>
 
-    <table v-else class="ss-dbg-table">
+    <table v-else ref="tableRef" class="ss-dbg-table">
       <thead>
         <tr>
-          <th style="width: 60px">ID</th>
+          <th>ID</th>
           <th>Name</th>
-          <th style="width: 80px">Status</th>
+          <th>Status</th>
           <th>Payload</th>
-          <th style="width: 50px">Tries</th>
-          <th style="width: 70px">Duration</th>
-          <th style="width: 80px">Time</th>
-          <th style="width: 60px"></th>
+          <th>Tries</th>
+          <th>Duration</th>
+          <th>Time</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
@@ -123,7 +150,7 @@ function handleRetry(jobId: string) {
             <span :class="statusClass(j.status)">{{ j.status }}</span>
           </td>
           <td>
-            <JsonViewer :value="j.payload || j.data" />
+            <JsonViewer :value="j.payload || j.data" :max-len="60" />
           </td>
           <td style="color: var(--ss-muted); text-align: center">
             {{ j.attempts }}
@@ -132,7 +159,7 @@ function handleRetry(jobId: string) {
             {{ j.duration !== null ? formatDuration(j.duration) : "-" }}
           </td>
           <td class="ss-dbg-event-time">
-            {{ timeAgo(j.timestamp || j.createdAt || 0) }}
+            {{ timeAgo(j.timestamp || j.createdAt) }}
           </td>
           <td>
             <button

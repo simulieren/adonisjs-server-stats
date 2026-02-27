@@ -65,13 +65,29 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
     <div>
       {/* Stats row */}
       {stats && (
-        <div className="ss-dash-stats-row">
-          {Object.entries(stats).map(([key, val]) => (
-            <div key={key} className="ss-dash-stat-card">
-              <span className="ss-dash-stat-label">{key}</span>
-              <span className="ss-dash-stat-value">{val as number}</span>
-            </div>
-          ))}
+        <div className="ss-dash-job-stats">
+          <span className="ss-dash-job-stat">
+            <span className="ss-dash-job-stat-label">Active:</span>
+            <span className="ss-dash-job-stat-value">{stats.active ?? 0}</span>
+          </span>
+          <span className="ss-dash-job-stat">
+            <span className="ss-dash-job-stat-label">Waiting:</span>
+            <span className="ss-dash-job-stat-value">{stats.waiting ?? 0}</span>
+          </span>
+          <span className="ss-dash-job-stat">
+            <span className="ss-dash-job-stat-label">Delayed:</span>
+            <span className="ss-dash-job-stat-value">{stats.delayed ?? 0}</span>
+          </span>
+          <span className="ss-dash-job-stat">
+            <span className="ss-dash-job-stat-label">Completed:</span>
+            <span className="ss-dash-job-stat-value">
+              {stats.completed ?? 0}
+            </span>
+          </span>
+          <span className="ss-dash-job-stat">
+            <span className="ss-dash-job-stat-label">Failed:</span>
+            <span className="ss-dash-job-stat-value">{stats.failed ?? 0}</span>
+          </span>
         </div>
       )}
 
@@ -103,49 +119,75 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
         <>
           <DataTable
             columns={[
-              { key: "id", label: "ID", width: "60px" },
+              {
+                key: "id",
+                label: "ID",
+                width: "40px",
+                render: (v: string) => (
+                  <span style={{ color: "var(--ss-dim)" }}>{v}</span>
+                ),
+              },
               {
                 key: "name",
                 label: "Name",
                 render: (v: string) => (
-                  <span style={{ color: "var(--ss-text)" }}>{v}</span>
+                  <span style={{ color: "var(--ss-text)" }} title={v}>
+                    {v}
+                  </span>
                 ),
               },
               {
                 key: "status",
                 label: "Status",
-                width: "80px",
+                width: "90px",
                 render: (v: string) => (
                   <Badge color={(statusColor[v] || "muted") as any}>{v}</Badge>
                 ),
               },
               {
-                key: "data",
+                key: "payload",
                 label: "Payload",
-                render: (v: any) => (
-                  <JsonViewer data={v} maxPreviewLength={60} />
+                render: (v: any, row: any) => (
+                  <JsonViewer data={v || row?.data} maxPreviewLength={60} />
                 ),
               },
-              { key: "attempts", label: "Tries", width: "50px" },
+              {
+                key: "attempts",
+                label: "Tries",
+                width: "50px",
+                render: (v: number) => (
+                  <span
+                    style={{
+                      color: "var(--ss-muted)",
+                      textAlign: "center",
+                      display: "block",
+                    }}
+                  >
+                    {v}
+                  </span>
+                ),
+              },
               {
                 key: "duration",
                 label: "Duration",
-                width: "70px",
+                width: "75px",
                 render: (v: number | null) =>
                   v != null ? formatDuration(v) : "-",
               },
               {
                 key: "timestamp",
                 label: "Time",
-                width: "80px",
-                render: (v: any) => (
-                  <span className="ss-dash-event-time">{timeAgo(v)}</span>
+                width: "70px",
+                render: (v: any, row: any) => (
+                  <span className="ss-dash-event-time">
+                    {timeAgo(v || row?.createdAt)}
+                  </span>
                 ),
               },
               {
                 key: "_actions",
                 label: "",
-                width: "60px",
+                width: "50px",
                 render: (_: any, row: any) =>
                   row.status === "failed" ? (
                     <button

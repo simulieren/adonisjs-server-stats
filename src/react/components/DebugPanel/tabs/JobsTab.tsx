@@ -1,6 +1,13 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 
 import { timeAgo, formatDuration } from "../../../../core/formatters.js";
+import { initResizableColumns } from "../../../../core/resizable-columns.js";
 import { useDebugData } from "../../../hooks/useDebugData.js";
 import { JsonViewer } from "../../shared/JsonViewer.js";
 
@@ -72,6 +79,14 @@ export function JobsTab({ options }: JobsTabProps) {
     delayed: "ss-dbg-job-status-delayed",
   };
 
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  useEffect(() => {
+    if (tableRef.current) {
+      return initResizableColumns(tableRef.current);
+    }
+  }, [jobs]);
+
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading jobs...</div>;
   }
@@ -134,23 +149,23 @@ export function JobsTab({ options }: JobsTabProps) {
       {jobs.length === 0 ? (
         <div className="ss-dbg-empty">No jobs found</div>
       ) : (
-        <table className="ss-dbg-table">
+        <table ref={tableRef} className="ss-dbg-table">
           <thead>
             <tr>
-              <th style={{ width: "60px" }}>ID</th>
+              <th>ID</th>
               <th>Name</th>
-              <th style={{ width: "80px" }}>Status</th>
-              <th>Data</th>
-              <th style={{ width: "50px" }}>Tries</th>
-              <th style={{ width: "70px" }}>Duration</th>
-              <th style={{ width: "80px" }}>Time</th>
-              <th style={{ width: "50px" }} />
+              <th>Status</th>
+              <th>Payload</th>
+              <th>Tries</th>
+              <th>Duration</th>
+              <th>Time</th>
+              <th />
             </tr>
           </thead>
           <tbody>
             {jobs.map((job) => (
               <tr key={job.id}>
-                <td>{job.id}</td>
+                <td style={{ color: "var(--ss-dim)" }}>{job.id}</td>
                 <td style={{ color: "var(--ss-text)" }}>{job.name}</td>
                 <td>
                   <span
@@ -160,14 +175,19 @@ export function JobsTab({ options }: JobsTabProps) {
                   </span>
                 </td>
                 <td>
-                  <JsonViewer data={job.data} maxPreviewLength={60} />
+                  <JsonViewer
+                    data={(job as any).payload || job.data}
+                    maxPreviewLength={60}
+                  />
                 </td>
-                <td>{job.attempts}</td>
-                <td>
+                <td style={{ color: "var(--ss-muted)", textAlign: "center" }}>
+                  {job.attempts}
+                </td>
+                <td className="ss-dbg-duration">
                   {job.duration !== null ? formatDuration(job.duration) : "-"}
                 </td>
                 <td className="ss-dbg-event-time">
-                  {timeAgo(job.timestamp || (job as any).createdAt)}
+                  {timeAgo(job.timestamp || job.createdAt)}
                 </td>
                 <td>
                   {job.status === "failed" && (

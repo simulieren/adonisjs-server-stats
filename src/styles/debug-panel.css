@@ -55,7 +55,7 @@
 
 /* ── Theme: Light (auto via system preference) ────────────────── */
 @media (prefers-color-scheme: light) {
-  .ss-dbg-panel:not([data-ss-theme='dark']) {
+  .ss-dbg-panel:not([data-ss-theme="dark"]) {
     --ss-bg: #fafafa;
     --ss-surface: #ffffff;
     --ss-surface-alt: #f5f5f5;
@@ -93,7 +93,7 @@
 }
 
 /* ── Theme: Light (manual override) ───────────────────────────── */
-.ss-dbg-panel[data-ss-theme='light'] {
+.ss-dbg-panel[data-ss-theme="light"] {
   --ss-bg: #fafafa;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;
@@ -323,10 +323,34 @@
   padding: 5px 10px;
   border-bottom: 1px solid var(--ss-border-faint);
   vertical-align: top;
-  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ss-dbg-table tr:hover td {
   background: var(--ss-hover);
+}
+/* Column resize handles */
+.ss-col-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+  background: var(--ss-border-faint);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ss-dbg-table th:hover .ss-col-resize {
+  opacity: 0.6;
+}
+.ss-col-resize:hover,
+.ss-col-resize.ss-resizing {
+  background: var(--ss-accent, #6d28d9);
+  opacity: 0.8;
 }
 
 /* Query-specific styles */
@@ -346,6 +370,7 @@
 }
 .ss-dbg-duration {
   font-variant-numeric: tabular-nums;
+  color: var(--ss-text);
 }
 .ss-dbg-slow {
   color: var(--ss-amber-fg);
@@ -1145,7 +1170,7 @@
 .ss-dbg-redacted-real {
   font-style: normal;
   color: var(--ss-text-secondary);
-  font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+  font-family: "SF Mono", SFMono-Regular, ui-monospace, Menlo, monospace;
   font-size: 11px;
   word-break: break-all;
 }

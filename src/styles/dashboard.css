@@ -33,7 +33,8 @@
   --ss-purple-bg: #2e1065;
   --ss-purple-fg: #c084fc;
   --ss-sql-color: #93c5fd;
-  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ss-text-primary: var(--ss-text);
   --ss-reqid-bg: #1e1b2e;
   --ss-reqid-fg: #6d28d9;
@@ -42,7 +43,7 @@
 }
 
 /* ── Theme: Dark (explicit toggle override) ───────────────────── */
-[data-theme='dark'] {
+[data-theme="dark"] {
   --ss-bg: #0f0f0f;
   --ss-surface: #171717;
   --ss-surface-alt: #141414;
@@ -70,7 +71,8 @@
   --ss-purple-bg: #2e1065;
   --ss-purple-fg: #c084fc;
   --ss-sql-color: #93c5fd;
-  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ss-text-primary: var(--ss-text);
   --ss-reqid-bg: #1e1b2e;
   --ss-reqid-fg: #6d28d9;
@@ -80,7 +82,7 @@
 
 /* ── Theme: Light ──────────────────────────────────────────────── */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
+  :root:not([data-theme="dark"]) {
     --ss-bg: #fafafa;
     --ss-surface: #ffffff;
     --ss-surface-alt: #f5f5f5;
@@ -117,7 +119,7 @@
 }
 
 /* ── Theme: Light (explicit toggle override) ──────────────────── */
-[data-theme='light'] {
+[data-theme="light"] {
   --ss-bg: #fafafa;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;
@@ -153,7 +155,7 @@
 }
 
 /* ── Theme override via data attribute ─────────────────────────── */
-[data-theme='light'] {
+[data-theme="light"] {
   --ss-bg: #fafafa;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;
@@ -381,7 +383,7 @@ body {
   background: var(--ss-hover-accent);
 }
 .ss-dash-nav-item.ss-dash-active::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 4px;
@@ -596,7 +598,32 @@ body {
   padding: 6px 12px;
   border-bottom: 1px solid var(--ss-border-faint);
   vertical-align: top;
-  max-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Column resize handles */
+.ss-col-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+  background: var(--ss-border-faint);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ss-dash-table th:hover .ss-col-resize,
+.ss-dbg-table th:hover .ss-col-resize {
+  opacity: 0.6;
+}
+.ss-col-resize:hover,
+.ss-col-resize.ss-resizing {
+  background: var(--ss-accent, #6d28d9);
+  opacity: 0.8;
 }
 .ss-dash-table tr:hover td {
   background: var(--ss-hover);
@@ -709,6 +736,7 @@ body {
 /* ── Duration ──────────────────────────────────────────────────── */
 .ss-dash-duration {
   font-variant-numeric: tabular-nums;
+  color: var(--ss-text);
 }
 .ss-dash-slow {
   color: var(--ss-amber-fg);
@@ -1774,6 +1802,7 @@ tr:hover .ss-dash-copy-row-btn {
 .ss-dash-job-stat-value {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+  color: var(--ss-text);
 }
 
 .ss-dash-retry-btn {
