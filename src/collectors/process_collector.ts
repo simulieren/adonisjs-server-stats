@@ -37,6 +37,7 @@ export function processCollector(): MetricCollector {
 
   return {
     name: 'process',
+    label: 'process — cpu, memory, event loop, uptime',
 
     start() {
       if (!started) {

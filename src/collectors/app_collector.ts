@@ -22,6 +22,7 @@ let warnedSessionsTable = false
 export function appCollector(): MetricCollector {
   return {
     name: 'app',
+    label: 'app — users, webhooks, emails',
 
     async collect() {
       try {

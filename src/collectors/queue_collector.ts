@@ -80,6 +80,7 @@ export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
 
   return {
     name: 'queue',
+    label: `queue — ${queueName} @ ${opts.connection?.host ?? '?'}:${opts.connection?.port ?? '?'}`,
 
     async collect() {
       if (!opts.connection) {

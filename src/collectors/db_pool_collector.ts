@@ -46,6 +46,7 @@ export function dbPoolCollector(opts?: DbPoolCollectorOptions): MetricCollector 
 
   return {
     name: 'db_pool',
+    label: `db_pool — connection: ${connectionName}`,
 
     async collect() {
       try {

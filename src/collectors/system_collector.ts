@@ -16,6 +16,7 @@ import type { MetricCollector } from './collector.js'
 export function systemCollector(): MetricCollector {
   return {
     name: 'system',
+    label: 'system — load avg, memory, uptime',
 
     collect() {
       const loadAvg = os.loadavg()

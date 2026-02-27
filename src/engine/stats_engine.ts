@@ -36,6 +36,13 @@ export class StatsEngine {
     for (const collector of this.collectors) {
       await collector.start?.()
     }
+
+    if (this.collectors.length > 0) {
+      log.list(
+        'collectors started:',
+        this.collectors.map((c) => c.label ?? c.name)
+      )
+    }
   }
 
   /**

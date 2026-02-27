@@ -71,6 +71,7 @@ export function logCollector(opts?: LogCollectorOptions): MetricCollector {
 
   return {
     name: 'log',
+    label: opts?.logPath ? `log — file: ${opts.logPath}` : 'log — pino stream (zero-config)',
 
     async start() {
       if (opts?.logPath) {

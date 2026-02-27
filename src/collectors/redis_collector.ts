@@ -24,6 +24,7 @@ let warnedConnectionError = false
 export function redisCollector(): MetricCollector {
   return {
     name: 'redis',
+    label: 'redis — memory, clients, keys, hit rate',
 
     async collect() {
       const defaults = {

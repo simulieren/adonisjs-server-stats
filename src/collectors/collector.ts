@@ -38,6 +38,16 @@ export interface MetricCollector {
   name: string
 
   /**
+   * Short description shown in the startup log.
+   *
+   * Include key options so the developer can verify the collector
+   * is configured correctly at a glance.
+   *
+   * @example `'http — buffer: 10k, window: 60s'`
+   */
+  label?: string
+
+  /**
    * Called once when the {@link StatsEngine} starts.
    *
    * Use this to initialize resources (e.g. start monitoring the
