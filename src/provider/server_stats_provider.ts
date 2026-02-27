@@ -1,26 +1,24 @@
 import { readFileSync } from 'node:fs'
-
+import type { ApplicationService } from '@adonisjs/core/types'
+import type DebugController from '../controller/debug_controller.js'
+import type ServerStatsController from '../controller/server_stats_controller.js'
+import type DashboardController from '../dashboard/dashboard_controller.js'
 import { registerDashboardRoutes } from '../dashboard/dashboard_routes.js'
 import { DashboardStore } from '../dashboard/dashboard_store.js'
 import { DebugStore } from '../debug/debug_store.js'
+import type { DevToolbarConfig } from '../debug/types.js'
 import { StatsEngine } from '../engine/stats_engine.js'
 import { LogStreamService } from '../log_stream/log_stream_service.js'
 import {
-  setShouldShow,
-  setTraceCollector,
   setDashboardPath,
   setExcludedPrefixes,
   setOnRequestComplete,
+  setShouldShow,
+  setTraceCollector,
 } from '../middleware/request_tracking_middleware.js'
 import { registerDebugRoutes } from '../routes/debug_routes.js'
 import { registerStatsRoutes } from '../routes/stats_routes.js'
-
-import type DashboardController from '../dashboard/dashboard_controller.js'
-import type DebugController from '../controller/debug_controller.js'
-import type ServerStatsController from '../controller/server_stats_controller.js'
-import type { DevToolbarConfig } from '../debug/types.js'
 import type { ServerStatsConfig } from '../types.js'
-import type { ApplicationService } from '@adonisjs/core/types'
 
 export default class ServerStatsProvider {
   private intervalId: ReturnType<typeof setInterval> | null = null
@@ -59,12 +57,7 @@ export default class ServerStatsProvider {
 
       // ── Auto-register stats bar endpoint ───────────────────────
       if (typeof config.endpoint === 'string') {
-        registerStatsRoutes(
-          router,
-          config.endpoint,
-          () => this.statsController,
-          config.shouldShow
-        )
+        registerStatsRoutes(router, config.endpoint, () => this.statsController, config.shouldShow)
         registeredPaths.push(config.endpoint)
       }
 
@@ -72,23 +65,13 @@ export default class ServerStatsProvider {
       const toolbarConfig = config.devToolbar
       if (toolbarConfig?.enabled) {
         const debugEndpoint = toolbarConfig.debugEndpoint ?? '/admin/api/debug'
-        registerDebugRoutes(
-          router,
-          debugEndpoint,
-          () => this.debugController,
-          config.shouldShow
-        )
+        registerDebugRoutes(router, debugEndpoint, () => this.debugController, config.shouldShow)
         registeredPaths.push(debugEndpoint + '/*')
 
         // ── Auto-register dashboard routes ─────────────────────────
         if (toolbarConfig.dashboard) {
           const dashPath = toolbarConfig.dashboardPath ?? '/__stats'
-          registerDashboardRoutes(
-            router,
-            dashPath,
-            () => this.dashboardController,
-            config.shouldShow
-          )
+          registerDashboardRoutes(router, dashPath, () => this.dashboardController, config.shouldShow)
           registeredPaths.push(dashPath + '/*')
         }
       }
@@ -99,10 +82,7 @@ export default class ServerStatsProvider {
         const dim = (s: string) => `\x1b[2m${s}\x1b[0m`
         const bold = (s: string) => `\x1b[1m${s}\x1b[0m`
 
-        console.log(
-          `\n${tag} routes registered:\n` +
-            registeredPaths.map((p) => `  ${dim('→')} ${bold(p)}`).join('\n')
-        )
+        console.log(`\n${tag} routes registered:\n` + registeredPaths.map((p) => `  ${dim('→')} ${bold(p)}`).join('\n'))
 
         // Only warn about global auth middleware if:
         // 1. shouldShow is NOT configured (user hasn't set up access control)
@@ -128,7 +108,7 @@ export default class ServerStatsProvider {
                 `  ${dim("// () => import('#middleware/silent_auth_middleware')")}\n` +
                 '\n' +
                 `  ${dim('// start/routes.ts — add to your route groups instead')}\n` +
-                `  ${dim("router.group(() => { ... }).use(middleware.silentAuth())")}\n`
+                `  ${dim('router.group(() => { ... }).use(middleware.silentAuth())')}\n`
             )
           }
         }
@@ -187,11 +167,7 @@ export default class ServerStatsProvider {
           if (importPath.includes('initialize_auth')) continue
 
           // Detect auth-related middleware
-          if (
-            importPath.includes('auth') ||
-            importPath.includes('silent_auth') ||
-            importPath.includes('silentAuth')
-          ) {
+          if (importPath.includes('auth') || importPath.includes('silent_auth') || importPath.includes('silentAuth')) {
             found.push(importPath)
           }
         }
@@ -404,7 +380,6 @@ export default class ServerStatsProvider {
       }
       throw err
     }
-
     // Bind to container
     ;(this.app.container as any).singleton('dashboard.store', () => this.dashboardStore!)
 
@@ -413,11 +388,7 @@ export default class ServerStatsProvider {
 
     // Create the controller — this makes the routes registered in boot() functional
     const DashboardControllerClass = (await import('../dashboard/dashboard_controller.js')).default
-    this.dashboardController = new DashboardControllerClass(
-      this.dashboardStore,
-      this.debugStore!,
-      this.app
-    )
+    this.dashboardController = new DashboardControllerClass(this.dashboardStore, this.debugStore!, this.app)
 
     // ── Log piping ────────────────────────────────────────────────
     const logPath = this.app.makePath('logs', 'adonisjs.log')
@@ -433,7 +404,7 @@ export default class ServerStatsProvider {
     let lastQueryId = 0
     let lastEventId = 0
 
-    setOnRequestComplete(({ method, url, statusCode, duration, trace }) => {
+    setOnRequestComplete(({ method, url, statusCode, duration, trace, httpRequestId }) => {
       if (!dashStore.isReady()) return
 
       // Gather new queries since last request
@@ -452,7 +423,7 @@ export default class ServerStatsProvider {
 
       // Persist asynchronously (fire-and-forget)
       dashStore
-        .persistRequest(method, url, statusCode, duration, newQueries, trace ?? null)
+        .persistRequest(method, url, statusCode, duration, newQueries, trace ?? null, httpRequestId ?? null)
         .then((requestId) => {
           if (requestId !== null && newEvents.length > 0) {
             return dashStore.recordEvents(requestId, newEvents)

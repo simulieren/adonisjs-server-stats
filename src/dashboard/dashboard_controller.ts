@@ -1,18 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-
+import type { HttpContext } from '@adonisjs/core/http'
+import type { ApplicationService } from '@adonisjs/core/types'
+import type { DebugStore } from '../debug/debug_store.js'
 import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
-import { round, clamp } from '../utils/math_helpers.js'
+import { clamp, round } from '../utils/math_helpers.js'
 import { loadTransmitClient } from '../utils/transmit_client.js'
+import type { DashboardStore } from './dashboard_store.js'
 import { CacheInspector } from './integrations/cache_inspector.js'
 import { ConfigInspector } from './integrations/config_inspector.js'
 import { QueueInspector } from './integrations/queue_inspector.js'
-
-import type { DebugStore } from '../debug/debug_store.js'
-import type { DashboardStore } from './dashboard_store.js'
-import type { HttpContext } from '@adonisjs/core/http'
-import type { ApplicationService } from '@adonisjs/core/types'
 
 const EDGE_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'edge')
 
@@ -123,10 +121,7 @@ export default class DashboardController {
       ])
       if (!overview) return emptyOverview()
 
-      const [cacheStats, jobQueueStatus] = await Promise.all([
-        this.fetchCacheOverview(),
-        this.fetchQueueOverview(),
-      ])
+      const [cacheStats, jobQueueStatus] = await Promise.all([this.fetchCacheOverview(), this.fetchQueueOverview()])
 
       return {
         ...overview,
@@ -205,6 +200,14 @@ export default class DashboardController {
         ...formatRequest(detail),
         queries: (detail.queries || []).map(formatQuery),
         trace: detail.trace ? formatTrace(detail.trace) : null,
+        logs: (detail.logs || []).map((l: any) => ({
+          id: l.id,
+          level: l.level,
+          message: l.message,
+          requestId: l.request_id,
+          data: safeParseJson(l.data),
+          createdAt: l.created_at,
+        })),
       })
     } catch {
       return response.notFound({ error: 'Not found' })
@@ -491,10 +494,20 @@ export default class DashboardController {
     }
 
     try {
-      const trace = await this.dashboardStore.getTraceDetail(Number(params.id))
-      if (!trace) return response.notFound({ error: 'Trace not found' })
+      const detail = await this.dashboardStore.getTraceDetail(Number(params.id))
+      if (!detail) return response.notFound({ error: 'Trace not found' })
 
-      return response.json(formatTrace(trace))
+      return response.json({
+        ...formatTrace(detail),
+        logs: (detail.logs || []).map((l: any) => ({
+          id: l.id,
+          level: l.level,
+          message: l.message,
+          requestId: l.request_id,
+          data: safeParseJson(l.data),
+          createdAt: l.created_at,
+        })),
+      })
     } catch {
       return response.notFound({ error: 'Not found' })
     }
@@ -516,10 +529,7 @@ export default class DashboardController {
     const count = clamp(Number(qs.count) || 100, 1, 500)
 
     try {
-      const [stats, keyList] = await Promise.all([
-        inspector.getStats(),
-        inspector.listKeys(pattern, cursor, count),
-      ])
+      const [stats, keyList] = await Promise.all([inspector.getStats(), inspector.listKeys(pattern, cursor, count)])
 
       return response.json({
         available: true,
@@ -664,8 +674,7 @@ export default class DashboardController {
         })
       }
 
-      const configObj =
-        typeof filterConfig === 'string' ? safeParseJson(filterConfig) : filterConfig
+      const configObj = typeof filterConfig === 'string' ? safeParseJson(filterConfig) : filterConfig
       const result = await this.dashboardStore.createSavedFilter(name, section, configObj)
       if (!result) {
         return response.serviceUnavailable({ error: 'Database not available' })
@@ -728,9 +737,7 @@ export default class DashboardController {
   /** Lazy-init inspector pattern for cache and queue. */
   private async getInspector(type: 'cache'): Promise<CacheInspector | null>
   private async getInspector(type: 'queue'): Promise<QueueInspector | null>
-  private async getInspector(
-    type: 'cache' | 'queue'
-  ): Promise<CacheInspector | QueueInspector | null> {
+  private async getInspector(type: 'cache' | 'queue'): Promise<CacheInspector | QueueInspector | null> {
     if (type === 'cache') {
       if (this.cacheAvailable === false) return null
       if (this.cacheInspector) return this.cacheInspector
@@ -809,7 +816,7 @@ export default class DashboardController {
 // ---------------------------------------------------------------------------
 
 function formatRequest(r: any) {
-  return {
+  const out: any = {
     id: r.id,
     method: r.method,
     url: r.url,
@@ -819,6 +826,8 @@ function formatRequest(r: any) {
     warningCount: r.warning_count,
     createdAt: r.created_at,
   }
+  if (r.http_request_id) out.httpRequestId = r.http_request_id
+  return out
 }
 
 function formatQuery(q: any) {
@@ -838,7 +847,7 @@ function formatQuery(q: any) {
 }
 
 function formatTrace(t: any) {
-  return {
+  const out: any = {
     id: t.id,
     requestId: t.request_id,
     method: t.method,
@@ -850,6 +859,8 @@ function formatTrace(t: any) {
     warnings: safeParseJsonArray(t.warnings),
     createdAt: t.created_at,
   }
+  if (t.http_request_id) out.httpRequestId = t.http_request_id
+  return out
 }
 
 function formatEmail(e: any) {

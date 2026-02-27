@@ -693,6 +693,84 @@
 
   const shortReqId = (id) => (id ? id.slice(0, 8) : '')
 
+  // ── Structured log detail helpers ──────────────────────────────
+  const DBG_STANDARD_LOG_KEYS = {
+    level: 1, time: 1, pid: 1, hostname: 1, msg: 1, message: 1,
+    v: 1, name: 1, request_id: 1, 'x-request-id': 1, levelName: 1,
+    level_name: 1, timestamp: 1, id: 1, createdAt: 1, created_at: 1,
+    requestId: 1
+  }
+
+  const dbgGetStructuredData = (entry) => {
+    if (!entry || typeof entry !== 'object') return null
+    const result = {}
+    let count = 0
+    Object.keys(entry).forEach((k) => {
+      if (!DBG_STANDARD_LOG_KEYS[k]) {
+        result[k] = entry[k]
+        count++
+      }
+    })
+    return count > 0 ? result : null
+  }
+
+  const dbgRenderJsonValue = (val, indent) => {
+    indent = indent || 0
+    const pad = new Array(indent * 2 + 1).join(' ')
+    if (val === null) return '<span class="ss-json-null">null</span>'
+    if (typeof val === 'boolean') return '<span class="ss-json-bool">' + val + '</span>'
+    if (typeof val === 'number') return '<span class="ss-json-num">' + val + '</span>'
+    if (typeof val === 'string') return '<span class="ss-json-str">&quot;' + esc(val) + '&quot;</span>'
+    if (Array.isArray(val)) {
+      if (val.length === 0) return '[]'
+      const items = val.map((v) => pad + '  ' + dbgRenderJsonValue(v, indent + 1))
+      return '[\n' + items.join(',\n') + '\n' + pad + ']'
+    }
+    if (typeof val === 'object') {
+      const keys = Object.keys(val)
+      if (keys.length === 0) return '{}'
+      const entries = keys.map((k) =>
+        pad + '  <span class="ss-json-key">&quot;' + esc(k) + '&quot;</span>: ' + dbgRenderJsonValue(val[k], indent + 1)
+      )
+      return '{\n' + entries.join(',\n') + '\n' + pad + '}'
+    }
+    return esc(String(val))
+  }
+
+  let currentShownLogs = []
+
+  const dbgToggleLogDetail = (idx, entryEl) => {
+    const detailId = 'ss-dbg-log-detail-' + idx
+    const existing = document.getElementById(detailId)
+    if (existing) {
+      existing.remove()
+      entryEl.classList.remove('ss-dbg-log-expanded')
+      const ic = entryEl.querySelector('.ss-dbg-log-expand-icon')
+      if (ic) ic.innerHTML = '&#x25B6;'
+      return
+    }
+    // Collapse any other open detail
+    panel.querySelectorAll('.ss-dbg-log-detail').forEach((el) => el.remove())
+    panel.querySelectorAll('.ss-dbg-log-expanded').forEach((el) => {
+      el.classList.remove('ss-dbg-log-expanded')
+      const i2 = el.querySelector('.ss-dbg-log-expand-icon')
+      if (i2) i2.innerHTML = '&#x25B6;'
+    })
+    const entry = currentShownLogs[idx]
+    if (!entry) return
+    const sd = dbgGetStructuredData(entry)
+    if (!sd) return
+    entryEl.classList.add('ss-dbg-log-expanded')
+    const icon = entryEl.querySelector('.ss-dbg-log-expand-icon')
+    if (icon) icon.innerHTML = '&#x25BC;'
+    const detail = document.createElement('div')
+    detail.id = detailId
+    detail.className = 'ss-dbg-log-detail'
+    detail.innerHTML = '<pre class="ss-dbg-log-json">' + dbgRenderJsonValue(sd) + '</pre>'
+    detail.addEventListener('click', (ev) => ev.stopPropagation())
+    entryEl.parentNode.insertBefore(detail, entryEl.nextSibling)
+  }
+
   const renderLogs = () => {
     let entries = cachedLogs
 
@@ -721,6 +799,7 @@
     }
 
     const shown = entries.slice(-200).reverse()
+    currentShownLogs = shown
     let html = ''
 
     for (let i = 0; i < shown.length; i++) {
@@ -729,9 +808,12 @@
       const msg = e.msg || e.message || JSON.stringify(e)
       const ts = e.time || e.timestamp || 0
       const reqId = e.request_id || e['x-request-id'] || ''
+      const sd = dbgGetStructuredData(e)
 
       html +=
-        '<div class="ss-dbg-log-entry">' +
+        '<div class="ss-dbg-log-entry' +
+        (sd ? ' ss-dbg-log-expandable' : '') +
+        '" data-log-idx="' + i + '">' +
         '<span class="ss-dbg-log-level ss-dbg-log-level-' +
         esc(level) +
         '">' +
@@ -752,6 +834,7 @@
         '<span class="ss-dbg-log-msg">' +
         esc(msg) +
         '</span>' +
+        (sd ? '<span class="ss-dbg-log-expand-icon">&#x25B6;</span>' : '') +
         '</div>'
     }
 
@@ -759,8 +842,18 @@
 
     // Click request ID to filter
     logBodyEl.querySelectorAll('.ss-dbg-log-reqid').forEach((el) => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation()
         setReqIdFilter(el.getAttribute('data-reqid'))
+      })
+    })
+
+    // Click log entry to expand structured data
+    logBodyEl.querySelectorAll('.ss-dbg-log-expandable').forEach((el) => {
+      el.addEventListener('click', (ev) => {
+        if (ev.target.classList.contains('ss-dbg-log-reqid')) return
+        const idx = parseInt(el.getAttribute('data-log-idx'), 10)
+        dbgToggleLogDetail(idx, el)
       })
     })
   }
@@ -1055,8 +1148,15 @@
   }
 
   const fetchTraceDetail = (id) => {
-    fetchJSON(BASE + '/traces/' + id)
-      .then((trace) => {
+    // Fetch both trace detail and fresh logs in parallel so
+    // the time-window correlation always has up-to-date data.
+    Promise.all([
+      fetchJSON(BASE + '/traces/' + id),
+      fetchJSON(LOGS_ENDPOINT).then((data) => {
+        cachedLogs = Array.isArray(data) ? data : data.logs || data.entries || []
+      }).catch(() => {}),
+    ])
+      .then(([trace]) => {
         showTimeline(trace)
       })
       .catch(() => {
@@ -1192,13 +1292,190 @@
       html += '</div>'
     }
 
+    // Related Logs — prefer precise httpRequestId match, fall back to time-window
+    let relatedLogs
+    if (trace.httpRequestId) {
+      // Precise: match logs by HTTP request ID
+      relatedLogs = cachedLogs.filter((e) => {
+        const rid = e.request_id || e.requestId || e['x-request-id'] || ''
+        return rid === trace.httpRequestId
+      })
+    }
+    if (!relatedLogs || relatedLogs.length === 0) {
+      // Fallback: time-window correlation
+      const padding = trace.totalDuration + 2000
+      const traceStart = trace.timestamp - padding
+      const traceEnd = trace.timestamp + padding
+      relatedLogs = cachedLogs.filter((e) => {
+        const t = e.time || e.timestamp || 0
+        return t >= traceStart && t <= traceEnd
+      })
+    }
+
     tlWaterfall.innerHTML = html
+
+    // Remove any previous related-logs pane & resize handle from the parent
+    const parent = tlWaterfall.parentNode
+    const oldHandle = parent.querySelector('.ss-dbg-split-handle')
+    const oldLogsPane = parent.querySelector('.ss-dbg-related-logs-pane')
+    if (oldHandle) oldHandle.remove()
+    if (oldLogsPane) oldLogsPane.remove()
+    parent.classList.remove('ss-dbg-split-active')
+
+    // Render related logs into a separate sibling pane (50/50 split with resize)
+    if (relatedLogs.length > 0) {
+      parent.classList.add('ss-dbg-split-active')
+
+      // Create resize handle
+      const handle = document.createElement('div')
+      handle.className = 'ss-dbg-split-handle'
+      handle.title = 'Drag to resize'
+      parent.appendChild(handle)
+
+      // Create logs pane
+      const logsPane = document.createElement('div')
+      logsPane.className = 'ss-dbg-related-logs-pane'
+      let logsHtml =
+        '<div class="ss-dbg-tl-related-logs-title">Related Logs (' +
+        relatedLogs.length + ')</div>'
+      relatedLogs.forEach((e, idx) => {
+        const level = (e.levelName || e.level_name || 'info').toLowerCase()
+        const msg = e.msg || e.message || ''
+        const ts = e.time || e.timestamp || 0
+        const reqId = e.request_id || e['x-request-id'] || ''
+        const sd = dbgGetStructuredData(e)
+
+        logsHtml +=
+          '<div class="ss-dbg-log-entry' +
+          (sd ? ' ss-dbg-log-expandable' : '') +
+          '" data-tl-log-idx="' + idx + '">' +
+          '<span class="ss-dbg-log-level ss-dbg-log-level-' + esc(level) + '">' +
+          esc(level.toUpperCase()) +
+          '</span>' +
+          '<span class="ss-dbg-log-time">' + (ts ? formatTime(ts) : '-') + '</span>' +
+          (reqId
+            ? '<span class="ss-dbg-log-reqid" data-reqid="' + esc(reqId) + '" title="' + esc(reqId) + '">' +
+              esc(shortReqId(reqId)) + '</span>'
+            : '<span class="ss-dbg-log-reqid-empty">-</span>') +
+          '<span class="ss-dbg-log-msg">' + esc(msg) + '</span>' +
+          (sd ? '<span class="ss-dbg-log-expand-icon">&#x25B6;</span>' : '') +
+          '</div>'
+      })
+      logsPane.innerHTML = logsHtml
+      parent.appendChild(logsPane)
+
+      // Attach expand handlers for related logs
+      logsPane.querySelectorAll('[data-tl-log-idx]').forEach((el) => {
+        el.addEventListener('click', (ev) => {
+          if (ev.target.classList.contains('ss-dbg-log-reqid')) return
+          const idx = parseInt(el.getAttribute('data-tl-log-idx'), 10)
+          const entry = relatedLogs[idx]
+          if (!entry) return
+          const sd = dbgGetStructuredData(entry)
+          if (!sd) return
+          const detailId = 'ss-dbg-tl-log-detail-' + idx
+          const existing = document.getElementById(detailId)
+          if (existing) {
+            existing.remove()
+            el.classList.remove('ss-dbg-log-expanded')
+            const ic = el.querySelector('.ss-dbg-log-expand-icon')
+            if (ic) ic.innerHTML = '&#x25B6;'
+            return
+          }
+          // Collapse any other open detail in this logs pane
+          logsPane.querySelectorAll('.ss-dbg-log-detail').forEach((d) => d.remove())
+          logsPane.querySelectorAll('.ss-dbg-log-expanded').forEach((d) => {
+            d.classList.remove('ss-dbg-log-expanded')
+            const i2 = d.querySelector('.ss-dbg-log-expand-icon')
+            if (i2) i2.innerHTML = '&#x25B6;'
+          })
+          el.classList.add('ss-dbg-log-expanded')
+          const icon = el.querySelector('.ss-dbg-log-expand-icon')
+          if (icon) icon.innerHTML = '&#x25BC;'
+          const detail = document.createElement('div')
+          detail.id = detailId
+          detail.className = 'ss-dbg-log-detail'
+          detail.innerHTML = '<pre class="ss-dbg-log-json">' + dbgRenderJsonValue(sd) + '</pre>'
+          detail.addEventListener('click', (ev2) => ev2.stopPropagation())
+          el.parentNode.insertBefore(detail, el.nextSibling)
+        })
+      })
+
+      // Request ID clicks in related logs → switch to logs tab with filter
+      logsPane.querySelectorAll('.ss-dbg-log-reqid').forEach((el) => {
+        el.addEventListener('click', (ev) => {
+          ev.stopPropagation()
+          setReqIdFilter(el.getAttribute('data-reqid'))
+          // Switch to logs tab
+          panel.querySelectorAll('.ss-dbg-tab').forEach((t) => t.classList.remove('ss-dbg-active'))
+          panel.querySelectorAll('.ss-dbg-pane').forEach((p) => (p.style.display = 'none'))
+          const logsTab = panel.querySelector('[data-ss-dbg-tab="logs"]')
+          const logsPaneEl = document.getElementById('ss-dbg-pane-logs')
+          if (logsTab) logsTab.classList.add('ss-dbg-active')
+          if (logsPaneEl) logsPaneEl.style.display = ''
+          activeTab = 'logs'
+        })
+      })
+
+      // Restore saved split ratio from localStorage
+      const savedRatio = parseFloat(localStorage.getItem('ss-stats-split-ratio'))
+      if (savedRatio && savedRatio > 0 && savedRatio < 1) {
+        const initParentH = parent.getBoundingClientRect().height - 6
+        const initTopH = Math.max(60, Math.min(initParentH - 60, initParentH * savedRatio))
+        tlWaterfall.style.flex = 'none'
+        tlWaterfall.style.height = initTopH + 'px'
+        logsPane.style.flex = '1'
+      }
+
+      // Draggable resize handle
+      let dragging = false
+      let startY = 0
+      let startTopH = 0
+      handle.addEventListener('mousedown', (ev) => {
+        ev.preventDefault()
+        dragging = true
+        startY = ev.clientY
+        startTopH = tlWaterfall.getBoundingClientRect().height
+        document.body.style.cursor = 'row-resize'
+        document.body.style.userSelect = 'none'
+      })
+      document.addEventListener('mousemove', (ev) => {
+        if (!dragging) return
+        const delta = ev.clientY - startY
+        const parentH = parent.getBoundingClientRect().height - 6 // minus header and handle
+        const newTopH = Math.max(60, Math.min(parentH - 60, startTopH + delta))
+        tlWaterfall.style.flex = 'none'
+        tlWaterfall.style.height = newTopH + 'px'
+        logsPane.style.flex = '1'
+      })
+      document.addEventListener('mouseup', () => {
+        if (!dragging) return
+        dragging = false
+        document.body.style.cursor = ''
+        document.body.style.userSelect = ''
+        // Save split ratio to localStorage
+        const totalH = parent.getBoundingClientRect().height - 6
+        if (totalH > 0) {
+          const ratio = tlWaterfall.getBoundingClientRect().height / totalH
+          localStorage.setItem('ss-stats-split-ratio', ratio.toFixed(3))
+        }
+      })
+    }
   }
 
   if (tlBackBtn) {
     tlBackBtn.addEventListener('click', () => {
       if (tlListEl) tlListEl.style.display = ''
-      if (tlDetailEl) tlDetailEl.style.display = 'none'
+      if (tlDetailEl) {
+        // Clean up split pane
+        const h = tlDetailEl.querySelector('.ss-dbg-split-handle')
+        const lp = tlDetailEl.querySelector('.ss-dbg-related-logs-pane')
+        if (h) h.remove()
+        if (lp) lp.remove()
+        tlDetailEl.classList.remove('ss-dbg-split-active')
+        if (tlWaterfall) { tlWaterfall.style.flex = ''; tlWaterfall.style.height = '' }
+        tlDetailEl.style.display = 'none'
+      }
     })
   }
 

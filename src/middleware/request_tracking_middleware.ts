@@ -1,12 +1,10 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { performance } from 'node:perf_hooks'
-
-import { getRequestMetrics } from '../collectors/http_collector.js'
-
-import type { TraceCollector } from '../debug/trace_collector.js'
-import type { TraceRecord } from '../debug/types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
+import { getRequestMetrics } from '../collectors/http_collector.js'
+import type { TraceCollector } from '../debug/trace_collector.js'
+import type { TraceRecord } from '../debug/types.js'
 
 /**
  * AsyncLocalStorage that marks the current request as "excluded" from
@@ -72,6 +70,7 @@ export interface RequestCompleteData {
   statusCode: number
   duration: number
   trace?: TraceRecord
+  httpRequestId?: string
 }
 
 /**
@@ -117,9 +116,7 @@ export default class RequestTrackingMiddleware {
     // Skip tracing and dashboard persistence for the debug panel's own requests
     // (e.g. /admin/api/debug/*, /admin/api/server-stats) so they don't flood
     // the timeline. HTTP metrics (req/s, avg latency) are still recorded.
-    const skipTracing =
-      excludedPrefixes.length > 0 &&
-      excludedPrefixes.some((prefix) => requestUrl.startsWith(prefix))
+    const skipTracing = excludedPrefixes.length > 0 && excludedPrefixes.some((prefix) => requestUrl.startsWith(prefix))
 
     const runRequest = async () => {
       try {
@@ -142,6 +139,7 @@ export default class RequestTrackingMiddleware {
             statusCode: ctx.response.getStatus(),
             duration,
             trace: traceRecord ?? undefined,
+            httpRequestId: typeof ctx.request.id === 'function' ? ctx.request.id() : undefined,
           })
         }
       }

@@ -551,7 +551,48 @@
 .ss-dbg-log-msg {
   color: var(--ss-text);
   word-break: break-word;
+  flex: 1;
+  min-width: 0;
 }
+
+/* ── Structured log detail (expandable) ─────────────────────── */
+.ss-dbg-log-expandable {
+  cursor: pointer;
+}
+.ss-dbg-log-expanded {
+  background: var(--ss-hover);
+  border-bottom-color: transparent;
+}
+.ss-dbg-log-expand-icon {
+  font-size: 8px;
+  color: var(--ss-dim);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+.ss-dbg-log-expandable:hover .ss-dbg-log-expand-icon {
+  color: var(--ss-accent);
+}
+.ss-dbg-log-detail {
+  padding: 6px 12px 8px 66px;
+  border-bottom: 1px solid var(--ss-input-bg);
+  background: var(--ss-surface-alt, var(--ss-surface));
+}
+.ss-dbg-log-json {
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ss-muted);
+  font-family: inherit;
+}
+.ss-json-key { color: var(--ss-accent); }
+.ss-json-str { color: var(--ss-green-fg); }
+.ss-json-num { color: var(--ss-amber-fg); }
+.ss-json-bool { color: #c792ea; }
+.ss-json-null { color: var(--ss-dim); font-style: italic; }
 
 /* Empty state */
 .ss-dbg-empty {
@@ -801,6 +842,61 @@
   font-size: 10px;
   color: var(--ss-dim);
   margin-left: 8px;
+}
+
+/* ── Split layout for waterfall + related logs ──────────────────── */
+.ss-dbg-tl-detail.ss-dbg-split-active {
+  display: flex;
+  flex-direction: column;
+}
+.ss-dbg-split-active .ss-dbg-tl-waterfall {
+  flex: 1;
+  min-height: 60px;
+  overflow: auto;
+}
+.ss-dbg-split-active .ss-dbg-empty {
+  height: auto;
+  flex: 0;
+  min-height: 40px;
+}
+.ss-dbg-split-handle {
+  flex: 0 0 6px;
+  background: var(--ss-border-faint, var(--ss-input-bg));
+  cursor: row-resize;
+  position: relative;
+  transition: background 0.15s;
+}
+.ss-dbg-split-handle:hover,
+.ss-dbg-split-handle:active {
+  background: var(--ss-accent);
+}
+.ss-dbg-split-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--ss-muted, var(--ss-dim));
+}
+.ss-dbg-related-logs-pane {
+  flex: 1;
+  min-height: 60px;
+  overflow: auto;
+  padding: 8px 16px;
+  scrollbar-width: thin;
+}
+.ss-dbg-tl-related-logs-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ss-text);
+  padding: 4px 0 8px;
+  position: sticky;
+  top: 0;
+  background: var(--ss-bg);
+  z-index: 1;
 }
 
 /* Status code badges */
