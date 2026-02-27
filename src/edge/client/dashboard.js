@@ -387,8 +387,19 @@
     if (data.queryStats && data.queryStats.total !== undefined) lastQueryStats = data.queryStats
     if (data.recentErrors) lastRecentErrors = data.recentErrors
     if (data.topEvents && data.topEvents.length > 0) lastTopEvents = data.topEvents
-    if (data.emailActivity && (data.emailActivity.sent || data.emailActivity.queued || data.emailActivity.failed)) lastEmailActivity = data.emailActivity
-    if (data.logLevelBreakdown && (data.logLevelBreakdown.error || data.logLevelBreakdown.warn || data.logLevelBreakdown.info || data.logLevelBreakdown.debug)) lastLogLevelBreakdown = data.logLevelBreakdown
+    if (
+      data.emailActivity &&
+      (data.emailActivity.sent || data.emailActivity.queued || data.emailActivity.failed)
+    )
+      lastEmailActivity = data.emailActivity
+    if (
+      data.logLevelBreakdown &&
+      (data.logLevelBreakdown.error ||
+        data.logLevelBreakdown.warn ||
+        data.logLevelBreakdown.info ||
+        data.logLevelBreakdown.debug)
+    )
+      lastLogLevelBreakdown = data.logLevelBreakdown
     if (data.cacheStats) lastCacheStats = data.cacheStats
     if (data.jobQueueStatus) lastJobQueueStatus = data.jobQueueStatus
     if (data.statusDistribution) lastStatusDistribution = data.statusDistribution
@@ -1783,6 +1794,110 @@
   var logDeepLevelFilter = ''
   var logStructuredFilters = []
   var logSavedFilters = []
+  var currentLogItems = []
+
+  // ── Structured log detail helpers ──────────────────────────────
+
+  var STANDARD_LOG_KEYS = {
+    level: 1,
+    time: 1,
+    pid: 1,
+    hostname: 1,
+    msg: 1,
+    message: 1,
+    v: 1,
+    name: 1,
+    request_id: 1,
+    'x-request-id': 1,
+    levelName: 1,
+    level_name: 1,
+    timestamp: 1,
+    id: 1,
+    createdAt: 1,
+    created_at: 1,
+    requestId: 1,
+  }
+
+  var getStructuredData = function (entry) {
+    if (!entry || !entry.data || typeof entry.data !== 'object') return null
+    var result = {}
+    var count = 0
+    Object.keys(entry.data).forEach(function (k) {
+      if (!STANDARD_LOG_KEYS[k]) {
+        result[k] = entry.data[k]
+        count++
+      }
+    })
+    return count > 0 ? result : null
+  }
+
+  var renderJsonValue = function (val, indent) {
+    indent = indent || 0
+    var pad = ' '.repeat(indent * 2)
+    if (val === null) return '<span class="ss-json-null">null</span>'
+    if (typeof val === 'boolean') return '<span class="ss-json-bool">' + val + '</span>'
+    if (typeof val === 'number') return '<span class="ss-json-num">' + val + '</span>'
+    if (typeof val === 'string')
+      return '<span class="ss-json-str">&quot;' + esc(val) + '&quot;</span>'
+    if (Array.isArray(val)) {
+      if (val.length === 0) return '[]'
+      var items = val.map(function (v) {
+        return pad + '  ' + renderJsonValue(v, indent + 1)
+      })
+      return '[\n' + items.join(',\n') + '\n' + pad + ']'
+    }
+    if (typeof val === 'object') {
+      var keys = Object.keys(val)
+      if (keys.length === 0) return '{}'
+      var entries = keys.map(function (k) {
+        return (
+          pad +
+          '  <span class="ss-json-key">&quot;' +
+          esc(k) +
+          '&quot;</span>: ' +
+          renderJsonValue(val[k], indent + 1)
+        )
+      })
+      return '{\n' + entries.join(',\n') + '\n' + pad + '}'
+    }
+    return esc(String(val))
+  }
+
+  var toggleLogDetail = function (idx, entryEl) {
+    var detailId = 'ss-dash-log-detail-' + idx
+    var existing = document.getElementById(detailId)
+    if (existing) {
+      existing.remove()
+      entryEl.classList.remove('ss-dash-log-expanded')
+      var ic = entryEl.querySelector('.ss-dash-log-expand-icon')
+      if (ic) ic.innerHTML = '&#x25B6;'
+      return
+    }
+    // Collapse any other open detail
+    document.querySelectorAll('.ss-dash-log-detail').forEach(function (el) {
+      el.remove()
+    })
+    document.querySelectorAll('.ss-dash-log-expanded').forEach(function (el) {
+      el.classList.remove('ss-dash-log-expanded')
+      var i2 = el.querySelector('.ss-dash-log-expand-icon')
+      if (i2) i2.innerHTML = '&#x25B6;'
+    })
+    var entry = currentLogItems[idx]
+    if (!entry) return
+    var sd = getStructuredData(entry)
+    if (!sd) return
+    entryEl.classList.add('ss-dash-log-expanded')
+    var icon = entryEl.querySelector('.ss-dash-log-expand-icon')
+    if (icon) icon.innerHTML = '&#x25BC;'
+    var detail = document.createElement('div')
+    detail.id = detailId
+    detail.className = 'ss-dash-log-detail'
+    detail.innerHTML = '<pre class="ss-dash-log-json">' + renderJsonValue(sd) + '</pre>'
+    detail.addEventListener('click', function (ev) {
+      ev.stopPropagation()
+    })
+    entryEl.parentNode.insertBefore(detail, entryEl.nextSibling)
+  }
 
   var fetchLogs = function () {
     var ps = getPage('logs')
@@ -1814,6 +1929,7 @@
 
   var renderLogs = function (data) {
     var items = data.data || data.logs || data.entries || []
+    currentLogItems = items
     var ps = getPage('logs')
     ps.total = data.meta ? data.meta.total : data.total || items.length
 
@@ -1827,14 +1943,20 @@
     }
 
     var html = ''
-    items.forEach(function (e) {
+    items.forEach(function (e, idx) {
       var level = (e.level || e.levelName || e.level_name || 'info').toLowerCase()
       var msg = e.message || e.msg || ''
       var ts = e.createdAt || e.created_at || e.time || e.timestamp || 0
       var reqId = e.request_id || e['x-request-id'] || ''
+      var hasData = e.data && typeof e.data === 'object' && Object.keys(e.data).length > 0
+      var sd = hasData ? getStructuredData(e) : null
 
       html +=
-        '<div class="ss-dash-log-entry">' +
+        '<div class="ss-dash-log-entry' +
+        (sd ? ' ss-dash-log-expandable' : '') +
+        '" data-log-idx="' +
+        idx +
+        '">' +
         '<span class="ss-dash-log-level ss-dash-log-level-' +
         esc(level) +
         '">' +
@@ -1855,6 +1977,7 @@
         '<span class="ss-dash-log-msg">' +
         esc(msg) +
         '</span>' +
+        (sd ? '<span class="ss-dash-log-expand-icon">&#x25B6;</span>' : '') +
         '</div>'
     })
 
@@ -1866,7 +1989,8 @@
     var logBody = document.getElementById('ss-dash-logs-body')
     if (logBody) {
       logBody.querySelectorAll('.ss-dash-log-reqid').forEach(function (el) {
-        el.addEventListener('click', function () {
+        el.addEventListener('click', function (ev) {
+          ev.stopPropagation()
           logReqIdFilter = el.getAttribute('data-reqid') || ''
           var input = document.getElementById('ss-dash-log-reqid-input')
           if (input) input.value = logReqIdFilter
@@ -1874,6 +1998,15 @@
           if (clearBtn) clearBtn.style.display = logReqIdFilter ? '' : 'none'
           getPage('logs').page = 1
           fetchLogs()
+        })
+      })
+
+      // Click log entry to expand structured data
+      logBody.querySelectorAll('.ss-dash-log-expandable').forEach(function (el) {
+        el.addEventListener('click', function (ev) {
+          if (ev.target.classList.contains('ss-dash-log-reqid')) return
+          var idx = parseInt(el.getAttribute('data-log-idx'), 10)
+          toggleLogDetail(idx, el)
         })
       })
     }
