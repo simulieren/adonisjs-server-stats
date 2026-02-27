@@ -928,6 +928,58 @@ body {
 .ss-dash-log-msg {
   color: var(--ss-text);
   word-break: break-word;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Structured log detail (expandable) ─────────────────────── */
+.ss-dash-log-expandable {
+  cursor: pointer;
+}
+.ss-dash-log-expanded {
+  background: var(--ss-hover);
+  border-bottom-color: transparent;
+}
+.ss-dash-log-expand-icon {
+  font-size: 8px;
+  color: var(--ss-dim);
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+.ss-dash-log-expandable:hover .ss-dash-log-expand-icon {
+  color: var(--ss-accent);
+}
+.ss-dash-log-detail {
+  padding: 8px 16px 10px 66px;
+  border-bottom: 1px solid var(--ss-border-faint);
+  background: var(--ss-surface);
+}
+.ss-dash-log-json {
+  font-size: 11px;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ss-muted);
+  font-family: inherit;
+}
+.ss-json-key {
+  color: var(--ss-accent);
+}
+.ss-json-str {
+  color: var(--ss-green-fg);
+}
+.ss-json-num {
+  color: var(--ss-amber-fg);
+}
+.ss-json-bool {
+  color: #c792ea;
+}
+.ss-json-null {
+  color: var(--ss-dim);
+  font-style: italic;
 }
 
 /* ── Structured log search ─────────────────────────────────────── */

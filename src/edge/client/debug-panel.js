@@ -693,6 +693,103 @@
 
   const shortReqId = (id) => (id ? id.slice(0, 8) : '')
 
+  // ── Structured log detail helpers ──────────────────────────────
+  const DBG_STANDARD_LOG_KEYS = {
+    level: 1,
+    time: 1,
+    pid: 1,
+    hostname: 1,
+    msg: 1,
+    message: 1,
+    v: 1,
+    name: 1,
+    request_id: 1,
+    'x-request-id': 1,
+    levelName: 1,
+    level_name: 1,
+    timestamp: 1,
+    id: 1,
+    createdAt: 1,
+    created_at: 1,
+    requestId: 1,
+  }
+
+  const dbgGetStructuredData = (entry) => {
+    if (!entry || typeof entry !== 'object') return null
+    const result = {}
+    let count = 0
+    Object.keys(entry).forEach((k) => {
+      if (!DBG_STANDARD_LOG_KEYS[k]) {
+        result[k] = entry[k]
+        count++
+      }
+    })
+    return count > 0 ? result : null
+  }
+
+  const dbgRenderJsonValue = (val, indent) => {
+    indent = indent || 0
+    const pad = ' '.repeat(indent * 2)
+    if (val === null) return '<span class="ss-json-null">null</span>'
+    if (typeof val === 'boolean') return '<span class="ss-json-bool">' + val + '</span>'
+    if (typeof val === 'number') return '<span class="ss-json-num">' + val + '</span>'
+    if (typeof val === 'string')
+      return '<span class="ss-json-str">&quot;' + esc(val) + '&quot;</span>'
+    if (Array.isArray(val)) {
+      if (val.length === 0) return '[]'
+      const items = val.map((v) => pad + '  ' + dbgRenderJsonValue(v, indent + 1))
+      return '[\n' + items.join(',\n') + '\n' + pad + ']'
+    }
+    if (typeof val === 'object') {
+      const keys = Object.keys(val)
+      if (keys.length === 0) return '{}'
+      const entries = keys.map(
+        (k) =>
+          pad +
+          '  <span class="ss-json-key">&quot;' +
+          esc(k) +
+          '&quot;</span>: ' +
+          dbgRenderJsonValue(val[k], indent + 1)
+      )
+      return '{\n' + entries.join(',\n') + '\n' + pad + '}'
+    }
+    return esc(String(val))
+  }
+
+  let currentShownLogs = []
+
+  const dbgToggleLogDetail = (idx, entryEl) => {
+    const detailId = 'ss-dbg-log-detail-' + idx
+    const existing = document.getElementById(detailId)
+    if (existing) {
+      existing.remove()
+      entryEl.classList.remove('ss-dbg-log-expanded')
+      const ic = entryEl.querySelector('.ss-dbg-log-expand-icon')
+      if (ic) ic.innerHTML = '&#x25B6;'
+      return
+    }
+    // Collapse any other open detail
+    panel.querySelectorAll('.ss-dbg-log-detail').forEach((el) => el.remove())
+    panel.querySelectorAll('.ss-dbg-log-expanded').forEach((el) => {
+      el.classList.remove('ss-dbg-log-expanded')
+      const i2 = el.querySelector('.ss-dbg-log-expand-icon')
+      if (i2) i2.innerHTML = '&#x25B6;'
+    })
+    const entry = currentShownLogs[idx]
+    if (!entry) return
+    const sd = dbgGetStructuredData(entry)
+    if (!sd) return
+    entryEl.classList.add('ss-dbg-log-expanded')
+    const icon = entryEl.querySelector('.ss-dbg-log-expand-icon')
+    if (icon) icon.innerHTML = '&#x25BC;'
+    const detail = document.createElement('div')
+    detail.id = detailId
+    detail.className = 'ss-dbg-log-detail'
+    detail.innerHTML = '<pre class="ss-dbg-log-json">' + dbgRenderJsonValue(sd) + '</pre>'
+    detail.addEventListener('click', (ev) => ev.stopPropagation())
+    entryEl.parentNode.insertBefore(detail, entryEl.nextSibling)
+  }
+
   const renderLogs = () => {
     let entries = cachedLogs
 
@@ -721,6 +818,7 @@
     }
 
     const shown = entries.slice(-200).reverse()
+    currentShownLogs = shown
     let html = ''
 
     for (let i = 0; i < shown.length; i++) {
@@ -729,9 +827,14 @@
       const msg = e.msg || e.message || JSON.stringify(e)
       const ts = e.time || e.timestamp || 0
       const reqId = e.request_id || e['x-request-id'] || ''
+      const sd = dbgGetStructuredData(e)
 
       html +=
-        '<div class="ss-dbg-log-entry">' +
+        '<div class="ss-dbg-log-entry' +
+        (sd ? ' ss-dbg-log-expandable' : '') +
+        '" data-log-idx="' +
+        i +
+        '">' +
         '<span class="ss-dbg-log-level ss-dbg-log-level-' +
         esc(level) +
         '">' +
@@ -752,6 +855,7 @@
         '<span class="ss-dbg-log-msg">' +
         esc(msg) +
         '</span>' +
+        (sd ? '<span class="ss-dbg-log-expand-icon">&#x25B6;</span>' : '') +
         '</div>'
     }
 
@@ -759,8 +863,18 @@
 
     // Click request ID to filter
     logBodyEl.querySelectorAll('.ss-dbg-log-reqid').forEach((el) => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', (ev) => {
+        ev.stopPropagation()
         setReqIdFilter(el.getAttribute('data-reqid'))
+      })
+    })
+
+    // Click log entry to expand structured data
+    logBodyEl.querySelectorAll('.ss-dbg-log-expandable').forEach((el) => {
+      el.addEventListener('click', (ev) => {
+        if (ev.target.classList.contains('ss-dbg-log-reqid')) return
+        const idx = parseInt(el.getAttribute('data-log-idx'), 10)
+        dbgToggleLogDetail(idx, el)
       })
     })
   }
