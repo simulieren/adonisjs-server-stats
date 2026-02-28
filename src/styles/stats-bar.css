@@ -123,11 +123,7 @@
   flex: 1;
   min-width: 0;
   padding-right: 8px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.ss-bar-scroll::-webkit-scrollbar {
-  display: none;
+  /* scrollbar hiding → utilities.css */
 }
 
 .ss-group {
@@ -178,7 +174,7 @@
 .ss-value {
   font-size: 11px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   color: var(--ss-accent);
 }
 
@@ -257,7 +253,7 @@
 .ss-toggle-summary .ss-value {
   font-size: 10px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
 }
 
 /* Tooltip — positioned absolutely within .ss-bar (outside scroll area) via JS */
@@ -310,7 +306,7 @@
 }
 .ss-tooltip-current {
   margin-top: 6px;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
 }
 .ss-tooltip-current-label {
   color: var(--ss-text-secondary);
@@ -324,7 +320,7 @@
   display: flex;
   gap: 12px;
   font-size: 10px;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   color: var(--ss-text-secondary);
 }
 .ss-tooltip-details {

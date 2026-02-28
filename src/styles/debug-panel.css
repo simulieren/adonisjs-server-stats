@@ -161,8 +161,7 @@
   flex: 1;
   min-width: 0;
   padding-left: 8px;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  /* scrollbar hiding → utilities.css */
   mask-image: linear-gradient(
     to right,
     transparent 0,
@@ -177,9 +176,6 @@
     black calc(100% - 24px),
     transparent 100%
   );
-}
-.ss-dbg-tabs-scroll::-webkit-scrollbar {
-  display: none;
 }
 .ss-dbg-tab {
   display: inline-flex;
@@ -250,11 +246,7 @@
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.ss-dbg-pane::-webkit-scrollbar {
-  display: none;
+  /* scrollbar hiding → utilities.css */
 }
 .ss-dbg-pane.ss-dbg-active {
   display: block;
@@ -306,61 +298,7 @@
   border-color: var(--ss-dim);
 }
 
-/* Table */
-.ss-dbg-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-  table-layout: fixed;
-}
-.ss-dbg-table th {
-  position: sticky;
-  top: 0;
-  padding: 6px 10px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ss-muted);
-  background: var(--ss-surface);
-  border-bottom: 1px solid var(--ss-border);
-  white-space: nowrap;
-}
-.ss-dbg-table td {
-  padding: 5px 10px;
-  border-bottom: 1px solid var(--ss-border-faint);
-  vertical-align: top;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ss-text);
-}
-.ss-dbg-table tr:hover td {
-  background: var(--ss-hover);
-}
-/* Column resize handles */
-.ss-col-resize {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 5px;
-  height: 100%;
-  cursor: col-resize;
-  user-select: none;
-  z-index: 3;
-  background: var(--ss-border-faint);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.ss-dbg-table th:hover .ss-col-resize {
-  opacity: 0.6;
-}
-.ss-col-resize:hover,
-.ss-col-resize.ss-resizing {
-  background: var(--ss-accent, #6d28d9);
-  opacity: 0.8;
-}
+/* Table base / column resize → components.css */
 
 /* Query-specific styles */
 .ss-dbg-sql {
@@ -369,9 +307,7 @@
   word-break: break-all;
   cursor: pointer;
   max-width: 500px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
 }
 .ss-dbg-sql.ss-dbg-expanded {
   white-space: pre-wrap;
@@ -383,33 +319,7 @@
   font-size: 10px;
 }
 
-/* Method badges */
-.ss-dbg-method {
-  display: inline-block;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.ss-dbg-method-get {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dbg-method-post {
-  background: var(--ss-blue-bg);
-  color: var(--ss-blue-fg);
-}
-.ss-dbg-method-put,
-.ss-dbg-method-patch {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dbg-method-delete {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
-}
+/* Method badges → components.css */
 
 /* Route highlight */
 .ss-dbg-current-route td {
@@ -419,31 +329,25 @@
 /* Event list */
 .ss-dbg-event-name {
   color: var(--ss-sql-color);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
 }
 .ss-dbg-event-data {
   color: var(--ss-muted);
   font-size: 10px;
   position: relative;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
 }
 .ss-dbg-event-time {
   color: var(--ss-dim);
   font-size: 10px;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   white-space: nowrap;
 }
 .ss-dbg-data-preview {
   cursor: pointer;
   color: var(--ss-text-secondary);
   border-bottom: 1px dashed var(--ss-dim);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
   display: block;
 }
 .ss-dbg-data-preview:hover {
@@ -451,9 +355,7 @@
 }
 /* Data cell wrapper used by JsonViewer */
 .ss-dbg-data-cell {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
 }
 /* When expanded data is shown, allow the cell to wrap */
 .ss-dbg-event-data:has(.ss-dbg-data-full),
@@ -474,11 +376,7 @@
   max-height: 200px;
   overflow: auto;
   cursor: pointer;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.ss-dbg-data-full::-webkit-scrollbar {
-  display: none;
+  /* scrollbar hiding → utilities.css */
 }
 /* Copy button → components.css */
 
@@ -516,296 +414,35 @@
   color: var(--ss-accent);
 }
 
-.ss-dbg-log-entry {
-  padding: 4px 12px;
-  font-size: 11px;
-  border-bottom: 1px solid var(--ss-input-bg);
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-}
-.ss-dbg-log-level {
-  font-size: 10px;
-  font-weight: 600;
-  width: 42px;
-  text-align: center;
-  flex-shrink: 0;
-  padding: 1px 0;
-  border-radius: 3px;
-}
-.ss-dbg-log-level-info {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dbg-log-level-warn {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dbg-log-level-error,
-.ss-dbg-log-level-fatal {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
-}
-.ss-dbg-log-level-debug {
-  background: var(--ss-surface-alt);
-  color: var(--ss-muted);
-}
-.ss-dbg-log-level-trace {
-  background: var(--ss-surface-alt);
-  color: var(--ss-dim);
-}
-.ss-dbg-log-time {
-  color: var(--ss-dim);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-.ss-dbg-log-reqid {
-  font-size: 10px;
-  color: var(--ss-reqid-fg);
-  background: var(--ss-reqid-bg);
-  padding: 1px 5px;
-  border-radius: 3px;
-  cursor: pointer;
-  flex-shrink: 0;
-  letter-spacing: 0.02em;
-}
-.ss-dbg-log-reqid:hover {
-  color: var(--ss-reqid-hover-fg);
-  background: var(--ss-reqid-hover-bg);
-}
-.ss-dbg-log-reqid-empty {
-  font-size: 10px;
-  color: var(--ss-border);
-  flex-shrink: 0;
-  width: 58px;
-  text-align: center;
-}
+/* Log entry / level / time / reqid / msg → components.css */
 .ss-dbg-reqid-input {
   max-width: 200px;
   margin-left: auto;
-}
-.ss-dbg-log-msg {
-  color: var(--ss-text);
-  word-break: break-word;
 }
 
 /* Empty state → components.css */
 
 /* Badge → components.css */
 
-/* Email preview overlay */
-.ss-dbg-email-preview {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--ss-bg);
-  z-index: 30;
-}
-.ss-dbg-email-preview-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  flex-shrink: 0;
-}
-.ss-dbg-email-preview-meta {
-  font-size: 11px;
-  color: var(--ss-text-secondary);
-  line-height: 1.6;
-  overflow: hidden;
-}
-.ss-dbg-email-preview-meta strong {
-  color: var(--ss-text);
-  font-weight: 600;
-}
-.ss-dbg-email-iframe {
-  flex: 1;
-  border: none;
-  background: #fff;
-}
-
-/* Email row */
-.ss-dbg-email-row {
-  cursor: pointer;
-}
-.ss-dbg-email-row:hover td {
-  background: var(--ss-hover-accent) !important;
-}
-
-/* Email status badges */
-.ss-dbg-email-status {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.ss-dbg-email-status-sent {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dbg-email-status-sending {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dbg-email-status-queued {
-  background: var(--ss-blue-bg);
-  color: var(--ss-blue-fg);
-}
-.ss-dbg-email-status-failed {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
-}
+/* Email preview / row / status → components.css */
 
 /* Filterable cell */
 .ss-dbg-filterable:hover {
   background: var(--ss-hover-accent);
 }
 
-/* Timeline */
-.ss-dbg-tl-detail-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  flex-shrink: 0;
-  font-size: 11px;
-}
+/* Timeline base → components.css */
+/* Debug-specific timeline overrides */
 .ss-dbg-tl-detail-url {
   color: var(--ss-text);
   font-size: 11px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* truncation → utilities.css */
   min-width: 0;
 }
 #ss-dbg-tl-waterfall {
   padding: 8px 12px;
   overflow: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-#ss-dbg-tl-waterfall::-webkit-scrollbar {
-  display: none;
-}
-
-.ss-dbg-tl-row {
-  display: flex;
-  align-items: center;
-  height: 24px;
-  font-size: 11px;
-  border-bottom: 1px solid var(--ss-input-bg);
-}
-.ss-dbg-tl-row:hover {
-  background: var(--ss-hover);
-}
-.ss-dbg-tl-label {
-  width: 280px;
-  min-width: 280px;
-  padding-right: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ss-text-secondary);
-  font-size: 10px;
-}
-.ss-dbg-tl-track {
-  flex: 1;
-  position: relative;
-  height: 16px;
-}
-.ss-dbg-tl-bar {
-  position: absolute;
-  height: 12px;
-  top: 2px;
-  border-radius: 2px;
-  min-width: 2px;
-  cursor: default;
-}
-/* Timeline bar colors are semantic category indicators — kept as fixed values */
-.ss-dbg-tl-bar-request {
-  background: #1e3a5f;
-}
-.ss-dbg-tl-bar-middleware {
-  background: #1e3a5f;
-  opacity: 0.7;
-}
-.ss-dbg-tl-bar-db {
-  background: #6d28d9;
-}
-.ss-dbg-tl-bar-view {
-  background: #0e7490;
-}
-.ss-dbg-tl-bar-mail {
-  background: #059669;
-}
-.ss-dbg-tl-bar-event {
-  background: #b45309;
-}
-.ss-dbg-tl-bar-custom {
-  background: #525252;
-}
-
-.ss-dbg-tl-dur {
-  font-size: 10px;
-  color: var(--ss-dim);
-  margin-left: 4px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.ss-dbg-tl-legend {
-  display: flex;
-  gap: 10px;
-  padding: 4px 12px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  font-size: 10px;
-  color: var(--ss-muted);
-}
-.ss-dbg-tl-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.ss-dbg-tl-legend-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.ss-dbg-tl-warnings {
-  margin-top: 12px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--ss-border-dim);
-}
-.ss-dbg-tl-warnings-title {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--ss-amber-fg);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-}
-.ss-dbg-tl-warning {
-  font-size: 11px;
-  color: var(--ss-amber-fg);
-  padding: 2px 0;
-}
-
-.ss-dbg-tl-meta {
-  font-size: 10px;
-  color: var(--ss-dim);
-  margin-left: 8px;
+  /* scrollbar hiding → utilities.css */
 }
 
 /* Status code badges → components.css */
@@ -894,7 +531,7 @@
   white-space: nowrap;
 }
 .ss-dbg-mini-stat-value {
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   font-weight: 600;
   color: var(--ss-text);
 }
@@ -928,7 +565,7 @@
 .ss-dbg-cache-stat-value {
   color: var(--ss-text);
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
 }
 
 /* Cache detail overlay */
@@ -950,11 +587,7 @@
   word-break: break-all;
   max-height: 300px;
   overflow: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.ss-dbg-cache-detail pre::-webkit-scrollbar {
-  display: none;
+  /* scrollbar hiding → utilities.css */
 }
 
 /* Jobs tab */
@@ -979,7 +612,7 @@
 .ss-dbg-job-stat-value {
   color: var(--ss-text);
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
 }
 
 /* .ss-dbg-job-filter → consolidated above with log-filter & config-tab */
@@ -1025,118 +658,14 @@
 }
 
 /* .ss-dbg-config-tab → consolidated above with log-filter & job-filter */
+/* Config sections/toggle/key/val/match/leaf/redacted/copy-row/inner-table → components.css */
+/* Btn / btn-group → components.css */
 
-.ss-dbg-config-sections {
-  padding: 0;
-}
-.ss-dbg-config-section {
-  border-bottom: 1px solid var(--ss-border-faint);
-}
-.ss-dbg-config-section-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 11px;
-}
-.ss-dbg-config-section-header:hover {
-  background: var(--ss-hover);
-}
-.ss-dbg-config-toggle {
-  color: var(--ss-dim);
-  font-size: 9px;
-  width: 12px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.ss-dbg-config-key {
-  color: var(--ss-sql-color);
-}
-.ss-dbg-config-count {
-  color: var(--ss-dim);
-  font-size: 10px;
-  margin-left: auto;
-}
-.ss-dbg-config-val {
-  color: var(--ss-text-secondary);
-}
-.ss-dbg-config-val-true {
-  color: var(--ss-accent);
-}
-.ss-dbg-config-val-false {
-  color: var(--ss-red-fg);
-}
-.ss-dbg-config-val-number {
-  color: var(--ss-amber-fg);
-}
-.ss-dbg-config-val-array {
-  color: var(--ss-purple-fg);
-}
-.ss-dbg-config-val-null {
-  color: var(--ss-dim);
-}
-.ss-dbg-config-redacted {
-  color: var(--ss-dim);
-  font-style: italic;
-}
-.ss-dbg-redacted-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-style: italic;
-  color: var(--ss-dim);
-}
-.ss-dbg-redacted-real {
-  font-style: normal;
-  color: var(--ss-text-secondary);
-  font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-  font-size: 11px;
-  word-break: break-all;
-}
-.ss-dbg-redacted-reveal,
-.ss-dbg-redacted-copy {
-  background: none;
-  border: 1px solid var(--ss-border);
-  border-radius: 3px;
-  padding: 2px 4px;
-  cursor: pointer;
-  color: var(--ss-dim);
-  display: inline-flex;
-  align-items: center;
-  line-height: 1;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-.ss-dbg-redacted-reveal:hover,
-.ss-dbg-redacted-copy:hover {
-  color: var(--ss-text);
-  border-color: var(--ss-dim);
-}
-.ss-dbg-config-match {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-  border-radius: 2px;
-  padding: 0 1px;
-}
-
-.ss-dbg-config-leaf {
-  cursor: default;
-}
-.ss-dbg-config-leaf:hover {
-  background: transparent;
-}
-
+/* Debug-specific: config toolbar, env table, search wrap */
 .ss-dbg-config-table-wrap {
   overflow: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  /* scrollbar hiding → utilities.css */
 }
-.ss-dbg-config-table-wrap::-webkit-scrollbar {
-  display: none;
-}
-
 .ss-dbg-config-toolbar {
   display: flex;
   align-items: center;
@@ -1144,88 +673,18 @@
   padding: 6px 10px;
   border-bottom: 1px solid var(--ss-border-faint);
 }
-
 .ss-dbg-config-env-table {
   table-layout: fixed;
 }
-
-.ss-dbg-config-inner-table {
-  font-size: 11px;
-  table-layout: fixed;
-}
-.ss-dbg-config-inner-table th {
-  background: var(--ss-surface-alt);
-}
-.ss-dbg-config-inner-table td {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ss-dbg-config-inner-table td:hover {
-  white-space: normal;
-  word-break: break-all;
-}
-
-.ss-dbg-config-section-body {
-  padding: 0 0 4px 0;
-  background: var(--ss-surface-alt);
-}
-
 .ss-dbg-env-key {
   width: 200px;
   min-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* truncation → utilities.css */
 }
 .ss-dbg-env-val {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
   max-width: 0;
 }
-
-.ss-dbg-copy-row-btn {
-  padding: 2px 6px;
-  font-size: 12px;
-  color: var(--ss-dim);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  cursor: pointer;
-  line-height: 1;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-tr:hover .ss-dbg-copy-row-btn,
-.ss-dbg-config-section-header:hover .ss-dbg-copy-row-btn {
-  opacity: 1;
-}
-.ss-dbg-copy-row-btn:hover {
-  color: var(--ss-text);
-  border-color: var(--ss-border);
-}
-.ss-dbg-copy-row-btn.ss-dbg-copy-row-ok {
-  color: var(--ss-green-fg);
-  opacity: 1;
-}
-
-.ss-dbg-btn-group {
-  display: inline-flex;
-  gap: 0;
-}
-.ss-dbg-btn-group .ss-dbg-btn {
-  border-radius: 0;
-  margin-left: -1px;
-}
-.ss-dbg-btn-group .ss-dbg-btn:first-child {
-  border-radius: 4px 0 0 4px;
-  margin-left: 0;
-}
-.ss-dbg-btn-group .ss-dbg-btn:last-child {
-  border-radius: 0 4px 4px 0;
-}
-
 .ss-dbg-config-search-wrap {
   position: relative;
   flex: 1;
@@ -1233,26 +692,11 @@ tr:hover .ss-dbg-copy-row-btn,
   max-width: 280px;
 }
 
-/* Wrench button in stats bar */
+/* Debug-specific btn overrides */
 .ss-dbg-btn {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
-  color: var(--ss-muted);
-  cursor: pointer;
-  border: none;
-  background: none;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-.ss-dbg-btn:hover {
-  color: var(--ss-text);
-  background: var(--ss-hover);
-}
-.ss-dbg-btn.ss-dbg-active {
-  color: var(--ss-accent);
+  --ss-btn-py: 2px;
+  --ss-btn-px: 6px;
+  --ss-btn-font: 12px;
 }
 
 /* Theme toggle button */

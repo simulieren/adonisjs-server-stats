@@ -101,8 +101,9 @@ export default class DashboardController {
     if (!this.cachedCss) {
       const tokens = readFileSync(join(STYLES_DIR, 'tokens.css'), 'utf-8')
       const components = readFileSync(join(STYLES_DIR, 'components.css'), 'utf-8')
+      const utilities = readFileSync(join(STYLES_DIR, 'utilities.css'), 'utf-8')
       const dashboard = readFileSync(join(STYLES_DIR, 'dashboard.css'), 'utf-8')
-      this.cachedCss = tokens + '\n' + components + '\n' + dashboard
+      this.cachedCss = tokens + '\n' + components + '\n' + utilities + '\n' + dashboard
     }
     if (!this.cachedJs) {
       const renderer = toolbarConfig.renderer || 'preact'

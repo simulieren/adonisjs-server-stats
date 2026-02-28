@@ -157,11 +157,7 @@ body {
   transition:
     width 0.2s ease,
     min-width 0.2s ease;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.ss-dash-sidebar::-webkit-scrollbar {
-  display: none;
+  /* scrollbar hiding → utilities.css */
 }
 
 .ss-dash-sidebar.ss-dash-collapsed {
@@ -250,7 +246,7 @@ body {
   color: #fff;
   padding: 0 5px;
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
 }
 .ss-dash-nav-badge.ss-dash-badge-accent {
   background: var(--ss-accent-dim);
@@ -401,43 +397,25 @@ body {
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
+/* Base btn / btn-group → components.css */
+/* Dashboard override: bordered style with uppercase */
 .ss-dash-btn {
-  padding: 4px 10px;
-  font-size: 10px;
-  color: var(--ss-muted);
-  background: var(--ss-surface);
-  border: 1px solid var(--ss-border);
-  border-radius: 4px;
-  cursor: pointer;
-  text-transform: uppercase;
+  --ss-btn-py: 4px;
+  --ss-btn-px: 10px;
+  --ss-btn-border: 1px solid var(--ss-border);
+  --ss-btn-bg: var(--ss-surface);
+  --ss-btn-case: uppercase;
   letter-spacing: 0.03em;
   font-weight: 500;
   white-space: nowrap;
 }
 .ss-dash-btn:hover {
-  color: var(--ss-text);
   border-color: var(--ss-dim);
 }
 .ss-dash-btn.ss-dash-active {
   color: var(--ss-accent);
   border-color: var(--ss-accent);
   background: var(--ss-accent-dim);
-}
-
-.ss-dash-btn-group {
-  display: flex;
-  gap: 0;
-}
-.ss-dash-btn-group .ss-dash-btn {
-  border-radius: 0;
-  margin-left: -1px;
-}
-.ss-dash-btn-group .ss-dash-btn:first-child {
-  border-radius: 4px 0 0 4px;
-  margin-left: 0;
-}
-.ss-dash-btn-group .ss-dash-btn:last-child {
-  border-radius: 0 4px 4px 0;
 }
 
 .ss-dash-filter-btn {
@@ -463,6 +441,9 @@ body {
 
 /* ── Tables ────────────────────────────────────────────────────── */
 .ss-dash-table-wrap {
+  --ss-table-cell-px: 12px;
+  --ss-table-cell-py: 7px;
+  --ss-table-td-py: 6px;
   flex: 1;
   overflow-x: auto;
   overflow-y: visible;
@@ -471,63 +452,13 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--ss-border) transparent;
 }
-
-.ss-dash-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 11px;
-  table-layout: fixed;
-}
+/* Table base → components.css */
+/* Column resize → components.css */
 .ss-dash-table th {
-  position: sticky;
-  top: 0;
-  padding: 7px 12px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ss-muted);
-  background: var(--ss-surface);
-  border-bottom: 1px solid var(--ss-border);
-  white-space: nowrap;
   z-index: 2;
 }
 .ss-dash-table td {
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--ss-border-faint);
-  vertical-align: top;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   max-width: 0;
-  color: var(--ss-text);
-}
-/* Column resize handles */
-.ss-col-resize {
-  position: absolute;
-  right: 0;
-  top: 0;
-  width: 5px;
-  height: 100%;
-  cursor: col-resize;
-  user-select: none;
-  z-index: 3;
-  background: var(--ss-border-faint);
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.ss-dash-table th:hover .ss-col-resize,
-.ss-dbg-table th:hover .ss-col-resize {
-  opacity: 0.6;
-}
-.ss-col-resize:hover,
-.ss-col-resize.ss-resizing {
-  background: var(--ss-accent, #6d28d9);
-  opacity: 0.8;
-}
-.ss-dash-table tr:hover td {
-  background: var(--ss-hover);
 }
 .ss-dash-table tr.ss-dash-explain-row:hover td {
   background: var(--ss-surface-alt);
@@ -559,34 +490,19 @@ body {
 }
 
 /* ── Method badges ─────────────────────────────────────────────── */
-.ss-dash-method {
-  display: inline-block;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.ss-dash-method-get,
+/* Base + GET/POST/PUT/PATCH/DELETE → components.css */
+/* Dashboard-only SQL method variants */
 .ss-dash-method-select {
   background: var(--ss-green-bg);
   color: var(--ss-green-fg);
 }
-.ss-dash-method-post,
 .ss-dash-method-insert {
   background: var(--ss-blue-bg);
   color: var(--ss-blue-fg);
 }
-.ss-dash-method-put,
-.ss-dash-method-patch,
 .ss-dash-method-update {
   background: var(--ss-amber-bg);
   color: var(--ss-amber-fg);
-}
-.ss-dash-method-delete {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
 }
 .ss-dash-method-head,
 .ss-dash-method-options,
@@ -612,9 +528,7 @@ body {
   word-break: break-all;
   cursor: pointer;
   max-width: 600px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
   display: inline-block;
 }
 .ss-dash-sql.ss-dash-expanded {
@@ -683,11 +597,17 @@ body {
 .ss-dash-event-time {
   color: var(--ss-dim);
   font-size: 10px;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
 }
 
 /* ── Logs ──────────────────────────────────────────────────────── */
+/* Log entry / level / time / reqid / msg → components.css */
+/* Dashboard overrides: wider padding, border-faint separator, surface bg for debug/trace */
 .ss-dash-log-filters {
+  --ss-log-px: 16px;
+  --ss-log-border: var(--ss-border-faint);
+  --ss-log-debug-bg: var(--ss-surface);
+  --ss-log-trace-bg: var(--ss-surface);
   display: flex;
   gap: 4px;
   padding: 8px 16px;
@@ -725,84 +645,16 @@ body {
 }
 
 .ss-dash-log-entries {
+  --ss-log-px: 16px;
+  --ss-log-border: var(--ss-border-faint);
+  --ss-log-debug-bg: var(--ss-surface);
+  --ss-log-trace-bg: var(--ss-surface);
   flex: 1;
   overflow: auto;
   scrollbar-width: thin;
 }
-
-.ss-dash-log-entry {
-  padding: 4px 16px;
-  font-size: 11px;
-  border-bottom: 1px solid var(--ss-border-faint);
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-}
 .ss-dash-log-entry:hover {
   background: var(--ss-hover);
-}
-
-.ss-dash-log-level {
-  font-size: 10px;
-  font-weight: 600;
-  width: 42px;
-  text-align: center;
-  flex-shrink: 0;
-  padding: 1px 0;
-  border-radius: 3px;
-}
-.ss-dash-log-level-info {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dash-log-level-warn {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dash-log-level-error,
-.ss-dash-log-level-fatal {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
-}
-.ss-dash-log-level-debug {
-  background: var(--ss-surface);
-  color: var(--ss-muted);
-}
-.ss-dash-log-level-trace {
-  background: var(--ss-surface);
-  color: var(--ss-dim);
-}
-
-.ss-dash-log-time {
-  color: var(--ss-dim);
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
-}
-.ss-dash-log-reqid {
-  font-size: 10px;
-  color: var(--ss-reqid-fg);
-  background: var(--ss-reqid-bg);
-  padding: 1px 5px;
-  border-radius: 3px;
-  cursor: pointer;
-  flex-shrink: 0;
-  letter-spacing: 0.02em;
-}
-.ss-dash-log-reqid:hover {
-  color: var(--ss-reqid-hover-fg);
-  background: var(--ss-reqid-hover-bg);
-}
-.ss-dash-log-reqid-empty {
-  font-size: 10px;
-  color: var(--ss-border);
-  flex-shrink: 0;
-  width: 58px;
-  text-align: center;
-}
-.ss-dash-log-msg {
-  color: var(--ss-text);
-  word-break: break-word;
 }
 
 /* ── Structured log search ─────────────────────────────────────── */
@@ -890,40 +742,11 @@ body {
 }
 
 /* ── Email preview ─────────────────────────────────────────────── */
+/* Base email preview / row / status → components.css */
+/* Dashboard override: 16px header padding */
 .ss-dash-email-preview {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--ss-bg);
-  z-index: 30;
+  --ss-email-px: 16px;
 }
-.ss-dash-email-preview-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  flex-shrink: 0;
-}
-.ss-dash-email-preview-meta {
-  font-size: 11px;
-  color: var(--ss-text-secondary);
-  line-height: 1.6;
-  overflow: hidden;
-}
-.ss-dash-email-preview-meta strong {
-  color: var(--ss-text);
-  font-weight: 600;
-}
-.ss-dash-email-iframe {
-  flex: 1;
-  border: none;
-  background: #fff;
-}
-
 .ss-dash-email-preview-close {
   position: absolute;
   top: 8px;
@@ -941,164 +764,47 @@ body {
   color: var(--ss-text);
 }
 
-.ss-dash-email-row {
-  cursor: pointer;
-}
-.ss-dash-email-row:hover td {
-  background: var(--ss-hover-accent) !important;
-}
-
-/* Email status badges reuse .ss-dash-badge base */
-.ss-dash-email-status-sent {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dash-email-status-sending {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dash-email-status-queued {
-  background: var(--ss-blue-bg);
-  color: var(--ss-blue-fg);
-}
-.ss-dash-email-status-failed {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
-}
-
 /* ── Timeline / Waterfall ──────────────────────────────────────── */
+/* Base timeline → components.css */
+/* Dashboard overrides: wider dimensions, faint border, extra bar style */
 .ss-dash-tl-detail-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  flex-shrink: 0;
+  --ss-tl-detail-gap: 12px;
+  --ss-tl-detail-py: 8px;
+  --ss-tl-detail-px: 16px;
 }
 
 .ss-dash-tl-waterfall {
+  --ss-tl-label-w: 320px;
+  --ss-tl-row-h: 26px;
+  --ss-tl-bar-h: 14px;
+  --ss-tl-track-h: 18px;
+  --ss-tl-row-border: var(--ss-border-faint);
+  --ss-tl-dur-ml: 6px;
+  --ss-tl-legend-gap: 14px;
+  --ss-tl-legend-py: 6px;
+  --ss-tl-legend-px: 16px;
+  --ss-tl-legend-dot-size: 8px;
+  --ss-tl-warnings-px: 16px;
+  --ss-tl-bar-custom-bg: var(--ss-dim);
   padding: 8px 16px;
   overflow: auto;
   flex: 1;
   scrollbar-width: thin;
 }
 
-.ss-dash-tl-row {
-  display: flex;
-  align-items: center;
-  height: 26px;
-  font-size: 11px;
-  border-bottom: 1px solid var(--ss-border-faint);
-}
-.ss-dash-tl-row:hover {
-  background: var(--ss-hover);
-}
-
-.ss-dash-tl-label {
-  width: 320px;
-  min-width: 320px;
-  padding-right: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ss-text-secondary);
-  font-size: 10px;
-}
-
-.ss-dash-tl-track {
-  flex: 1;
-  position: relative;
-  height: 18px;
-}
-
-.ss-dash-tl-bar {
-  position: absolute;
-  height: 14px;
-  top: 2px;
-  border-radius: 2px;
-  min-width: 2px;
-  cursor: default;
-}
+/* Dashboard-specific: request bar has a border */
 .ss-dash-tl-bar-request {
   background: var(--ss-blue-bg);
   border: 1px solid var(--ss-blue-fg);
 }
-.ss-dash-tl-bar-middleware {
-  background: var(--ss-blue-bg);
-  opacity: 0.7;
-}
-.ss-dash-tl-bar-db {
-  background: #6d28d9;
-}
-.ss-dash-tl-bar-view {
-  background: #0e7490;
-}
-.ss-dash-tl-bar-mail {
-  background: #059669;
-}
-.ss-dash-tl-bar-event {
-  background: #b45309;
-}
-.ss-dash-tl-bar-custom {
-  background: var(--ss-dim);
-}
 
 .ss-dash-tl-dur {
-  font-size: 10px;
-  color: var(--ss-dim);
-  margin-left: 6px;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
   min-width: 60px;
   text-align: right;
 }
 
 .ss-dash-tl-legend {
-  display: flex;
-  gap: 14px;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  font-size: 10px;
-  color: var(--ss-muted);
   flex-shrink: 0;
-}
-.ss-dash-tl-legend-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.ss-dash-tl-legend-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-.ss-dash-tl-warnings {
-  margin-top: 12px;
-  padding: 8px 16px;
-  border-top: 1px solid var(--ss-border-dim);
-}
-.ss-dash-tl-warnings-title {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--ss-amber-fg);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 4px;
-}
-.ss-dash-tl-warning {
-  font-size: 11px;
-  color: var(--ss-amber-fg);
-  padding: 2px 0;
-}
-
-.ss-dash-tl-meta {
-  font-size: 10px;
-  color: var(--ss-dim);
-  margin-left: 8px;
 }
 
 /* ── EXPLAIN panel ─────────────────────────────────────────────── */
@@ -1225,7 +931,7 @@ body {
   font-size: 22px;
   font-weight: 700;
   color: var(--ss-text);
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   line-height: 1.2;
 }
 .ss-dash-card-value.ss-dash-accent {
@@ -1387,9 +1093,7 @@ body {
   border-bottom: none;
 }
 .ss-dash-secondary-list li > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
   min-width: 0;
 }
 .ss-dash-secondary-list li:last-child {
@@ -1397,7 +1101,7 @@ body {
 }
 .ss-dash-secondary-list-value {
   color: var(--ss-text-secondary);
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -1455,6 +1159,8 @@ body {
 }
 
 /* ── Config viewer ─────────────────────────────────────────────── */
+/* Config section/toggle/key/val/match/redacted/copy-row/inner-table → components.css */
+/* Dashboard-specific: toolbar, tabs, env table, wider config sections */
 .ss-dash-config-toolbar {
   display: flex;
   align-items: center;
@@ -1494,162 +1200,53 @@ body {
 .ss-dash-env-key {
   width: 280px;
   min-width: 280px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* truncation → utilities.css */
 }
 .ss-dash-env-val {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
   max-width: 0;
 }
 
+/* Dashboard config overrides: larger header, wider padding, border-dim */
 .ss-dash-config-key {
-  color: var(--ss-sql-color);
   font-weight: 500;
   font-size: 11px;
 }
 .ss-dash-config-val {
-  color: var(--ss-text-secondary);
   font-size: 11px;
 }
-.ss-dash-config-redacted {
-  color: var(--ss-dim);
-  font-style: italic;
-}
-.ss-dash-redacted-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-style: italic;
-  color: var(--ss-dim);
-}
-.ss-dash-redacted-real {
-  font-style: normal;
-  color: var(--ss-text-secondary);
-  font-family: var(--ss-font-mono);
-  font-size: 11px;
-  word-break: break-all;
-}
-.ss-dash-redacted-reveal,
-.ss-dash-redacted-copy {
-  background: none;
-  border: 1px solid var(--ss-border-dim);
-  border-radius: 3px;
-  padding: 2px 4px;
-  cursor: pointer;
-  color: var(--ss-dim);
-  display: inline-flex;
-  align-items: center;
-  line-height: 1;
-  transition:
-    color 0.15s,
-    border-color 0.15s;
-}
-.ss-dash-redacted-reveal:hover,
-.ss-dash-redacted-copy:hover {
-  color: var(--ss-text-primary);
-  border-color: var(--ss-border);
-}
-
 .ss-dash-config-sections {
+  --ss-config-section-border: var(--ss-border-dim);
+  --ss-config-header-gap: 8px;
+  --ss-config-header-py: 9px;
+  --ss-config-header-px: 16px;
+  --ss-config-header-font: 12px;
+  --ss-config-toggle-color: var(--ss-muted);
   flex: 1;
   overflow: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--ss-border) transparent;
 }
-
-.ss-dash-config-section {
-  border-bottom: 1px solid var(--ss-border-dim);
-}
-
 .ss-dash-config-section-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
-  cursor: pointer;
   user-select: none;
-  font-size: 12px;
   font-weight: 600;
   transition: background 0.1s;
 }
-.ss-dash-config-section-header:hover {
-  background: var(--ss-hover);
-}
 .ss-dash-config-section-header.ss-dash-config-leaf {
-  cursor: default;
   font-weight: 400;
 }
-
-.ss-dash-config-toggle {
-  color: var(--ss-muted);
-  font-size: 10px;
-  flex-shrink: 0;
-  width: 12px;
-  text-align: center;
-}
-
 .ss-dash-config-count {
-  margin-left: auto;
-  font-size: 10px;
-  color: var(--ss-dim);
   font-weight: 400;
 }
-
-.ss-dash-config-section-body {
-  padding: 0 0 4px 0;
-  background: var(--ss-surface-alt);
+/* Dashboard redacted border override (uses border-dim instead of border) */
+.ss-dash-redacted-reveal,
+.ss-dash-redacted-copy {
+  border-color: var(--ss-border-dim);
 }
-
-.ss-dash-config-inner-table {
-  font-size: 11px;
-  table-layout: fixed;
-}
-.ss-dash-config-inner-table th {
-  background: var(--ss-surface-alt);
-}
-.ss-dash-config-inner-table td {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ss-dash-config-inner-table td:hover {
-  white-space: normal;
-  word-break: break-all;
-}
-
-.ss-dash-config-match {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-  border-radius: 2px;
-  padding: 0 1px;
-}
-
-.ss-dash-copy-row-btn {
-  padding: 2px 6px;
-  font-size: 12px;
-  color: var(--ss-dim);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  cursor: pointer;
-  line-height: 1;
-  opacity: 0;
-  transition: opacity 0.1s;
-}
-tr:hover .ss-dash-copy-row-btn,
-.ss-dash-config-section-header:hover .ss-dash-copy-row-btn {
-  opacity: 1;
-}
-.ss-dash-copy-row-btn:hover {
-  color: var(--ss-text);
+.ss-dash-redacted-reveal:hover,
+.ss-dash-redacted-copy:hover {
+  color: var(--ss-text-primary);
   border-color: var(--ss-border);
-}
-.ss-dash-copy-row-btn.ss-dash-copy-row-ok {
-  color: var(--ss-green-fg);
-  opacity: 1;
 }
 
 /* ── Cache ─────────────────────────────────────────────────────── */
@@ -1672,7 +1269,7 @@ tr:hover .ss-dash-copy-row-btn,
 }
 .ss-dash-cache-stat-value {
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   color: var(--ss-text);
 }
 
@@ -1706,7 +1303,7 @@ tr:hover .ss-dash-copy-row-btn,
 }
 .ss-dash-job-stat-value {
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   color: var(--ss-text);
 }
 
@@ -1802,9 +1399,7 @@ tr:hover .ss-dash-copy-row-btn,
   color: var(--ss-accent);
 }
 .ss-dash-widget-row-link > span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* truncation → utilities.css */
   min-width: 0;
 }
 
@@ -1828,7 +1423,7 @@ tr:hover .ss-dash-copy-row-btn,
 }
 .ss-dash-widget-stat-value {
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  /* tabular-nums → utilities.css */
   color: var(--ss-text);
 }
 

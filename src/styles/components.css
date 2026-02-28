@@ -308,3 +308,741 @@
 .ss-dbg-c-border {
   color: var(--ss-border);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+ * Phase 4: Full Component Unification
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* ── 1. Tables ───────────────────────────────────────────────── */
+/* Base table: debug uses 10px cell padding, dashboard uses 12px.
+ * Override via --ss-table-cell-px / --ss-table-cell-py on a wrapper. */
+.ss-table,
+.ss-dash-table,
+.ss-dbg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  table-layout: fixed;
+}
+.ss-table th,
+.ss-dash-table th,
+.ss-dbg-table th {
+  position: sticky;
+  top: 0;
+  padding: var(--ss-table-cell-py, 6px) var(--ss-table-cell-px, 10px);
+  text-align: left;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  background: var(--ss-surface);
+  border-bottom: 1px solid var(--ss-border);
+  white-space: nowrap;
+}
+.ss-table td,
+.ss-dash-table td,
+.ss-dbg-table td {
+  padding: var(--ss-table-td-py, 5px) var(--ss-table-cell-px, 10px);
+  border-bottom: 1px solid var(--ss-border-faint);
+  vertical-align: top;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ss-text);
+}
+.ss-table tr:hover td,
+.ss-dash-table tr:hover td,
+.ss-dbg-table tr:hover td {
+  background: var(--ss-hover);
+}
+
+/* Column resize handles (shared between dashboard & debug) */
+.ss-col-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  user-select: none;
+  z-index: 3;
+  background: var(--ss-border-faint);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ss-table th:hover .ss-col-resize,
+.ss-dash-table th:hover .ss-col-resize,
+.ss-dbg-table th:hover .ss-col-resize {
+  opacity: 0.6;
+}
+.ss-col-resize:hover,
+.ss-col-resize.ss-resizing {
+  background: var(--ss-accent, #6d28d9);
+  opacity: 0.8;
+}
+
+/* ── 2. Method badges ────────────────────────────────────────── */
+.ss-method,
+.ss-dash-method,
+.ss-dbg-method {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.ss-method-get,
+.ss-dash-method-get,
+.ss-dbg-method-get {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-method-post,
+.ss-dash-method-post,
+.ss-dbg-method-post {
+  background: var(--ss-blue-bg);
+  color: var(--ss-blue-fg);
+}
+.ss-method-put,
+.ss-method-patch,
+.ss-dash-method-put,
+.ss-dash-method-patch,
+.ss-dbg-method-put,
+.ss-dbg-method-patch {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-method-delete,
+.ss-dash-method-delete,
+.ss-dbg-method-delete {
+  background: var(--ss-red-bg);
+  color: var(--ss-red-fg);
+}
+
+/* ── 3. Log system ───────────────────────────────────────────── */
+/* Log entry row: dashboard uses 16px horizontal padding, debug uses 12px.
+ * Dashboard uses border-faint, debug uses input-bg for separator.
+ * Override via --ss-log-px and --ss-log-border. */
+.ss-log-entry,
+.ss-dash-log-entry,
+.ss-dbg-log-entry {
+  padding: 4px var(--ss-log-px, 12px);
+  font-size: 11px;
+  border-bottom: 1px solid var(--ss-log-border, var(--ss-input-bg));
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.ss-log-level,
+.ss-dash-log-level,
+.ss-dbg-log-level {
+  font-size: 10px;
+  font-weight: 600;
+  width: 42px;
+  text-align: center;
+  flex-shrink: 0;
+  padding: 1px 0;
+  border-radius: 3px;
+}
+.ss-log-level-info,
+.ss-dash-log-level-info,
+.ss-dbg-log-level-info {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-log-level-warn,
+.ss-dash-log-level-warn,
+.ss-dbg-log-level-warn {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-log-level-error,
+.ss-log-level-fatal,
+.ss-dash-log-level-error,
+.ss-dash-log-level-fatal,
+.ss-dbg-log-level-error,
+.ss-dbg-log-level-fatal {
+  background: var(--ss-red-bg);
+  color: var(--ss-red-fg);
+}
+.ss-log-level-debug,
+.ss-dash-log-level-debug,
+.ss-dbg-log-level-debug {
+  background: var(--ss-log-debug-bg, var(--ss-surface-alt));
+  color: var(--ss-muted);
+}
+.ss-log-level-trace,
+.ss-dash-log-level-trace,
+.ss-dbg-log-level-trace {
+  background: var(--ss-log-trace-bg, var(--ss-surface-alt));
+  color: var(--ss-dim);
+}
+.ss-log-time,
+.ss-dash-log-time,
+.ss-dbg-log-time {
+  color: var(--ss-dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.ss-log-reqid,
+.ss-dash-log-reqid,
+.ss-dbg-log-reqid {
+  font-size: 10px;
+  color: var(--ss-reqid-fg);
+  background: var(--ss-reqid-bg);
+  padding: 1px 5px;
+  border-radius: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+.ss-log-reqid:hover,
+.ss-dash-log-reqid:hover,
+.ss-dbg-log-reqid:hover {
+  color: var(--ss-reqid-hover-fg);
+  background: var(--ss-reqid-hover-bg);
+}
+.ss-log-reqid-empty,
+.ss-dash-log-reqid-empty,
+.ss-dbg-log-reqid-empty {
+  font-size: 10px;
+  color: var(--ss-border);
+  flex-shrink: 0;
+  width: 58px;
+  text-align: center;
+}
+.ss-log-msg,
+.ss-dash-log-msg,
+.ss-dbg-log-msg {
+  color: var(--ss-text);
+  word-break: break-word;
+}
+
+/* ── 4. Email preview ────────────────────────────────────────── */
+/* Dashboard uses 16px padding, debug uses 12px — override via
+ * --ss-email-px on a wrapper. */
+.ss-email-preview,
+.ss-dash-email-preview,
+.ss-dbg-email-preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--ss-bg);
+  z-index: 30;
+}
+.ss-email-preview-header,
+.ss-dash-email-preview-header,
+.ss-dbg-email-preview-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px var(--ss-email-px, 12px);
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+}
+.ss-email-preview-meta,
+.ss-dash-email-preview-meta,
+.ss-dbg-email-preview-meta {
+  font-size: 11px;
+  color: var(--ss-text-secondary);
+  line-height: 1.6;
+  overflow: hidden;
+}
+.ss-email-preview-meta strong,
+.ss-dash-email-preview-meta strong,
+.ss-dbg-email-preview-meta strong {
+  color: var(--ss-text);
+  font-weight: 600;
+}
+.ss-email-iframe,
+.ss-dash-email-iframe,
+.ss-dbg-email-iframe {
+  flex: 1;
+  border: none;
+  background: #fff;
+}
+/* Email row */
+.ss-email-row,
+.ss-dash-email-row,
+.ss-dbg-email-row {
+  cursor: pointer;
+}
+.ss-email-row:hover td,
+.ss-dash-email-row:hover td,
+.ss-dbg-email-row:hover td {
+  background: var(--ss-hover-accent) !important;
+}
+/* Email status badges */
+.ss-email-status,
+.ss-dash-email-status,
+.ss-dbg-email-status {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.ss-email-status-sent,
+.ss-dash-email-status-sent,
+.ss-dbg-email-status-sent {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-email-status-sending,
+.ss-dash-email-status-sending,
+.ss-dbg-email-status-sending {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-email-status-queued,
+.ss-dash-email-status-queued,
+.ss-dbg-email-status-queued {
+  background: var(--ss-blue-bg);
+  color: var(--ss-blue-fg);
+}
+.ss-email-status-failed,
+.ss-dash-email-status-failed,
+.ss-dbg-email-status-failed {
+  background: var(--ss-red-bg);
+  color: var(--ss-red-fg);
+}
+
+/* ── 5. Timeline / Waterfall ─────────────────────────────────── */
+/* Dimension differences via CSS variables:
+ * --ss-tl-label-w: 280px (debug) vs 320px (dashboard)
+ * --ss-tl-row-h:   24px (debug) vs 26px (dashboard)
+ * --ss-tl-bar-h:   12px (debug) vs 14px (dashboard) */
+.ss-tl-row,
+.ss-dash-tl-row,
+.ss-dbg-tl-row {
+  display: flex;
+  align-items: center;
+  height: var(--ss-tl-row-h, 24px);
+  font-size: 11px;
+  border-bottom: 1px solid var(--ss-tl-row-border, var(--ss-input-bg));
+}
+.ss-tl-row:hover,
+.ss-dash-tl-row:hover,
+.ss-dbg-tl-row:hover {
+  background: var(--ss-hover);
+}
+.ss-tl-label,
+.ss-dash-tl-label,
+.ss-dbg-tl-label {
+  width: var(--ss-tl-label-w, 280px);
+  min-width: var(--ss-tl-label-w, 280px);
+  padding-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ss-text-secondary);
+  font-size: 10px;
+}
+.ss-tl-track,
+.ss-dash-tl-track,
+.ss-dbg-tl-track {
+  flex: 1;
+  position: relative;
+  height: var(--ss-tl-track-h, 16px);
+}
+.ss-tl-bar,
+.ss-dash-tl-bar,
+.ss-dbg-tl-bar {
+  position: absolute;
+  height: var(--ss-tl-bar-h, 12px);
+  top: 2px;
+  border-radius: 2px;
+  min-width: 2px;
+  cursor: default;
+}
+/* Timeline bar colors — semantic category indicators */
+.ss-tl-bar-request,
+.ss-dash-tl-bar-request,
+.ss-dbg-tl-bar-request {
+  background: #1e3a5f;
+}
+.ss-tl-bar-middleware,
+.ss-dash-tl-bar-middleware,
+.ss-dbg-tl-bar-middleware {
+  background: #1e3a5f;
+  opacity: 0.7;
+}
+.ss-tl-bar-db,
+.ss-dash-tl-bar-db,
+.ss-dbg-tl-bar-db {
+  background: #6d28d9;
+}
+.ss-tl-bar-view,
+.ss-dash-tl-bar-view,
+.ss-dbg-tl-bar-view {
+  background: #0e7490;
+}
+.ss-tl-bar-mail,
+.ss-dash-tl-bar-mail,
+.ss-dbg-tl-bar-mail {
+  background: #059669;
+}
+.ss-tl-bar-event,
+.ss-dash-tl-bar-event,
+.ss-dbg-tl-bar-event {
+  background: #b45309;
+}
+.ss-tl-bar-custom,
+.ss-dash-tl-bar-custom,
+.ss-dbg-tl-bar-custom {
+  background: var(--ss-tl-bar-custom-bg, #525252);
+}
+.ss-tl-dur,
+.ss-dash-tl-dur,
+.ss-dbg-tl-dur {
+  font-size: 10px;
+  color: var(--ss-dim);
+  margin-left: var(--ss-tl-dur-ml, 4px);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.ss-tl-legend,
+.ss-dash-tl-legend,
+.ss-dbg-tl-legend {
+  display: flex;
+  gap: var(--ss-tl-legend-gap, 10px);
+  padding: var(--ss-tl-legend-py, 4px) var(--ss-tl-legend-px, 12px);
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  font-size: 10px;
+  color: var(--ss-muted);
+}
+.ss-tl-legend-item,
+.ss-dash-tl-legend-item,
+.ss-dbg-tl-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ss-tl-legend-dot,
+.ss-dash-tl-legend-dot,
+.ss-dbg-tl-legend-dot {
+  width: var(--ss-tl-legend-dot-size, 6px);
+  height: var(--ss-tl-legend-dot-size, 6px);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.ss-tl-warnings,
+.ss-dash-tl-warnings,
+.ss-dbg-tl-warnings {
+  margin-top: 12px;
+  padding: 8px var(--ss-tl-warnings-px, 12px);
+  border-top: 1px solid var(--ss-border-dim);
+}
+.ss-tl-warnings-title,
+.ss-dash-tl-warnings-title,
+.ss-dbg-tl-warnings-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ss-amber-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.ss-tl-warning,
+.ss-dash-tl-warning,
+.ss-dbg-tl-warning {
+  font-size: 11px;
+  color: var(--ss-amber-fg);
+  padding: 2px 0;
+}
+.ss-tl-meta,
+.ss-dash-tl-meta,
+.ss-dbg-tl-meta {
+  font-size: 10px;
+  color: var(--ss-dim);
+  margin-left: 8px;
+}
+.ss-tl-detail-header,
+.ss-dash-tl-detail-header,
+.ss-dbg-tl-detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ss-tl-detail-gap, 6px);
+  padding: var(--ss-tl-detail-py, 5px) var(--ss-tl-detail-px, 12px);
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+/* ── 6. Config viewer ────────────────────────────────────────── */
+.ss-config-sections,
+.ss-dash-config-sections,
+.ss-dbg-config-sections {
+  padding: 0;
+}
+.ss-config-section,
+.ss-dash-config-section,
+.ss-dbg-config-section {
+  border-bottom: 1px solid var(--ss-config-section-border, var(--ss-border-faint));
+}
+.ss-config-section-header,
+.ss-dash-config-section-header,
+.ss-dbg-config-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--ss-config-header-gap, 6px);
+  padding: var(--ss-config-header-py, 6px) var(--ss-config-header-px, 12px);
+  cursor: pointer;
+  font-size: var(--ss-config-header-font, 11px);
+}
+.ss-config-section-header:hover,
+.ss-dash-config-section-header:hover,
+.ss-dbg-config-section-header:hover {
+  background: var(--ss-hover);
+}
+.ss-config-toggle,
+.ss-dash-config-toggle,
+.ss-dbg-config-toggle {
+  color: var(--ss-config-toggle-color, var(--ss-dim));
+  font-size: 9px;
+  width: 12px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ss-config-key,
+.ss-dash-config-key,
+.ss-dbg-config-key {
+  color: var(--ss-sql-color);
+}
+.ss-config-count,
+.ss-dash-config-count,
+.ss-dbg-config-count {
+  color: var(--ss-dim);
+  font-size: 10px;
+  margin-left: auto;
+}
+.ss-config-val,
+.ss-dash-config-val,
+.ss-dbg-config-val {
+  color: var(--ss-text-secondary);
+}
+.ss-config-val-true,
+.ss-dash-config-val-true,
+.ss-dbg-config-val-true {
+  color: var(--ss-accent);
+}
+.ss-config-val-false,
+.ss-dash-config-val-false,
+.ss-dbg-config-val-false {
+  color: var(--ss-red-fg);
+}
+.ss-config-val-number,
+.ss-dash-config-val-number,
+.ss-dbg-config-val-number {
+  color: var(--ss-amber-fg);
+}
+.ss-config-val-array,
+.ss-dash-config-val-array,
+.ss-dbg-config-val-array {
+  color: var(--ss-purple-fg);
+}
+.ss-config-val-null,
+.ss-dash-config-val-null,
+.ss-dbg-config-val-null {
+  color: var(--ss-dim);
+}
+.ss-config-redacted,
+.ss-dash-config-redacted,
+.ss-dbg-config-redacted {
+  color: var(--ss-dim);
+  font-style: italic;
+}
+.ss-config-section-body,
+.ss-dash-config-section-body,
+.ss-dbg-config-section-body {
+  padding: 0 0 4px 0;
+  background: var(--ss-surface-alt);
+}
+.ss-config-match,
+.ss-dash-config-match,
+.ss-dbg-config-match {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.ss-config-leaf,
+.ss-dash-config-leaf,
+.ss-dbg-config-leaf {
+  cursor: default;
+}
+.ss-config-leaf:hover,
+.ss-dash-config-leaf:hover,
+.ss-dbg-config-leaf:hover {
+  background: transparent;
+}
+.ss-config-inner-table,
+.ss-dash-config-inner-table,
+.ss-dbg-config-inner-table {
+  font-size: 11px;
+  table-layout: fixed;
+}
+.ss-config-inner-table th,
+.ss-dash-config-inner-table th,
+.ss-dbg-config-inner-table th {
+  background: var(--ss-surface-alt);
+}
+.ss-config-inner-table td,
+.ss-dash-config-inner-table td,
+.ss-dbg-config-inner-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ss-config-inner-table td:hover,
+.ss-dash-config-inner-table td:hover,
+.ss-dbg-config-inner-table td:hover {
+  white-space: normal;
+  word-break: break-all;
+}
+.ss-redacted-wrap,
+.ss-dash-redacted-wrap,
+.ss-dbg-redacted-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-style: italic;
+  color: var(--ss-dim);
+}
+.ss-redacted-real,
+.ss-dash-redacted-real,
+.ss-dbg-redacted-real {
+  font-style: normal;
+  color: var(--ss-text-secondary);
+  font-family: var(--ss-font-mono);
+  font-size: 11px;
+  word-break: break-all;
+}
+.ss-redacted-reveal,
+.ss-redacted-copy,
+.ss-dash-redacted-reveal,
+.ss-dash-redacted-copy,
+.ss-dbg-redacted-reveal,
+.ss-dbg-redacted-copy {
+  background: none;
+  border: 1px solid var(--ss-border);
+  border-radius: 3px;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--ss-dim);
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.ss-redacted-reveal:hover,
+.ss-redacted-copy:hover,
+.ss-dash-redacted-reveal:hover,
+.ss-dash-redacted-copy:hover,
+.ss-dbg-redacted-reveal:hover,
+.ss-dbg-redacted-copy:hover {
+  color: var(--ss-text);
+  border-color: var(--ss-dim);
+}
+/* Copy-row button (shared pattern) */
+.ss-copy-row-btn,
+.ss-dash-copy-row-btn,
+.ss-dbg-copy-row-btn {
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--ss-dim);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+tr:hover .ss-copy-row-btn,
+tr:hover .ss-dash-copy-row-btn,
+tr:hover .ss-dbg-copy-row-btn,
+.ss-config-section-header:hover .ss-copy-row-btn,
+.ss-dash-config-section-header:hover .ss-copy-row-btn,
+.ss-dash-config-section-header:hover .ss-dash-copy-row-btn,
+.ss-dbg-config-section-header:hover .ss-dbg-copy-row-btn {
+  opacity: 1;
+}
+.ss-copy-row-btn:hover,
+.ss-dash-copy-row-btn:hover,
+.ss-dbg-copy-row-btn:hover {
+  color: var(--ss-text);
+  border-color: var(--ss-border);
+}
+.ss-copy-row-btn.ss-copy-row-ok,
+.ss-dash-copy-row-btn.ss-dash-copy-row-ok,
+.ss-dbg-copy-row-btn.ss-dbg-copy-row-ok {
+  color: var(--ss-green-fg);
+  opacity: 1;
+}
+
+/* ── 7. Buttons ──────────────────────────────────────────────── */
+/* Shared base button pattern */
+.ss-btn,
+.ss-dash-btn,
+.ss-dbg-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--ss-btn-py, 3px) var(--ss-btn-px, 8px);
+  font-size: var(--ss-btn-font, 10px);
+  color: var(--ss-muted);
+  cursor: pointer;
+  border: var(--ss-btn-border, none);
+  background: var(--ss-btn-bg, none);
+  border-radius: 4px;
+  flex-shrink: 0;
+  text-transform: var(--ss-btn-case, none);
+}
+.ss-btn:hover,
+.ss-dash-btn:hover,
+.ss-dbg-btn:hover {
+  color: var(--ss-text);
+  background: var(--ss-hover);
+}
+.ss-btn.ss-active,
+.ss-dash-btn.ss-dash-active,
+.ss-dbg-btn.ss-dbg-active {
+  color: var(--ss-accent);
+}
+/* Button group */
+.ss-btn-group,
+.ss-dash-btn-group,
+.ss-dbg-btn-group {
+  display: inline-flex;
+  gap: 0;
+}
+.ss-btn-group .ss-btn,
+.ss-dash-btn-group .ss-dash-btn,
+.ss-dbg-btn-group .ss-dbg-btn {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.ss-btn-group .ss-btn:first-child,
+.ss-dash-btn-group .ss-dash-btn:first-child,
+.ss-dbg-btn-group .ss-dbg-btn:first-child {
+  border-radius: 4px 0 0 4px;
+  margin-left: 0;
+}
+.ss-btn-group .ss-btn:last-child,
+.ss-dash-btn-group .ss-dash-btn:last-child,
+.ss-dbg-btn-group .ss-dbg-btn:last-child {
+  border-radius: 0 4px 4px 0;
+}

@@ -72,7 +72,8 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
 
     // Read client assets once at boot
     const componentsCss = read('../styles/components.css')
-    const css = componentsCss + '\n' + read('../styles/stats-bar.css')
+    const utilitiesCss = read('../styles/utilities.css')
+    const css = componentsCss + '\n' + utilitiesCss + '\n' + read('../styles/stats-bar.css')
 
     const renderer = config.devToolbar?.renderer || 'preact'
     const clientDir = renderer === 'vue' ? 'client-vue' : 'client'
