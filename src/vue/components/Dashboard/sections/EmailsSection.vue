@@ -8,6 +8,7 @@
 import { ref, computed, inject, type Ref } from 'vue'
 import { timeAgo, formatTime } from '../../../../core/index.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 
@@ -60,6 +61,8 @@ function closePreview() {
   previewId.value = null
   previewHtml.value = null
 }
+
+const { tableRef } = useResizableTable(() => emails.value)
 </script>
 
 <template>
@@ -121,7 +124,7 @@ function closePreview() {
 
       <template v-else>
         <div class="ss-dash-table-wrap">
-          <table v-if="emails.length > 0" class="ss-dash-table">
+          <table v-if="emails.length > 0" ref="tableRef" class="ss-dash-table">
             <colgroup>
               <col style="width: 40px" />
               <col style="width: 150px" />

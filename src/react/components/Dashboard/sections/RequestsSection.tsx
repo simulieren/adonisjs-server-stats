@@ -10,7 +10,7 @@ import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 import { WaterfallChart } from '../shared/WaterfallChart.js'
 
-import type { DashboardHookOptions } from '../../../../core/types.js'
+import type { DashboardHookOptions, TraceSpan } from '../../../../core/types.js'
 import type { TraceDetail } from '../../../../core/trace-utils.js'
 
 interface RequestsSectionProps {
@@ -87,7 +87,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
           </span>
         </div>
         <WaterfallChart
-          spans={normalized.spans}
+          spans={normalized.spans as TraceSpan[]}
           totalDuration={normalized.totalDuration}
           warnings={normalized.warnings}
         />

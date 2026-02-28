@@ -10,6 +10,7 @@ import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js
 import { useApiClient } from '../../../composables/useApiClient.js'
 import { parseTraceSpans, parseTraceWarnings } from '../../../../core/trace-utils.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import WaterfallChart from '../shared/WaterfallChart.vue'
@@ -87,6 +88,8 @@ function dashDurationClass(ms: number): string {
   return ''
 }
 
+const { tableRef } = useResizableTable(() => traces.value)
+
 </script>
 
 <template>
@@ -147,7 +150,7 @@ function dashDurationClass(ms: number): string {
 
       <template v-else>
         <div class="ss-dash-table-wrap">
-          <table v-if="traces.length > 0" class="ss-dash-table">
+          <table v-if="traces.length > 0" ref="tableRef" class="ss-dash-table">
             <colgroup>
               <col style="width: 40px" />
               <col style="width: 70px" />

@@ -541,7 +541,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                 key: 'id',
                 label: '#',
                 width: '40px',
-                render: (v: unknown) => <span style={{ color: 'var(--ss-dim)' }}>{v}</span>,
+                render: (v) => <span style={{ color: 'var(--ss-dim)' }}>{v as React.ReactNode}</span>,
               },
               {
                 key: 'sql',

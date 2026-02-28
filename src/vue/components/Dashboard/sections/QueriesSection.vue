@@ -99,6 +99,7 @@ import { ref, computed, inject, watch, type Ref } from 'vue'
 import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js'
 import { SLOW_DURATION_MS } from '../../../../core/constants.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 
@@ -259,6 +260,8 @@ function dashDurationClass(ms: number): string {
   if (sev === 'slow') return 'ss-dash-slow'
   return ''
 }
+
+const { tableRef } = useResizableTable(() => queries.value)
 </script>
 
 <template>
@@ -292,7 +295,7 @@ function dashDurationClass(ms: number): string {
     <!-- Grouped view -->
     <template v-else-if="viewMode === 'grouped'">
       <div class="ss-dash-table-wrap">
-        <table v-if="queries.length > 0" class="ss-dash-table">
+        <table v-if="queries.length > 0" ref="tableRef" class="ss-dash-table">
           <thead>
             <tr>
               <th>Pattern</th>
@@ -352,7 +355,7 @@ function dashDurationClass(ms: number): string {
     <!-- List view -->
     <template v-else>
       <div class="ss-dash-table-wrap">
-        <table v-if="queries.length > 0" class="ss-dash-table">
+        <table v-if="queries.length > 0" ref="tableRef" class="ss-dash-table">
           <colgroup>
             <col style="width: 40px" />
             <col />

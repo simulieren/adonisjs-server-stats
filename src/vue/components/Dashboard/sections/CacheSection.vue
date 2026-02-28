@@ -7,6 +7,7 @@
  */
 import { ref, computed, inject, type Ref } from 'vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import { DashboardApi, formatTtl, formatCacheSize } from '../../../../core/index.js'
 import { useApiClient } from '../../../composables/useApiClient.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
@@ -68,6 +69,8 @@ async function handleDelete(key: string) {
     // silently fail
   }
 }
+
+const { tableRef } = useResizableTable(() => keys.value)
 
 async function handleKeyClick(key: string) {
   if (selectedKey.value === key) {
@@ -134,7 +137,7 @@ async function handleKeyClick(key: string) {
 
     <template v-else>
       <div class="ss-dash-table-wrap">
-        <table v-if="keys.length > 0" class="ss-dash-table">
+        <table v-if="keys.length > 0" ref="tableRef" class="ss-dash-table">
           <thead>
             <tr>
               <th>Key</th>

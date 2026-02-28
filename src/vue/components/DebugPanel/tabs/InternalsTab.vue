@@ -231,7 +231,7 @@ const integrationEntries = computed(() => {
               <template v-if="c.lastError">
                 {{ c.lastError }}
                 <span class="ss-dbg-c-dim" style="margin-left: 4px">{{
-                  timeAgo(c.lastErrorAt)
+                  timeAgo(c.lastErrorAt ?? 0)
                 }}</span>
               </template>
               <template v-else>-</template>
@@ -393,7 +393,7 @@ const integrationEntries = computed(() => {
             </tr>
             <tr>
               <td>Last Cleanup</td>
-              <td>{{ timeAgo(d.storage!.lastCleanupAt) }}</td>
+              <td>{{ timeAgo(d.storage!.lastCleanupAt ?? 0) }}</td>
             </tr>
           </tbody>
         </table>

@@ -99,7 +99,10 @@ export default class DashboardController {
     const toolbarConfig: Partial<DevToolbarOptions> = config?.devToolbar ?? {}
 
     if (!this.cachedCss) {
-      this.cachedCss = readFileSync(join(STYLES_DIR, 'dashboard.css'), 'utf-8')
+      const tokens = readFileSync(join(STYLES_DIR, 'tokens.css'), 'utf-8')
+      const components = readFileSync(join(STYLES_DIR, 'components.css'), 'utf-8')
+      const dashboard = readFileSync(join(STYLES_DIR, 'dashboard.css'), 'utf-8')
+      this.cachedCss = tokens + '\n' + components + '\n' + dashboard
     }
     if (!this.cachedJs) {
       const renderer = toolbarConfig.renderer || 'preact'

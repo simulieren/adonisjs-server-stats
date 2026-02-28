@@ -260,6 +260,7 @@ export {
   matchesConfigSearch,
   copyWithFeedback,
   REDACT_PATTERN,
+  shouldRedact,
 } from './config-utils.js'
 export type {
   RedactedValue,

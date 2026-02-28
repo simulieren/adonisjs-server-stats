@@ -257,14 +257,89 @@ export function copyWithFeedback(
 }
 
 // ---------------------------------------------------------------------------
-// Redaction pattern
+// Redaction helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Words that indicate a config key holds sensitive data.
+ *
+ * Matching is performed on individual "words" extracted from the key after
+ * splitting on camelCase boundaries, underscores, dots, and hyphens. This
+ * avoids false positives like "keyboard" or "monkey" while still catching
+ * compound keys such as `secretKey`, `publishableKey`, and `api_key`.
+ */
+const SENSITIVE_WORDS = new Set([
+  'secret',
+  'key',
+  'token',
+  'password',
+  'pass',
+  'pwd',
+  'auth',
+  'credential',
+  'credentials',
+  'apikey',
+  'private',
+  'encryption',
+])
+
+/**
+ * Split a config key (or dot-path) into individual words.
+ *
+ * Handles:
+ * - Dot notation: `stripe.secretKey` -> `["stripe", "secret", "Key"]`
+ * - Snake_case:   `api_key`          -> `["api", "key"]`
+ * - CamelCase:    `secretKey`        -> `["secret", "Key"]`
+ * - Kebab-case:   `auth-token`       -> `["auth", "token"]`
+ * - Uppercase:    `API_KEY`          -> `["API", "KEY"]`
+ */
+function tokenizeKey(key: string): string[] {
+  // First split on dots, underscores, and hyphens
+  const segments = key.split(/[._-]/)
+  const words: string[] = []
+  for (const segment of segments) {
+    // Split camelCase: insert boundary before uppercase letters that follow
+    // a lowercase letter (e.g. "secretKey" -> "secret", "Key")
+    const camelWords = segment.split(/(?<=[a-z])(?=[A-Z])/)
+    for (const w of camelWords) {
+      if (w) words.push(w)
+    }
+  }
+  return words
+}
+
+/**
+ * Determine whether a config key (or full dot-path) should be redacted.
+ *
+ * Tokenises the key into individual words and checks each against a
+ * known set of sensitive terms. Case-insensitive.
+ *
+ * @example
+ * ```ts
+ * shouldRedact('stripe.secretKey')   // true  ("secret")
+ * shouldRedact('stripe.publishableKey') // true ("key")
+ * shouldRedact('database.password')  // true  ("password")
+ * shouldRedact('auth.token')         // true  ("auth", "token")
+ * shouldRedact('app.key')            // true  ("key")
+ * shouldRedact('app.name')           // false
+ * shouldRedact('keyboard.layout')    // false ("keyboard" is one word)
+ * shouldRedact('monkey.patch')       // false ("monkey" is one word)
+ * ```
+ */
+export function shouldRedact(key: string): boolean {
+  const words = tokenizeKey(key)
+  return words.some((w) => SENSITIVE_WORDS.has(w.toLowerCase()))
+}
 
 /**
  * Regex pattern matching common secret-like key names.
  *
- * Used by the Vue config viewer for client-side redaction when the server
- * does not provide pre-redacted values.
+ * @deprecated Use {@link shouldRedact} instead for accurate word-boundary
+ * aware matching that avoids false positives (e.g. "keyboard", "monkey").
+ *
+ * Kept for backward compatibility. The pattern now uses word-boundary
+ * assertions for "key" to reduce false positives, and includes additional
+ * sensitive terms (pass, pwd, encryption).
  */
 export const REDACT_PATTERN =
-  /secret|password|token|key|api_key|apikey|auth|credential|private/i
+  /secret|password|pass(?:word)?|pwd|token|(?:^|[._-])key(?:[._-]|$)|(?<=[a-z])Key|apikey|api_key|auth|credential|private|encryption/i

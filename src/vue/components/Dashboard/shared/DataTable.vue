@@ -72,7 +72,7 @@ const { tableRef } = useResizableTable(() => props.rows)
     <tbody>
       <tr
         v-for="(row, index) in rows"
-        :key="row[keyField || 'id'] ?? index"
+        :key="(row[keyField || 'id'] as PropertyKey) ?? index"
         :class="[clickable ? 'ss-dash-clickable' : '', rowClassName || ''].filter(Boolean).join(' ')"
         @click="clickable ? emit('rowClick', row, index) : undefined"
       >

@@ -85,7 +85,7 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
   }
 
   // Dashboard API wraps stats in a nested `stats` object; handle both shapes.
-  const stats = (data as Record<string, unknown>).stats as
+  const stats = (data as unknown as Record<string, unknown>).stats as
     | CacheStats
     | undefined;
   const resolved = stats || data;
@@ -133,7 +133,7 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
       </div>
 
       {/* Key detail overlay */}
-      {selectedKey && keyValue && (
+      {selectedKey && !!keyValue && (
         <div className="ss-dbg-cache-detail">
           <strong>{selectedKey}</strong>
           <button

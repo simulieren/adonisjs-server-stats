@@ -246,39 +246,39 @@ defineExpose({ toggle, open, close });
       <template v-else>
         <QueriesTab
           v-if="activeTab === 'queries'"
-          :data="data"
+          :data="(data as any)"
           :dashboard-path="dashboardPath"
         />
         <EventsTab
           v-else-if="activeTab === 'events'"
-          :data="data"
+          :data="(data as any)"
           :dashboard-path="dashboardPath"
         />
         <EmailsTab
           v-else-if="activeTab === 'emails'"
-          :data="data"
+          :data="(data as any)"
           :dashboard-path="dashboardPath"
         />
-        <RoutesTab v-else-if="activeTab === 'routes'" :data="data" />
+        <RoutesTab v-else-if="activeTab === 'routes'" :data="(data as any)" />
         <LogsTab
           v-else-if="activeTab === 'logs'"
-          :data="data"
+          :data="(data as any)"
           :dashboard-path="dashboardPath"
         />
         <TimelineTab
           v-else-if="activeTab === 'timeline'"
-          :data="data"
+          :data="(data as any)"
           :dashboard-path="dashboardPath"
           :base-url="baseUrl"
           :debug-endpoint="debugEndpoint"
           :auth-token="authToken"
         />
-        <CacheTab v-else-if="activeTab === 'cache'" :data="data" />
-        <JobsTab v-else-if="activeTab === 'jobs'" :data="data" />
-        <ConfigTab v-else-if="activeTab === 'config'" :data="data" />
+        <CacheTab v-else-if="activeTab === 'cache'" :data="(data as any)" />
+        <JobsTab v-else-if="activeTab === 'jobs'" :data="(data as any)" />
+        <ConfigTab v-else-if="activeTab === 'config'" :data="(data as any)" />
         <InternalsTab
           v-else-if="activeTab === 'internals'"
-          :data="data"
+          :data="(data as any)"
           :base-url="baseUrl"
           :debug-endpoint="debugEndpoint"
           :auth-token="authToken"

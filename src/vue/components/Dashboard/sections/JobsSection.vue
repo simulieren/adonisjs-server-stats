@@ -14,6 +14,7 @@ import {
   extractJobStats,
 } from '../../../../core/job-utils.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
@@ -61,6 +62,8 @@ function handleStatusFilter(status: string) {
     setFilter('status', status)
   }
 }
+
+const { tableRef } = useResizableTable(() => jobs.value)
 
 async function handleRetry(jobId: string) {
   retryStates.value[jobId] = 'pending'
@@ -128,7 +131,7 @@ async function handleRetry(jobId: string) {
 
     <template v-else>
       <div class="ss-dash-table-wrap">
-        <table v-if="jobs.length > 0" class="ss-dash-table">
+        <table v-if="jobs.length > 0" ref="tableRef" class="ss-dash-table">
           <colgroup>
             <col style="width: 40px" />
             <col />

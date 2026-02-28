@@ -10,7 +10,7 @@
  * the dashboard API because 'config' is in the DASHBOARD_TABS set).
  */
 import { ref, computed, watch } from 'vue'
-import { matchesConfigSearch, REDACT_PATTERN } from '../../../../core/config-utils.js'
+import { matchesConfigSearch, shouldRedact } from '../../../../core/config-utils.js'
 import type { ConfigValue } from '../../../../core/config-utils.js'
 
 interface ConfigData {
@@ -52,7 +52,7 @@ watch(searchRaw, (val) => {
 // ---------------------------------------------------------------------------
 
 function isRedacted(key: string): boolean {
-  return REDACT_PATTERN.test(key)
+  return shouldRedact(key)
 }
 
 function formatValue(value: ConfigValue): string {

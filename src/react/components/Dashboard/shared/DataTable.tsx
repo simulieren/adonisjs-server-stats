@@ -6,7 +6,8 @@ interface Column<T> {
   key: string
   label: string
   width?: string
-  render?: (value: unknown, row: T) => React.ReactNode
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  render?: (value: any, row: T) => React.ReactNode
   sortable?: boolean
 }
 
@@ -87,14 +88,14 @@ export function DataTable<T extends Record<string, unknown>>({
             : ''
           const clickClass = onRowClick ? 'ss-dash-clickable' : ''
           return (
-          <React.Fragment key={row[keyField] ?? i}>
+          <React.Fragment key={(row[keyField] as React.Key) ?? i}>
           <tr
             onClick={onRowClick ? () => onRowClick(row) : undefined}
             className={`${clickClass} ${extraClass}`.trim()}
           >
             {columns.map((col) => (
               <td key={col.key}>
-                {col.render ? col.render(row[col.key], row) : (row[col.key] ?? '-')}
+                {col.render ? col.render(row[col.key], row) : (row[col.key] as React.ReactNode) ?? '-'}
               </td>
             ))}
           </tr>

@@ -223,7 +223,7 @@ const integrationEntries = computed(() => {
             <td :style="c.lastError ? { color: 'var(--ss-red-fg)' } : {}">
               <template v-if="c.lastError">
                 {{ c.lastError }}
-                <span style="color: var(--ss-dim); margin-left: 4px">{{ timeAgo(c.lastErrorAt) }}</span>
+                <span style="color: var(--ss-dim); margin-left: 4px">{{ timeAgo(c.lastErrorAt ?? 0) }}</span>
               </template>
               <template v-else>-</template>
             </td>
@@ -339,7 +339,7 @@ const integrationEntries = computed(() => {
             <tr><td>File Size</td><td>{{ diagnostics.storage!.fileSizeMb.toFixed(1) }} MB</td></tr>
             <tr><td>WAL Size</td><td>{{ diagnostics.storage!.walSizeMb.toFixed(1) }} MB</td></tr>
             <tr><td>Retention</td><td>{{ diagnostics.storage!.retentionDays }} days</td></tr>
-            <tr><td>Last Cleanup</td><td>{{ timeAgo(diagnostics.storage!.lastCleanupAt) }}</td></tr>
+            <tr><td>Last Cleanup</td><td>{{ timeAgo(diagnostics.storage!.lastCleanupAt ?? 0) }}</td></tr>
           </tbody>
         </table>
 

@@ -42,7 +42,7 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
 
   // Extract jobs from the response (server may use `data` or `jobs` key)
   const jobs = useMemo(() => {
-    const items = extractJobsFromData(data) as JobRecord[];
+    const items = extractJobsFromData(data) as unknown as JobRecord[];
     if (statusFilter === "all") return items;
     return items.filter((j) => j.status === statusFilter);
   }, [data, statusFilter]);
@@ -170,7 +170,7 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
           </thead>
           <tbody>
             {jobs.map((job) => {
-              const jobAny = job as Record<string, unknown>;
+              const jobAny = job as unknown as Record<string, unknown>;
               return (
                 <tr key={job.id}>
                   <td className="ss-dbg-c-dim">{job.id}</td>

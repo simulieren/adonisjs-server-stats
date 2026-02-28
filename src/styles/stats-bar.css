@@ -53,6 +53,16 @@
   }
 }
 
+/* ── Reset: inherit font-family on form elements ─────────────── */
+.ss-bar button,
+.ss-bar input,
+.ss-bar select,
+.ss-bar textarea,
+.ss-toggle button,
+.ss-toggle input {
+  font-family: inherit;
+}
+
 /* ── Theme: Light (manual override) ───────────────────────────── */
 .ss-bar[data-ss-theme='light'],
 .ss-toggle[data-ss-theme='light'] {
@@ -280,7 +290,6 @@
   cursor: pointer;
   padding: 0 4px;
   line-height: 1;
-  font-family: inherit;
 }
 .ss-tooltip-close:hover {
   color: var(--ss-text-bright);

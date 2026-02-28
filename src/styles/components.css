@@ -1,0 +1,310 @@
+/* Shared component styles for adonisjs-server-stats.
+ * Contains styles that are identical across dashboard and debug panel.
+ * Uses neutral `.ss-` prefix with backward-compatible aliases for
+ * `.ss-dash-` and `.ss-dbg-` prefixes.
+ *
+ * Loaded AFTER tokens.css, BEFORE dashboard.css / debug-panel.css.
+ */
+
+/* ── Badge ────────────────────────────────────────────────────── */
+.ss-badge-block,
+.ss-dash-badge,
+.ss-dbg-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+.ss-badge-green,
+.ss-dash-badge-green,
+.ss-dbg-badge-green {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-badge-amber,
+.ss-dash-badge-amber,
+.ss-dbg-badge-amber {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-badge-red,
+.ss-dash-badge-red,
+.ss-dbg-badge-red {
+  background: var(--ss-red-bg);
+  color: var(--ss-red-fg);
+}
+.ss-badge-blue,
+.ss-dash-badge-blue,
+.ss-dbg-badge-blue {
+  background: var(--ss-blue-bg);
+  color: var(--ss-blue-fg);
+}
+.ss-badge-purple,
+.ss-dash-badge-purple,
+.ss-dbg-badge-purple {
+  background: var(--ss-purple-bg);
+  color: var(--ss-purple-fg);
+}
+/* Badge muted — dashboard and debug differ slightly in background,
+ * so each keeps its own override. This is the debug-panel version. */
+.ss-badge-muted,
+.ss-dbg-badge-muted {
+  background: var(--ss-border-dim);
+  color: var(--ss-muted);
+}
+
+/* ── Status code badges ───────────────────────────────────────── */
+.ss-status,
+.ss-dash-status,
+.ss-dbg-status {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.ss-status-2xx,
+.ss-dash-status-2xx,
+.ss-dbg-status-2xx {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-status-3xx,
+.ss-dash-status-3xx,
+.ss-dbg-status-3xx {
+  background: var(--ss-blue-bg);
+  color: var(--ss-blue-fg);
+}
+.ss-status-4xx,
+.ss-dash-status-4xx,
+.ss-dbg-status-4xx {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-status-5xx,
+.ss-dash-status-5xx,
+.ss-dbg-status-5xx {
+  background: var(--ss-red-bg);
+  color: var(--ss-red-fg);
+}
+
+/* ── Empty state ──────────────────────────────────────────────── */
+.ss-empty,
+.ss-dash-empty,
+.ss-dbg-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 120px;
+  color: var(--ss-dim);
+  font-size: 12px;
+}
+
+/* ── Info cards ───────────────────────────────────────────────── */
+.ss-info-cards,
+.ss-dash-info-cards,
+.ss-dbg-info-cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ss-info-card,
+.ss-dash-info-card,
+.ss-dbg-info-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--ss-surface-alt);
+  border-radius: 6px;
+  min-width: 0;
+  flex: 1 1 0;
+}
+.ss-info-card-label,
+.ss-dash-info-card-label,
+.ss-dbg-info-card-label {
+  font-size: 10px;
+  color: var(--ss-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ss-info-card-value,
+.ss-dash-info-card-value,
+.ss-dbg-info-card-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ss-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Progress bar ─────────────────────────────────────────────── */
+.ss-progress,
+.ss-dash-bar,
+.ss-dbg-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ss-progress-track,
+.ss-dash-bar-track,
+.ss-dbg-bar-track {
+  flex: 1;
+  height: 8px;
+  background: var(--ss-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.ss-progress-fill,
+.ss-dash-bar-fill,
+.ss-dbg-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--ss-blue-fg);
+  transition: width 0.3s;
+}
+.ss-progress-fill-warn,
+.ss-dash-bar-fill-warn,
+.ss-dbg-bar-fill-warn {
+  background: var(--ss-amber-fg);
+}
+.ss-progress-pct,
+.ss-dash-bar-pct,
+.ss-dbg-bar-pct {
+  font-size: 11px;
+  min-width: 36px;
+  text-align: right;
+  color: var(--ss-dim);
+}
+.ss-progress-pct-warn,
+.ss-dash-bar-pct-warn,
+.ss-dbg-bar-pct-warn {
+  color: var(--ss-amber-fg);
+}
+
+/* ── Status indicator dot ─────────────────────────────────────── */
+.ss-indicator-dot,
+.ss-dash-dot,
+.ss-dbg-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--ss-dim);
+}
+.ss-indicator-dot-ok,
+.ss-dash-dot-ok,
+.ss-dbg-dot-ok {
+  background: var(--ss-green-fg);
+}
+.ss-indicator-dot-err,
+.ss-dash-dot-err,
+.ss-dbg-dot-err {
+  background: var(--ss-red-fg);
+}
+
+/* ── Duration classes ─────────────────────────────────────────── */
+.ss-duration,
+.ss-dash-duration,
+.ss-dbg-duration {
+  font-variant-numeric: tabular-nums;
+  color: var(--ss-text);
+}
+.ss-slow,
+.ss-dash-slow,
+.ss-dbg-slow {
+  color: var(--ss-amber-fg);
+}
+.ss-very-slow,
+.ss-dash-very-slow,
+.ss-dbg-very-slow {
+  color: var(--ss-red-fg);
+}
+
+/* ── Copy button ──────────────────────────────────────────────── */
+.ss-copy-btn,
+.ss-dash-copy-btn,
+.ss-dbg-copy-btn {
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-size: 11px;
+  color: var(--ss-dim);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.ss-copy-btn:hover,
+.ss-dash-copy-btn:hover,
+.ss-dbg-copy-btn:hover {
+  color: var(--ss-text-secondary);
+  border-color: var(--ss-border-strong);
+}
+
+/* ── Utility color classes ────────────────────────────────────── */
+.ss-c-dim,
+.ss-dash-c-dim,
+.ss-dbg-c-dim {
+  color: var(--ss-dim);
+}
+.ss-c-muted,
+.ss-dash-c-muted,
+.ss-dbg-c-muted {
+  color: var(--ss-muted);
+}
+.ss-c-secondary,
+.ss-dash-c-secondary,
+.ss-dbg-c-secondary {
+  color: var(--ss-text-secondary);
+}
+.ss-c-text,
+.ss-dash-c-text,
+.ss-dbg-c-text {
+  color: var(--ss-text);
+}
+.ss-c-sql,
+.ss-dash-c-sql,
+.ss-dbg-c-sql {
+  color: var(--ss-sql-color);
+}
+.ss-c-amber,
+.ss-dash-c-amber,
+.ss-dbg-c-amber {
+  color: var(--ss-amber-fg);
+}
+.ss-c-red,
+.ss-dash-c-red,
+.ss-dbg-c-red {
+  color: var(--ss-red-fg);
+}
+.ss-c-green,
+.ss-dash-c-green,
+.ss-dbg-c-green {
+  color: var(--ss-green-fg);
+}
+.ss-c-blue,
+.ss-dash-c-blue,
+.ss-dbg-c-blue {
+  color: var(--ss-blue-fg);
+}
+.ss-c-purple,
+.ss-dash-c-purple,
+.ss-dbg-c-purple {
+  color: var(--ss-purple-fg);
+}
+.ss-c-accent,
+.ss-dash-c-accent,
+.ss-dbg-c-accent {
+  color: var(--ss-accent);
+}
+.ss-c-border,
+.ss-dash-c-border,
+.ss-dbg-c-border {
+  color: var(--ss-border);
+}

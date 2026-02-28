@@ -66,7 +66,6 @@ const { tableRef } = useResizableTable(() => events.value)
               class="ss-dbg-deeplink"
             >
               <svg
-                viewBox="0 0 16 16"
                 width="12"
                 height="12"
                 :viewBox="TAB_ICONS['open-external'].viewBox"

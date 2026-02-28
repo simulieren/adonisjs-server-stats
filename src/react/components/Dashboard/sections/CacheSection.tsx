@@ -174,7 +174,7 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
                 ),
               },
             ]}
-            data={cacheData.keys || cacheData.data || []}
+            data={(cacheData.keys || cacheData.data || []) as unknown as Record<string, unknown>[]}
             keyField="key"
             onRowClick={(row: Record<string, unknown>) =>
               handleKeyClick(row.key as string)

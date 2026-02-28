@@ -8,7 +8,7 @@ import { JOB_STATUS_FILTERS, getJobStatusCssClass } from '../../../../core/job-u
 import { useResizableTable } from '../../../composables/useResizableTable.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
-import type { JobRecord, JobsApiResponse } from '../../../../core/types.js'
+import type { JobRecord, JobsApiResponse, JobStats } from '../../../../core/types.js'
 
 const props = defineProps<{
   data: JobsApiResponse | null
@@ -21,7 +21,7 @@ const emit = defineEmits<{
 const activeFilter = ref('all')
 
 const jobData = computed(() => props.data || {})
-const stats = computed(() => jobData.value.stats || jobData.value.overview || {})
+const stats = computed(() => jobData.value.stats || jobData.value.overview || ({} as Partial<JobStats>))
 
 const jobs = computed<JobRecord[]>(() => {
   const arr = jobData.value.jobs || []

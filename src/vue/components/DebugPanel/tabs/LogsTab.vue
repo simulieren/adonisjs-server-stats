@@ -106,7 +106,7 @@ function filterByReqId(reqId: string) {
     <div v-if="logs.length === 0" class="ss-dbg-empty">No log entries</div>
 
     <div v-else>
-      <div v-for="(log, i) in logs" :key="log.id || i" class="ss-dbg-log-entry">
+      <div v-for="(log, i) in logs" :key="(log.id as PropertyKey) || i" class="ss-dbg-log-entry">
         <span :class="['ss-dbg-log-level', getLogLevelCssClass(resolveLogLevel(log))]">
           {{ resolveLogLevel(log).toUpperCase() }}
         </span>

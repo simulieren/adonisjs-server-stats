@@ -7,6 +7,7 @@
  */
 import { ref, computed, inject, type Ref } from 'vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import FilterBar from '../shared/FilterBar.vue'
 
 const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
@@ -41,6 +42,8 @@ function handleSearch(term: string) {
   search.value = term
   setSearch(term)
 }
+
+const { tableRef } = useResizableTable(() => routes.value)
 </script>
 
 <template>
@@ -58,7 +61,7 @@ function handleSearch(term: string) {
 
     <template v-else>
       <div class="ss-dash-table-wrap">
-        <table v-if="routes.length > 0" class="ss-dash-table">
+        <table v-if="routes.length > 0" ref="tableRef" class="ss-dash-table">
           <colgroup>
             <col style="width: 70px" />
             <col />

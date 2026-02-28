@@ -1,194 +1,7 @@
 /* Full-page dashboard styles for adonisjs-server-stats.
  * All classes use the `.ss-dash-` prefix to avoid conflicts.
- * Two themes via CSS custom properties + @media (prefers-color-scheme).
+ * Theme tokens are loaded from tokens.css (prepended at runtime).
  */
-
-/* ── Theme: Dark (default) ─────────────────────────────────────── */
-:root {
-  --ss-bg: #0f0f0f;
-  --ss-surface: #171717;
-  --ss-surface-alt: #141414;
-  --ss-text: #e5e5e5;
-  --ss-text-secondary: #b5b5b5;
-  --ss-accent: #34d399;
-  --ss-accent-dim: #064e3b;
-  --ss-border: #333;
-  --ss-border-dim: #262626;
-  --ss-border-faint: #1f1f1f;
-  --ss-muted: #9ca3af;
-  --ss-dim: #6b7280;
-  --ss-hover: rgba(38, 38, 38, 0.4);
-  --ss-hover-accent: rgba(52, 211, 153, 0.08);
-  --ss-input-bg: #1a1a1a;
-  --ss-shadow: rgb(0 0 0 / 0.4);
-  /* Status colors */
-  --ss-green-bg: #064e3b;
-  --ss-green-fg: #34d399;
-  --ss-blue-bg: #1e3a5f;
-  --ss-blue-fg: #60a5fa;
-  --ss-amber-bg: #422006;
-  --ss-amber-fg: #fbbf24;
-  --ss-red-bg: #450a0a;
-  --ss-red-fg: #f87171;
-  --ss-purple-bg: #2e1065;
-  --ss-purple-fg: #c084fc;
-  --ss-sql-color: #93c5fd;
-  --ss-font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --ss-text-primary: var(--ss-text);
-  --ss-reqid-bg: #1e1b2e;
-  --ss-reqid-fg: #6d28d9;
-  --ss-reqid-hover-bg: #2e2644;
-  --ss-reqid-hover-fg: #a78bfa;
-}
-
-/* ── Theme: Dark (explicit toggle override) ───────────────────── */
-[data-theme="dark"] {
-  --ss-bg: #0f0f0f;
-  --ss-surface: #171717;
-  --ss-surface-alt: #141414;
-  --ss-text: #e5e5e5;
-  --ss-text-secondary: #b5b5b5;
-  --ss-accent: #34d399;
-  --ss-accent-dim: #064e3b;
-  --ss-border: #333;
-  --ss-border-dim: #262626;
-  --ss-border-faint: #1f1f1f;
-  --ss-muted: #9ca3af;
-  --ss-dim: #6b7280;
-  --ss-hover: rgba(38, 38, 38, 0.4);
-  --ss-hover-accent: rgba(52, 211, 153, 0.08);
-  --ss-input-bg: #1a1a1a;
-  --ss-shadow: rgb(0 0 0 / 0.4);
-  --ss-green-bg: #064e3b;
-  --ss-green-fg: #34d399;
-  --ss-blue-bg: #1e3a5f;
-  --ss-blue-fg: #60a5fa;
-  --ss-amber-bg: #422006;
-  --ss-amber-fg: #fbbf24;
-  --ss-red-bg: #450a0a;
-  --ss-red-fg: #f87171;
-  --ss-purple-bg: #2e1065;
-  --ss-purple-fg: #c084fc;
-  --ss-sql-color: #93c5fd;
-  --ss-font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --ss-text-primary: var(--ss-text);
-  --ss-reqid-bg: #1e1b2e;
-  --ss-reqid-fg: #6d28d9;
-  --ss-reqid-hover-bg: #2e2644;
-  --ss-reqid-hover-fg: #a78bfa;
-}
-
-/* ── Theme: Light ──────────────────────────────────────────────── */
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --ss-bg: #fafafa;
-    --ss-surface: #ffffff;
-    --ss-surface-alt: #f5f5f5;
-    --ss-text: #171717;
-    --ss-text-secondary: #525252;
-    --ss-accent: #059669;
-    --ss-accent-dim: #d1fae5;
-    --ss-border: #e5e5e5;
-    --ss-border-dim: #e5e5e5;
-    --ss-border-faint: #f0f0f0;
-    --ss-muted: #6b7280;
-    --ss-dim: #9ca3af;
-    --ss-hover: rgba(0, 0, 0, 0.03);
-    --ss-hover-accent: rgba(5, 150, 105, 0.06);
-    --ss-input-bg: #ffffff;
-    --ss-shadow: rgb(0 0 0 / 0.08);
-    --ss-green-bg: #d1fae5;
-    --ss-green-fg: #059669;
-    --ss-blue-bg: #dbeafe;
-    --ss-blue-fg: #2563eb;
-    --ss-amber-bg: #fef3c7;
-    --ss-amber-fg: #b45309;
-    --ss-red-bg: #fee2e2;
-    --ss-red-fg: #dc2626;
-    --ss-purple-bg: #ede9fe;
-    --ss-purple-fg: #7c3aed;
-    --ss-sql-color: #2563eb;
-    --ss-text-primary: var(--ss-text);
-    --ss-reqid-bg: #ede9fe;
-    --ss-reqid-fg: #7c3aed;
-    --ss-reqid-hover-bg: #ddd6fe;
-    --ss-reqid-hover-fg: #6d28d9;
-  }
-}
-
-/* ── Theme: Light (explicit toggle override) ──────────────────── */
-[data-theme="light"] {
-  --ss-bg: #fafafa;
-  --ss-surface: #ffffff;
-  --ss-surface-alt: #f5f5f5;
-  --ss-text: #171717;
-  --ss-text-secondary: #525252;
-  --ss-accent: #059669;
-  --ss-accent-dim: #d1fae5;
-  --ss-border: #e5e5e5;
-  --ss-border-dim: #e5e5e5;
-  --ss-border-faint: #f0f0f0;
-  --ss-muted: #6b7280;
-  --ss-dim: #9ca3af;
-  --ss-hover: rgba(0, 0, 0, 0.03);
-  --ss-hover-accent: rgba(5, 150, 105, 0.06);
-  --ss-input-bg: #ffffff;
-  --ss-shadow: rgb(0 0 0 / 0.08);
-  --ss-green-bg: #d1fae5;
-  --ss-green-fg: #059669;
-  --ss-blue-bg: #dbeafe;
-  --ss-blue-fg: #2563eb;
-  --ss-amber-bg: #fef3c7;
-  --ss-amber-fg: #b45309;
-  --ss-red-bg: #fee2e2;
-  --ss-red-fg: #dc2626;
-  --ss-purple-bg: #ede9fe;
-  --ss-purple-fg: #7c3aed;
-  --ss-sql-color: #2563eb;
-  --ss-text-primary: var(--ss-text);
-  --ss-reqid-bg: #ede9fe;
-  --ss-reqid-fg: #7c3aed;
-  --ss-reqid-hover-bg: #ddd6fe;
-  --ss-reqid-hover-fg: #6d28d9;
-}
-
-/* ── Theme override via data attribute ─────────────────────────── */
-[data-theme="light"] {
-  --ss-bg: #fafafa;
-  --ss-surface: #ffffff;
-  --ss-surface-alt: #f5f5f5;
-  --ss-text: #171717;
-  --ss-text-secondary: #525252;
-  --ss-accent: #059669;
-  --ss-accent-dim: #d1fae5;
-  --ss-border: #e5e5e5;
-  --ss-border-dim: #e5e5e5;
-  --ss-border-faint: #f0f0f0;
-  --ss-muted: #6b7280;
-  --ss-dim: #9ca3af;
-  --ss-hover: rgba(0, 0, 0, 0.03);
-  --ss-hover-accent: rgba(5, 150, 105, 0.06);
-  --ss-input-bg: #ffffff;
-  --ss-shadow: rgb(0 0 0 / 0.08);
-  --ss-green-bg: #d1fae5;
-  --ss-green-fg: #059669;
-  --ss-blue-bg: #dbeafe;
-  --ss-blue-fg: #2563eb;
-  --ss-amber-bg: #fef3c7;
-  --ss-amber-fg: #b45309;
-  --ss-red-bg: #fee2e2;
-  --ss-red-fg: #dc2626;
-  --ss-purple-bg: #ede9fe;
-  --ss-purple-fg: #7c3aed;
-  --ss-sql-color: #2563eb;
-  --ss-text-primary: var(--ss-text);
-  --ss-reqid-bg: #ede9fe;
-  --ss-reqid-fg: #7c3aed;
-  --ss-reqid-hover-bg: #ddd6fe;
-  --ss-reqid-hover-fg: #6d28d9;
-}
 
 /* ── Reset & base ──────────────────────────────────────────────── */
 *,
@@ -197,6 +10,14 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+button,
+input,
+select,
+textarea,
+pre {
+  font-family: inherit;
 }
 
 html,
@@ -301,7 +122,6 @@ body {
   cursor: pointer;
   border: none;
   background: none;
-  font-family: inherit;
   border-radius: 4px;
 }
 .ss-dash-theme-btn:hover,
@@ -367,7 +187,6 @@ body {
   background: none;
   width: 100%;
   text-align: left;
-  font-family: inherit;
   transition:
     color 0.15s,
     background 0.15s;
@@ -460,7 +279,6 @@ body {
   color: var(--ss-dim);
   border: none;
   background: none;
-  font-family: inherit;
   font-size: 14px;
   border-top: 1px solid var(--ss-border-dim);
   flex-shrink: 0;
@@ -510,7 +328,6 @@ body {
   padding-left: 28px;
   padding-right: 24px;
   font-size: 11px;
-  font-family: inherit;
   color: var(--ss-text);
   background: var(--ss-input-bg);
   border: 1px solid var(--ss-border);
@@ -587,7 +404,6 @@ body {
 .ss-dash-btn {
   padding: 4px 10px;
   font-size: 10px;
-  font-family: inherit;
   color: var(--ss-muted);
   background: var(--ss-surface);
   border: 1px solid var(--ss-border);
@@ -779,75 +595,15 @@ body {
   color: var(--ss-dim);
 }
 
-/* ── Status badges ─────────────────────────────────────────────── */
-.ss-dash-status {
-  font-size: 10px;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 3px;
-}
-.ss-dash-status-2xx {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dash-status-3xx {
-  background: var(--ss-blue-bg);
-  color: var(--ss-blue-fg);
-}
-.ss-dash-status-4xx {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dash-status-5xx {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
-}
+/* Status badges → components.css */
+/* Badge generic → components.css */
 
-/* ── Badge generic ─────────────────────────────────────────────── */
-.ss-dash-badge {
-  display: inline-block;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.ss-dash-badge-green {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dash-badge-amber {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dash-badge-red {
-  background: var(--ss-red-bg);
-  color: var(--ss-red-fg);
-}
-.ss-dash-badge-blue {
-  background: var(--ss-blue-bg);
-  color: var(--ss-blue-fg);
-}
-.ss-dash-badge-purple {
-  background: var(--ss-purple-bg);
-  color: var(--ss-purple-fg);
-}
+/* Dashboard badge-muted override (uses --ss-surface instead of --ss-border-dim) */
 .ss-dash-badge-muted {
   background: var(--ss-surface);
-  color: var(--ss-muted);
 }
 
-/* ── Duration ──────────────────────────────────────────────────── */
-.ss-dash-duration {
-  font-variant-numeric: tabular-nums;
-  color: var(--ss-text);
-}
-.ss-dash-slow {
-  color: var(--ss-amber-fg);
-}
-.ss-dash-very-slow {
-  color: var(--ss-red-fg);
-}
+/* Duration → components.css */
 
 /* ── SQL ───────────────────────────────────────────────────────── */
 .ss-dash-sql {
@@ -895,7 +651,6 @@ body {
   border-radius: 4px;
   color: var(--ss-text-secondary);
   font-size: 10px;
-  font-family: inherit;
   white-space: pre-wrap;
   word-break: break-all;
   max-height: 300px;
@@ -904,32 +659,15 @@ body {
   scrollbar-width: thin;
 }
 
-.ss-dash-copy-btn {
-  margin-left: 6px;
-  padding: 1px 5px;
-  font-size: 11px;
-  color: var(--ss-dim);
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  cursor: pointer;
-  font-family: inherit;
-  vertical-align: middle;
-}
+/* Copy button → components.css */
+/* Dashboard copy-btn hover override (uses --ss-border instead of --ss-border-strong) */
 .ss-dash-copy-btn:hover {
-  color: var(--ss-text-secondary);
   border-color: var(--ss-border);
 }
 
-/* ── Empty state ───────────────────────────────────────────────── */
+/* Empty state → components.css */
+/* Dashboard empty override (adds flex: 1) */
 .ss-dash-empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  min-height: 120px;
-  color: var(--ss-dim);
-  font-size: 12px;
   flex: 1;
 }
 
@@ -970,7 +708,6 @@ body {
 .ss-dash-log-filter {
   padding: 3px 10px;
   font-size: 10px;
-  font-family: inherit;
   border: 1px solid var(--ss-border);
   border-radius: 4px;
   cursor: pointer;
@@ -1050,7 +787,6 @@ body {
   border-radius: 3px;
   cursor: pointer;
   flex-shrink: 0;
-  font-family: inherit;
   letter-spacing: 0.02em;
 }
 .ss-dash-log-reqid:hover {
@@ -1085,7 +821,6 @@ body {
 .ss-dash-filter-input {
   padding: 4px 8px;
   font-size: 11px;
-  font-family: inherit;
   color: var(--ss-text);
   background: var(--ss-input-bg);
   border: 1px solid var(--ss-border);
@@ -1121,7 +856,6 @@ body {
   background: var(--ss-accent-dim);
   color: var(--ss-accent);
   border-radius: 4px;
-  font-family: inherit;
 }
 .ss-dash-filter-chip-remove {
   cursor: pointer;
@@ -1130,7 +864,6 @@ body {
   color: var(--ss-accent);
   background: none;
   border: none;
-  font-family: inherit;
   padding: 0;
 }
 .ss-dash-filter-chip-remove:hover {
@@ -1148,7 +881,6 @@ body {
 .ss-dash-saved-select {
   padding: 4px 8px;
   font-size: 10px;
-  font-family: inherit;
   color: var(--ss-text);
   background: var(--ss-input-bg);
   border: 1px solid var(--ss-border);
@@ -1386,7 +1118,6 @@ body {
 .ss-dash-explain-btn {
   padding: 2px 8px;
   font-size: 9px;
-  font-family: inherit;
   color: var(--ss-purple-fg);
   background: var(--ss-purple-bg);
   border: none;
@@ -1698,7 +1429,6 @@ body {
 .ss-dash-page-btn {
   padding: 3px 10px;
   font-size: 10px;
-  font-family: inherit;
   color: var(--ss-muted);
   background: none;
   border: 1px solid var(--ss-border);
@@ -1735,7 +1465,6 @@ body {
 .ss-dash-config-tab {
   padding: 4px 12px;
   font-size: 11px;
-  font-family: inherit;
   border: 1px solid var(--ss-border-dim);
   border-radius: 4px;
   background: transparent;
@@ -1906,7 +1635,6 @@ body {
   border: 1px solid transparent;
   border-radius: 3px;
   cursor: pointer;
-  font-family: inherit;
   line-height: 1;
   opacity: 0;
   transition: opacity 0.1s;
@@ -1985,7 +1713,6 @@ tr:hover .ss-dash-copy-row-btn,
 .ss-dash-retry-btn {
   padding: 2px 8px;
   font-size: 9px;
-  font-family: inherit;
   color: var(--ss-amber-fg);
   background: var(--ss-amber-bg);
   border: none;
@@ -2105,43 +1832,7 @@ tr:hover .ss-dash-copy-row-btn,
   color: var(--ss-text);
 }
 
-/* ── Utility color classes ─────────────────────────────────────── */
-.ss-dash-c-dim {
-  color: var(--ss-dim);
-}
-.ss-dash-c-muted {
-  color: var(--ss-muted);
-}
-.ss-dash-c-red {
-  color: var(--ss-red-fg);
-}
-.ss-dash-c-green {
-  color: var(--ss-green-fg);
-}
-.ss-dash-c-amber {
-  color: var(--ss-amber-fg);
-}
-.ss-dash-c-secondary {
-  color: var(--ss-text-secondary);
-}
-.ss-dash-c-text {
-  color: var(--ss-text);
-}
-.ss-dash-c-sql {
-  color: var(--ss-sql-color);
-}
-.ss-dash-c-blue {
-  color: var(--ss-blue-fg);
-}
-.ss-dash-c-purple {
-  color: var(--ss-purple-fg);
-}
-.ss-dash-c-accent {
-  color: var(--ss-accent);
-}
-.ss-dash-c-border {
-  color: var(--ss-border);
-}
+/* Utility color classes → components.css */
 
 /* ── Section title (reused by internals + Vue) ────────────────── */
 .ss-dash-internals-title,
@@ -2160,85 +1851,9 @@ tr:hover .ss-dash-copy-row-btn,
   margin-top: 4px;
 }
 
-/* ── Compact info cards ───────────────────────────────────────── */
-.ss-dash-info-cards {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ss-dash-info-card {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 12px;
-  background: var(--ss-surface-alt);
-  border-radius: 6px;
-  min-width: 0;
-  flex: 1 1 0;
-}
-.ss-dash-info-card-label {
-  font-size: 10px;
-  color: var(--ss-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.ss-dash-info-card-value {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ss-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ── Status indicator dot ─────────────────────────────────────── */
-.ss-dash-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 6px;
-  vertical-align: middle;
-  background: var(--ss-dim);
-}
-.ss-dash-dot-ok {
-  background: var(--ss-green-fg);
-}
-.ss-dash-dot-err {
-  background: var(--ss-red-fg);
-}
-
-/* ── Progress bar ─────────────────────────────────────────────── */
-.ss-dash-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ss-dash-bar-track {
-  flex: 1;
-  height: 8px;
-  background: var(--ss-border);
-  border-radius: 4px;
-  overflow: hidden;
-}
-.ss-dash-bar-fill {
-  height: 100%;
-  border-radius: 4px;
-  background: var(--ss-blue-fg);
-  transition: width 0.3s;
-}
-.ss-dash-bar-fill-warn {
-  background: var(--ss-amber-fg);
-}
-.ss-dash-bar-pct {
-  font-size: 11px;
-  min-width: 36px;
-  text-align: right;
-  color: var(--ss-dim);
-}
-.ss-dash-bar-pct-warn {
-  color: var(--ss-amber-fg);
-}
+/* Info cards → components.css */
+/* Status indicator dot → components.css */
+/* Progress bar → components.css */
 
 /* ── Tooltip trigger ─────────────────────────────────────────── */
 .ss-tooltip-trigger {

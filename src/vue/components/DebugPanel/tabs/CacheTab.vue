@@ -19,7 +19,7 @@ const cacheData = computed(() => {
   return props.data || {}
 })
 
-const stats = computed(() => cacheData.value.stats || {})
+const stats = computed(() => cacheData.value.stats || ({} as Partial<CacheStats>))
 
 const keys = computed<CacheEntry[]>(() => {
   const arr = cacheData.value.keys || []
