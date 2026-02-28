@@ -3,7 +3,7 @@
  * Queue management tab for the debug panel.
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { timeAgo, formatDuration } from '../../../../core/index.js'
+import { timeAgo, formatDuration, formatTime } from '../../../../core/index.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
@@ -98,7 +98,7 @@ onBeforeUnmount(() => {
         </span>
         <span class="ss-dbg-job-stat">
           <span class="ss-dbg-job-stat-label">Failed:</span>
-          <span class="ss-dbg-job-stat-value">{{ stats.failed ?? 0 }}</span>
+          <span class="ss-dbg-job-stat-value ss-dbg-c-red">{{ stats.failed ?? 0 }}</span>
         </span>
       </div>
 
@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
             <span :class="statusClass(j.status)">{{ j.status }}</span>
           </td>
           <td>
-            <JsonViewer :value="j.payload || j.data" :max-len="60" />
+            <JsonViewer :value="j.payload || j.data" :max-len="60" class-prefix="ss-dbg" />
           </td>
           <td class="ss-dbg-c-muted" style="text-align: center">
             {{ j.attempts }}
@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
           <td class="ss-dbg-duration">
             {{ j.duration !== null ? formatDuration(j.duration) : '-' }}
           </td>
-          <td class="ss-dbg-event-time">
+          <td class="ss-dbg-event-time" :title="formatTime(j.timestamp || j.createdAt)">
             {{ timeAgo(j.timestamp || j.createdAt) }}
           </td>
           <td>

@@ -1,146 +1,277 @@
 <script setup lang="ts">
 /**
  * Request history section for the dashboard.
+ *
+ * Self-contained: injects dependencies and fetches its own data
+ * via useDashboardData. CSS classes match the React RequestsSection.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { formatDuration, statusColor, timeAgo } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
-import type { TraceRecord } from '../../../../core/index.js'
+import { ref, computed, inject, type Ref } from 'vue'
+import { ApiClient, timeAgo, formatTime } from '../../../../core/index.js'
+import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import WaterfallChart from '../shared/WaterfallChart.vue'
 
-interface RequestRecord extends TraceRecord {
-  status_code?: number
-  duration?: number
-  span_count?: number
-  createdAt?: number
-  created_at?: number
-}
+const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
+const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
+const authToken = inject<string | undefined>('ss-auth-token', undefined)
+const baseUrl = inject<string>('ss-base-url', '')
 
-interface RequestsData {
-  data?: RequestRecord[]
-  requests?: RequestRecord[]
-}
-
-const props = defineProps<{
-  data: RequestsData | RequestRecord[] | null
-  page: number
-  perPage: number
-  total: number
-}>()
-
-const emit = defineEmits<{
-  goToPage: [page: number]
-  search: [term: string]
-}>()
-
-const search = ref('')
-const expandedId = ref<number | null>(null)
-
-const requests = computed(() => {
-  const d = props.data
-  if (!d) return []
-  return d.data || d.requests || d || []
+const {
+  data,
+  loading,
+  error,
+  pagination,
+  sort,
+  goToPage,
+  setSearch,
+  setSort,
+} = useDashboardData(() => 'requests', {
+  baseUrl,
+  dashboardEndpoint,
+  authToken,
+  refreshKey,
 })
 
-function toggleExpand(id: number) {
-  expandedId.value = expandedId.value === id ? null : id
+const search = ref('')
+const selectedTrace = ref<Record<string, unknown> | null>(null)
+const detailLoading = ref(false)
+
+interface TraceDetail {
+  method?: string
+  url?: string
+  status_code?: number
+  statusCode?: number
+  total_duration?: number
+  totalDuration?: number
+  duration?: number
+  spanCount?: number
+  span_count?: number
+  spans: unknown[] | string
+  warnings: string[] | string
+}
+
+const traceDetail = ref<TraceDetail | null>(null)
+
+const requests = computed<Record<string, unknown>[]>(() => {
+  if (!data.value) return []
+  const d = data.value as Record<string, unknown>
+  return (d.data || d.requests || data.value || []) as Record<string, unknown>[]
+})
+
+let apiClient: ApiClient | null = null
+function getClient(): ApiClient {
+  if (!apiClient) {
+    apiClient = new ApiClient({ baseUrl, authToken })
+  }
+  return apiClient
+}
+
+async function handleRowClick(row: Record<string, unknown>) {
+  const id = row.id as number
+  detailLoading.value = true
+  try {
+    const endpoint = dashboardEndpoint || '/__stats/api'
+    const result = await getClient().fetch<TraceDetail>(`${endpoint}/requests/${id}`)
+    traceDetail.value = result
+    selectedTrace.value = row
+  } catch {
+    // silently fail
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function handleBack() {
+  selectedTrace.value = null
+  traceDetail.value = null
 }
 
 function handleSearch(term: string) {
   search.value = term
-  emit('search', term)
+  setSearch(term)
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
+function handleSort(key: string) {
+  setSort(key)
 }
 
-watch(requests, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+function parseSpans(raw: unknown[] | string | undefined): unknown[] {
+  if (!raw) return []
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) } catch { return [] }
+  }
+  return Array.isArray(raw) ? raw : []
+}
+
+function parseWarnings(raw: string[] | string | undefined): string[] {
+  if (!raw) return []
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) } catch { return [] }
+  }
+  return Array.isArray(raw) ? raw : []
+}
 </script>
 
 <template>
   <div>
-    <FilterBar
-      :model-value="search"
-      placeholder="Filter by URL, method, or status..."
-      :summary="`${props.total} requests`"
-      @update:model-value="handleSearch"
-    />
+    <!-- Trace detail view -->
+    <template v-if="traceDetail && selectedTrace">
+      <div class="ss-dash-tl-detail-header">
+        <button type="button" class="ss-dash-btn" @click="handleBack">
+          &larr; Back to Requests
+        </button>
+        <span :class="`ss-dash-method ss-dash-method-${(traceDetail.method || '').toLowerCase()}`">
+          {{ traceDetail.method }}
+        </span>
+        <span style="color: var(--ss-text)">{{ traceDetail.url }}</span>
+        <span :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.status_code || traceDetail.statusCode || 200) / 100)}xx`">
+          {{ traceDetail.status_code || traceDetail.statusCode }}
+        </span>
+        <span class="ss-dash-tl-meta">
+          {{ (traceDetail.total_duration || traceDetail.totalDuration || traceDetail.duration || 0).toFixed(1) }}ms
+          &middot;
+          {{ traceDetail.span_count || traceDetail.spanCount || 0 }} spans
+        </span>
+      </div>
+      <WaterfallChart
+        :spans="parseSpans(traceDetail.spans) as any"
+        :total-duration="traceDetail.total_duration || traceDetail.totalDuration || traceDetail.duration || 0"
+        :warnings="parseWarnings(traceDetail.warnings)"
+      />
+    </template>
 
-    <div v-if="requests.length === 0" class="ss-dash-empty">No requests found</div>
+    <!-- Loading detail -->
+    <template v-else-if="detailLoading">
+      <div class="ss-dash-tl-detail-header">
+        <button type="button" class="ss-dash-btn" @click="detailLoading = false">
+          &larr; Back to Requests
+        </button>
+      </div>
+      <div class="ss-dash-empty">Loading request detail...</div>
+    </template>
 
-    <table v-else ref="tableRef" class="ss-dash-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Method</th>
-          <th>URL</th>
-          <th>Status</th>
-          <th>Duration</th>
-          <th>Spans</th>
-          <th>Time</th>
-        </tr>
-      </thead>
-      <tbody>
-        <template v-for="r in requests" :key="r.id">
-          <tr style="cursor: pointer" @click="toggleExpand(r.id)">
-            <td style="color: var(--ss-dim)">{{ r.id }}</td>
-            <td>
-              <span :class="`ss-dash-method ss-dash-method-${(r.method || '').toLowerCase()}`">
-                {{ r.method }}
-              </span>
-            </td>
-            <td style="color: var(--ss-text)">{{ r.url }}</td>
-            <td>
-              <span
-                :class="`ss-dash-status ss-dash-status-${Math.floor((r.statusCode || r.status_code || 200) / 100)}xx`"
+    <!-- List view -->
+    <template v-else>
+      <FilterBar
+        :model-value="search"
+        placeholder="Filter requests..."
+        :summary="`${pagination.total ?? 0} requests`"
+        @update:model-value="handleSearch"
+      />
+
+      <div v-if="error" class="ss-dash-empty">Failed to load requests</div>
+
+      <div v-if="loading && !data" class="ss-dash-empty">Loading requests...</div>
+
+      <template v-else>
+        <div class="ss-dash-table-wrap">
+          <table v-if="requests.length > 0" class="ss-dash-table">
+            <colgroup>
+              <col style="width: 40px" />
+              <col style="width: 70px" />
+              <col />
+              <col style="width: 60px" />
+              <col style="width: 80px" />
+              <col style="width: 50px" />
+              <col style="width: 40px" />
+              <col style="width: 80px" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th class="ss-dash-sortable" @click="handleSort('method')">
+                  Method
+                  <span v-if="sort.column === 'method'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                </th>
+                <th class="ss-dash-sortable" @click="handleSort('url')">
+                  URL
+                  <span v-if="sort.column === 'url'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                </th>
+                <th class="ss-dash-sortable" @click="handleSort('statusCode')">
+                  Status
+                  <span v-if="sort.column === 'statusCode'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                </th>
+                <th class="ss-dash-sortable" @click="handleSort('duration')">
+                  Duration
+                  <span v-if="sort.column === 'duration'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                </th>
+                <th>Spans</th>
+                <th>&#x26A0;</th>
+                <th class="ss-dash-sortable" @click="handleSort('createdAt')">
+                  Time
+                  <span v-if="sort.column === 'createdAt'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="r in requests"
+                :key="(r.id as number)"
+                class="ss-dash-clickable"
+                @click="handleRowClick(r)"
               >
-                {{ r.statusCode || r.status_code }}
-              </span>
-            </td>
-            <td class="ss-dash-duration">
-              {{ formatDuration(r.totalDuration || r.duration || 0) }}
-            </td>
-            <td style="color: var(--ss-muted); text-align: center">
-              {{ r.spanCount || r.span_count || 0 }}
-            </td>
-            <td class="ss-dash-event-time">
-              {{ timeAgo(r.timestamp || r.createdAt || r.created_at) }}
-            </td>
-          </tr>
-          <!-- Expanded waterfall -->
-          <tr v-if="expandedId === r.id && r.spans">
-            <td colspan="7" style="padding: 0">
-              <WaterfallChart
-                :spans="r.spans"
-                :total-duration="r.totalDuration || r.duration || 1"
-              />
-            </td>
-          </tr>
-        </template>
-      </tbody>
-    </table>
-
-    <PaginationControls
-      :page="props.page"
-      :per-page="props.perPage"
-      :total="props.total"
-      @go-to-page="emit('goToPage', $event)"
-    />
+                <td><span style="color: var(--ss-dim)">{{ r.id }}</span></td>
+                <td>
+                  <span :class="`ss-dash-method ss-dash-method-${((r.method as string) || '').toLowerCase()}`">
+                    {{ r.method }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    style="color: var(--ss-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                    :title="(r.url as string)"
+                  >
+                    {{ r.url }}
+                  </span>
+                </td>
+                <td>
+                  <span :class="`ss-dash-status ss-dash-status-${Math.floor(((r.status_code as number) || (r.statusCode as number) || 200) / 100)}xx`">
+                    {{ r.status_code || r.statusCode }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    :class="`ss-dash-duration ${((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0) > 500 ? 'ss-dash-very-slow' : ((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0) > 100 ? 'ss-dash-slow' : ''}`"
+                  >
+                    {{ ((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0).toFixed(1) }}ms
+                  </span>
+                </td>
+                <td>
+                  <span style="color: var(--ss-muted); text-align: center">
+                    {{ (r.span_count as number) || (r.spanCount as number) || 0 }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    v-if="((r.warning_count as number) || (r.warningCount as number) || 0) > 0"
+                    style="color: var(--ss-amber-fg); text-align: center; display: block"
+                  >
+                    {{ (r.warning_count as number) || (r.warningCount as number) || 0 }}
+                  </span>
+                  <span v-else style="color: var(--ss-dim); text-align: center; display: block">-</span>
+                </td>
+                <td>
+                  <span
+                    class="ss-dash-event-time"
+                    :title="formatTime(((r.createdAt as string) || (r.created_at as string) || (r.timestamp as string) || '') as string)"
+                  >
+                    {{ timeAgo(((r.createdAt as string) || (r.created_at as string) || (r.timestamp as string) || '') as string) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="ss-dash-empty">No requests recorded yet</div>
+        </div>
+        <PaginationControls
+          v-if="pagination.totalPages > 1"
+          :page="pagination.page"
+          :last-page="pagination.totalPages"
+          :total="pagination.total"
+          @page-change="goToPage"
+        />
+      </template>
+    </template>
   </div>
 </template>

@@ -3,7 +3,7 @@
  * SQL queries table tab for the debug panel.
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { formatDuration, durationSeverity, timeAgo } from '../../../../core/index.js'
+import { formatDuration, durationSeverity, formatTime, timeAgo } from '../../../../core/index.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { QueryRecord } from '../../../../core/index.js'
 
@@ -29,10 +29,34 @@ const queries = computed<QueryRecord[]>(() => {
   )
 })
 
-const summary = computed(() => {
+const allQueries = computed<QueryRecord[]>(() => {
+  if (!props.data) return []
   const d = props.data
-  const arr = d ? (Array.isArray(d) ? d : d.queries) || [] : []
-  return `${arr.length} queries`
+  return (Array.isArray(d) ? d : d.queries) || []
+})
+
+const dupCounts = computed(() => {
+  const counts: Record<string, number> = {}
+  for (const q of allQueries.value) {
+    counts[q.sql] = (counts[q.sql] || 0) + 1
+  }
+  return counts
+})
+
+const summaryStats = computed(() => {
+  const all = allQueries.value
+  const slowCount = all.filter((q) => q.duration > 100).length
+  const dupCount = Object.values(dupCounts.value).filter((c) => c > 1).length
+  const avgDuration = all.length > 0 ? all.reduce((sum, q) => sum + q.duration, 0) / all.length : 0
+  return { slowCount, dupCount, avgDuration }
+})
+
+const summary = computed(() => {
+  let s = `${queries.value.length} queries`
+  if (summaryStats.value.slowCount > 0) s += ` | ${summaryStats.value.slowCount} slow`
+  if (summaryStats.value.dupCount > 0) s += ` | ${summaryStats.value.dupCount} dup`
+  if (queries.value.length > 0) s += ` | avg ${formatDuration(summaryStats.value.avgDuration)}`
+  return s
 })
 
 function toggleExpand(id: number) {
@@ -88,39 +112,30 @@ onBeforeUnmount(() => {
         <tr>
           <th>#</th>
           <th>SQL</th>
+          <th>Duration</th>
           <th>Method</th>
           <th>Model</th>
-          <th>Duration</th>
           <th>Time</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="q in queries" :key="q.id">
-          <td class="ss-dbg-c-dim">{{ q.id }}</td>
+          <td class="ss-dbg-c-dim" style="white-space: nowrap">{{ q.id }}</td>
           <td>
             <span
               :class="['ss-dbg-sql', { 'ss-dbg-expanded': isExpanded(q.id) }]"
+              role="button"
+              tabindex="0"
               @click="toggleExpand(q.id)"
+              @keydown.enter="toggleExpand(q.id)"
             >
               {{ q.sql }}
             </span>
-            <a
-              v-if="dashboardPath"
-              :href="`${dashboardPath}#queries?id=${q.id}`"
-              target="_blank"
-              class="ss-dbg-deeplink"
-            >
-              <svg
-                viewBox="0 0 16 16"
-                width="12"
-                height="12"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-              >
-                <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
-              </svg>
-            </a>
+            <span v-if="dupCounts[q.sql] > 1" class="ss-dbg-dup"> x{{ dupCounts[q.sql] }}</span>
+            <span v-if="q.inTransaction" class="ss-dbg-dup"> TXN</span>
+          </td>
+          <td :class="['ss-dbg-duration', durationClass(q.duration)]">
+            {{ formatDuration(q.duration) }}
           </td>
           <td>
             <span :class="`ss-dbg-method ss-dbg-method-${q.method.toLowerCase()}`">
@@ -128,12 +143,7 @@ onBeforeUnmount(() => {
             </span>
           </td>
           <td class="ss-dbg-c-muted">{{ q.model || '-' }}</td>
-          <td>
-            <span :class="['ss-dbg-duration', durationClass(q.duration)]">
-              {{ formatDuration(q.duration) }}
-            </span>
-          </td>
-          <td class="ss-dbg-event-time">{{ timeAgo(q.timestamp) }}</td>
+          <td class="ss-dbg-event-time" :title="formatTime(q.timestamp)">{{ timeAgo(q.timestamp) }}</td>
         </tr>
       </tbody>
     </table>

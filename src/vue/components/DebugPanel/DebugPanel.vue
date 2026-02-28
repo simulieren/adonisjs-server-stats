@@ -15,6 +15,7 @@ import type {
   DebugPane,
   DebugTab,
 } from "../../../core/index.js";
+import { TAB_ICONS } from "../../../core/index.js";
 import ThemeToggle from "../shared/ThemeToggle.vue";
 
 // Lazy-loaded tab components
@@ -59,6 +60,9 @@ const { features } = useFeatures({
 const dashboardEndpoint = props.dashboardPath
   ? props.dashboardPath.replace(/\/+$/, "") + "/api"
   : undefined;
+
+const isCustomTab = computed(() => activeTab.value.startsWith("custom-"));
+const isSelfManagedTab = computed(() => isCustomTab.value || activeTab.value === 'internals');
 
 const {
   data,
@@ -166,9 +170,16 @@ defineExpose({ toggle, open, close });
         <button
           v-for="tab in TABS"
           :key="tab.id"
+          type="button"
           :class="['ss-dbg-tab', { 'ss-dbg-active': activeTab === tab.id }]"
           @click="selectTab(tab.id)"
         >
+          <svg
+            v-if="TAB_ICONS[tab.id]"
+            class="ss-dbg-tab-icon"
+            :viewBox="TAB_ICONS[tab.id].viewBox"
+            v-html="TAB_ICONS[tab.id].elements.join('')"
+          ></svg>
           {{ tab.label }}
         </button>
       </div>
@@ -194,35 +205,37 @@ defineExpose({ toggle, open, close });
           v-if="dashboardPath && features.dashboard"
           :href="dashboardPath"
           target="_blank"
+          rel="noopener noreferrer"
           class="ss-dbg-dashboard-link"
-          title="Open full dashboard"
+          title="Open dashboard"
         >
           <svg
-            viewBox="0 0 16 16"
             width="14"
             height="14"
+            :viewBox="TAB_ICONS['external-link'].viewBox"
             fill="none"
             stroke="currentColor"
             stroke-width="2"
-          >
-            <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
-          </svg>
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            v-html="TAB_ICONS['external-link'].elements.join('')"
+          ></svg>
         </a>
 
         <ThemeToggle />
 
-        <button class="ss-dbg-close" @click="close">&times;</button>
+        <button type="button" class="ss-dbg-close" @click="close" title="Close panel">&times;</button>
       </div>
     </div>
 
     <!-- Tab content -->
     <div class="ss-dbg-content">
-      <!-- Loading state -->
-      <div v-if="loading && !data" class="ss-dbg-empty">Loading...</div>
+      <!-- Loading state (skip for custom tabs - they handle their own state) -->
+      <div v-if="loading && !data && !isSelfManagedTab" class="ss-dbg-empty">Loading...</div>
 
-      <!-- Error state -->
+      <!-- Error state (skip for custom tabs - they handle their own state) -->
       <div
-        v-else-if="error"
+        v-else-if="error && !isSelfManagedTab"
         class="ss-dbg-empty"
         style="color: var(--ss-red-fg)"
       >
@@ -263,7 +276,13 @@ defineExpose({ toggle, open, close });
         <CacheTab v-else-if="activeTab === 'cache'" :data="data" />
         <JobsTab v-else-if="activeTab === 'jobs'" :data="data" />
         <ConfigTab v-else-if="activeTab === 'config'" :data="data" />
-        <InternalsTab v-else-if="activeTab === 'internals'" :data="data" />
+        <InternalsTab
+          v-else-if="activeTab === 'internals'"
+          :data="data"
+          :base-url="baseUrl"
+          :debug-endpoint="debugEndpoint"
+          :auth-token="authToken"
+        />
         <CustomPaneTab
           v-else-if="activeTab.startsWith('custom-')"
           :pane="getCustomPane(activeTab)!"

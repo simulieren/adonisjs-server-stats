@@ -385,6 +385,18 @@ export interface DevToolbarOptions {
    * @default '/admin/api/debug'
    */
   debugEndpoint?: string
+
+  /**
+   * Client-side rendering library for the Edge integration.
+   *
+   * - `'preact'` — lightweight Preact + React-compat components (default)
+   * - `'vue'` — Vue 3 components (ideal if your app already uses Vue / Inertia)
+   *
+   * Both renderers share the same CSS and JSON config; only the JS bundle differs.
+   *
+   * @default 'preact'
+   */
+  renderer?: 'preact' | 'vue'
 }
 
 // ---------------------------------------------------------------------------

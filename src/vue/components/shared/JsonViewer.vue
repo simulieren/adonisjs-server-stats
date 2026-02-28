@@ -5,12 +5,19 @@
 import { ref, computed } from 'vue'
 import { compactPreview } from '../../../core/index.js'
 
-const props = defineProps<{
-  /** The value to display (object, array, or primitive). */
-  value: unknown
-  /** Maximum preview length. */
-  maxLen?: number
-}>()
+const props = withDefaults(
+  defineProps<{
+    /** The value to display (object, array, or primitive). */
+    value: unknown
+    /** Maximum preview length. */
+    maxLen?: number
+    /** CSS class prefix: 'ss-dash' for dashboard, 'ss-dbg' for debug panel. */
+    classPrefix?: 'ss-dash' | 'ss-dbg'
+  }>(),
+  {
+    classPrefix: 'ss-dash',
+  }
+)
 
 const expanded = ref(false)
 
@@ -48,18 +55,26 @@ function copyToClipboard() {
 </script>
 
 <template>
-  <div class="ss-dbg-data-cell">
-    <span class="ss-dbg-data-preview" @click="toggle">
+  <span v-if="value === null || value === undefined" :class="`ss-dim ${props.classPrefix}-c-dim`">-</span>
+  <div v-else :class="`${props.classPrefix}-data-cell`">
+    <span
+      :class="`${props.classPrefix}-data-preview`"
+      role="button"
+      :tabindex="0"
+      @click="toggle"
+      @keydown="(e: KeyboardEvent) => e.key === 'Enter' && toggle()"
+    >
       {{ preview }}
     </span>
-    <button
-      v-if="value !== null && value !== undefined"
-      class="ss-dbg-copy-btn"
-      title="Copy JSON"
-      @click.stop="copyToClipboard"
-    >
-      &#x2398;
-    </button>
-    <pre v-if="expanded" class="ss-dbg-data-full" @click="toggle">{{ fullJson }}</pre>
+    <div v-if="expanded" :class="`${props.classPrefix}-data-full`" @click="toggle">
+      <button
+        :class="`${props.classPrefix}-copy-btn`"
+        title="Copy to clipboard"
+        @click.stop="copyToClipboard"
+      >
+        Copy
+      </button>
+      <pre>{{ fullJson }}</pre>
+    </div>
   </div>
 </template>

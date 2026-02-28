@@ -5,7 +5,7 @@
  * Supports sortable columns, row click handlers,
  * and slot-based cell rendering.
  */
-import { computed, ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 
 export interface Column {
@@ -19,10 +19,13 @@ export interface Column {
 const props = defineProps<{
   columns: Column[]
   rows: Record<string, unknown>[]
+  keyField?: string
   sortColumn?: string
   sortDirection?: 'asc' | 'desc'
   emptyMessage?: string
   clickable?: boolean
+  rowClassName?: string
+  className?: string
 }>()
 
 const emit = defineEmits<{
@@ -34,12 +37,6 @@ function handleSort(col: Column) {
   if (col.sortable) {
     emit('sort', col.key)
   }
-}
-
-function getSortIcon(col: Column): string {
-  if (!col.sortable) return ''
-  if (props.sortColumn !== col.key) return ' \u2195'
-  return props.sortDirection === 'asc' ? ' \u2191' : ' \u2193'
 }
 
 const tableRef = ref<HTMLTableElement | null>(null)
@@ -67,44 +64,42 @@ onBeforeUnmount(() => {
     {{ emptyMessage || 'No data' }}
   </div>
 
-  <div v-else class="ss-dash-table-wrap">
-    <table ref="tableRef" class="ss-dash-table">
-      <colgroup>
-        <col
+  <table v-else ref="tableRef" :class="`ss-dash-table ${className || ''}`">
+    <colgroup>
+      <col
+        v-for="col in columns"
+        :key="col.key"
+        :style="col.width ? { width: col.width } : undefined"
+      />
+    </colgroup>
+    <thead>
+      <tr>
+        <th
           v-for="col in columns"
           :key="col.key"
-          :style="col.width ? { width: col.width } : undefined"
-        />
-      </colgroup>
-      <thead>
-        <tr>
-          <th
-            v-for="col in columns"
-            :key="col.key"
-            :style="{
-              textAlign: col.align || 'left',
-              cursor: col.sortable ? 'pointer' : 'default',
-            }"
-            @click="handleSort(col)"
-          >
-            {{ col.label }}{{ getSortIcon(col) }}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="(row, index) in rows"
-          :key="index"
-          :style="{ cursor: clickable ? 'pointer' : 'default' }"
-          @click="clickable ? emit('rowClick', row, index) : undefined"
+          :class="col.sortable ? 'ss-dash-sortable' : ''"
+          @click="handleSort(col)"
         >
-          <td v-for="col in columns" :key="col.key" :style="{ textAlign: col.align || 'left' }">
-            <slot :name="`cell-${col.key}`" :value="row[col.key]" :row="row" :index="index">
-              {{ row[col.key] ?? '-' }}
-            </slot>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+          {{ col.label }}
+          <span v-if="col.sortable && sortColumn === col.key" class="ss-dash-sort-arrow">
+            {{ sortDirection === 'asc' ? ' \u25B2' : ' \u25BC' }}
+          </span>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr
+        v-for="(row, index) in rows"
+        :key="row[keyField || 'id'] ?? index"
+        :class="[clickable ? 'ss-dash-clickable' : '', rowClassName || ''].filter(Boolean).join(' ')"
+        @click="clickable ? emit('rowClick', row, index) : undefined"
+      >
+        <td v-for="col in columns" :key="col.key">
+          <slot :name="`cell-${col.key}`" :value="row[col.key]" :row="row" :index="index">
+            {{ row[col.key] ?? '-' }}
+          </slot>
+        </td>
+      </tr>
+    </tbody>
+  </table>
 </template>

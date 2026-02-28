@@ -3,7 +3,7 @@
  * Emails table with preview tab for the debug panel.
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { timeAgo } from '../../../../core/index.js'
+import { timeAgo, formatTime } from '../../../../core/index.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import type { EmailRecord } from '../../../../core/index.js'
 
@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
             </span>
           </div>
         </div>
-        <button class="ss-dbg-close" @click="closePreview">&times;</button>
+        <button type="button" class="ss-dbg-btn-clear" @click="closePreview">&times;</button>
       </div>
       <iframe
         v-if="previewEmail.html"
@@ -113,49 +113,31 @@ onBeforeUnmount(() => {
         <thead>
           <tr>
             <th>#</th>
-            <th>Subject</th>
+            <th>From</th>
             <th>To</th>
-            <th>Mailer</th>
+            <th>Subject</th>
             <th>Status</th>
-            <th>Att.</th>
+            <th>Mailer</th>
+            <th title="Attachments">&#x1F4CE;</th>
             <th>Time</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="e in emails" :key="e.id" class="ss-dbg-email-row" @click="openPreview(e)">
-            <td class="ss-dbg-c-dim">{{ e.id }}</td>
-            <td class="ss-dbg-c-text">
-              {{ e.subject }}
-              <a
-                v-if="dashboardPath"
-                :href="`${dashboardPath}#emails?id=${e.id}`"
-                target="_blank"
-                class="ss-dbg-deeplink"
-                @click.stop
-              >
-                <svg
-                  viewBox="0 0 16 16"
-                  width="12"
-                  height="12"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
-                </svg>
-              </a>
-            </td>
-            <td class="ss-dbg-c-secondary">{{ e.to }}</td>
-            <td class="ss-dbg-c-muted">{{ e.mailer }}</td>
+            <td class="ss-dbg-c-dim" style="white-space: nowrap">{{ e.id }}</td>
+            <td class="ss-dbg-c-secondary" :title="e.from">{{ e.from }}</td>
+            <td class="ss-dbg-c-secondary" :title="e.to">{{ e.to }}</td>
+            <td class="ss-dbg-c-sql">{{ e.subject }}</td>
             <td>
               <span :class="['ss-dbg-email-status', statusClass(e.status)]">
                 {{ e.status }}
               </span>
             </td>
+            <td class="ss-dbg-c-muted">{{ e.mailer }}</td>
             <td class="ss-dbg-c-dim" style="text-align: center">
-              {{ e.attachmentCount || 0 }}
+              {{ e.attachmentCount > 0 ? e.attachmentCount : '-' }}
             </td>
-            <td class="ss-dbg-event-time">{{ timeAgo(e.timestamp) }}</td>
+            <td class="ss-dbg-event-time" :title="formatTime(e.timestamp)">{{ timeAgo(e.timestamp) }}</td>
           </tr>
         </tbody>
       </table>

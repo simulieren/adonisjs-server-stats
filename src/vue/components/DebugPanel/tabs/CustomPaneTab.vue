@@ -69,13 +69,13 @@ function formatCell(value: unknown, col: DebugPaneColumn): string {
   const fmt = col.format || 'text'
   switch (fmt) {
     case 'time':
-      return formatTime(value as number | string)
+      return typeof value === 'number' ? timeAgo(value) : String(value)
     case 'timeAgo':
       return timeAgo(value as number | string)
     case 'duration':
       return formatDuration(typeof value === 'number' ? value : parseFloat(String(value)))
     case 'method':
-      return String(value).toUpperCase()
+      return String(value)
     case 'json': {
       let parsed: unknown = value
       if (typeof value === 'string') {
@@ -83,7 +83,7 @@ function formatCell(value: unknown, col: DebugPaneColumn): string {
           parsed = JSON.parse(value)
         } catch {}
       }
-      return compactPreview(parsed, 100)
+      return compactPreview(parsed, 80)
     }
     case 'badge':
       return String(value)
@@ -92,13 +92,23 @@ function formatCell(value: unknown, col: DebugPaneColumn): string {
   }
 }
 
-function cellClass(value: unknown, col: DebugPaneColumn): string {
-  if (col.format === 'duration') {
-    const ms = typeof value === 'number' ? value : parseFloat(String(value))
-    if (ms > 500) return 'ss-dbg-very-slow'
-    if (ms > 100) return 'ss-dbg-slow'
+function cellTitle(value: unknown, col: DebugPaneColumn): string | undefined {
+  if (col.format === 'time' || col.format === 'timeAgo') {
+    return formatTime(value as number | string)
   }
-  return ''
+  return undefined
+}
+
+function isNullish(value: unknown): boolean {
+  return value === null || value === undefined
+}
+
+function durationClass(value: unknown): string {
+  const ms = typeof value === 'number' ? value : parseFloat(String(value))
+  if (isNaN(ms)) return 'ss-dbg-duration'
+  if (ms > 500) return 'ss-dbg-duration ss-dbg-very-slow'
+  if (ms > 100) return 'ss-dbg-duration ss-dbg-slow'
+  return 'ss-dbg-duration'
 }
 
 function badgeColor(value: unknown, col: DebugPaneColumn): string {
@@ -165,23 +175,42 @@ onBeforeUnmount(() => {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(row, i) in filteredData" :key="i">
+        <tr v-for="(row, i) in filteredData" :key="row.id ?? i">
           <td
             v-for="col in pane.columns"
             :key="col.key"
-            :class="[cellClass(row[col.key], col), { 'ss-dbg-filterable': col.filterable }]"
+            :class="{ 'ss-dbg-filterable': col.filterable }"
             @click="col.filterable ? (search = String(row[col.key])) : undefined"
           >
-            <template v-if="col.format === 'badge'">
-              <span :class="`ss-dbg-badge ss-dbg-badge-${badgeColor(row[col.key], col)}`">
+            <!-- null / undefined -->
+            <template v-if="isNullish(row[col.key])">
+              <span class="ss-dbg-c-dim">-</span>
+            </template>
+            <!-- time / timeAgo -->
+            <template v-else-if="col.format === 'time' || col.format === 'timeAgo'">
+              <span class="ss-dbg-event-time" :title="cellTitle(row[col.key], col)">
                 {{ formatCell(row[col.key], col) }}
               </span>
             </template>
+            <!-- duration -->
+            <template v-else-if="col.format === 'duration'">
+              <span :class="durationClass(row[col.key])">
+                {{ formatCell(row[col.key], col) }}
+              </span>
+            </template>
+            <!-- method -->
             <template v-else-if="col.format === 'method'">
               <span :class="methodClass(row[col.key])">
                 {{ formatCell(row[col.key], col) }}
               </span>
             </template>
+            <!-- badge -->
+            <template v-else-if="col.format === 'badge'">
+              <span :class="`ss-dbg-badge ss-dbg-badge-${badgeColor(row[col.key], col)}`">
+                {{ formatCell(row[col.key], col) }}
+              </span>
+            </template>
+            <!-- json / text / default -->
             <template v-else>
               {{ formatCell(row[col.key], col) }}
             </template>

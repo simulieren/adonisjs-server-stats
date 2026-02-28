@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
 
     <!-- Key detail -->
     <div v-if="selectedKey" class="ss-dbg-cache-detail">
-      <button class="ss-dbg-close" @click="selectedKey = null">&larr; Back</button>
+      <button type="button" class="ss-dbg-btn-clear" @click="selectedKey = null">&larr; Back</button>
       <div style="margin-top: 8px">
         <strong>{{ selectedKey.key }}</strong>
         <span class="ss-dbg-c-muted" style="margin-left: 8px">
@@ -137,7 +137,7 @@ onBeforeUnmount(() => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="k in keys" :key="k.key" style="cursor: pointer" @click="selectedKey = k">
+          <tr v-for="k in keys" :key="k.key" class="ss-dbg-email-row" @click="selectedKey = k">
             <td class="ss-dbg-c-sql">{{ k.key }}</td>
             <td class="ss-dbg-c-muted">{{ k.type }}</td>
             <td class="ss-dbg-c-dim">{{ formatTtl(k.ttl) }}</td>

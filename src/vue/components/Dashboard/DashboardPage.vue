@@ -2,344 +2,437 @@
 /**
  * Full page dashboard with sidebar navigation.
  *
- * Uses hash-based routing for SPA-like navigation
- * with lazy-loaded sections.
+ * Mirrors React DashboardPage.tsx structure exactly:
+ * - SSE subscription via transmit-adapter for live updates
+ * - Hash-based routing with deep linking
+ * - Sidebar navigation with badges and custom panes
+ * - Each section fetches its own data via provide/inject
  */
 import {
   ref,
   computed,
+  watch,
+  provide,
   onMounted,
   onUnmounted,
   defineAsyncComponent,
-} from "vue";
-import { useDashboardData } from "../../composables/useDashboardData.js";
-import { useFeatures } from "../../composables/useFeatures.js";
-import { useTheme } from "../../composables/useTheme.js";
-import type { DashboardConfig, DashboardSection } from "../../../core/index.js";
-import ThemeToggle from "../shared/ThemeToggle.vue";
+} from 'vue'
+
+import { subscribeToChannel } from '../../../core/transmit-adapter.js'
+import { useFeatures } from '../../composables/useFeatures.js'
+import { useTheme } from '../../composables/useTheme.js'
+import { useDashboardData } from '../../composables/useDashboardData.js'
+import type { DashboardSection, OverviewMetrics } from '../../../core/types.js'
+import { TAB_ICONS } from '../../../core/icons.js'
+import type { DebugPane } from '../../../debug/types.js'
+import ThemeToggle from '../shared/ThemeToggle.vue'
 
 // Lazy-loaded sections
 const OverviewSection = defineAsyncComponent(
-  () => import("./sections/OverviewSection.vue"),
-);
+  () => import('./sections/OverviewSection.vue'),
+)
 const RequestsSection = defineAsyncComponent(
-  () => import("./sections/RequestsSection.vue"),
-);
+  () => import('./sections/RequestsSection.vue'),
+)
 const QueriesSection = defineAsyncComponent(
-  () => import("./sections/QueriesSection.vue"),
-);
+  () => import('./sections/QueriesSection.vue'),
+)
 const EventsSection = defineAsyncComponent(
-  () => import("./sections/EventsSection.vue"),
-);
+  () => import('./sections/EventsSection.vue'),
+)
 const RoutesSection = defineAsyncComponent(
-  () => import("./sections/RoutesSection.vue"),
-);
+  () => import('./sections/RoutesSection.vue'),
+)
 const LogsSection = defineAsyncComponent(
-  () => import("./sections/LogsSection.vue"),
-);
+  () => import('./sections/LogsSection.vue'),
+)
 const EmailsSection = defineAsyncComponent(
-  () => import("./sections/EmailsSection.vue"),
-);
+  () => import('./sections/EmailsSection.vue'),
+)
 const TimelineSection = defineAsyncComponent(
-  () => import("./sections/TimelineSection.vue"),
-);
+  () => import('./sections/TimelineSection.vue'),
+)
 const CacheSection = defineAsyncComponent(
-  () => import("./sections/CacheSection.vue"),
-);
+  () => import('./sections/CacheSection.vue'),
+)
 const JobsSection = defineAsyncComponent(
-  () => import("./sections/JobsSection.vue"),
-);
+  () => import('./sections/JobsSection.vue'),
+)
 const ConfigSection = defineAsyncComponent(
-  () => import("./sections/ConfigSection.vue"),
-);
+  () => import('./sections/ConfigSection.vue'),
+)
 const InternalsSection = defineAsyncComponent(
-  () => import("./sections/InternalsSection.vue"),
-);
+  () => import('./sections/InternalsSection.vue'),
+)
 
-const props = withDefaults(defineProps<DashboardConfig>(), {
-  baseUrl: "",
-  dashboardEndpoint: "/__stats/api",
-  tracingEnabled: false,
-});
+/** All built-in section IDs used for hash-route validation. */
+const VALID_SECTIONS: DashboardSection[] = [
+  'overview',
+  'requests',
+  'queries',
+  'events',
+  'routes',
+  'logs',
+  'emails',
+  'timeline',
+  'cache',
+  'jobs',
+  'config',
+  'internals',
+]
 
-const { theme, toggleTheme } = useTheme();
+const props = withDefaults(
+  defineProps<{
+    baseUrl?: string
+    dashboardEndpoint?: string
+    debugEndpoint?: string
+    authToken?: string
+    backUrl?: string
+    channelName?: string
+  }>(),
+  {
+    baseUrl: '',
+    dashboardEndpoint: '/__stats/api',
+    debugEndpoint: undefined,
+    authToken: undefined,
+    backUrl: '/',
+    channelName: 'server-stats/dashboard',
+  },
+)
+
+const { theme, toggleTheme } = useTheme()
 const { features } = useFeatures({
   baseUrl: props.baseUrl,
-  debugEndpoint: props.dashboardEndpoint?.replace("/api", "") || "/__stats",
+  debugEndpoint: props.debugEndpoint,
   authToken: props.authToken,
-});
+})
 
-const activeSection = ref<DashboardSection>("overview");
-const sidebarCollapsed = ref(false);
+const activeSection = ref<DashboardSection>('overview')
+const sidebarCollapsed = ref(false)
+const isConnected = ref(false)
+const refreshKey = ref(0)
 
-// Initialize from hash
+// Provide values for child sections to inject
+provide('ss-refresh-key', refreshKey)
+provide('ss-base-url', props.baseUrl)
+provide('ss-dashboard-endpoint', props.dashboardEndpoint)
+provide('ss-debug-endpoint', props.debugEndpoint)
+provide('ss-auth-token', props.authToken)
+
+// Initialize sidebar state from localStorage
+if (typeof window !== 'undefined') {
+  sidebarCollapsed.value = localStorage.getItem('ss-dash-sidebar') === 'collapsed'
+}
+
+// SSE subscription for live updates
+let unsubscribeSSE: (() => void) | null = null
+
+function setupSSE() {
+  if (unsubscribeSSE) {
+    unsubscribeSSE()
+    unsubscribeSSE = null
+  }
+
+  if (!props.channelName) return
+
+  const sub = subscribeToChannel({
+    baseUrl: props.baseUrl,
+    channelName: props.channelName,
+    authToken: props.authToken,
+    onMessage: () => {
+      refreshKey.value += 1
+    },
+    onConnect: () => {
+      isConnected.value = true
+    },
+    onDisconnect: () => {
+      isConnected.value = false
+    },
+    onError: () => {
+      isConnected.value = false
+    },
+  })
+
+  unsubscribeSSE = sub.unsubscribe
+}
+
 onMounted(() => {
-  const stored = localStorage.getItem("ss-dash-sidebar");
-  sidebarCollapsed.value = stored === "collapsed";
-
-  readHash();
-  window.addEventListener("hashchange", readHash);
-});
+  setupSSE()
+})
 
 onUnmounted(() => {
-  window.removeEventListener("hashchange", readHash);
-});
+  if (unsubscribeSSE) {
+    unsubscribeSSE()
+    unsubscribeSSE = null
+  }
+})
 
+// Custom panes from features
+const customPanes = computed<DebugPane[]>(() => features.value.customPanes || [])
+
+/** Resolve a hash fragment to a validated section ID, falling back to 'overview'. */
+function resolveHashSection(hash: string): DashboardSection {
+  const section = hash.replace('#', '').split('?')[0]
+  if (!section) return 'overview'
+  const allValid: string[] = [
+    ...VALID_SECTIONS,
+    ...customPanes.value.map((p: DebugPane) => p.id),
+  ]
+  return allValid.includes(section) ? (section as DashboardSection) : 'overview'
+}
+
+// Hash-based routing
 function readHash() {
-  const hash = window.location.hash.replace("#", "").split("?")[0];
-  if (hash && SECTIONS.some((s) => s.id === hash)) {
-    activeSection.value = hash as DashboardSection;
+  const section = resolveHashSection(window.location.hash)
+  if (section !== activeSection.value) {
+    activeSection.value = section
   }
 }
 
-const {
-  data,
-  loading,
-  error,
-  isUnauthorized,
-  pagination,
-  timeRange,
-  goToPage,
-  setSearch,
-  setFilter,
-  setSort,
-  setTimeRange,
-  refresh,
-  fetchChart,
-  fetchGroupedQueries,
-  explainQuery,
-  retryJob,
-  deleteCacheKey,
-  fetchEmailPreview,
-} = useDashboardData(() => activeSection.value, {
+// Parse hash for deep linking on mount
+onMounted(() => {
+  if (typeof window === 'undefined') return
+  const section = resolveHashSection(window.location.hash)
+  if (section !== 'overview' || window.location.hash) {
+    activeSection.value = section
+  }
+  window.addEventListener('hashchange', readHash)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('hashchange', readHash)
+})
+
+// Update hash when section changes
+watch(activeSection, (section) => {
+  if (typeof window !== 'undefined') {
+    window.location.hash = section
+  }
+})
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  localStorage.setItem(
+    'ss-dash-sidebar',
+    sidebarCollapsed.value ? 'collapsed' : 'expanded',
+  )
+}
+
+function navigateTo(section: DashboardSection) {
+  if (section !== activeSection.value) {
+    activeSection.value = section
+  }
+}
+
+// Built-in section definitions
+const builtInSections = computed(() => [
+  { id: 'overview' as DashboardSection, label: 'Overview', visible: true },
+  { id: 'requests' as DashboardSection, label: 'Requests', visible: true },
+  { id: 'queries' as DashboardSection, label: 'Queries', visible: true },
+  { id: 'events' as DashboardSection, label: 'Events', visible: true },
+  { id: 'routes' as DashboardSection, label: 'Routes', visible: true },
+  { id: 'logs' as DashboardSection, label: 'Logs', visible: true },
+  { id: 'emails' as DashboardSection, label: 'Emails', visible: true },
+  { id: 'timeline' as DashboardSection, label: 'Timeline', visible: features.value.tracing },
+  { id: 'cache' as DashboardSection, label: 'Cache', visible: features.value.cache },
+  { id: 'jobs' as DashboardSection, label: 'Jobs', visible: features.value.queues },
+  { id: 'config' as DashboardSection, label: 'Config', visible: true },
+  { id: 'internals' as DashboardSection, label: 'Internals', visible: true },
+])
+
+const visibleSections = computed(() => builtInSections.value.filter((s) => s.visible))
+
+// Fetch overview metrics for sidebar nav badges
+const { data: overviewRawData } = useDashboardData(() => 'overview', {
   baseUrl: props.baseUrl,
   dashboardEndpoint: props.dashboardEndpoint,
   authToken: props.authToken,
-});
+  refreshKey,
+})
+const overviewData = computed(() => overviewRawData.value as OverviewMetrics | null)
 
-// Section definitions
-interface SectionDef {
-  id: DashboardSection;
-  label: string;
-  icon: string;
-  show?: () => boolean;
+/** Badge counts for sidebar nav items. */
+const navBadges = computed(() => {
+  const badges: Partial<Record<DashboardSection, { count: number; variant?: string }>> = {}
+  if (!overviewData.value) return badges
+
+  if (overviewData.value.totalRequests > 0) {
+    badges.requests = { count: overviewData.value.totalRequests }
+  }
+
+  if (overviewData.value.queryStats?.total > 0) {
+    badges.queries = { count: overviewData.value.queryStats.total }
+  }
+
+  if (overviewData.value.logLevelBreakdown) {
+    const b = overviewData.value.logLevelBreakdown
+    const totalLogs = b.error + b.warn + b.info + b.debug
+    if (totalLogs > 0) {
+      badges.logs = { count: totalLogs }
+    }
+  }
+
+  return badges
+})
+
+/** Section component map for rendering active pane. */
+const sectionComponents: Record<string, ReturnType<typeof defineAsyncComponent>> = {
+  overview: OverviewSection,
+  requests: RequestsSection,
+  queries: QueriesSection,
+  events: EventsSection,
+  routes: RoutesSection,
+  logs: LogsSection,
+  emails: EmailsSection,
+  timeline: TimelineSection,
+  cache: CacheSection,
+  jobs: JobsSection,
+  config: ConfigSection,
+  internals: InternalsSection,
 }
 
-const SECTIONS: SectionDef[] = [
-  { id: "overview", label: "Overview", icon: "\u2302" },
-  { id: "requests", label: "Requests", icon: "\u21C4" },
-  { id: "queries", label: "Queries", icon: "\u2318" },
-  { id: "events", label: "Events", icon: "\u26A1" },
-  { id: "routes", label: "Routes", icon: "\u2630" },
-  { id: "logs", label: "Logs", icon: "\u2261" },
-  { id: "emails", label: "Emails", icon: "\u2709" },
-  { id: "timeline", label: "Timeline", icon: "\u23F1" },
-  { id: "cache", label: "Cache", icon: "\u26C1" },
-  { id: "jobs", label: "Jobs", icon: "\u2699" },
-  { id: "config", label: "Config", icon: "\u2699" },
-  { id: "internals", label: "Internals", icon: "\u2318" },
-];
+const activeSectionComponent = computed(() => sectionComponents[activeSection.value] || null)
 
-const visibleSections = computed(() =>
-  SECTIONS.filter((s) => {
-    if (s.id === "timeline" && !features.value.tracing && !props.tracingEnabled)
-      return false;
-    if (s.id === "cache" && !features.value.cache) return false;
-    if (s.id === "jobs" && !features.value.queues) return false;
-    return true;
-  }),
-);
-
-function navigateTo(section: DashboardSection) {
-  activeSection.value = section;
-  window.location.hash = section;
+/** Resolve icon key for a dashboard section, using the clock variant for timeline. */
+function sectionIconKey(sectionId: string): string {
+  return sectionId === 'timeline' ? 'dashboard-timeline' : sectionId
 }
-
-function toggleSidebar() {
-  sidebarCollapsed.value = !sidebarCollapsed.value;
-  localStorage.setItem(
-    "ss-dash-sidebar",
-    sidebarCollapsed.value ? "collapsed" : "expanded",
-  );
-}
-
-const themeAttr = computed(() => theme.value);
 </script>
 
 <template>
-  <div class="ss-dash" :data-theme="themeAttr">
+  <div class="ss-dash" :data-theme="theme" id="ss-dash">
     <!-- Header -->
-    <header class="ss-dash-header">
+    <div class="ss-dash-header">
       <div class="ss-dash-header-left">
         <span class="ss-dash-logo">Server Stats</span>
+        <span class="ss-dash-logo-sub">Dashboard</span>
+      </div>
+      <div class="ss-dash-header-center">
+        <span
+          :class="['ss-dash-live-dot', { 'ss-dash-connected': isConnected }]"
+          id="ss-dash-live-dot"
+        />
+        <span
+          :class="['ss-dash-live-label', { 'ss-dash-connected': isConnected }]"
+          id="ss-dash-live-label"
+        >
+          {{ isConnected ? 'Live' : 'Polling' }}
+        </span>
       </div>
       <div class="ss-dash-header-right">
-        <span class="ss-dash-live-indicator">
-          <span class="ss-dash-live-dot"></span>
-          Live
-        </span>
-        <ThemeToggle />
+        <ThemeToggle class-prefix="ss-dash" />
+        <a
+          v-if="backUrl"
+          :href="backUrl"
+          class="ss-dash-back-link"
+          title="Back to app"
+        >
+          &larr; App
+        </a>
       </div>
-    </header>
+    </div>
 
-    <div class="ss-dash-layout">
+    <!-- Body: sidebar + main -->
+    <div class="ss-dash-body">
       <!-- Sidebar -->
-      <nav
-        :class="[
-          'ss-dash-sidebar',
-          { 'ss-dash-sidebar-collapsed': sidebarCollapsed },
-        ]"
+      <div
+        :class="['ss-dash-sidebar', { 'ss-dash-collapsed': sidebarCollapsed }]"
+        id="ss-dash-sidebar"
       >
-        <div class="ss-dash-sidebar-items">
+        <nav class="ss-dash-nav">
           <button
             v-for="section in visibleSections"
             :key="section.id"
-            :class="[
-              'ss-dash-sidebar-item',
-              { 'ss-dash-sidebar-active': activeSection === section.id },
-            ]"
+            type="button"
+            :class="['ss-dash-nav-item', { 'ss-dash-active': activeSection === section.id }]"
+            :data-ss-section="section.id"
             @click="navigateTo(section.id)"
-            :title="section.label"
+            :title="sidebarCollapsed ? section.label : undefined"
           >
-            <span class="ss-dash-sidebar-icon">{{ section.icon }}</span>
-            <span v-if="!sidebarCollapsed" class="ss-dash-sidebar-label">{{
-              section.label
-            }}</span>
+            <span class="ss-dash-nav-icon">
+              <svg
+                width="20"
+                height="20"
+                :viewBox="(TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).viewBox"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                v-html="(TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).elements.join('')"
+              ></svg>
+            </span>
+            <span class="ss-dash-nav-label">{{ section.label }}</span>
+            <span
+              v-if="navBadges[section.id] && navBadges[section.id]!.count > 0"
+              :class="['ss-dash-nav-badge', navBadges[section.id]!.variant || '']"
+            >
+              {{ navBadges[section.id]!.count }}
+            </span>
           </button>
-        </div>
-        <button class="ss-dash-sidebar-toggle" @click="toggleSidebar">
-          {{ sidebarCollapsed ? "\u00BB" : "\u00AB" }}
+
+          <!-- Separator before custom panes -->
+          <div v-if="customPanes.length > 0" class="ss-dash-nav-sep" />
+
+          <!-- Custom pane nav items -->
+          <button
+            v-for="pane in customPanes"
+            :key="pane.id"
+            type="button"
+            :class="['ss-dash-nav-item', { 'ss-dash-active': activeSection === pane.id }]"
+            @click="navigateTo(pane.id)"
+            :title="sidebarCollapsed ? pane.label : undefined"
+          >
+            <span class="ss-dash-nav-icon">
+              <svg
+                width="20"
+                height="20"
+                :viewBox="TAB_ICONS['custom-pane'].viewBox"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                v-html="TAB_ICONS['custom-pane'].elements.join('')"
+              ></svg>
+            </span>
+            <span class="ss-dash-nav-label">{{ pane.label }}</span>
+          </button>
+        </nav>
+
+        <!-- Collapse toggle -->
+        <button
+          type="button"
+          class="ss-dash-sidebar-toggle"
+          id="ss-dash-sidebar-toggle"
+          @click="toggleSidebar"
+          :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+        >
+          <svg v-if="sidebarCollapsed" width="16" height="16" :viewBox="TAB_ICONS['chevron-right'].viewBox" fill="none" stroke="currentColor" stroke-width="1.5" v-html="TAB_ICONS['chevron-right'].elements.join('')"></svg>
+          <svg v-else width="16" height="16" :viewBox="TAB_ICONS['chevron-left'].viewBox" fill="none" stroke="currentColor" stroke-width="1.5" v-html="TAB_ICONS['chevron-left'].elements.join('')"></svg>
         </button>
-      </nav>
+      </div>
 
       <!-- Main content -->
-      <main class="ss-dash-main">
-        <!-- Unauthorized -->
-        <div v-if="isUnauthorized" class="ss-dash-empty">
-          Access denied. You do not have permission to view this dashboard.
-        </div>
-
-        <!-- Loading -->
-        <div v-else-if="loading && !data" class="ss-dash-empty">Loading...</div>
-
-        <!-- Error -->
+      <div class="ss-dash-main">
         <div
-          v-else-if="error"
-          class="ss-dash-empty"
-          style="color: var(--ss-red-fg)"
+          class="ss-dash-pane ss-dash-active"
+          :id="`ss-dash-pane-${activeSection}`"
         >
-          Error: {{ error.message }}
+          <div class="ss-dash-pane-inner">
+            <Suspense>
+              <component
+                :is="activeSectionComponent"
+                v-if="activeSectionComponent"
+              />
+              <div v-else class="ss-dash-empty">Unknown section</div>
+              <template #fallback>
+                <div class="ss-dash-empty">Loading...</div>
+              </template>
+            </Suspense>
+          </div>
         </div>
-
-        <!-- Section content -->
-        <template v-else>
-          <OverviewSection
-            v-if="activeSection === 'overview'"
-            :data="data"
-            :time-range="timeRange"
-            :on-fetch-chart="fetchChart"
-            @change-time-range="setTimeRange"
-            @navigate-to="navigateTo($event as DashboardSection)"
-          />
-
-          <RequestsSection
-            v-else-if="activeSection === 'requests'"
-            :data="data"
-            :page="pagination.page"
-            :per-page="pagination.perPage"
-            :total="pagination.total"
-            @go-to-page="goToPage"
-            @search="setSearch"
-          />
-
-          <QueriesSection
-            v-else-if="activeSection === 'queries'"
-            :data="data"
-            :page="pagination.page"
-            :per-page="pagination.perPage"
-            :total="pagination.total"
-            :on-explain-query="explainQuery"
-            :on-fetch-grouped="fetchGroupedQueries"
-            @go-to-page="goToPage"
-            @search="setSearch"
-          />
-
-          <EventsSection
-            v-else-if="activeSection === 'events'"
-            :data="data"
-            :page="pagination.page"
-            :per-page="pagination.perPage"
-            :total="pagination.total"
-            @go-to-page="goToPage"
-            @search="setSearch"
-          />
-
-          <RoutesSection v-else-if="activeSection === 'routes'" :data="data" />
-
-          <LogsSection
-            v-else-if="activeSection === 'logs'"
-            :data="data"
-            :page="pagination.page"
-            :per-page="pagination.perPage"
-            :total="pagination.total"
-            @go-to-page="goToPage"
-            @search="setSearch"
-            @filter="setFilter"
-          />
-
-          <EmailsSection
-            v-else-if="activeSection === 'emails'"
-            :data="data"
-            :page="pagination.page"
-            :per-page="pagination.perPage"
-            :total="pagination.total"
-            :on-fetch-preview="fetchEmailPreview"
-            @go-to-page="goToPage"
-            @search="setSearch"
-          />
-
-          <TimelineSection
-            v-else-if="activeSection === 'timeline'"
-            :data="data"
-            :page="pagination.page"
-            :per-page="pagination.perPage"
-            :total="pagination.total"
-            :base-url="baseUrl"
-            :dashboard-endpoint="dashboardEndpoint"
-            :auth-token="authToken"
-            @go-to-page="goToPage"
-            @search="setSearch"
-          />
-
-          <CacheSection
-            v-else-if="activeSection === 'cache'"
-            :data="data"
-            :on-delete-key="deleteCacheKey"
-          />
-
-          <JobsSection
-            v-else-if="activeSection === 'jobs'"
-            :data="data"
-            :page="pagination.page"
-            :per-page="pagination.perPage"
-            :total="pagination.total"
-            :on-retry-job="retryJob"
-            @go-to-page="goToPage"
-            @search="setSearch"
-            @filter="setFilter"
-          />
-
-          <ConfigSection v-else-if="activeSection === 'config'" :data="data" />
-
-          <InternalsSection
-            v-else-if="activeSection === 'internals'"
-            :data="data"
-            :base-url="baseUrl"
-            :dashboard-endpoint="dashboardEndpoint"
-            :auth-token="authToken"
-          />
-        </template>
-      </main>
+      </div>
     </div>
   </div>
 </template>

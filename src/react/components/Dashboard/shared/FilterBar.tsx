@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+import { TAB_ICONS } from '../../../../core/icons.js'
 
 interface FilterBarProps {
   search: string
@@ -34,16 +35,14 @@ export function FilterBar({
           className="ss-dash-search-icon"
           width="14"
           height="14"
-          viewBox="0 0 24 24"
+          viewBox={TAB_ICONS.search.viewBox}
           fill="none"
           stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
+          dangerouslySetInnerHTML={{ __html: TAB_ICONS.search.elements.join('') }}
+        />
         <input
           type="text"
           className="ss-dash-search"

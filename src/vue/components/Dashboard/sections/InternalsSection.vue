@@ -2,11 +2,11 @@
 /**
  * Internals diagnostics section for the dashboard.
  *
- * Fetches from the debug endpoint ({debugEndpoint}/diagnostics)
- * and renders 7 grouped tables showing runtime state.
+ * Self-contained: injects dependencies and fetches from the debug endpoint.
+ * CSS classes match the React InternalsSection / InternalsContent.
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { ApiClient } from '../../../../core/index.js'
+import { ref, computed, inject, watch, onMounted, onUnmounted, type Ref } from 'vue'
+import { ApiClient, UnauthorizedError, SECTION_REFRESH_MS } from '../../../../core/index.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,6 +37,7 @@ interface DiagnosticsResponse {
     version: string
     nodeVersion: string
     adonisVersion: string
+    uptime?: number
   }
   config: {
     intervalMs: number
@@ -85,57 +86,68 @@ interface DiagnosticsResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Props
+// Inject dependencies
 // ---------------------------------------------------------------------------
 
-const props = defineProps<{
-  data: unknown
-  baseUrl?: string
-  dashboardEndpoint?: string
-  authToken?: string
-}>()
+const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
+const baseUrl = inject<string>('ss-base-url', '')
+const debugEndpoint = inject<string>('ss-debug-endpoint', '/admin/api/debug')
+const authToken = inject<string | undefined>('ss-auth-token', undefined)
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
 const diagnostics = ref<DiagnosticsResponse | null>(null)
-const loading = ref(true)
+const isLoading = ref(true)
 const error = ref<Error | null>(null)
 const revealedKeys = ref(new Set<string>())
 
 // ---------------------------------------------------------------------------
-// Data fetching
+// Data fetching - from debug endpoint (not dashboard API)
 // ---------------------------------------------------------------------------
-
-const debugEndpoint = computed(() => {
-  const ep = props.dashboardEndpoint || '/__stats/api'
-  return ep.replace(/\/api$/, '')
-})
 
 let client: ApiClient
 let timer: ReturnType<typeof setInterval> | null = null
 
 async function fetchDiagnostics() {
   try {
-    const result = await client.fetch<DiagnosticsResponse>(`${debugEndpoint.value}/diagnostics`)
+    const result = await client.fetch<DiagnosticsResponse>(
+      `${debugEndpoint}/diagnostics`
+    )
     diagnostics.value = result
     error.value = null
+    isLoading.value = false
   } catch (err) {
-    error.value = err as Error
-  } finally {
-    loading.value = false
+    if (err instanceof UnauthorizedError) {
+      error.value = err
+      isLoading.value = false
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+      return
+    }
+    error.value = err instanceof Error ? err : new Error(String(err))
+    isLoading.value = false
   }
 }
 
 onMounted(() => {
-  client = new ApiClient({ baseUrl: props.baseUrl || '', authToken: props.authToken })
+  client = new ApiClient({ baseUrl, authToken })
+  isLoading.value = true
+  error.value = null
   fetchDiagnostics()
-  timer = setInterval(fetchDiagnostics, 10000)
+  timer = setInterval(fetchDiagnostics, SECTION_REFRESH_MS)
 })
 
 onUnmounted(() => {
   if (timer) clearInterval(timer)
+})
+
+// Re-fetch when SSE pushes an update
+watch(refreshKey, () => {
+  fetchDiagnostics()
 })
 
 // ---------------------------------------------------------------------------
@@ -189,31 +201,16 @@ function formatConfigValue(value: unknown): string {
   if (typeof value === 'number') return String(value)
   if (typeof value === 'string') return value
   if (Array.isArray(value)) return value.join(', ') || '-'
-  try {
-    return JSON.stringify(value)
-  } catch {
-    return String(value)
-  }
+  try { return JSON.stringify(value) } catch { return String(value) }
 }
 
 function isSecret(key: string): boolean {
   const lower = key.toLowerCase()
-  return (
-    lower.includes('password') ||
-    lower.includes('secret') ||
-    lower.includes('token') ||
-    lower.includes('key')
-  )
+  return lower.includes('password') || lower.includes('secret') || lower.includes('token') || lower.includes('key')
 }
 
-function formatCollectorConfig(
-  config: Record<string, unknown>
-): Array<{ key: string; value: string; secret: boolean }> {
-  return Object.entries(config).map(([k, v]) => ({
-    key: k,
-    value: formatConfigValue(v),
-    secret: isSecret(k),
-  }))
+function formatCollectorConfig(config: Record<string, unknown>): Array<{ key: string; value: string; secret: boolean }> {
+  return Object.entries(config).map(([k, v]) => ({ key: k, value: formatConfigValue(v), secret: isSecret(k) }))
 }
 
 const TIMER_LABELS: Record<string, string> = {
@@ -245,8 +242,7 @@ function integrationStatus(info: { active?: boolean; available?: boolean }): str
 }
 
 function dotClass(status: string): string {
-  if (['healthy', 'active', 'connected', 'available', 'ready'].includes(status))
-    return 'ss-dash-dot-ok'
+  if (['healthy', 'active', 'connected', 'available', 'ready'].includes(status)) return 'ss-dash-dot-ok'
   if (['errored', 'unavailable'].includes(status)) return 'ss-dash-dot-err'
   return ''
 }
@@ -254,10 +250,8 @@ function dotClass(status: string): string {
 function integrationDetails(key: string, info: Record<string, unknown>): string {
   if (key === 'pinoHook' && info.mode) return `Mode: ${info.mode}`
   if (key === 'edgePlugin' && info.active) return '@serverStats() tag registered'
-  if (key === 'cacheInspector')
-    return info.available ? 'Redis dependency detected' : 'Redis not installed'
-  if (key === 'queueInspector')
-    return info.available ? 'Queue dependency detected' : '@rlanz/bull-queue not installed'
+  if (key === 'cacheInspector') return info.available ? 'Redis dependency detected' : 'Redis not installed'
+  if (key === 'queueInspector') return info.available ? 'Queue dependency detected' : '@rlanz/bull-queue not installed'
   return '-'
 }
 
@@ -288,7 +282,6 @@ const integrationEntries = computed(() => {
   if (!diagnostics.value) return []
   const entries: Array<{ key: string; label: string; status: string; details: string }> = []
 
-  // Transmit first
   if (diagnostics.value.transmit) {
     entries.push({
       key: 'transmit',
@@ -300,7 +293,6 @@ const integrationEntries = computed(() => {
     })
   }
 
-  // Other integrations
   if (diagnostics.value.integrations) {
     for (const [key, info] of Object.entries(diagnostics.value.integrations)) {
       entries.push({
@@ -319,15 +311,18 @@ const integrationEntries = computed(() => {
 <template>
   <div>
     <!-- Loading -->
-    <div v-if="loading && !diagnostics" class="ss-dash-empty">Loading diagnostics...</div>
+    <div v-if="isLoading && !diagnostics" class="ss-dash-empty">Loading diagnostics...</div>
 
     <!-- Error -->
-    <div v-else-if="error && !diagnostics" class="ss-dash-empty ss-dash-c-red">
+    <div v-else-if="error && !diagnostics" class="ss-dash-empty">
       Error: {{ error.message }}
     </div>
 
-    <template v-else-if="diagnostics">
-      <!-- 1. Package Info — compact card row -->
+    <!-- No data -->
+    <div v-else-if="!diagnostics" class="ss-dash-empty">Diagnostics not available</div>
+
+    <template v-else>
+      <!-- 1. Package Info -->
       <h3 class="ss-dash-section-title">Package Info</h3>
       <div class="ss-dash-info-cards">
         <div
@@ -335,7 +330,7 @@ const integrationEntries = computed(() => {
             { label: 'Version', value: diagnostics.package?.version || '-' },
             { label: 'Node.js', value: diagnostics.package?.nodeVersion || '-' },
             { label: 'AdonisJS', value: diagnostics.package?.adonisVersion || '-' },
-            { label: 'Uptime', value: formatUptime(diagnostics.package?.uptime) },
+            { label: 'Uptime', value: formatUptime(diagnostics.uptime || diagnostics.package?.uptime) },
           ]"
           :key="card.label"
           class="ss-dash-info-card"
@@ -363,21 +358,17 @@ const integrationEntries = computed(() => {
               <span style="font-family: monospace; font-size: 11px">{{ c.name }}</span>
               <span
                 v-if="c.label && c.label !== c.name"
-                class="ss-dash-c-dim"
-                style="margin-left: 6px; font-size: 11px"
-                >{{ c.label }}</span
-              >
+                style="margin-left: 6px; font-size: 11px; color: var(--ss-dim)"
+              >{{ c.label }}</span>
             </td>
             <td>
               <span :class="['ss-dash-dot', dotClass(c.status)]"></span>
               {{ c.status }}
             </td>
-            <td :class="c.lastError ? 'ss-dash-c-red' : ''">
+            <td :style="c.lastError ? { color: 'var(--ss-red-fg)' } : {}">
               <template v-if="c.lastError">
                 {{ c.lastError }}
-                <span class="ss-dash-c-dim" style="margin-left: 4px">{{
-                  timeAgo(c.lastErrorAt)
-                }}</span>
+                <span style="color: var(--ss-dim); margin-left: 4px">{{ timeAgo(c.lastErrorAt) }}</span>
               </template>
               <template v-else>-</template>
             </td>
@@ -388,32 +379,19 @@ const integrationEntries = computed(() => {
                   :key="item.key"
                   style="margin-right: 8px"
                 >
-                  {{ item.key }}=<template
-                    v-if="item.secret && !revealedKeys.has(`collector-${c.name}-${item.key}`)"
-                    ><span
-                      class="ss-dash-c-muted"
-                      style="cursor: pointer"
+                  {{ item.key }}=<template v-if="item.secret && !revealedKeys.has(`collector-${c.name}-${item.key}`)">
+                    <span
+                      style="color: var(--ss-muted); cursor: pointer"
                       @click="toggleReveal(`collector-${c.name}-${item.key}`)"
-                      >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
-                    ></template
-                  ><template v-else
-                    ><span>{{ item.value }}</span
-                    ><button
+                    >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span>
+                  </template><template v-else>
+                    <span>{{ item.value }}</span>
+                    <button
                       v-if="item.secret"
-                      style="
-                        background: none;
-                        border: none;
-                        color: var(--ss-link-color, #3b82f6);
-                        cursor: pointer;
-                        font-size: 10px;
-                        margin-left: 4px;
-                        padding: 0;
-                      "
+                      style="background: none; border: none; color: var(--ss-link-color, #3b82f6); cursor: pointer; font-size: 10px; margin-left: 4px; padding: 0"
                       @click="toggleReveal(`collector-${c.name}-${item.key}`)"
-                    >
-                      Hide
-                    </button></template
-                  >
+                    >Hide</button>
+                  </template>
                 </span>
               </template>
               <template v-else>-</template>
@@ -427,11 +405,7 @@ const integrationEntries = computed(() => {
       <div v-if="!bufferEntries.length" class="ss-dash-empty">No buffer data</div>
       <table v-else class="ss-dash-table">
         <thead>
-          <tr>
-            <th>Buffer</th>
-            <th>Usage</th>
-            <th>Fill %</th>
-          </tr>
+          <tr><th>Buffer</th><th>Usage</th><th>Fill %</th></tr>
         </thead>
         <tbody>
           <tr v-for="b in bufferEntries" :key="b.name">
@@ -445,9 +419,7 @@ const integrationEntries = computed(() => {
                     :style="{ width: b.percent + '%' }"
                   ></div>
                 </div>
-                <span :class="['ss-dash-bar-pct', b.percent >= 100 ? 'ss-dash-bar-pct-warn' : '']"
-                  >{{ b.percent }}%</span
-                >
+                <span :class="['ss-dash-bar-pct', b.percent >= 100 ? 'ss-dash-bar-pct-warn' : '']">{{ b.percent }}%</span>
               </div>
             </td>
           </tr>
@@ -459,11 +431,7 @@ const integrationEntries = computed(() => {
       <div v-if="!timerEntries.length" class="ss-dash-empty">No timer data</div>
       <table v-else class="ss-dash-table">
         <thead>
-          <tr>
-            <th>Timer</th>
-            <th>Status</th>
-            <th>Interval</th>
-          </tr>
+          <tr><th>Timer</th><th>Status</th><th>Interval</th></tr>
         </thead>
         <tbody>
           <tr v-for="t in timerEntries" :key="t.key">
@@ -472,7 +440,7 @@ const integrationEntries = computed(() => {
               <span :class="['ss-dash-dot', dotClass(t.active ? 'active' : 'inactive')]"></span>
               {{ t.active ? 'active' : 'inactive' }}
             </td>
-            <td class="ss-dash-c-dim">{{ t.interval }}</td>
+            <td style="color: var(--ss-dim)">{{ t.interval }}</td>
           </tr>
         </tbody>
       </table>
@@ -482,11 +450,7 @@ const integrationEntries = computed(() => {
       <div v-if="!integrationEntries.length" class="ss-dash-empty">No integration data</div>
       <table v-else class="ss-dash-table">
         <thead>
-          <tr>
-            <th>Integration</th>
-            <th>Status</th>
-            <th>Details</th>
-          </tr>
+          <tr><th>Integration</th><th>Status</th><th>Details</th></tr>
         </thead>
         <tbody>
           <tr v-for="i in integrationEntries" :key="i.key">
@@ -495,7 +459,7 @@ const integrationEntries = computed(() => {
               <span :class="['ss-dash-dot', dotClass(i.status)]"></span>
               {{ i.status }}
             </td>
-            <td class="ss-dash-c-dim" style="font-size: 11px">{{ i.details }}</td>
+            <td style="color: var(--ss-dim); font-size: 11px">{{ i.details }}</td>
           </tr>
         </tbody>
       </table>
@@ -504,62 +468,28 @@ const integrationEntries = computed(() => {
       <template v-if="diagnostics.storage">
         <h3 class="ss-dash-section-title">Storage</h3>
         <table class="ss-dash-table">
-          <thead>
-            <tr>
-              <th>Metric</th>
-              <th>Value</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Metric</th><th>Value</th></tr></thead>
           <tbody>
             <tr>
               <td>Status</td>
               <td>
-                <span
-                  :class="[
-                    'ss-dash-dot',
-                    dotClass(diagnostics.storage!.ready ? 'ready' : 'unavailable'),
-                  ]"
-                ></span>
+                <span :class="['ss-dash-dot', dotClass(diagnostics.storage!.ready ? 'ready' : 'unavailable')]"></span>
                 {{ diagnostics.storage!.ready ? 'ready' : 'not ready' }}
               </td>
             </tr>
             <tr>
               <td>DB Path</td>
-              <td style="font-family: monospace; font-size: 11px">
-                {{ diagnostics.storage!.dbPath }}
-              </td>
+              <td style="font-family: monospace; font-size: 11px">{{ diagnostics.storage!.dbPath }}</td>
             </tr>
-            <tr>
-              <td>File Size</td>
-              <td>{{ diagnostics.storage!.fileSizeMb.toFixed(1) }} MB</td>
-            </tr>
-            <tr>
-              <td>WAL Size</td>
-              <td>{{ diagnostics.storage!.walSizeMb.toFixed(1) }} MB</td>
-            </tr>
-            <tr>
-              <td>Retention</td>
-              <td>{{ diagnostics.storage!.retentionDays }} days</td>
-            </tr>
-            <tr>
-              <td>Last Cleanup</td>
-              <td>{{ timeAgo(diagnostics.storage!.lastCleanupAt) }}</td>
-            </tr>
+            <tr><td>File Size</td><td>{{ diagnostics.storage!.fileSizeMb.toFixed(1) }} MB</td></tr>
+            <tr><td>WAL Size</td><td>{{ diagnostics.storage!.walSizeMb.toFixed(1) }} MB</td></tr>
+            <tr><td>Retention</td><td>{{ diagnostics.storage!.retentionDays }} days</td></tr>
+            <tr><td>Last Cleanup</td><td>{{ timeAgo(diagnostics.storage!.lastCleanupAt) }}</td></tr>
           </tbody>
         </table>
 
-        <!-- Per-table breakdown -->
-        <table
-          v-if="diagnostics.storage!.tables?.length"
-          class="ss-dash-table"
-          style="margin-top: 8px"
-        >
-          <thead>
-            <tr>
-              <th>Table</th>
-              <th>Rows</th>
-            </tr>
-          </thead>
+        <table v-if="diagnostics.storage!.tables?.length" class="ss-dash-table" style="margin-top: 8px">
+          <thead><tr><th>Table</th><th>Rows</th></tr></thead>
           <tbody>
             <tr v-for="t in diagnostics.storage!.tables" :key="t.name">
               <td style="font-family: monospace; font-size: 11px">{{ t.name }}</td>
@@ -572,172 +502,71 @@ const integrationEntries = computed(() => {
       <!-- 7. Resolved Config -->
       <h3 class="ss-dash-section-title">Resolved Config</h3>
       <table class="ss-dash-table">
-        <thead>
-          <tr>
-            <th>Setting</th>
-            <th>Value</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Setting</th><th>Value</th></tr></thead>
         <tbody>
-          <tr>
-            <td>intervalMs</td>
-            <td>{{ diagnostics.config?.intervalMs }}</td>
-          </tr>
-          <tr>
-            <td>transport</td>
-            <td>{{ diagnostics.config?.transport }}</td>
-          </tr>
-          <tr>
-            <td>channelName</td>
-            <td>{{ diagnostics.config?.channelName }}</td>
-          </tr>
-          <tr>
-            <td>endpoint</td>
-            <td>
-              {{ diagnostics.config?.endpoint === false ? 'false' : diagnostics.config?.endpoint }}
-            </td>
-          </tr>
-          <tr>
-            <td>skipInTest</td>
-            <td>{{ diagnostics.config?.skipInTest }}</td>
-          </tr>
-          <tr>
-            <td>onStats callback</td>
-            <td>{{ diagnostics.config?.hasOnStatsCallback ? 'defined' : 'not defined' }}</td>
-          </tr>
-          <tr>
-            <td>shouldShow callback</td>
-            <td>{{ diagnostics.config?.hasShouldShowCallback ? 'defined' : 'not defined' }}</td>
-          </tr>
+          <tr><td>intervalMs</td><td>{{ diagnostics.config?.intervalMs }}</td></tr>
+          <tr><td>transport</td><td>{{ diagnostics.config?.transport }}</td></tr>
+          <tr><td>channelName</td><td>{{ diagnostics.config?.channelName }}</td></tr>
+          <tr><td>endpoint</td><td>{{ diagnostics.config?.endpoint === false ? 'false' : diagnostics.config?.endpoint }}</td></tr>
+          <tr><td>skipInTest</td><td>{{ diagnostics.config?.skipInTest }}</td></tr>
+          <tr><td>onStats callback</td><td>{{ diagnostics.config?.hasOnStatsCallback ? 'defined' : 'not defined' }}</td></tr>
+          <tr><td>shouldShow callback</td><td>{{ diagnostics.config?.hasShouldShowCallback ? 'defined' : 'not defined' }}</td></tr>
         </tbody>
       </table>
 
-      <!-- DevToolbar sub-table -->
       <h4 class="ss-dash-section-title">DevToolbar</h4>
       <table class="ss-dash-table">
-        <thead>
-          <tr>
-            <th>Setting</th>
-            <th>Value</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Setting</th><th>Value</th></tr></thead>
         <tbody>
-          <tr>
-            <td>enabled</td>
-            <td>{{ diagnostics.devToolbar?.enabled }}</td>
-          </tr>
-          <tr>
-            <td>tracing</td>
-            <td>{{ diagnostics.devToolbar?.tracing }}</td>
-          </tr>
-          <tr>
-            <td>dashboard</td>
-            <td>{{ diagnostics.devToolbar?.dashboard }}</td>
-          </tr>
+          <tr><td>enabled</td><td>{{ diagnostics.devToolbar?.enabled }}</td></tr>
+          <tr><td>tracing</td><td>{{ diagnostics.devToolbar?.tracing }}</td></tr>
+          <tr><td>dashboard</td><td>{{ diagnostics.devToolbar?.dashboard }}</td></tr>
           <tr>
             <td>dashboardPath</td>
-            <td style="font-family: monospace; font-size: 11px">
-              {{ diagnostics.devToolbar?.dashboardPath }}
-            </td>
+            <td style="font-family: monospace; font-size: 11px">{{ diagnostics.devToolbar?.dashboardPath }}</td>
           </tr>
           <tr>
             <td>debugEndpoint</td>
             <td style="font-family: monospace; font-size: 11px">
               <template v-if="!revealedKeys.has('cfg-debugEndpoint')">
-                <span
-                  class="ss-dash-c-muted"
-                  style="cursor: pointer"
-                  @click="toggleReveal('cfg-debugEndpoint')"
-                  >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
-                >
+                <span style="color: var(--ss-muted); cursor: pointer" @click="toggleReveal('cfg-debugEndpoint')">&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span>
               </template>
               <template v-else>
                 {{ diagnostics.devToolbar?.debugEndpoint }}
                 <button
-                  style="
-                    background: none;
-                    border: none;
-                    color: var(--ss-link-color, #3b82f6);
-                    cursor: pointer;
-                    font-size: 10px;
-                    margin-left: 4px;
-                    padding: 0;
-                  "
+                  style="background: none; border: none; color: var(--ss-link-color, #3b82f6); cursor: pointer; font-size: 10px; margin-left: 4px; padding: 0"
                   @click="toggleReveal('cfg-debugEndpoint')"
-                >
-                  Hide
-                </button>
+                >Hide</button>
               </template>
             </td>
           </tr>
-          <tr>
-            <td>maxQueries</td>
-            <td>{{ diagnostics.devToolbar?.maxQueries }}</td>
-          </tr>
-          <tr>
-            <td>maxEvents</td>
-            <td>{{ diagnostics.devToolbar?.maxEvents }}</td>
-          </tr>
-          <tr>
-            <td>maxEmails</td>
-            <td>{{ diagnostics.devToolbar?.maxEmails }}</td>
-          </tr>
-          <tr>
-            <td>maxTraces</td>
-            <td>{{ diagnostics.devToolbar?.maxTraces }}</td>
-          </tr>
-          <tr>
-            <td>slowQueryThresholdMs</td>
-            <td>{{ diagnostics.devToolbar?.slowQueryThresholdMs }}</td>
-          </tr>
-          <tr>
-            <td>retentionDays</td>
-            <td>{{ diagnostics.devToolbar?.retentionDays }}</td>
-          </tr>
+          <tr><td>maxQueries</td><td>{{ diagnostics.devToolbar?.maxQueries }}</td></tr>
+          <tr><td>maxEvents</td><td>{{ diagnostics.devToolbar?.maxEvents }}</td></tr>
+          <tr><td>maxEmails</td><td>{{ diagnostics.devToolbar?.maxEmails }}</td></tr>
+          <tr><td>maxTraces</td><td>{{ diagnostics.devToolbar?.maxTraces }}</td></tr>
+          <tr><td>slowQueryThresholdMs</td><td>{{ diagnostics.devToolbar?.slowQueryThresholdMs }}</td></tr>
+          <tr><td>retentionDays</td><td>{{ diagnostics.devToolbar?.retentionDays }}</td></tr>
           <tr>
             <td>dbPath</td>
             <td style="font-family: monospace; font-size: 11px">
               <template v-if="!revealedKeys.has('cfg-dbPath')">
-                <span
-                  class="ss-dash-c-muted"
-                  style="cursor: pointer"
-                  @click="toggleReveal('cfg-dbPath')"
-                  >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
-                >
+                <span style="color: var(--ss-muted); cursor: pointer" @click="toggleReveal('cfg-dbPath')">&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span>
               </template>
               <template v-else>
                 {{ diagnostics.devToolbar?.dbPath }}
                 <button
-                  style="
-                    background: none;
-                    border: none;
-                    color: var(--ss-link-color, #3b82f6);
-                    cursor: pointer;
-                    font-size: 10px;
-                    margin-left: 4px;
-                    padding: 0;
-                  "
+                  style="background: none; border: none; color: var(--ss-link-color, #3b82f6); cursor: pointer; font-size: 10px; margin-left: 4px; padding: 0"
                   @click="toggleReveal('cfg-dbPath')"
-                >
-                  Hide
-                </button>
+                >Hide</button>
               </template>
             </td>
           </tr>
-          <tr>
-            <td>persistDebugData</td>
-            <td>{{ diagnostics.devToolbar?.persistDebugData }}</td>
-          </tr>
+          <tr><td>persistDebugData</td><td>{{ diagnostics.devToolbar?.persistDebugData }}</td></tr>
           <tr>
             <td>excludeFromTracing</td>
-            <td style="font-size: 11px">
-              {{ diagnostics.devToolbar?.excludeFromTracing?.join(', ') || '-' }}
-            </td>
+            <td style="font-size: 11px">{{ diagnostics.devToolbar?.excludeFromTracing?.join(', ') || '-' }}</td>
           </tr>
-          <tr>
-            <td>customPanes</td>
-            <td>{{ diagnostics.devToolbar?.customPaneCount ?? 0 }} registered</td>
-          </tr>
+          <tr><td>customPanes</td><td>{{ diagnostics.devToolbar?.customPaneCount ?? 0 }} registered</td></tr>
         </tbody>
       </table>
     </template>

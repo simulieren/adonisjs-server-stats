@@ -40,33 +40,36 @@ const gradientId = computed(() => `sg-${props.color.replace('#', '')}`)
 </script>
 
 <template>
-  <svg :width="width" :height="height" style="display: block">
-    <template v-if="hasData && sparkline">
-      <defs>
-        <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" :stop-color="color" stop-opacity="0.25" />
-          <stop offset="100%" :stop-color="color" stop-opacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path :d="sparkline.areaPath" :fill="`url(#${gradientId})`" />
-      <polyline
-        :points="sparkline.points"
-        fill="none"
-        :stroke="color"
-        stroke-width="1.5"
-        stroke-linejoin="round"
-        stroke-linecap="round"
-      />
-    </template>
-    <text
-      v-else
-      :x="width / 2"
-      :y="height / 2 + 3"
-      text-anchor="middle"
-      fill="#737373"
-      font-size="9"
-    >
-      collecting...
-    </text>
-  </svg>
+  <div class="ss-dash-sparkline" :style="{ '--ss-accent': color } as any">
+    <svg :width="width" :height="height" :viewBox="`0 0 ${width} ${height}`" style="display: block">
+      <template v-if="hasData && sparkline">
+        <defs>
+          <linearGradient :id="gradientId" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" :stop-color="color" stop-opacity="0.25" />
+            <stop offset="100%" :stop-color="color" stop-opacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path :d="sparkline.areaPath" :fill="`url(#${gradientId})`" />
+        <path
+          class="ss-dash-sparkline-line"
+          :d="'M' + sparkline.points.replace(/ /g, ' L')"
+          fill="none"
+          :stroke="color"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
+      </template>
+      <text
+        v-else
+        :x="width / 2"
+        :y="height / 2 + 3"
+        text-anchor="middle"
+        fill="#737373"
+        font-size="9"
+      >
+        collecting...
+      </text>
+    </svg>
+  </div>
 </template>

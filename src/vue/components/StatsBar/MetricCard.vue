@@ -180,6 +180,42 @@ function onClick() {
 function closeTooltip() {
   pinned.value = false
 }
+
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Enter') onClick()
+}
+
+// Close pinned tooltip when clicking outside or pressing Escape
+function handleOutsideClick(e: MouseEvent) {
+  const target = e.target as Node
+  if (
+    badgeRef.value &&
+    !badgeRef.value.contains(target) &&
+    tooltipRef.value &&
+    !tooltipRef.value.contains(target)
+  ) {
+    pinned.value = false
+  }
+}
+
+function handleEscape(e: KeyboardEvent) {
+  if (e.key === 'Escape') pinned.value = false
+}
+
+watch(pinned, (isPinned) => {
+  if (isPinned) {
+    document.addEventListener('click', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+  } else {
+    document.removeEventListener('click', handleOutsideClick)
+    document.removeEventListener('keydown', handleEscape)
+  }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleOutsideClick)
+  document.removeEventListener('keydown', handleEscape)
+})
 </script>
 
 <template>
@@ -188,9 +224,12 @@ function closeTooltip() {
     ref="badgeRef"
     :id="`ss-b-${metric.id}`"
     :class="['ss-badge', { 'ss-pinned': pinned }]"
+    role="button"
+    :tabindex="0"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
     @click="onClick"
+    @keydown="onKeyDown"
   >
     <span class="ss-label">{{ metric.label }}</span>
     <span :class="['ss-value', `ss-${colorClass}`]">{{ displayValue }}</span>

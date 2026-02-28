@@ -106,12 +106,13 @@
     "./vue/css": "./dist/vue/style.css"
   },
   "scripts": {
-    "copy-assets": "cp -r src/stubs/config.stub dist/src/stubs/ && cp -r src/edge/views dist/src/edge/ && cp -r src/edge/client dist/src/edge/ && cp -r src/styles dist/src/styles",
-    "build": "rm -rf dist && tsc && npm run build:edge && npm run copy-assets && npm run build:core && npm run build:react && npm run build:vue",
+    "copy-assets": "cp -r src/stubs/config.stub dist/src/stubs/ && cp -r src/edge/views dist/src/edge/ && cp -r src/edge/client dist/src/edge/ && cp -r src/edge/client-vue dist/src/edge/ && cp -r src/styles dist/src/styles",
+    "build": "rm -rf dist && tsc && npm run build:edge && npm run build:edge-vue && npm run copy-assets && npm run build:core && npm run build:react && npm run build:vue",
     "build:core": "vite build --config vite.config.core.ts",
     "build:react": "vite build --config vite.config.react.ts",
     "build:vue": "vite build --config vite.config.vue.ts",
     "build:edge": "ENTRY=stats-bar vite build --config vite.config.edge.ts && ENTRY=debug-panel vite build --config vite.config.edge.ts && ENTRY=dashboard vite build --config vite.config.edge.ts",
+    "build:edge-vue": "ENTRY=stats-bar vite build --config vite.config.edge-vue.ts && ENTRY=debug-panel vite build --config vite.config.edge-vue.ts && ENTRY=dashboard vite build --config vite.config.edge-vue.ts",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
     "lint": "oxlint",

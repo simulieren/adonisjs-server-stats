@@ -1,84 +1,64 @@
 <script setup lang="ts">
 /**
  * Pagination controls for dashboard tables.
+ *
+ * CSS classes match the React Pagination component exactly:
+ * - ss-dash-pagination (container)
+ * - ss-dash-page-info (info text)
+ * - ss-dash-pagination-controls (button row)
+ * - ss-dash-page-btn / ss-dash-active (page buttons)
+ * - ss-dash-page-ellipsis (ellipsis separator)
  */
 import { computed } from 'vue'
-import { computePagination } from '../../../../core/index.js'
+import { getPageNumbers } from '../../../../core/pagination.js'
 
 const props = defineProps<{
   page: number
-  perPage: number
+  lastPage: number
   total: number
 }>()
 
 const emit = defineEmits<{
-  goToPage: [page: number]
+  pageChange: [page: number]
 }>()
 
-const pagination = computed(() =>
-  computePagination({
-    page: props.page,
-    perPage: props.perPage,
-    total: props.total,
-  })
-)
-
-const pageNumbers = computed(() => {
-  const p = pagination.value
-  const pages: (number | '...')[] = []
-  const maxVisible = 7
-
-  if (p.lastPage <= maxVisible) {
-    for (let i = 1; i <= p.lastPage; i++) pages.push(i)
-  } else {
-    pages.push(1)
-    if (p.page > 3) pages.push('...')
-    for (let i = Math.max(2, p.page - 1); i <= Math.min(p.lastPage - 1, p.page + 1); i++) {
-      pages.push(i)
-    }
-    if (p.page < p.lastPage - 2) pages.push('...')
-    pages.push(p.lastPage)
-  }
-
-  return pages
-})
+const pages = computed(() => getPageNumbers(props.page, props.lastPage))
 </script>
 
 <template>
-  <div v-if="total > perPage" class="ss-dash-pagination">
-    <span class="ss-dash-pagination-info">
-      {{ pagination.from }}-{{ pagination.to }} of {{ pagination.total }}
+  <div v-if="lastPage > 1" class="ss-dash-pagination">
+    <span class="ss-dash-page-info">
+      Page {{ page }} of {{ lastPage }} ({{ total }} total)
     </span>
-
     <div class="ss-dash-pagination-controls">
       <button
-        class="ss-dash-pagination-btn"
-        :disabled="!pagination.hasPrev"
-        @click="emit('goToPage', pagination.page - 1)"
+        type="button"
+        class="ss-dash-page-btn"
+        :disabled="page <= 1"
+        @click="emit('pageChange', page - 1)"
       >
-        &laquo;
+        &laquo; Prev
       </button>
 
-      <template v-for="p in pageNumbers" :key="p">
-        <span v-if="p === '...'" class="ss-dash-pagination-dots">&hellip;</span>
+      <template v-for="(p, i) in pages" :key="p === '...' ? `ellipsis-${i}` : p">
+        <span v-if="p === '...'" class="ss-dash-page-ellipsis">...</span>
         <button
           v-else
-          :class="[
-            'ss-dash-pagination-btn',
-            { 'ss-dash-pagination-active': p === pagination.page },
-          ]"
-          @click="emit('goToPage', p as number)"
+          type="button"
+          :class="`ss-dash-page-btn ${p === page ? 'ss-dash-active' : ''}`"
+          @click="emit('pageChange', p as number)"
         >
           {{ p }}
         </button>
       </template>
 
       <button
-        class="ss-dash-pagination-btn"
-        :disabled="!pagination.hasNext"
-        @click="emit('goToPage', pagination.page + 1)"
+        type="button"
+        class="ss-dash-page-btn"
+        :disabled="page >= lastPage"
+        @click="emit('pageChange', page + 1)"
       >
-        &raquo;
+        Next &raquo;
       </button>
     </div>
   </div>

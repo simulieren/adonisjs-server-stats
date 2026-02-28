@@ -1,249 +1,254 @@
 <script setup lang="ts">
 /**
  * Timeline/traces section for the dashboard.
+ *
+ * Self-contained: injects dependencies and fetches its own data.
+ * CSS classes match the React TimelineSection.
  */
-import {
-  ref,
-  computed,
-  onMounted,
-  onBeforeUnmount,
-  watch,
-  nextTick,
-} from "vue";
-import { ApiClient, formatDuration, timeAgo } from "../../../../core/index.js";
-import { initResizableColumns } from "../../../../core/resizable-columns.js";
-import type { TraceRecord, TraceSpan } from "../../../../core/index.js";
-import FilterBar from "../shared/FilterBar.vue";
-import PaginationControls from "../shared/PaginationControls.vue";
-import WaterfallChart from "../shared/WaterfallChart.vue";
+import { ref, computed, inject, type Ref } from 'vue'
+import { ApiClient, timeAgo, formatTime } from '../../../../core/index.js'
+import { useDashboardData } from '../../../composables/useDashboardData.js'
+import FilterBar from '../shared/FilterBar.vue'
+import PaginationControls from '../shared/PaginationControls.vue'
+import WaterfallChart from '../shared/WaterfallChart.vue'
 
-interface TracesData {
-  data?: TraceRecord[];
-  traces?: TraceRecord[];
+const props = withDefaults(defineProps<{
+  /** When false, show a "tracing disabled" message instead of fetching. Defaults to true. */
+  tracingEnabled?: boolean
+}>(), {
+  tracingEnabled: true,
+})
+
+const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
+const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
+const authToken = inject<string | undefined>('ss-auth-token', undefined)
+const baseUrl = inject<string>('ss-base-url', '')
+
+interface TraceDetail {
+  method?: string
+  url?: string
+  status_code?: number
+  statusCode?: number
+  total_duration?: number
+  totalDuration?: number
+  spanCount?: number
+  spans?: unknown[] | string
+  warnings?: string[] | string
 }
 
-const props = defineProps<{
-  data: TracesData | TraceRecord[] | null;
-  page: number;
-  perPage: number;
-  total: number;
-  baseUrl?: string;
-  dashboardEndpoint?: string;
-  authToken?: string;
-}>();
+const {
+  data,
+  loading,
+  error,
+  pagination,
+  goToPage,
+  setSearch,
+} = useDashboardData(() => 'traces', {
+  baseUrl,
+  dashboardEndpoint,
+  authToken,
+  refreshKey,
+})
 
-const emit = defineEmits<{
-  goToPage: [page: number];
-  search: [term: string];
-}>();
+const search = ref('')
+const selectedId = ref<number | null>(null)
+const traceDetail = ref<TraceDetail | null>(null)
+const detailLoading = ref(false)
 
-const search = ref("");
-const selectedTraceId = ref<number | null>(null);
-const traceDetail = ref<TraceRecord | null>(null);
-const detailLoading = ref(false);
-const detailError = ref<string | null>(null);
+const traces = computed<Record<string, unknown>[]>(() => {
+  if (!data.value) return []
+  const d = data.value as Record<string, unknown>
+  return (d.data || d.traces || data.value || []) as Record<string, unknown>[]
+})
 
-let apiClient: ApiClient | null = null;
+let apiClient: ApiClient | null = null
 function getClient(): ApiClient {
   if (!apiClient) {
-    apiClient = new ApiClient({
-      baseUrl: props.baseUrl || "",
-      authToken: props.authToken,
-    });
+    apiClient = new ApiClient({ baseUrl, authToken })
   }
-  return apiClient;
+  return apiClient
 }
 
-const traces = computed<TraceRecord[]>(() => {
-  const d = props.data;
-  if (!d) return [];
-  return (
-    (d as TracesData).data ||
-    (d as TracesData).traces ||
-    (d as TraceRecord[]) ||
-    []
-  );
-});
-
-let fetchAbortController: AbortController | null = null;
-
-async function fetchTraceDetail(id: number) {
-  if (fetchAbortController) {
-    fetchAbortController.abort();
-  }
-  fetchAbortController = new AbortController();
-
-  detailLoading.value = true;
-  detailError.value = null;
-  traceDetail.value = null;
-
-  const endpoint = props.dashboardEndpoint || "/__stats/api";
+async function selectTrace(id: number) {
+  selectedId.value = id
+  detailLoading.value = true
+  traceDetail.value = null
   try {
-    const client = getClient();
-    const detail = await client.get<TraceRecord>(`${endpoint}/traces/${id}`);
-
-    // Parse spans/warnings from JSON string if necessary (SQLite storage)
-    let spans = detail.spans as TraceSpan[] | string | undefined;
-    if (typeof spans === "string") {
-      try {
-        spans = JSON.parse(spans);
-      } catch {
-        spans = [];
-      }
-    }
-
-    let warnings = detail.warnings as string[] | string | undefined;
-    if (typeof warnings === "string") {
-      try {
-        warnings = JSON.parse(warnings);
-      } catch {
-        warnings = [];
-      }
-    }
-
-    traceDetail.value = {
-      ...detail,
-      spans: (Array.isArray(spans) ? spans : []) as TraceSpan[],
-      warnings: (Array.isArray(warnings) ? warnings : []) as string[],
-    };
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") return;
-    detailError.value =
-      err instanceof Error ? err.message : "Failed to load trace";
+    const endpoint = dashboardEndpoint || '/__stats/api'
+    const result = await getClient().fetch<TraceDetail>(`${endpoint}/traces/${id}`)
+    traceDetail.value = result
+  } catch {
+    // silently fail
   } finally {
-    detailLoading.value = false;
+    detailLoading.value = false
   }
 }
 
-function toggleTrace(id: number) {
-  if (selectedTraceId.value === id) {
-    selectedTraceId.value = null;
-    traceDetail.value = null;
-    detailError.value = null;
-  } else {
-    selectedTraceId.value = id;
-    fetchTraceDetail(id);
-  }
+function handleBack() {
+  selectedId.value = null
+  traceDetail.value = null
 }
 
 function handleSearch(term: string) {
-  search.value = term;
-  emit("search", term);
+  search.value = term
+  setSearch(term)
 }
 
-const detailSpans = computed<TraceSpan[]>(() => traceDetail.value?.spans || []);
-const detailWarnings = computed<string[]>(
-  () => traceDetail.value?.warnings || [],
-);
-
-const tableRef = ref<HTMLTableElement | null>(null);
-let cleanupResize: (() => void) | null = null;
-
-function attachResize() {
-  if (cleanupResize) cleanupResize();
-  cleanupResize = null;
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value);
-    }
-  });
+function parseSpans(raw: unknown[] | string | undefined): unknown[] {
+  if (!raw) return []
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) } catch { return [] }
+  }
+  return Array.isArray(raw) ? raw : []
 }
 
-watch(traces, attachResize);
-onMounted(attachResize);
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize();
-  if (fetchAbortController) fetchAbortController.abort();
-});
+function parseWarnings(raw: string[] | string | undefined): string[] {
+  if (!raw) return []
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) } catch { return [] }
+  }
+  return Array.isArray(raw) ? raw : []
+}
 </script>
 
 <template>
   <div>
-    <FilterBar
-      :model-value="search"
-      placeholder="Filter traces..."
-      :summary="`${props.total} traces`"
-      @update:model-value="handleSearch"
-    />
+    <!-- Tracing disabled message -->
+    <div v-if="!props.tracingEnabled" class="ss-dash-empty">
+      Tracing is not enabled. Enable tracing in your server-stats config to use the timeline.
+    </div>
 
-    <div v-if="traces.length === 0" class="ss-dash-empty">No traces found</div>
+    <!-- Trace detail view -->
+    <template v-else-if="selectedId && traceDetail">
+      <div class="ss-dash-tl-detail-header">
+        <button type="button" class="ss-dash-btn" @click="handleBack">
+          &larr; Back
+        </button>
+        <span :class="`ss-dash-method ss-dash-method-${(traceDetail.method || '').toLowerCase()}`">
+          {{ traceDetail.method }}
+        </span>
+        <span style="color: var(--ss-text)">{{ traceDetail.url }}</span>
+        <span :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.status_code || traceDetail.statusCode || 0) / 100)}xx`">
+          {{ traceDetail.status_code || traceDetail.statusCode || 0 }}
+        </span>
+        <span class="ss-dash-tl-meta">
+          {{ (traceDetail.total_duration || traceDetail.totalDuration || 0).toFixed(1) }}ms
+          &middot;
+          {{ traceDetail.spanCount ?? parseSpans(traceDetail.spans).length }} spans
+        </span>
+      </div>
+      <WaterfallChart
+        :spans="parseSpans(traceDetail.spans) as any"
+        :total-duration="traceDetail.total_duration || traceDetail.totalDuration || 0"
+        :warnings="parseWarnings(traceDetail.warnings)"
+      />
+    </template>
 
-    <table v-else ref="tableRef" class="ss-dash-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Method</th>
-          <th>URL</th>
-          <th>Status</th>
-          <th>Duration</th>
-          <th>Spans</th>
-          <th>Time</th>
-        </tr>
-      </thead>
-      <tbody>
-        <template v-for="t in traces" :key="t.id">
-          <tr style="cursor: pointer" @click="toggleTrace(t.id)">
-            <td style="color: var(--ss-dim)">{{ t.id }}</td>
-            <td>
-              <span
-                :class="`ss-dash-method ss-dash-method-${t.method.toLowerCase()}`"
+    <!-- Loading detail -->
+    <template v-else-if="selectedId && detailLoading">
+      <div class="ss-dash-tl-detail-header">
+        <button type="button" class="ss-dash-btn" @click="handleBack">
+          &larr; Back
+        </button>
+      </div>
+      <div class="ss-dash-empty">Loading trace detail...</div>
+    </template>
+
+    <!-- List view -->
+    <template v-else>
+      <FilterBar
+        :model-value="search"
+        placeholder="Filter traces..."
+        :summary="`${pagination.total ?? 0} traces`"
+        @update:model-value="handleSearch"
+      />
+
+      <div v-if="error" class="ss-dash-empty">Failed to load traces</div>
+
+      <div v-if="loading && !data" class="ss-dash-empty">Loading traces...</div>
+
+      <template v-else>
+        <div class="ss-dash-table-wrap">
+          <table v-if="traces.length > 0" class="ss-dash-table">
+            <colgroup>
+              <col style="width: 40px" />
+              <col style="width: 70px" />
+              <col />
+              <col style="width: 60px" />
+              <col style="width: 80px" />
+              <col style="width: 50px" />
+              <col style="width: 80px" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Method</th>
+                <th>URL</th>
+                <th>Status</th>
+                <th>Duration</th>
+                <th>Spans</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="t in traces"
+                :key="(t.id as number)"
+                class="ss-dash-clickable"
+                @click="selectTrace(t.id as number)"
               >
-                {{ t.method }}
-              </span>
-            </td>
-            <td style="color: var(--ss-text)">{{ t.url }}</td>
-            <td>
-              <span
-                :class="`ss-dash-status ss-dash-status-${Math.floor(t.statusCode / 100)}xx`"
-              >
-                {{ t.statusCode }}
-              </span>
-            </td>
-            <td class="ss-dash-duration">
-              {{ formatDuration(t.totalDuration) }}
-            </td>
-            <td style="color: var(--ss-muted); text-align: center">
-              {{ t.spanCount }}
-            </td>
-            <td class="ss-dash-event-time">{{ timeAgo(t.timestamp) }}</td>
-          </tr>
-          <!-- Expanded waterfall -->
-          <tr v-if="selectedTraceId === t.id">
-            <td colspan="7" style="padding: 0">
-              <div v-if="detailLoading" class="ss-dash-empty">
-                Loading trace detail...
-              </div>
-              <div v-else-if="detailError" class="ss-dash-empty">
-                Error: {{ detailError }}
-              </div>
-              <template v-else-if="traceDetail">
-                <WaterfallChart
-                  :spans="detailSpans"
-                  :total-duration="traceDetail.totalDuration"
-                />
-                <div v-if="detailWarnings.length > 0" class="ss-dash-warnings">
-                  <div class="ss-dash-warnings-title">Warnings</div>
-                  <div
-                    v-for="(w, wi) in detailWarnings"
-                    :key="wi"
-                    class="ss-dash-warning"
+                <td><span style="color: var(--ss-dim)">{{ t.id }}</span></td>
+                <td>
+                  <span :class="`ss-dash-method ss-dash-method-${((t.method as string) || '').toLowerCase()}`">
+                    {{ t.method }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    style="color: var(--ss-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                    :title="(t.url as string)"
                   >
-                    {{ w }}
-                  </div>
-                </div>
-              </template>
-              <div v-else class="ss-dash-empty">Loading trace detail...</div>
-            </td>
-          </tr>
-        </template>
-      </tbody>
-    </table>
-
-    <PaginationControls
-      :page="props.page"
-      :per-page="props.perPage"
-      :total="props.total"
-      @go-to-page="emit('goToPage', $event)"
-    />
+                    {{ t.url }}
+                  </span>
+                </td>
+                <td>
+                  <span :class="`ss-dash-status ss-dash-status-${Math.floor(((t.statusCode as number) || (t.status_code as number) || 0) / 100)}xx`">
+                    {{ (t.statusCode as number) || (t.status_code as number) || 0 }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    :class="`ss-dash-duration ${((t.totalDuration as number) || (t.total_duration as number) || 0) > 500 ? 'ss-dash-very-slow' : ((t.totalDuration as number) || (t.total_duration as number) || 0) > 100 ? 'ss-dash-slow' : ''}`"
+                  >
+                    {{ ((t.totalDuration as number) || (t.total_duration as number) || 0).toFixed(1) }}ms
+                  </span>
+                </td>
+                <td>
+                  <span style="color: var(--ss-muted); text-align: center">
+                    {{ (t.spanCount as number) || (t.span_count as number) || 0 }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    class="ss-dash-event-time"
+                    :title="formatTime(((t.createdAt as string) || (t.created_at as string) || (t.timestamp as string)) as string)"
+                  >
+                    {{ timeAgo(((t.createdAt as string) || (t.created_at as string) || (t.timestamp as string)) as string) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="ss-dash-empty">No traces recorded</div>
+        </div>
+        <PaginationControls
+          v-if="pagination.totalPages > 1"
+          :page="pagination.page"
+          :last-page="pagination.totalPages"
+          :total="pagination.total"
+          @page-change="goToPage"
+        />
+      </template>
+    </template>
   </div>
 </template>

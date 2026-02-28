@@ -3,8 +3,9 @@
  * Events table tab for the debug panel.
  */
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { timeAgo } from '../../../../core/index.js'
+import { timeAgo, formatTime } from '../../../../core/index.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { TAB_ICONS } from '../../../../core/icons.js'
 import type { EventRecord } from '../../../../core/index.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
@@ -72,7 +73,7 @@ onBeforeUnmount(() => {
       </thead>
       <tbody>
         <tr v-for="e in events" :key="e.id">
-          <td class="ss-dbg-c-dim">{{ e.id }}</td>
+          <td class="ss-dbg-c-dim" style="white-space: nowrap">{{ e.id }}</td>
           <td class="ss-dbg-event-name">
             {{ e.event }}
             <a
@@ -85,18 +86,18 @@ onBeforeUnmount(() => {
                 viewBox="0 0 16 16"
                 width="12"
                 height="12"
+                :viewBox="TAB_ICONS['open-external'].viewBox"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="2"
-              >
-                <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
-              </svg>
+                v-html="TAB_ICONS['open-external'].elements.join('')"
+              ></svg>
             </a>
           </td>
           <td class="ss-dbg-event-data">
-            <JsonViewer :value="e.data" />
+            <JsonViewer :value="e.data" class-prefix="ss-dbg" />
           </td>
-          <td class="ss-dbg-event-time">{{ timeAgo(e.timestamp) }}</td>
+          <td class="ss-dbg-event-time" :title="formatTime(e.timestamp)">{{ timeAgo(e.timestamp) }}</td>
         </tr>
       </tbody>
     </table>

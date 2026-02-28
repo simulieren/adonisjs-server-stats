@@ -48,6 +48,9 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
     const currentTab = tab()
     if (!currentTab) return
 
+    // Custom tabs handle their own data fetching via CustomPaneTab
+    if (currentTab.startsWith('custom-')) return
+
     const path = getDebugTabPath(currentTab)
     const endpoint = DASHBOARD_TABS.has(currentTab) && dashboardEndpoint
       ? dashboardEndpoint

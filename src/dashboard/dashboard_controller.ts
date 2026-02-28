@@ -95,11 +95,16 @@ export default class DashboardController {
       return ctx.response.forbidden({ error: 'Access denied' })
     }
 
+    const config = this.app.config.get<ServerStatsConfig>('server_stats')
+    const toolbarConfig: Partial<DevToolbarOptions> = config?.devToolbar ?? {}
+
     if (!this.cachedCss) {
       this.cachedCss = readFileSync(join(STYLES_DIR, 'dashboard.css'), 'utf-8')
     }
     if (!this.cachedJs) {
-      this.cachedJs = readFileSync(join(EDGE_DIR, 'client', 'dashboard.js'), 'utf-8')
+      const renderer = toolbarConfig.renderer || 'preact'
+      const clientDir = renderer === 'vue' ? 'client-vue' : 'client'
+      this.cachedJs = readFileSync(join(EDGE_DIR, clientDir, 'dashboard.js'), 'utf-8')
     }
     if (this.cachedTransmitClient === null) {
       this.cachedTransmitClient = loadTransmitClient(this.app.makePath('package.json'))
@@ -111,9 +116,6 @@ export default class DashboardController {
         )
       }
     }
-
-    const config = this.app.config.get<ServerStatsConfig>('server_stats')
-    const toolbarConfig: Partial<DevToolbarOptions> = config?.devToolbar ?? {}
     const dashPath = this.getDashboardPath()
 
     return (ctx as unknown as { view: EdgeViewContext }).view.render('ss::dashboard', {

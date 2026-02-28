@@ -13,10 +13,12 @@ import {
 import {
   ApiClient,
   formatDuration,
+  formatTime,
   statusColor,
   timeAgo,
 } from "../../../../core/index.js";
 import { initResizableColumns } from "../../../../core/resizable-columns.js";
+import { TAB_ICONS } from "../../../../core/icons.js";
 import type { TraceRecord, TraceSpan } from "../../../../core/index.js";
 
 const props = defineProps<{
@@ -174,7 +176,7 @@ onBeforeUnmount(() => {
       <!-- Error state -->
       <template v-else-if="detailError">
         <div class="ss-dbg-tl-detail-header">
-          <button class="ss-dbg-close" @click="goBack">&larr; Back</button>
+          <button type="button" class="ss-dbg-btn-clear" @click="goBack">&larr; Back</button>
         </div>
         <div class="ss-dbg-empty">Error: {{ detailError }}</div>
       </template>
@@ -182,7 +184,7 @@ onBeforeUnmount(() => {
       <!-- Detail content -->
       <template v-else-if="traceDetail">
         <div class="ss-dbg-tl-detail-header">
-          <button class="ss-dbg-close" @click="goBack">&larr; Back</button>
+          <button type="button" class="ss-dbg-btn-clear" @click="goBack">&larr; Back</button>
           <span
             :class="`ss-dbg-method ss-dbg-method-${traceDetail.method.toLowerCase()}`"
           >
@@ -224,9 +226,9 @@ onBeforeUnmount(() => {
             </span>
             <span class="ss-dbg-tl-track">
               <span
-                class="ss-dbg-tl-bar"
+                :class="`ss-dbg-tl-bar ss-dbg-tl-bar-${span.category}`"
                 :style="getBarStyle(span, traceDetail.totalDuration)"
-                :title="`${formatDuration(span.duration)}`"
+                :title="`${span.label}: ${formatDuration(span.duration)}`"
               ></span>
             </span>
             <span class="ss-dbg-tl-dur">{{
@@ -278,10 +280,10 @@ onBeforeUnmount(() => {
           <tr
             v-for="t in traces"
             :key="t.id"
-            style="cursor: pointer"
+            class="ss-dbg-email-row"
             @click="selectTrace(t)"
           >
-            <td class="ss-dbg-c-dim">{{ t.id }}</td>
+            <td class="ss-dbg-c-dim" style="white-space: nowrap">{{ t.id }}</td>
             <td>
               <span
                 :class="`ss-dbg-method ss-dbg-method-${t.method.toLowerCase()}`"
@@ -299,15 +301,14 @@ onBeforeUnmount(() => {
                 @click.stop
               >
                 <svg
-                  viewBox="0 0 16 16"
+                  :viewBox="TAB_ICONS['open-external'].viewBox"
                   width="12"
                   height="12"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
-                >
-                  <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
-                </svg>
+                  v-html="TAB_ICONS['open-external'].elements.join('')"
+                ></svg>
               </a>
             </td>
             <td>
@@ -317,13 +318,13 @@ onBeforeUnmount(() => {
                 {{ t.statusCode }}
               </span>
             </td>
-            <td class="ss-dbg-duration">
+            <td :class="['ss-dbg-duration', t.totalDuration > 500 ? 'ss-dbg-very-slow' : t.totalDuration > 100 ? 'ss-dbg-slow' : '']">
               {{ formatDuration(t.totalDuration) }}
             </td>
             <td class="ss-dbg-c-muted" style="text-align: center">
               {{ t.spanCount }}
             </td>
-            <td class="ss-dbg-event-time">{{ timeAgo(t.timestamp) }}</td>
+            <td class="ss-dbg-event-time" :title="formatTime(t.timestamp)">{{ timeAgo(t.timestamp) }}</td>
           </tr>
         </tbody>
       </table>

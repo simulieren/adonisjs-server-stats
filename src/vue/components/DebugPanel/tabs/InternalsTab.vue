@@ -2,10 +2,11 @@
 /**
  * Internals diagnostics tab for the debug panel.
  *
- * Receives data from useDebugData (fetched via {debugEndpoint}/diagnostics).
- * Renders the same 7 grouped tables as InternalsSection.
+ * Fetches from {debugEndpoint}/diagnostics using its own ApiClient,
+ * with auto-refresh polling. Handles UnauthorizedError to stop polling.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ApiClient, UnauthorizedError } from '../../../../core/index.js'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,6 +37,7 @@ interface DiagnosticsData {
     version: string
     nodeVersion: string
     adonisVersion: string
+    uptime?: number
   }
   config?: {
     intervalMs: number
@@ -83,13 +85,76 @@ interface DiagnosticsData {
   uptime?: number
 }
 
+const REFRESH_INTERVAL = 3000
+
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
 
 const props = defineProps<{
-  data: DiagnosticsData | null
+  data?: DiagnosticsData | null
+  baseUrl?: string
+  debugEndpoint?: string
+  authToken?: string
 }>()
+
+// ---------------------------------------------------------------------------
+// Self-fetching (matches React pattern with ApiClient + UnauthorizedError)
+// ---------------------------------------------------------------------------
+
+const selfData = ref<DiagnosticsData | null>(null)
+const isLoading = ref(true)
+const fetchError = ref<Error | null>(null)
+
+let client: ApiClient | null = null
+let timer: ReturnType<typeof setInterval> | null = null
+
+function getClient(): ApiClient {
+  if (!client) {
+    client = new ApiClient({
+      baseUrl: props.baseUrl || '',
+      authToken: props.authToken,
+    })
+  }
+  return client
+}
+
+async function fetchDiagnostics() {
+  const endpoint = props.debugEndpoint || '/admin/api/debug'
+  try {
+    const c = getClient()
+    const result = await c.get<DiagnosticsData>(`${endpoint}/diagnostics`)
+    selfData.value = result
+    fetchError.value = null
+    isLoading.value = false
+  } catch (err) {
+    if (err instanceof UnauthorizedError) {
+      fetchError.value = err
+      isLoading.value = false
+      if (timer) {
+        clearInterval(timer)
+        timer = null
+      }
+      return
+    }
+    fetchError.value = err instanceof Error ? err : new Error(String(err))
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  isLoading.value = true
+  fetchError.value = null
+  fetchDiagnostics()
+  timer = setInterval(fetchDiagnostics, REFRESH_INTERVAL)
+})
+
+onBeforeUnmount(() => {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+})
 
 // ---------------------------------------------------------------------------
 // State
@@ -224,7 +289,9 @@ function integrationDetails(key: string, info: Record<string, unknown>): string 
 // Computed
 // ---------------------------------------------------------------------------
 
-const d = computed(() => props.data || ({} as DiagnosticsData))
+// Use self-fetched data if available, otherwise fall back to prop data
+const diagnosticsData = computed(() => selfData.value || props.data || null)
+const d = computed(() => diagnosticsData.value || ({} as DiagnosticsData))
 
 const bufferEntries = computed(() => {
   if (!d.value.buffers) return []
@@ -277,7 +344,11 @@ const integrationEntries = computed(() => {
 
 <template>
   <div>
-    <div v-if="!data" class="ss-dbg-empty">No diagnostics data</div>
+    <div v-if="isLoading && !diagnosticsData" class="ss-dbg-empty">Loading diagnostics...</div>
+
+    <div v-else-if="fetchError" class="ss-dbg-empty">Error: {{ fetchError.message }}</div>
+
+    <div v-else-if="!diagnosticsData" class="ss-dbg-empty">Diagnostics not available</div>
 
     <template v-else>
       <!-- 1. Package Info — compact card row -->

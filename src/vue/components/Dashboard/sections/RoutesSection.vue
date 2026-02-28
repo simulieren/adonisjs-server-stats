@@ -1,133 +1,124 @@
 <script setup lang="ts">
 /**
  * Routes section for the dashboard.
+ *
+ * Self-contained: injects dependencies and fetches its own data.
+ * CSS classes match the React RoutesSection.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import type { RouteRecord } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { ref, computed, inject, type Ref } from 'vue'
+import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 
-interface RoutesData {
-  data?: RouteRecord[]
-  routes?: RouteRecord[]
-}
+const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
+const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
+const authToken = inject<string | undefined>('ss-auth-token', undefined)
+const baseUrl = inject<string>('ss-base-url', '')
 
-const props = defineProps<{
-  data: RoutesData | RouteRecord[] | null
-}>()
+const {
+  data,
+  loading,
+  error,
+  setSearch,
+} = useDashboardData(() => 'routes', {
+  baseUrl,
+  dashboardEndpoint,
+  authToken,
+  refreshKey,
+})
 
 const search = ref('')
 
-const routes = computed<RouteRecord[]>(() => {
-  const arr = props.data?.data || props.data?.routes || props.data || []
-  if (!search.value.trim()) return arr
-  const term = search.value.toLowerCase()
-  return arr.filter(
-    (r: RouteRecord) =>
-      r.pattern.toLowerCase().includes(term) ||
-      r.handler.toLowerCase().includes(term) ||
-      r.method.toLowerCase().includes(term) ||
-      (r.name && r.name.toLowerCase().includes(term))
-  )
+const routes = computed<Record<string, unknown>[]>(() => {
+  if (!data.value) return []
+  const raw = data.value as Record<string, unknown> | Record<string, unknown>[]
+  if (Array.isArray(raw)) return raw
+  if (Array.isArray(raw.routes)) return raw.routes as Record<string, unknown>[]
+  if (Array.isArray(raw.data)) return raw.data as Record<string, unknown>[]
+  return []
 })
 
-// Group routes by controller
-const groupedByController = computed(() => {
-  const groups = new Map<string, RouteRecord[]>()
-  for (const route of routes.value) {
-    const controller = route.handler.split('.')[0] || 'Other'
-    if (!groups.has(controller)) groups.set(controller, [])
-    groups.get(controller)!.push(route)
-  }
-  return groups
-})
-
-const collapsedGroups = ref(new Set<string>())
-
-function toggleGroup(controller: string) {
-  if (collapsedGroups.value.has(controller)) {
-    collapsedGroups.value.delete(controller)
-  } else {
-    collapsedGroups.value.add(controller)
-  }
+function handleSearch(term: string) {
+  search.value = term
+  setSearch(term)
 }
-
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(routes, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
 </script>
 
 <template>
   <div>
     <FilterBar
-      v-model="search"
+      :model-value="search"
       placeholder="Filter routes..."
       :summary="`${routes.length} routes`"
+      @update:model-value="handleSearch"
     />
 
-    <div v-if="routes.length === 0" class="ss-dash-empty">No routes found</div>
+    <div v-if="error" class="ss-dash-empty">Failed to load routes</div>
 
-    <table v-else ref="tableRef" class="ss-dash-table">
-      <thead>
-        <tr>
-          <th>Method</th>
-          <th>Pattern</th>
-          <th>Name</th>
-          <th>Handler</th>
-          <th>Middleware</th>
-        </tr>
-      </thead>
-      <tbody>
-        <template v-for="[controller, groupRoutes] in groupedByController" :key="controller">
-          <tr style="cursor: pointer" @click="toggleGroup(controller)">
-            <td
-              colspan="5"
-              style="
-                background: var(--ss-surface-alt);
-                font-weight: 600;
-                color: var(--ss-text-secondary);
-                font-size: 10px;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-              "
-            >
-              {{ collapsedGroups.has(controller) ? '\u25B6' : '\u25BC' }}
-              {{ controller }}
-              <span style="color: var(--ss-dim); margin-left: 8px">{{ groupRoutes.length }}</span>
-            </td>
-          </tr>
-          <template v-if="!collapsedGroups.has(controller)">
-            <tr v-for="(r, i) in groupRoutes" :key="`${controller}-${i}`">
+    <div v-else-if="loading && !data" class="ss-dash-empty">Loading routes...</div>
+
+    <template v-else>
+      <div class="ss-dash-table-wrap">
+        <table v-if="routes.length > 0" class="ss-dash-table">
+          <colgroup>
+            <col style="width: 70px" />
+            <col />
+            <col style="width: 120px" />
+            <col />
+            <col />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>Method</th>
+              <th>Pattern</th>
+              <th>Name</th>
+              <th>Handler</th>
+              <th>Middleware</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in routes" :key="(r.pattern as string) || i">
               <td>
-                <span :class="`ss-dash-method ss-dash-method-${r.method.toLowerCase()}`">
+                <span :class="`ss-dash-method ss-dash-method-${((r.method as string) || '').toLowerCase()}`">
                   {{ r.method }}
                 </span>
               </td>
-              <td style="color: var(--ss-text)">{{ r.pattern }}</td>
-              <td style="color: var(--ss-muted)">{{ r.name || '-' }}</td>
-              <td style="color: var(--ss-text-secondary)">{{ r.handler }}</td>
-              <td style="color: var(--ss-dim); font-size: 10px">
-                {{ r.middleware.length > 0 ? r.middleware.join(', ') : '-' }}
+              <td>
+                <span
+                  style="color: var(--ss-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                  :title="(r.pattern as string)"
+                >
+                  {{ r.pattern }}
+                </span>
+              </td>
+              <td>
+                <span
+                  style="color: var(--ss-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                  :title="(r.name as string) || '-'"
+                >
+                  {{ (r.name as string) || '-' }}
+                </span>
+              </td>
+              <td>
+                <span
+                  style="color: var(--ss-sql-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                  :title="(r.handler as string)"
+                >
+                  {{ r.handler }}
+                </span>
+              </td>
+              <td>
+                <span
+                  style="color: var(--ss-dim); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                  :title="(r.middleware as string[])?.length ? (r.middleware as string[]).join(', ') : '-'"
+                >
+                  {{ (r.middleware as string[])?.length ? (r.middleware as string[]).join(', ') : '-' }}
+                </span>
               </td>
             </tr>
-          </template>
-        </template>
-      </tbody>
-    </table>
+          </tbody>
+        </table>
+        <div v-else class="ss-dash-empty">No routes available</div>
+      </div>
+    </template>
   </div>
 </template>

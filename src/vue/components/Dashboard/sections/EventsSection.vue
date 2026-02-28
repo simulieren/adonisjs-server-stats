@@ -1,63 +1,47 @@
 <script setup lang="ts">
 /**
  * Events section for the dashboard.
+ *
+ * Self-contained: injects dependencies and fetches its own data.
+ * CSS classes match the React EventsSection.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { timeAgo } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
-import type { EventRecord } from '../../../../core/index.js'
+import { ref, computed, inject, type Ref } from 'vue'
+import { timeAgo, formatTime } from '../../../../core/index.js'
+import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
-interface EventsData {
-  data?: EventRecord[]
-  events?: EventRecord[]
-}
+const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
+const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
+const authToken = inject<string | undefined>('ss-auth-token', undefined)
+const baseUrl = inject<string>('ss-base-url', '')
 
-const props = defineProps<{
-  data: EventsData | EventRecord[] | null
-  page: number
-  perPage: number
-  total: number
-}>()
-
-const emit = defineEmits<{
-  goToPage: [page: number]
-  search: [term: string]
-}>()
+const {
+  data,
+  loading,
+  pagination,
+  goToPage,
+  setSearch,
+} = useDashboardData(() => 'events', {
+  baseUrl,
+  dashboardEndpoint,
+  authToken,
+  refreshKey,
+})
 
 const search = ref('')
 
-const events = computed<EventRecord[]>(() => {
-  const d = props.data
-  if (!d) return []
-  return d.data || d.events || d || []
+const events = computed<Record<string, unknown>[]>(() => {
+  if (!data.value) return []
+  const d = data.value as Record<string, unknown>
+  return (d.data || d.events || data.value || []) as Record<string, unknown>[]
 })
 
 function handleSearch(term: string) {
   search.value = term
-  emit('search', term)
+  setSearch(term)
 }
-
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(events, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
 </script>
 
 <template>
@@ -65,38 +49,64 @@ onBeforeUnmount(() => {
     <FilterBar
       :model-value="search"
       placeholder="Filter events..."
-      :summary="`${props.total} events`"
+      :summary="`${pagination.total ?? 0} events`"
       @update:model-value="handleSearch"
     />
 
-    <div v-if="events.length === 0" class="ss-dash-empty">No events found</div>
+    <div v-if="loading && !data" class="ss-dash-empty">Loading events...</div>
 
-    <table v-else ref="tableRef" class="ss-dash-table">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Event</th>
-          <th>Data</th>
-          <th>Time</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="e in events" :key="e.id">
-          <td style="color: var(--ss-dim)">{{ e.id }}</td>
-          <td class="ss-dash-event-name">{{ e.event }}</td>
-          <td>
-            <JsonViewer :value="e.data" />
-          </td>
-          <td class="ss-dash-event-time">{{ timeAgo(e.timestamp) }}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <PaginationControls
-      :page="props.page"
-      :per-page="props.perPage"
-      :total="props.total"
-      @go-to-page="emit('goToPage', $event)"
-    />
+    <template v-else>
+      <div class="ss-dash-table-wrap">
+        <table v-if="events.length > 0" class="ss-dash-table">
+          <colgroup>
+            <col style="width: 40px" />
+            <col />
+            <col />
+            <col style="width: 80px" />
+          </colgroup>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Event</th>
+              <th>Data</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="e in events" :key="(e.id as string)">
+              <td><span style="color: var(--ss-dim)">{{ e.id }}</span></td>
+              <td>
+                <span
+                  class="ss-dash-event-name"
+                  :title="((e.event_name as string) || (e.eventName as string) || (e.event as string) || '') as string"
+                  style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                >
+                  {{ (e.event_name as string) || (e.eventName as string) || (e.event as string) || '' }}
+                </span>
+              </td>
+              <td>
+                <JsonViewer :value="e.data" class="ss-dash-event-data" />
+              </td>
+              <td>
+                <span
+                  class="ss-dash-event-time"
+                  :title="formatTime(((e.createdAt as string) || (e.created_at as string) || (e.timestamp as string)) as string)"
+                >
+                  {{ timeAgo(((e.createdAt as string) || (e.created_at as string) || (e.timestamp as string)) as string) }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="ss-dash-empty">No events recorded yet</div>
+      </div>
+      <PaginationControls
+        v-if="pagination.totalPages > 1"
+        :page="pagination.page"
+        :last-page="pagination.totalPages"
+        :total="pagination.total"
+        @page-change="goToPage"
+      />
+    </template>
   </div>
 </template>

@@ -6,7 +6,7 @@
  * Uses SSE/polling for real-time updates, with sparkline tooltips.
  * Auto-hides on 403, persists visibility to localStorage.
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useServerStats } from '../../composables/useServerStats.js'
 import { useFeatures } from '../../composables/useFeatures.js'
 import { useTheme } from '../../composables/useTheme.js'
@@ -17,26 +17,33 @@ import {
   formatBytes,
 } from '../../../core/index.js'
 import type { StatsBarConfig } from '../../../core/index.js'
+import { TAB_ICONS } from '../../../core/index.js'
 import MetricCard from './MetricCard.vue'
 
-const props = withDefaults(defineProps<StatsBarConfig>(), {
+const props = withDefaults(defineProps<StatsBarConfig & { debugPanelOpen?: boolean }>(), {
   baseUrl: '',
   endpoint: '/admin/api/server-stats',
   channelName: 'admin/server-stats',
   pollInterval: 3000,
   debugEndpoint: '/admin/api/debug',
+  debugPanelOpen: false,
 })
 
 const emit = defineEmits<{
   openDebugPanel: []
+  connectionChange: [isConnected: boolean]
 }>()
 
-const { stats, history, isStale, isUnauthorized, connectionMode } = useServerStats({
+const { stats, history, isStale, isUnauthorized, isConnected, connectionMode } = useServerStats({
   baseUrl: props.baseUrl,
   endpoint: props.endpoint,
   channelName: props.channelName,
   authToken: props.authToken,
   pollInterval: props.pollInterval,
+})
+
+watch(isConnected, (value) => {
+  emit('connectionChange', value)
 })
 
 const { features } = useFeatures({
@@ -49,9 +56,22 @@ const { theme } = useTheme()
 
 const STORAGE_KEY = 'admin:stats-bar'
 const visible = ref(true)
+const scrollRef = ref<HTMLDivElement | null>(null)
 
 onMounted(() => {
   visible.value = localStorage.getItem(STORAGE_KEY) !== 'hidden'
+
+  // Horizontal wheel scroll
+  const el = scrollRef.value
+  if (el) {
+    const handler = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return
+      e.preventDefault()
+      el.scrollLeft += e.deltaY
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    onUnmounted(() => el.removeEventListener('wheel', handler))
+  }
 })
 
 function toggleVisibility() {
@@ -97,7 +117,9 @@ const cpuSummary = computed(() => {
 
 const memSummary = computed(() => {
   if (!stats.value) return '...'
-  return formatBytes(stats.value.memHeapUsed)
+  return stats.value.memHeapUsed !== undefined
+    ? Math.round(stats.value.memHeapUsed / (1024 * 1024)) + 'M'
+    : '-'
 })
 
 const redisSummary = computed(() => {
@@ -120,16 +142,27 @@ const themeAttr = computed(() => theme.value)
       <button
         v-if="features.tracing || visibleGroups.has('redis') || visibleGroups.has('queue')"
         type="button"
-        class="ss-dbg-btn"
-        title="Open debug panel"
+        :class="['ss-dbg-btn', { 'ss-dbg-active': debugPanelOpen }]"
+        title="Toggle debug panel"
+        id="ss-dbg-wrench"
         @click="emit('openDebugPanel')"
       >
-        &#x1F50D; Open debug panel
+        <svg
+          width="14"
+          height="14"
+          :viewBox="TAB_ICONS.wrench.viewBox"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          v-html="TAB_ICONS.wrench.elements.join('')"
+        ></svg>
       </button>
       <div :class="['ss-dot', { 'ss-stale': isStale }]"></div>
     </div>
 
-    <div id="ss-bar-scroll" class="ss-bar-scroll">
+    <div ref="scrollRef" id="ss-bar-scroll" class="ss-bar-scroll">
       <template v-for="(group, gi) in metricGroups" :key="group.name">
         <div class="ss-group">
           <MetricCard
@@ -154,11 +187,14 @@ const themeAttr = computed(() => theme.value)
     :title="visible ? 'Hide stats bar' : 'Show stats bar'"
     @click="toggleVisibility"
   >
-    <span v-if="!visible" class="ss-toggle-summary">
-      <span v-if="visibleGroups.has('process')" class="ss-value ss-green">{{ cpuSummary }}</span>
+    <span v-if="!visible && stats" class="ss-toggle-summary" style="display: flex">
+      <span
+        v-if="visibleGroups.has('process')"
+        :class="['ss-value', stats.cpuPercent > 80 ? 'ss-red' : stats.cpuPercent > 50 ? 'ss-amber' : 'ss-green']"
+      >{{ cpuSummary }}</span>
       <span v-if="visibleGroups.has('process')" class="ss-value ss-green">{{ memSummary }}</span>
       <span
-        v-if="visibleGroups.has('redis')"
+        v-if="visibleGroups.has('redis') && stats?.redisOk !== undefined"
         :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']"
         >{{ redisSummary }}</span
       >

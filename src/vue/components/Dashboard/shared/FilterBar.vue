@@ -2,6 +2,8 @@
 /**
  * Search/filter bar for dashboard sections.
  */
+import { TAB_ICONS } from '../../../../core/icons.js'
+
 const props = defineProps<{
   modelValue: string
   placeholder?: string
@@ -29,7 +31,7 @@ function handleClear() {
     <div class="ss-dash-search-wrapper">
       <svg
         class="ss-dash-search-icon"
-        viewBox="0 0 24 24"
+        :viewBox="TAB_ICONS.search.viewBox"
         width="14"
         height="14"
         fill="none"
@@ -37,10 +39,8 @@ function handleClear() {
         stroke-width="2"
         stroke-linecap="round"
         stroke-linejoin="round"
-      >
-        <circle cx="11" cy="11" r="8" />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-      </svg>
+        v-html="TAB_ICONS.search.elements.join('')"
+      ></svg>
       <input
         class="ss-dash-search"
         type="text"

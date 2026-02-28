@@ -1,164 +1,213 @@
 <script setup lang="ts">
 /**
- * Redis browser section for the dashboard.
+ * Cache inspector section for the dashboard.
+ *
+ * Self-contained: injects dependencies and fetches its own data.
+ * CSS classes match the React CacheSection.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { ref, computed, inject, type Ref } from 'vue'
+import { useDashboardData } from '../../../composables/useDashboardData.js'
+import { ApiClient, DashboardApi } from '../../../../core/index.js'
+import JsonViewer from '../../shared/JsonViewer.vue'
 import FilterBar from '../shared/FilterBar.vue'
 
-interface CacheKey {
+const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
+const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
+const authToken = inject<string | undefined>('ss-auth-token', undefined)
+const baseUrl = inject<string>('ss-base-url', '')
+
+interface CacheStats {
+  connected?: boolean
+  hits?: number
+  misses?: number
+  hitRate?: number
+  memoryUsedBytes?: number
+  memoryUsedHuman?: string
+  connectedClients?: number
+  totalKeys?: number
+  keyCount?: number
+}
+
+interface CacheKeyEntry {
   key: string
   type: string
   ttl: number
-  size: number
-  value?: string | number | boolean | Record<string, unknown> | unknown[] | null
+  size?: number | null
 }
 
-interface CacheData {
-  stats?: {
-    hitRate: number
-    totalHits: number
-    totalMisses: number
-    keyCount: number
-    memoryUsedMb: number
-  }
-  data?: CacheKey[]
-  keys?: CacheKey[]
+interface CacheResponse {
+  available?: boolean
+  stats?: CacheStats | null
+  keys?: CacheKeyEntry[]
+  data?: CacheKeyEntry[]
+  cursor?: string
 }
 
-const props = defineProps<{
-  data: CacheData | null
-  onDeleteKey?: (key: string) => Promise<boolean>
-}>()
-
-const search = ref('')
-const selectedKey = ref<CacheKey | null>(null)
-
-const cacheData = computed(() => props.data || {})
-const stats = computed(() => cacheData.value.stats || {})
-
-const keys = computed<CacheKey[]>(() => {
-  const arr = cacheData.value.data || cacheData.value.keys || []
-  if (!search.value.trim()) return arr
-  const term = search.value.toLowerCase()
-  return arr.filter((k: CacheKey) => k.key.toLowerCase().includes(term))
+const {
+  data,
+  loading,
+  setSearch,
+  mutate,
+} = useDashboardData(() => 'cache', {
+  baseUrl,
+  dashboardEndpoint,
+  authToken,
+  refreshKey,
 })
 
-function formatTtl(seconds: number): string {
-  if (seconds < 0) return 'no expiry'
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`
-  return `${Math.floor(seconds / 86400)}d`
-}
+const cacheClient = new ApiClient({ baseUrl: baseUrl || '', authToken })
+const cacheApi = new DashboardApi(cacheClient, dashboardEndpoint || '/__stats/api')
 
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+const search = ref('')
+const selectedKey = ref<string | null>(null)
+const keyValue = ref<unknown>(null)
+const keyValueLoading = ref(false)
+const keyValueError = ref<string | null>(null)
+
+const cacheData = computed<CacheResponse | null>(() => {
+  return data.value as CacheResponse | null
+})
+
+const keys = computed<CacheKeyEntry[]>(() => {
+  return cacheData.value?.keys || cacheData.value?.data || []
+})
+
+function handleSearch(term: string) {
+  search.value = term
+  setSearch(term)
 }
 
 async function handleDelete(key: string) {
-  if (props.onDeleteKey) {
-    const success = await props.onDeleteKey(key)
-    if (success) {
+  if (!confirm(`Delete cache key "${key}"?`)) return
+  try {
+    await mutate(`cache/${encodeURIComponent(key)}`, 'delete')
+    if (selectedKey.value === key) {
       selectedKey.value = null
+      keyValue.value = null
+      keyValueError.value = null
     }
+  } catch {
+    // silently fail
   }
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
+async function handleKeyClick(key: string) {
+  if (selectedKey.value === key) {
+    selectedKey.value = null
+    keyValue.value = null
+    keyValueError.value = null
+    return
+  }
+  selectedKey.value = key
+  keyValue.value = null
+  keyValueError.value = null
+  keyValueLoading.value = true
+  try {
+    const result = await cacheApi.fetchCacheKey(key)
+    keyValue.value =
+      result.value !== undefined ? result.value :
+      result.data !== undefined ? result.data : result
+    keyValueError.value = null
+  } catch {
+    keyValue.value = null
+    keyValueError.value = 'Failed to fetch key value'
+  } finally {
+    keyValueLoading.value = false
+  }
 }
-
-watch(keys, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
 </script>
 
 <template>
   <div>
-    <!-- Stats bar -->
-    <div class="ss-dash-cache-stats">
-      <span class="ss-dash-cache-stat">
+    <!-- Stats -->
+    <div v-if="cacheData?.available && cacheData?.stats" class="ss-dash-cache-stats">
+      <div class="ss-dash-cache-stat">
         <span class="ss-dash-cache-stat-label">Hit Rate:</span>
-        <span class="ss-dash-cache-stat-value">{{ (stats.hitRate || 0).toFixed(0) }}%</span>
-      </span>
-      <span class="ss-dash-cache-stat">
-        <span class="ss-dash-cache-stat-label">Hits:</span>
-        <span class="ss-dash-cache-stat-value">{{ stats.totalHits || 0 }}</span>
-      </span>
-      <span class="ss-dash-cache-stat">
-        <span class="ss-dash-cache-stat-label">Misses:</span>
-        <span class="ss-dash-cache-stat-value">{{ stats.totalMisses || 0 }}</span>
-      </span>
-      <span class="ss-dash-cache-stat">
-        <span class="ss-dash-cache-stat-label">Keys:</span>
-        <span class="ss-dash-cache-stat-value">{{ stats.keyCount || 0 }}</span>
-      </span>
-      <span class="ss-dash-cache-stat">
-        <span class="ss-dash-cache-stat-label">Memory:</span>
-        <span class="ss-dash-cache-stat-value">{{ (stats.memoryUsedMb || 0).toFixed(1) }}MB</span>
-      </span>
-    </div>
-
-    <FilterBar v-model="search" placeholder="Filter keys..." :summary="`${keys.length} keys`" />
-
-    <!-- Key detail -->
-    <div v-if="selectedKey" class="ss-dash-cache-detail">
-      <div class="ss-dash-cache-detail-header">
-        <button class="ss-dash-action-btn" @click="selectedKey = null">&larr; Back</button>
-        <strong style="margin-left: 8px">{{ selectedKey.key }}</strong>
-        <span style="color: var(--ss-muted); margin-left: 8px">
-          {{ selectedKey.type }} | TTL: {{ formatTtl(selectedKey.ttl) }} | Size:
-          {{ formatSize(selectedKey.size) }}
-        </span>
-        <button
-          v-if="onDeleteKey"
-          class="ss-dash-danger-btn"
-          @click="handleDelete(selectedKey.key)"
-        >
-          Delete
-        </button>
+        <span class="ss-dash-cache-stat-value">{{ (cacheData.stats.hitRate ?? 0).toFixed(1) }}%</span>
       </div>
-      <pre v-if="selectedKey.value !== undefined" class="ss-dash-cache-value">{{
-        JSON.stringify(selectedKey.value, null, 2)
-      }}</pre>
+      <div class="ss-dash-cache-stat">
+        <span class="ss-dash-cache-stat-label">Hits:</span>
+        <span class="ss-dash-cache-stat-value">{{ cacheData.stats.hits ?? 0 }}</span>
+      </div>
+      <div class="ss-dash-cache-stat">
+        <span class="ss-dash-cache-stat-label">Misses:</span>
+        <span class="ss-dash-cache-stat-value">{{ cacheData.stats.misses ?? 0 }}</span>
+      </div>
+      <div class="ss-dash-cache-stat">
+        <span class="ss-dash-cache-stat-label">Keys:</span>
+        <span class="ss-dash-cache-stat-value">
+          {{ cacheData.stats.totalKeys || cacheData.stats.keyCount || keys.length || 0 }}
+        </span>
+      </div>
     </div>
 
-    <!-- Key list -->
-    <template v-else>
-      <div v-if="keys.length === 0" class="ss-dash-empty">No cache keys found</div>
+    <FilterBar
+      :model-value="search"
+      placeholder="Filter cache keys..."
+      :summary="`${keys.length} keys`"
+      @update:model-value="handleSearch"
+    />
 
-      <table v-else ref="tableRef" class="ss-dash-table">
-        <thead>
-          <tr>
-            <th>Key</th>
-            <th>Type</th>
-            <th>TTL</th>
-            <th>Size</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="k in keys" :key="k.key" style="cursor: pointer" @click="selectedKey = k">
-            <td style="color: var(--ss-sql-color)">{{ k.key }}</td>
-            <td style="color: var(--ss-muted)">{{ k.type }}</td>
-            <td style="color: var(--ss-dim)">{{ formatTtl(k.ttl) }}</td>
-            <td style="color: var(--ss-dim)">{{ formatSize(k.size) }}</td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-if="loading && !data" class="ss-dash-empty">Loading cache...</div>
+
+    <div v-else-if="!cacheData || !cacheData.available" class="ss-dash-empty">
+      Cache inspector not available
+    </div>
+
+    <template v-else>
+      <div class="ss-dash-table-wrap">
+        <table v-if="keys.length > 0" class="ss-dash-table">
+          <thead>
+            <tr>
+              <th>Key</th>
+              <th>Type</th>
+              <th>Size</th>
+              <th>TTL</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="k in keys"
+              :key="k.key"
+              class="ss-dash-clickable"
+              @click="handleKeyClick(k.key)"
+            >
+              <td>
+                <span
+                  :title="k.key"
+                  style="color: var(--ss-sql-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                >
+                  {{ k.key }}
+                </span>
+              </td>
+              <td><span style="color: var(--ss-muted)">{{ k.type }}</span></td>
+              <td>{{ k.size !== null && k.size !== undefined ? k.size + 'B' : '-' }}</td>
+              <td>{{ k.ttl > 0 ? `${k.ttl}s` : '-' }}</td>
+              <td>
+                <button
+                  type="button"
+                  class="ss-dash-retry-btn"
+                  @click.stop="handleDelete(k.key)"
+                >
+                  Delete
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="ss-dash-empty">No cache keys found</div>
+      </div>
     </template>
+
+    <!-- Key value detail -->
+    <div v-if="selectedKey" class="ss-dash-cache-detail">
+      <h4>Key: {{ selectedKey }}</h4>
+      <div v-if="keyValueLoading" class="ss-dash-empty">Loading value...</div>
+      <div v-else-if="keyValueError" class="ss-dash-empty" style="color: var(--ss-red-fg)">
+        {{ keyValueError }}
+      </div>
+      <JsonViewer v-else :value="keyValue" />
+    </div>
   </div>
 </template>

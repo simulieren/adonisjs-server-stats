@@ -162,5 +162,9 @@ export { DashboardApi } from './dashboard-api.js'
 // -- Constants --------------------------------------------------------------
 export { OVERVIEW_REFRESH_MS, SECTION_REFRESH_MS, DEBUG_REFRESH_MS } from './constants.js'
 
+// -- Icons ------------------------------------------------------------------
+export { TAB_ICONS } from './icons.js'
+export type { TabIconDef } from './icons.js'
+
 // -- Resizable columns ------------------------------------------------------
 export { initResizableColumns } from './resizable-columns.js'

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 /**
- * Time range selector (1h / 6h / 24h / 7d).
+ * Time range selector (5m / 15m / 30m / 1h / 6h / 24h / 7d).
+ *
+ * CSS classes match the React TimeRangeSelector component:
+ * - ss-dash-btn-group (container)
+ * - ss-dash-btn / ss-dash-active (buttons)
  */
 import type { TimeRange } from '../../../../core/index.js'
 
@@ -13,6 +17,9 @@ const emit = defineEmits<{
 }>()
 
 const ranges: { value: TimeRange; label: string }[] = [
+  { value: '5m', label: '5m' },
+  { value: '15m', label: '15m' },
+  { value: '30m', label: '30m' },
   { value: '1h', label: '1h' },
   { value: '6h', label: '6h' },
   { value: '24h', label: '24h' },
@@ -21,14 +28,12 @@ const ranges: { value: TimeRange; label: string }[] = [
 </script>
 
 <template>
-  <div class="ss-dash-time-range">
+  <div class="ss-dash-btn-group">
     <button
       v-for="range in ranges"
       :key="range.value"
-      :class="[
-        'ss-dash-time-range-btn',
-        { 'ss-dash-time-range-active': modelValue === range.value },
-      ]"
+      type="button"
+      :class="`ss-dash-btn ${modelValue === range.value ? 'ss-dash-active' : ''}`"
       @click="emit('update:modelValue', range.value)"
     >
       {{ range.label }}

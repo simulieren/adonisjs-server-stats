@@ -3,7 +3,8 @@
  * Logs with level filter tab for the debug panel.
  */
 import { ref, computed } from 'vue'
-import { formatTime, shortReqId } from '../../../../core/index.js'
+import { formatTime, timeAgo } from '../../../../core/index.js'
+import { TAB_ICONS } from '../../../../core/icons.js'
 
 interface LogEntry {
   id?: number
@@ -120,11 +121,21 @@ function filterByReqId(reqId: string) {
       <button
         v-for="level in LEVELS"
         :key="level"
+        type="button"
         :class="['ss-dbg-log-filter', { 'ss-dbg-active': activeLevel === level }]"
         @click="activeLevel = level"
       >
         {{ level }}
       </button>
+      <button
+        v-if="requestIdFilter"
+        type="button"
+        class="ss-dbg-log-filter ss-dbg-active"
+        @click="requestIdFilter = ''"
+      >
+        req: {{ requestIdFilter.slice(0, 8) }} x
+      </button>
+      <span class="ss-dbg-summary" style="margin-left: auto">{{ logs.length }} entries</span>
     </div>
 
     <div class="ss-dbg-search-bar">
@@ -150,16 +161,19 @@ function filterByReqId(reqId: string) {
         <span :class="['ss-dbg-log-level', levelClass(resolveLevel(log))]">
           {{ resolveLevel(log).toUpperCase() }}
         </span>
-        <span class="ss-dbg-log-time">{{ formatTime(resolveTime(log)) }}</span>
+        <span class="ss-dbg-log-time" :title="resolveTime(log) ? formatTime(resolveTime(log)) : ''">{{ resolveTime(log) ? timeAgo(resolveTime(log)) : '-' }}</span>
         <span
           v-if="resolveReqId(log)"
           class="ss-dbg-log-reqid"
-          @click="filterByReqId(resolveReqId(log))"
+          role="button"
+          tabindex="0"
           :title="resolveReqId(log)"
+          @click="filterByReqId(resolveReqId(log))"
+          @keydown.enter="filterByReqId(resolveReqId(log))"
         >
-          {{ shortReqId(resolveReqId(log)) }}
+          {{ resolveReqId(log).slice(0, 8) }}
         </span>
-        <span v-else class="ss-dbg-log-reqid-empty">--</span>
+        <span v-else class="ss-dbg-log-reqid-empty">-</span>
         <span class="ss-dbg-log-msg">{{ resolveMsg(log) }}</span>
         <a
           v-if="dashboardPath && resolveReqId(log)"
@@ -168,15 +182,14 @@ function filterByReqId(reqId: string) {
           class="ss-dbg-deeplink"
         >
           <svg
-            viewBox="0 0 16 16"
+            :viewBox="TAB_ICONS['open-external'].viewBox"
             width="12"
             height="12"
             fill="none"
             stroke="currentColor"
             stroke-width="2"
-          >
-            <path d="M6 3H3v10h10v-3M9 1h6v6M7 9L15 1" />
-          </svg>
+            v-html="TAB_ICONS['open-external'].elements.join('')"
+          ></svg>
         </a>
       </div>
     </div>

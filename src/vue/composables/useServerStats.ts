@@ -10,13 +10,13 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 
 import {
   ApiClient,
-  createTransmitSubscription,
+  subscribeToChannel,
   UnauthorizedError,
   STALE_MS,
   createHistoryBuffer,
 } from '../../core/index.js'
 
-import type { ServerStats, TransmitSubscriptionHandle } from '../../core/index.js'
+import type { ServerStats } from '../../core/index.js'
 
 export interface UseServerStatsOptions {
   /** Base URL for API requests. */
@@ -49,18 +49,17 @@ export function useServerStats(options: UseServerStatsOptions = {}) {
   const isUnauthorized = ref(false)
 
   const client = new ApiClient({ baseUrl, authToken })
-  let subscription: TransmitSubscriptionHandle | null = null
-  let pollTimer: ReturnType<typeof setInterval> | null = null
+  let sseHandle: { unsubscribe: () => void } | null = null
+  const pollTimer = ref<ReturnType<typeof setInterval> | null>(null)
   let staleTimer: ReturnType<typeof setInterval> | null = null
   let lastSuccess = 0
-  let sseActive = false
+  const sseActive = ref(false)
 
-  function handleStatsUpdate(newStats: ServerStats) {
+  function processStats(newStats: ServerStats) {
     stats.value = newStats
+    error.value = null
     lastSuccess = Date.now()
     isStale.value = false
-    isConnected.value = true
-    error.value = null
 
     historyBuffer.push(newStats)
 
@@ -71,29 +70,30 @@ export function useServerStats(options: UseServerStatsOptions = {}) {
     }
   }
 
-  async function fetchStats() {
+  async function poll() {
+    if (isUnauthorized.value) return
     try {
       const data = await client.fetch<ServerStats>(endpoint)
-      handleStatsUpdate(data)
+      processStats(data)
     } catch (err) {
       if (err instanceof UnauthorizedError) {
         isUnauthorized.value = true
-        stopPolling()
-      } else {
         error.value = err as Error
+        stopPolling()
       }
+      // Network errors just mean stale data
     }
   }
 
   function startPolling() {
-    fetchStats()
-    pollTimer = setInterval(fetchStats, pollInterval)
+    poll()
+    pollTimer.value = setInterval(poll, pollInterval)
   }
 
   function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer)
-      pollTimer = null
+    if (pollTimer.value) {
+      clearInterval(pollTimer.value)
+      pollTimer.value = null
     }
   }
 
@@ -105,47 +105,80 @@ export function useServerStats(options: UseServerStatsOptions = {}) {
 
   const connectionMode = computed<'live' | 'polling' | 'disconnected'>(() => {
     if (isUnauthorized.value) return 'disconnected'
-    if (sseActive) return 'live'
-    if (pollTimer) return 'polling'
+    if (sseActive.value) return 'live'
+    if (pollTimer.value) return 'polling'
     return 'disconnected'
   })
 
   onMounted(() => {
+    if (isUnauthorized.value) return
+
     // Try SSE first via Transmit
-    subscription = createTransmitSubscription({
-      baseUrl,
-      channelName,
-      authToken,
-      onMessage: (data) => {
-        sseActive = true
-        handleStatsUpdate(data as ServerStats)
-      },
-      onError: () => {
-        // Fallback to polling if SSE fails
-        sseActive = false
-        if (!pollTimer) {
-          startPolling()
+    let usePolling = false
+
+    try {
+      const sub = subscribeToChannel({
+        baseUrl,
+        channelName,
+        authToken,
+        onMessage: (data) => {
+          if (data && typeof data === 'object' && 'timestamp' in data) {
+            processStats(data as ServerStats)
+          }
+        },
+        onConnect: () => {
+          sseActive.value = true
+          isConnected.value = true
+          // Stop polling — SSE is delivering data
+          stopPolling()
+        },
+        onDisconnect: () => {
+          sseActive.value = false
+          isConnected.value = false
+          // Fall back to polling
+          if (!pollTimer.value && !isUnauthorized.value) {
+            pollTimer.value = setInterval(poll, pollInterval)
+          }
+        },
+        onError: () => {
+          usePolling = true
+        },
+      })
+
+      sseHandle = sub
+    } catch {
+      usePolling = true
+    }
+
+    // Always do an initial poll to get data fast
+    poll()
+
+    // Start polling as fallback (will be stopped if SSE connects)
+    if (usePolling || !sseHandle) {
+      pollTimer.value = setInterval(poll, pollInterval)
+    } else {
+      // Give SSE 3 seconds to connect, then start polling as backup
+      const fallbackTimer = setTimeout(() => {
+        if (!isConnected.value && !pollTimer.value) {
+          pollTimer.value = setInterval(poll, pollInterval)
         }
-      },
-    })
+      }, 3000)
 
-    // Start SSE subscription
-    subscription.subscribe().catch(() => {
-      // If SSE subscription fails, start polling
-      sseActive = false
-      startPolling()
-    })
-
-    // Also start polling as fallback — will be stopped if SSE works
-    startPolling()
+      // Store the fallback timer for cleanup
+      const originalUnsubscribe = sseHandle.unsubscribe
+      sseHandle.unsubscribe = () => {
+        clearTimeout(fallbackTimer)
+        originalUnsubscribe()
+      }
+    }
 
     // Stale detection
     staleTimer = setInterval(checkStale, 2000)
   })
 
   onUnmounted(() => {
-    subscription?.unsubscribe()
-    subscription = null
+    sseHandle?.unsubscribe()
+    sseHandle = null
     stopPolling()
     if (staleTimer) {
       clearInterval(staleTimer)
