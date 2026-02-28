@@ -10,12 +10,8 @@
  * the dashboard API because 'config' is in the DASHBOARD_TABS set).
  */
 import { ref, computed, watch } from 'vue'
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-type ConfigValue = string | number | boolean | null | undefined | ConfigValue[] | { [key: string]: ConfigValue }
+import { matchesConfigSearch, REDACT_PATTERN } from '../../../../core/config-utils.js'
+import type { ConfigValue } from '../../../../core/config-utils.js'
 
 interface ConfigData {
   app?: Record<string, ConfigValue>
@@ -55,10 +51,8 @@ watch(searchRaw, (val) => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const REDACT_PATTERNS = /secret|password|token|key|api_key|apikey|auth|credential|private/i
-
 function isRedacted(key: string): boolean {
-  return REDACT_PATTERNS.test(key)
+  return REDACT_PATTERN.test(key)
 }
 
 function formatValue(value: ConfigValue): string {
@@ -101,11 +95,7 @@ function copyAllJson() {
  * Check if a key or its string value matches the search term.
  */
 function matchesSearch(key: string, value: ConfigValue): boolean {
-  if (!searchDebounced.value) return true
-  const term = searchDebounced.value
-  if (key.toLowerCase().includes(term)) return true
-  const strVal = formatValue(value).toLowerCase()
-  return strVal.includes(term)
+  return matchesConfigSearch(key, value, searchDebounced.value)
 }
 
 /**

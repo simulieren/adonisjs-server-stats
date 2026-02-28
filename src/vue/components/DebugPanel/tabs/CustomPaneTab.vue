@@ -5,16 +5,17 @@
  * Renders a table based on DebugPane column definitions
  * with support for search, formatting, and badge colors.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import {
-  ApiClient,
   compactPreview,
   formatTime,
   timeAgo,
   formatDuration,
+  durationSeverity,
 } from '../../../../core/index.js'
+import { useApiClient } from '../../../composables/useApiClient.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import type { DebugPane, DebugPaneColumn } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
 
 const props = defineProps<{
   pane: DebugPane
@@ -26,14 +27,14 @@ const data = ref<Record<string, unknown>[]>([])
 const loading = ref(false)
 const search = ref('')
 
-const client = new ApiClient({ baseUrl: props.baseUrl || '', authToken: props.authToken })
+const getClient = useApiClient(props.baseUrl || '', props.authToken)
 let fetched = false
 
 async function fetchData() {
   if (props.pane.fetchOnce && fetched) return
   loading.value = true
   try {
-    const result = await client.fetch(props.pane.endpoint)
+    const result = await getClient().fetch(props.pane.endpoint)
     // Extract data using dataKey or pane id
     const dataKey = props.pane.dataKey || props.pane.id
     const parts = dataKey.split('.')
@@ -106,8 +107,9 @@ function isNullish(value: unknown): boolean {
 function durationClass(value: unknown): string {
   const ms = typeof value === 'number' ? value : parseFloat(String(value))
   if (isNaN(ms)) return 'ss-dbg-duration'
-  if (ms > 500) return 'ss-dbg-duration ss-dbg-very-slow'
-  if (ms > 100) return 'ss-dbg-duration ss-dbg-slow'
+  const sev = durationSeverity(ms)
+  if (sev === 'very-slow') return 'ss-dbg-duration ss-dbg-very-slow'
+  if (sev === 'slow') return 'ss-dbg-duration ss-dbg-slow'
   return 'ss-dbg-duration'
 }
 
@@ -127,26 +129,10 @@ function handleClear() {
   data.value = []
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
+const { tableRef } = useResizableTable(() => filteredData.value)
 
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(filteredData, attachResize)
 onMounted(() => {
   fetchData()
-  attachResize()
-})
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
 })
 </script>
 

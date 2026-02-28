@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 
 import { timeAgo, formatTime } from '../../../../core/formatters.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { useResizableTable } from '../../../hooks/useResizableTable.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
 import type { EventRecord, DebugPanelProps } from '../../../../core/types.js'
@@ -26,12 +26,7 @@ export function EventsTab({ options }: EventsTabProps) {
     )
   }, [data, search])
 
-  const tableRef = useRef<HTMLTableElement>(null)
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current)
-    }
-  }, [events])
+  const tableRef = useResizableTable([events])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading events...</div>

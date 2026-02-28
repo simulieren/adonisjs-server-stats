@@ -1,12 +1,14 @@
 /**
  * Vue composable for fetching debug panel data.
  *
- * Fetches data for the active tab with auto-refresh every 3s.
+ * Thin wrapper around {@link DebugDataController} — bridges the
+ * controller's callbacks into Vue reactive refs so consumers get
+ * the same interface as before.
  */
 
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 
-import { ApiClient, UnauthorizedError, getDebugTabPath } from '../../core/index.js'
+import { DebugDataController } from '../../core/debug-data-controller.js'
 
 import type { DebugTab } from '../../core/index.js'
 
@@ -32,7 +34,7 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
     debugEndpoint = '/admin/api/debug',
     dashboardEndpoint,
     authToken,
-    refreshInterval = 3000,
+    refreshInterval,
   } = options
 
   const data = ref<unknown>(null)
@@ -40,77 +42,84 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
   const error = ref<Error | null>(null)
   const isUnauthorized = ref(false)
 
-  const client = new ApiClient({ baseUrl, authToken })
-  let timer: ReturnType<typeof setInterval> | null = null
-  const fetchOnceCache = new Set<string>()
+  const controller = new DebugDataController({
+    baseUrl,
+    endpoint: debugEndpoint,
+    authToken,
+    refreshInterval,
+    onData: (d) => { data.value = d },
+    onLoading: (l) => { loading.value = l },
+    onError: (e) => { error.value = e },
+    onUnauthorized: () => { isUnauthorized.value = true },
+  })
 
-  async function fetchData() {
+  // For DASHBOARD_TABS we need a second controller that targets the
+  // dashboard endpoint.  Created lazily only when needed.
+  let dashboardController: DebugDataController | null = null
+
+  function getDashboardController(): DebugDataController {
+    if (!dashboardController && dashboardEndpoint) {
+      dashboardController = new DebugDataController({
+        baseUrl,
+        endpoint: dashboardEndpoint,
+        authToken,
+        refreshInterval,
+        onData: (d) => { data.value = d },
+        onLoading: (l) => { loading.value = l },
+        onError: (e) => { error.value = e },
+        onUnauthorized: () => { isUnauthorized.value = true },
+      })
+    }
+    return dashboardController!
+  }
+
+  /** Resolve which controller + tab path to use for the current tab. */
+  function startForTab() {
     const currentTab = tab()
     if (!currentTab) return
 
     // Custom tabs handle their own data fetching via CustomPaneTab
     if (currentTab.startsWith('custom-')) return
 
-    const path = getDebugTabPath(currentTab)
-    const endpoint = DASHBOARD_TABS.has(currentTab) && dashboardEndpoint
-      ? dashboardEndpoint
-      : debugEndpoint
-
-    loading.value = true
-    try {
-      const result = await client.fetch(`${endpoint}${path}`)
-      data.value = result
-      error.value = null
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        isUnauthorized.value = true
-        stopRefresh()
-      } else {
-        error.value = err as Error
-      }
-    } finally {
-      loading.value = false
+    // Route dashboard-specific tabs to the dashboard endpoint controller
+    if (DASHBOARD_TABS.has(currentTab) && dashboardEndpoint) {
+      const dc = getDashboardController()
+      // Use getDebugTabPath for the path suffix but the dashboard controller for the base
+      controller.stop()
+      dc.start(currentTab)
+    } else {
+      dashboardController?.stop()
+      controller.start(currentTab)
     }
+  }
+
+  function stopAll() {
+    controller.stop()
+    dashboardController?.stop()
   }
 
   /**
    * Fetch data for a custom pane endpoint.
    */
   async function fetchCustomPane(endpoint: string, fetchOnce: boolean = false) {
-    if (fetchOnce && fetchOnceCache.has(endpoint)) return
-
-    loading.value = true
-    try {
-      const result = await client.fetch(endpoint)
-      data.value = result
-      error.value = null
-      if (fetchOnce) fetchOnceCache.add(endpoint)
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        isUnauthorized.value = true
-      } else {
-        error.value = err as Error
-      }
-    } finally {
-      loading.value = false
-    }
+    await controller.fetchCustomPane(endpoint, fetchOnce)
   }
 
   function startRefresh() {
-    stopRefresh()
-    fetchData()
-    timer = setInterval(fetchData, refreshInterval)
+    startForTab()
   }
 
   function stopRefresh() {
-    if (timer) {
-      clearInterval(timer)
-      timer = null
-    }
+    stopAll()
   }
 
   function refresh() {
-    fetchData()
+    const currentTab = tab()
+    if (DASHBOARD_TABS.has(currentTab) && dashboardEndpoint && dashboardController) {
+      dashboardController.refresh()
+    } else {
+      controller.refresh()
+    }
   }
 
   function clear() {
@@ -120,11 +129,7 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
   // Watch for tab changes
   watch(tab, () => {
     clear()
-    if (timer) {
-      startRefresh()
-    } else {
-      fetchData()
-    }
+    startForTab()
   })
 
   onMounted(() => {
@@ -132,7 +137,7 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
   })
 
   onUnmounted(() => {
-    stopRefresh()
+    stopAll()
   })
 
   return {

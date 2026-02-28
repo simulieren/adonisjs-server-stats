@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 
 import { timeAgo, formatTime } from '../../../../core/formatters.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { useResizableTable } from '../../../hooks/useResizableTable.js'
 
 import type { EmailRecord, DebugPanelProps } from '../../../../core/types.js'
 
@@ -39,12 +39,7 @@ export function EmailsTab({ options }: EmailsTabProps) {
     failed: 'ss-dbg-email-status-failed',
   }
 
-  const tableRef = useRef<HTMLTableElement>(null)
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current)
-    }
-  }, [emails])
+  const tableRef = useResizableTable([emails])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading emails...</div>

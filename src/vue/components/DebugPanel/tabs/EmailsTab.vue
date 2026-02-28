@@ -2,9 +2,9 @@
 /**
  * Emails table with preview tab for the debug panel.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import { timeAgo, formatTime } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import type { EmailRecord } from '../../../../core/index.js'
 
 const props = defineProps<{
@@ -53,24 +53,7 @@ function closePreview() {
   previewEmail.value = null
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(emails, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+const { tableRef } = useResizableTable(() => emails.value)
 </script>
 
 <template>

@@ -6,11 +6,15 @@
  * via useDashboardData. CSS classes match the React RequestsSection.
  */
 import { ref, computed, inject, type Ref } from 'vue'
-import { ApiClient, timeAgo, formatTime } from '../../../../core/index.js'
+import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js'
+import { useApiClient } from '../../../composables/useApiClient.js'
+import { normalizeTraceFields } from '../../../../core/trace-utils.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import WaterfallChart from '../shared/WaterfallChart.vue'
+
+import type { NormalizedTrace, TraceDetail } from '../../../../core/trace-utils.js'
 
 const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
@@ -37,21 +41,7 @@ const search = ref('')
 const selectedTrace = ref<Record<string, unknown> | null>(null)
 const detailLoading = ref(false)
 
-interface TraceDetail {
-  method?: string
-  url?: string
-  status_code?: number
-  statusCode?: number
-  total_duration?: number
-  totalDuration?: number
-  duration?: number
-  spanCount?: number
-  span_count?: number
-  spans: unknown[] | string
-  warnings: string[] | string
-}
-
-const traceDetail = ref<TraceDetail | null>(null)
+const traceDetail = ref<NormalizedTrace | null>(null)
 
 const requests = computed<Record<string, unknown>[]>(() => {
   if (!data.value) return []
@@ -59,13 +49,7 @@ const requests = computed<Record<string, unknown>[]>(() => {
   return (d.data || d.requests || data.value || []) as Record<string, unknown>[]
 })
 
-let apiClient: ApiClient | null = null
-function getClient(): ApiClient {
-  if (!apiClient) {
-    apiClient = new ApiClient({ baseUrl, authToken })
-  }
-  return apiClient
-}
+const getClient = useApiClient(baseUrl, authToken)
 
 async function handleRowClick(row: Record<string, unknown>) {
   const id = row.id as number
@@ -73,7 +57,7 @@ async function handleRowClick(row: Record<string, unknown>) {
   try {
     const endpoint = dashboardEndpoint || '/__stats/api'
     const result = await getClient().fetch<TraceDetail>(`${endpoint}/requests/${id}`)
-    traceDetail.value = result
+    traceDetail.value = normalizeTraceFields(result as unknown as Record<string, unknown>)
     selectedTrace.value = row
   } catch {
     // silently fail
@@ -96,21 +80,13 @@ function handleSort(key: string) {
   setSort(key)
 }
 
-function parseSpans(raw: unknown[] | string | undefined): unknown[] {
-  if (!raw) return []
-  if (typeof raw === 'string') {
-    try { return JSON.parse(raw) } catch { return [] }
-  }
-  return Array.isArray(raw) ? raw : []
+function dashDurationClass(ms: number): string {
+  const sev = durationSeverity(ms)
+  if (sev === 'very-slow') return 'ss-dash-very-slow'
+  if (sev === 'slow') return 'ss-dash-slow'
+  return ''
 }
 
-function parseWarnings(raw: string[] | string | undefined): string[] {
-  if (!raw) return []
-  if (typeof raw === 'string') {
-    try { return JSON.parse(raw) } catch { return [] }
-  }
-  return Array.isArray(raw) ? raw : []
-}
 </script>
 
 <template>
@@ -125,19 +101,19 @@ function parseWarnings(raw: string[] | string | undefined): string[] {
           {{ traceDetail.method }}
         </span>
         <span style="color: var(--ss-text)">{{ traceDetail.url }}</span>
-        <span :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.status_code || traceDetail.statusCode || 200) / 100)}xx`">
-          {{ traceDetail.status_code || traceDetail.statusCode }}
+        <span :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.statusCode || 200) / 100)}xx`">
+          {{ traceDetail.statusCode }}
         </span>
         <span class="ss-dash-tl-meta">
-          {{ (traceDetail.total_duration || traceDetail.totalDuration || traceDetail.duration || 0).toFixed(1) }}ms
+          {{ traceDetail.totalDuration.toFixed(1) }}ms
           &middot;
-          {{ traceDetail.span_count || traceDetail.spanCount || 0 }} spans
+          {{ traceDetail.spanCount }} spans
         </span>
       </div>
       <WaterfallChart
-        :spans="parseSpans(traceDetail.spans) as any"
-        :total-duration="traceDetail.total_duration || traceDetail.totalDuration || traceDetail.duration || 0"
-        :warnings="parseWarnings(traceDetail.warnings)"
+        :spans="traceDetail.spans as any"
+        :total-duration="traceDetail.totalDuration"
+        :warnings="traceDetail.warnings"
       />
     </template>
 
@@ -232,7 +208,7 @@ function parseWarnings(raw: string[] | string | undefined): string[] {
                 </td>
                 <td>
                   <span
-                    :class="`ss-dash-duration ${((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0) > 500 ? 'ss-dash-very-slow' : ((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0) > 100 ? 'ss-dash-slow' : ''}`"
+                    :class="`ss-dash-duration ${dashDurationClass((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0)}`"
                   >
                     {{ ((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0).toFixed(1) }}ms
                   </span>

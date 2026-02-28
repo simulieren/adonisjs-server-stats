@@ -1,6 +1,12 @@
 import React, { useState, useCallback } from 'react'
 
 import { timeAgo, formatDuration, formatTime } from '../../../../core/formatters.js'
+import {
+  JOB_STATUS_FILTERS,
+  getJobStatusBadgeColor,
+  extractJobs,
+  extractJobStats,
+} from '../../../../core/job-utils.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Badge } from '../../shared/Badge.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
@@ -13,8 +19,6 @@ import type { BadgeColor, DashboardHookOptions } from '../../../../core/types.js
 interface JobsSectionProps {
   options?: DashboardHookOptions
 }
-
-const JOB_STATUSES = ['all', 'active', 'waiting', 'delayed', 'completed', 'failed'] as const
 
 export function JobsSection({ options = {} }: JobsSectionProps) {
   const [page, setPage] = useState(1)
@@ -32,27 +36,8 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
     filters,
   })
 
-  interface JobsResponse {
-    jobs?: Array<Record<string, unknown>>
-    stats?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
-    overview?: {
-      active: number
-      waiting: number
-      delayed: number
-      completed: number
-      failed: number
-    }
-  }
-
-  const jobsData = data as JobsResponse | Array<Record<string, unknown>> | null
-  const jobs =
-    (jobsData && !Array.isArray(jobsData)
-      ? jobsData.jobs
-      : Array.isArray(jobsData)
-        ? jobsData
-        : null) || []
-  const stats =
-    jobsData && !Array.isArray(jobsData) ? jobsData.stats || jobsData.overview : undefined
+  const jobs = extractJobs(data)
+  const stats = extractJobStats(data)
 
   const handleRetry = useCallback(
     async (jobId: string) => {
@@ -78,14 +63,6 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
     },
     [mutate, refresh]
   )
-
-  const statusColor: Record<string, string> = {
-    active: 'blue',
-    waiting: 'amber',
-    delayed: 'purple',
-    completed: 'green',
-    failed: 'red',
-  }
 
   return (
     <div>
@@ -117,7 +94,7 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
 
       <FilterBar search={search} onSearchChange={setSearch} placeholder="Filter jobs..." summary={`${meta?.total ?? jobs.length} jobs`}>
         <div className="ss-dash-btn-group">
-          {JOB_STATUSES.map((status) => (
+          {JOB_STATUS_FILTERS.map((status) => (
             <button
               key={status}
               type="button"
@@ -162,7 +139,7 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                   label: 'Status',
                   width: '90px',
                   render: (v: string) => (
-                    <Badge color={(statusColor[v] || 'muted') as BadgeColor}>{v}</Badge>
+                    <Badge color={getJobStatusBadgeColor(v) as BadgeColor}>{v}</Badge>
                   ),
                 },
                 {

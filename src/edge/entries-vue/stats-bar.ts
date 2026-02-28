@@ -1,19 +1,10 @@
 import { createApp, defineComponent, h, ref } from 'vue'
 import StatsBar from '../../vue/components/StatsBar/StatsBar.vue'
 import DebugPanel from '../../vue/components/DebugPanel/DebugPanel.vue'
+import { readConfig } from '../bootstrap.js'
+import type { EdgeBarConfig } from '../types.js'
 
-interface BarConfig {
-  endpoint?: string
-  pollInterval?: number
-  channelName?: string
-  authToken?: string
-  showDebug?: boolean
-  debugEndpoint?: string
-  dashboardPath?: string | null
-}
-
-const configEl = document.getElementById('ss-bar-config')
-const config: BarConfig = configEl ? JSON.parse(configEl.textContent || '{}') : {}
+const config = readConfig<EdgeBarConfig>('ss-bar-config')
 
 /** Wrapper component to bridge StatsBar "openDebugPanel" emit to DebugPanel toggle. */
 const App = defineComponent({

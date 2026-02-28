@@ -2,18 +2,23 @@ import React, {
   useState,
   useMemo,
   useCallback,
-  useRef,
-  useEffect,
 } from "react";
 
 import { timeAgo, formatDuration, formatTime } from "../../../../core/formatters.js";
-import { initResizableColumns } from "../../../../core/resizable-columns.js";
+import {
+  JOB_STATUS_FILTERS,
+  getJobStatusCssClass,
+  extractJobs as extractJobsFromData,
+  extractJobStats,
+} from "../../../../core/job-utils.js";
 import { useDebugData } from "../../../hooks/useDebugData.js";
+import { useDashboardApiBase } from "../../../hooks/useDashboardApiBase.js";
+import { useResizableTable } from "../../../hooks/useResizableTable.js";
 import { JsonViewer } from "../../shared/JsonViewer.js";
 
 import type {
   JobRecord,
-  JobStats,
+  JobsApiResponse,
   DebugPanelProps,
 } from "../../../../core/types.js";
 
@@ -23,53 +28,21 @@ interface JobsTabProps {
   dashboardPath?: string;
 }
 
-const JOB_STATUSES = [
-  "all",
-  "active",
-  "waiting",
-  "delayed",
-  "completed",
-  "failed",
-] as const;
-
-/**
- * Server response shape from the dashboard API `/api/jobs` endpoint.
- *
- * The server may return jobs under `jobs` or `data`, and stats under
- * `stats` or `overview`. We handle all variants to stay compatible
- * with different queue inspector implementations.
- */
-interface JobsResponse {
-  available?: boolean;
-  overview?: JobStats;
-  stats?: JobStats;
-  data?: JobRecord[];
-  jobs?: JobRecord[];
-  total?: number;
-}
-
 export function JobsTab({ options, dashboardPath }: JobsTabProps) {
-  // Jobs live on the dashboard API (e.g. /__stats/api/jobs), not the debug endpoint.
-  // Override the debugEndpoint so useDebugData fetches from the correct URL.
-  const dashApiBase = useMemo(
-    () => (dashboardPath ? dashboardPath.replace(/\/+$/, "") + "/api" : null),
-    [dashboardPath],
+  const { dashApiBase, resolvedOptions } = useDashboardApiBase(
+    dashboardPath,
+    options,
   );
-  const jobsOptions = useMemo(
-    () => (dashApiBase ? { ...options, debugEndpoint: dashApiBase } : options),
-    [dashApiBase, options],
-  );
-  const { data, isLoading, error } = useDebugData<JobsResponse>(
+  const { data, isLoading, error } = useDebugData<JobsApiResponse>(
     "jobs",
-    jobsOptions,
+    resolvedOptions,
   );
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [retrying, setRetrying] = useState<string | null>(null);
 
   // Extract jobs from the response (server may use `data` or `jobs` key)
   const jobs = useMemo(() => {
-    if (!data) return [];
-    const items = data.data || data.jobs || [];
+    const items = extractJobsFromData(data) as JobRecord[];
     if (statusFilter === "all") return items;
     return items.filter((j) => j.status === statusFilter);
   }, [data, statusFilter]);
@@ -97,21 +70,7 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
     [options, dashApiBase],
   );
 
-  const statusColorMap: Record<string, string> = {
-    completed: "ss-dbg-job-status-completed",
-    failed: "ss-dbg-job-status-failed",
-    active: "ss-dbg-job-status-active",
-    waiting: "ss-dbg-job-status-waiting",
-    delayed: "ss-dbg-job-status-delayed",
-  };
-
-  const tableRef = useRef<HTMLTableElement>(null);
-
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current);
-    }
-  }, [jobs]);
+  const tableRef = useResizableTable([jobs]);
 
   if (!dashApiBase) {
     return (
@@ -134,7 +93,7 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
   }
 
   // Server may return stats under `stats` or `overview`
-  const stats = data.stats || data.overview;
+  const stats = extractJobStats(data);
 
   return (
     <div>
@@ -169,7 +128,7 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
 
         {/* Status filter */}
         <div className="ss-dbg-log-filters">
-          {JOB_STATUSES.map((status) => (
+          {JOB_STATUS_FILTERS.map((status) => (
             <button
               key={status}
               type="button"
@@ -220,7 +179,7 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
                   </td>
                   <td>
                     <span
-                      className={`ss-dbg-badge ${statusColorMap[job.status] || "ss-dbg-badge-muted"}`}
+                      className={`ss-dbg-badge ${getJobStatusCssClass(job.status)}`}
                     >
                       {job.status}
                     </span>

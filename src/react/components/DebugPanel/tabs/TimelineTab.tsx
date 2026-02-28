@@ -1,13 +1,14 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 
-import { ApiClient } from "../../../../core/api-client.js";
+import { useApiClient } from "../../../hooks/useApiClient.js";
 import {
   timeAgo,
   formatDuration,
   formatTime,
+  durationSeverity,
 } from "../../../../core/formatters.js";
-import { initResizableColumns } from "../../../../core/resizable-columns.js";
 import { useDebugData } from "../../../hooks/useDebugData.js";
+import { useResizableTable } from "../../../hooks/useResizableTable.js";
 
 import type {
   TraceRecord,
@@ -66,13 +67,7 @@ export function TimelineTab({ options }: TimelineTabProps) {
     );
   }, [data, search]);
 
-  const clientRef = useRef<ApiClient | null>(null);
-  const getClient = useCallback(() => {
-    if (!clientRef.current) {
-      clientRef.current = new ApiClient({ baseUrl, authToken });
-    }
-    return clientRef.current;
-  }, [baseUrl, authToken]);
+  const getClient = useApiClient(baseUrl, authToken);
 
   // Fetch trace detail (with spans) when a trace is selected
   useEffect(() => {
@@ -120,12 +115,7 @@ export function TimelineTab({ options }: TimelineTabProps) {
     return "ss-dbg-status-2xx";
   }, []);
 
-  const tableRef = useRef<HTMLTableElement>(null);
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current);
-    }
-  }, [traces]);
+  const tableRef = useResizableTable([traces]);
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading traces...</div>;
@@ -327,7 +317,7 @@ export function TimelineTab({ options }: TimelineTabProps) {
                   </span>
                 </td>
                 <td
-                  className={`ss-dbg-duration ${trace.totalDuration > 500 ? "ss-dbg-very-slow" : trace.totalDuration > 100 ? "ss-dbg-slow" : ""}`}
+                  className={`ss-dbg-duration ${durationSeverity(trace.totalDuration) === 'very-slow' ? 'ss-dbg-very-slow' : durationSeverity(trace.totalDuration) === 'slow' ? 'ss-dbg-slow' : ''}`}
                 >
                   {formatDuration(trace.totalDuration)}
                 </td>

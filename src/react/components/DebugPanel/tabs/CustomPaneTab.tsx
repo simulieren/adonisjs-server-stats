@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 
-import { formatTime, timeAgo, formatDuration, compactPreview } from '../../../../core/formatters.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { formatTime, timeAgo, formatDuration, compactPreview, durationSeverity } from '../../../../core/formatters.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { useResizableTable } from '../../../hooks/useResizableTable.js'
 
 import type { DebugPane, DebugPanelProps, DebugTab } from '../../../../core/types.js'
 
@@ -79,7 +79,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
         if (isNaN(ms)) return String(value)
         return (
           <span
-            className={`ss-dbg-duration ${ms > 500 ? 'ss-dbg-very-slow' : ms > 100 ? 'ss-dbg-slow' : ''}`}
+            className={`ss-dbg-duration ${durationSeverity(ms) === 'very-slow' ? 'ss-dbg-very-slow' : durationSeverity(ms) === 'slow' ? 'ss-dbg-slow' : ''}`}
           >
             {formatDuration(ms)}
           </span>
@@ -113,12 +113,7 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     }
   }
 
-  const tableRef = useRef<HTMLTableElement>(null)
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current)
-    }
-  }, [filteredRows])
+  const tableRef = useResizableTable([filteredRows])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading {pane.label}...</div>

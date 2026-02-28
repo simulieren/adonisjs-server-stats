@@ -1,26 +1,10 @@
 import { resolve } from 'node:path'
 
 import vue from '@vitejs/plugin-vue'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig } from 'vite'
 import dts from 'vite-plugin-dts'
 
-/**
- * Vite plugin that rewrites all relative imports to src/core/ to the
- * bare package specifier `adonisjs-server-stats/core` and marks them external.
- * Must run with `enforce: 'pre'` so it intercepts before Vite resolves the path.
- */
-function externalizeCorePlugin(): Plugin {
-  return {
-    name: 'externalize-core',
-    enforce: 'pre',
-    resolveId(source) {
-      if (/(?:\.\.\/)+core(?:\/|$)/.test(source)) {
-        return { id: 'adonisjs-server-stats/core', external: true }
-      }
-      return null
-    },
-  }
-}
+import { externalizeCorePlugin } from './vite-plugins/externalize-core.js'
 
 export default defineConfig({
   plugins: [

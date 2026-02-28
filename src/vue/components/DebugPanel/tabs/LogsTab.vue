@@ -5,22 +5,17 @@
 import { ref, computed } from 'vue'
 import { formatTime, timeAgo } from '../../../../core/index.js'
 import { TAB_ICONS } from '../../../../core/icons.js'
+import {
+  LOG_LEVELS,
+  resolveLogLevel,
+  resolveLogMessage,
+  resolveLogTimestamp,
+  resolveLogRequestId,
+  getLogLevelCssClass,
+  filterLogsByLevel,
+} from '../../../../core/log-utils.js'
 
-interface LogEntry {
-  id?: number
-  level: string | number
-  levelName?: string
-  level_name?: string
-  msg?: string
-  message?: string
-  requestId?: string
-  request_id?: string
-  'x-request-id'?: string
-  time?: number
-  timestamp?: number
-  data?: Record<string, unknown>
-  [key: string]: unknown
-}
+import type { LogEntry } from '../../../../core/log-utils.js'
 
 const props = defineProps<{
   data: { logs?: LogEntry[]; entries?: LogEntry[] } | LogEntry[] | null
@@ -35,57 +30,23 @@ const activeLevel = ref('all')
 const search = ref('')
 const requestIdFilter = ref('')
 
-const LEVELS = ['all', 'error', 'warn', 'info', 'debug'] as const
-
-/** Resolve the log level string from whichever field the backend provides. */
-function resolveLevel(l: LogEntry): string {
-  return (
-    (l.levelName as string) ||
-    (l.level_name as string) ||
-    (typeof l.level === 'string' ? l.level : '') ||
-    'info'
-  ).toLowerCase()
-}
-
-/** Resolve the message from whichever field the backend provides. */
-function resolveMsg(l: LogEntry): string {
-  return (l.msg as string) || (l.message as string) || JSON.stringify(l)
-}
-
-/** Resolve the timestamp from whichever field the backend provides. */
-function resolveTime(l: LogEntry): number {
-  return (l.time as number) || (l.timestamp as number) || 0
-}
-
-/** Resolve the request ID from whichever field the backend provides. */
-function resolveReqId(l: LogEntry): string {
-  return (l.requestId as string) || (l.request_id as string) || (l['x-request-id'] as string) || ''
-}
-
 const logs = computed<LogEntry[]>(() => {
   const d = props.data
   let arr: LogEntry[] = d ? (Array.isArray(d) ? d : d.logs || d.entries) || [] : []
 
-  if (activeLevel.value !== 'all') {
-    const level = activeLevel.value
-    arr = arr.filter((l) => {
-      const resolved = resolveLevel(l)
-      if (level === 'error') return resolved === 'error' || resolved === 'fatal'
-      return resolved === level
-    })
-  }
+  arr = filterLogsByLevel(arr, activeLevel.value)
 
   if (requestIdFilter.value.trim()) {
     const rid = requestIdFilter.value.trim().toLowerCase()
     arr = arr.filter((l) => {
-      const reqId = resolveReqId(l)
+      const reqId = resolveLogRequestId(l)
       return reqId && reqId.toLowerCase().includes(rid)
     })
   }
 
   if (search.value.trim()) {
     const s = search.value.trim().toLowerCase()
-    arr = arr.filter((l) => resolveMsg(l).toLowerCase().includes(s))
+    arr = arr.filter((l) => resolveLogMessage(l).toLowerCase().includes(s))
   }
 
   return arr
@@ -97,18 +58,6 @@ const summary = computed(() => {
   return `${logs.value.length} of ${all.length} entries`
 })
 
-function levelClass(level: string): string {
-  const map: Record<string, string> = {
-    info: 'ss-dbg-log-level-info',
-    warn: 'ss-dbg-log-level-warn',
-    error: 'ss-dbg-log-level-error',
-    fatal: 'ss-dbg-log-level-fatal',
-    debug: 'ss-dbg-log-level-debug',
-    trace: 'ss-dbg-log-level-trace',
-  }
-  return map[level] || 'ss-dbg-log-level-debug'
-}
-
 function filterByReqId(reqId: string) {
   requestIdFilter.value = reqId
   emit('filterByRequestId', reqId)
@@ -119,7 +68,7 @@ function filterByReqId(reqId: string) {
   <div>
     <div class="ss-dbg-log-filters">
       <button
-        v-for="level in LEVELS"
+        v-for="level in LOG_LEVELS"
         :key="level"
         type="button"
         :class="['ss-dbg-log-filter', { 'ss-dbg-active': activeLevel === level }]"
@@ -158,26 +107,26 @@ function filterByReqId(reqId: string) {
 
     <div v-else>
       <div v-for="(log, i) in logs" :key="log.id || i" class="ss-dbg-log-entry">
-        <span :class="['ss-dbg-log-level', levelClass(resolveLevel(log))]">
-          {{ resolveLevel(log).toUpperCase() }}
+        <span :class="['ss-dbg-log-level', getLogLevelCssClass(resolveLogLevel(log))]">
+          {{ resolveLogLevel(log).toUpperCase() }}
         </span>
-        <span class="ss-dbg-log-time" :title="resolveTime(log) ? formatTime(resolveTime(log)) : ''">{{ resolveTime(log) ? timeAgo(resolveTime(log)) : '-' }}</span>
+        <span class="ss-dbg-log-time" :title="resolveLogTimestamp(log) ? formatTime(resolveLogTimestamp(log)) : ''">{{ resolveLogTimestamp(log) ? timeAgo(resolveLogTimestamp(log)) : '-' }}</span>
         <span
-          v-if="resolveReqId(log)"
+          v-if="resolveLogRequestId(log)"
           class="ss-dbg-log-reqid"
           role="button"
           tabindex="0"
-          :title="resolveReqId(log)"
-          @click="filterByReqId(resolveReqId(log))"
-          @keydown.enter="filterByReqId(resolveReqId(log))"
+          :title="resolveLogRequestId(log)"
+          @click="filterByReqId(resolveLogRequestId(log))"
+          @keydown.enter="filterByReqId(resolveLogRequestId(log))"
         >
-          {{ resolveReqId(log).slice(0, 8) }}
+          {{ resolveLogRequestId(log).slice(0, 8) }}
         </span>
         <span v-else class="ss-dbg-log-reqid-empty">-</span>
-        <span class="ss-dbg-log-msg">{{ resolveMsg(log) }}</span>
+        <span class="ss-dbg-log-msg">{{ resolveLogMessage(log) }}</span>
         <a
-          v-if="dashboardPath && resolveReqId(log)"
-          :href="`${dashboardPath}#logs?requestId=${resolveReqId(log)}`"
+          v-if="dashboardPath && resolveLogRequestId(log)"
+          :href="`${dashboardPath}#logs?requestId=${resolveLogRequestId(log)}`"
           target="_blank"
           class="ss-dbg-deeplink"
         >

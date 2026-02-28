@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react'
+import React from 'react'
 
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { useDashboardApiBase } from '../../../hooks/useDashboardApiBase.js'
 import { ConfigContent } from '../../shared/ConfigContent.js'
 
 import type { ConfigValue } from '../../shared/ConfigContent.js'
@@ -12,18 +13,11 @@ interface ConfigTabProps {
 }
 
 export function ConfigTab({ options, dashboardPath }: ConfigTabProps) {
-  const dashApiBase = useMemo(
-    () => (dashboardPath ? dashboardPath.replace(/\/+$/, '') + '/api' : null),
-    [dashboardPath]
-  )
-  const configOptions = useMemo(
-    () => (dashApiBase ? { ...options, debugEndpoint: dashApiBase } : options),
-    [dashApiBase, options]
-  )
+  const { resolvedOptions } = useDashboardApiBase(dashboardPath, options)
   const { data, isLoading, error } = useDebugData<{
     app?: Record<string, ConfigValue>
     env?: Record<string, ConfigValue>
-  }>('config', configOptions)
+  }>('config', resolvedOptions)
 
   if (error) {
     return <div className="ss-dbg-empty">Error: {error.message}</div>

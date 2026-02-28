@@ -1,6 +1,14 @@
 import React, { useState, useCallback } from 'react'
 
 import { formatTime, timeAgo } from '../../../../core/formatters.js'
+import {
+  LOG_LEVELS,
+  resolveLogLevel,
+  resolveLogMessage,
+  resolveLogTimestamp,
+  resolveLogRequestId,
+  getLogLevelCssClass,
+} from '../../../../core/log-utils.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
@@ -16,8 +24,6 @@ interface StructuredFilter {
   operator: string
   value: string
 }
-
-const LOG_LEVELS = ['all', 'error', 'warn', 'info', 'debug'] as const
 
 export function LogsSection({ options = {} }: LogsSectionProps) {
   const [page, setPage] = useState(1)
@@ -218,33 +224,17 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
       ) : (
         <div className="ss-dash-log-entries">
           {logs.map((log, i) => {
-            const level = (
-              (log.level as string) ||
-              (log.levelName as string) ||
-              (log.level_name as string) ||
-              'info'
-            ).toLowerCase()
-            const message = ((log.message as string) || (log.msg as string) || '') as string
-            const logData = (log.data || {}) as Record<string, unknown>
-            const reqId = (
-              (log.requestId as string) ||
-              (log.request_id as string) ||
-              (log['x-request-id'] as string) ||
-              (logData.requestId as string) ||
-              (logData.request_id as string) ||
-              (logData['x-request-id'] as string) ||
-              ''
-            ) as string
-            const ts = (log.createdAt || log.created_at || log.time || log.timestamp || 0) as
-              | string
-              | number
+            const level = resolveLogLevel(log)
+            const message = resolveLogMessage(log)
+            const reqId = resolveLogRequestId(log)
+            const ts = resolveLogTimestamp(log)
 
             return (
               <div key={(log.id as string) || i} className="ss-dash-log-entry">
-                <span className={`ss-dash-log-level ss-dash-log-level-${level}`}>
+                <span className={`ss-dash-log-level ${getLogLevelCssClass(level, 'ss-dash-log-level')}`}>
                   {level.toUpperCase()}
                 </span>
-                <span className="ss-dash-log-time" title={ts ? formatTime(ts as string) : ''}>{ts ? timeAgo(ts as string) : '-'}</span>
+                <span className="ss-dash-log-time" title={ts ? formatTime(ts) : ''}>{ts ? timeAgo(ts) : '-'}</span>
                 {reqId ? (
                   <span
                     className="ss-dash-log-reqid"

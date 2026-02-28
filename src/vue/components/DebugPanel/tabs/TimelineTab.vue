@@ -5,19 +5,17 @@
 import {
   ref,
   computed,
-  onMounted,
   onBeforeUnmount,
-  watch,
-  nextTick,
 } from "vue";
 import {
-  ApiClient,
   formatDuration,
   formatTime,
   statusColor,
   timeAgo,
+  durationSeverity,
 } from "../../../../core/index.js";
-import { initResizableColumns } from "../../../../core/resizable-columns.js";
+import { useApiClient } from "../../../composables/useApiClient.js";
+import { useResizableTable } from "../../../composables/useResizableTable.js";
 import { TAB_ICONS } from "../../../../core/icons.js";
 import type { TraceRecord, TraceSpan } from "../../../../core/index.js";
 
@@ -35,16 +33,7 @@ const traceDetail = ref<TraceRecord | null>(null);
 const detailLoading = ref(false);
 const detailError = ref<string | null>(null);
 
-let apiClient: ApiClient | null = null;
-function getClient(): ApiClient {
-  if (!apiClient) {
-    apiClient = new ApiClient({
-      baseUrl: props.baseUrl || "",
-      authToken: props.authToken,
-    });
-  }
-  return apiClient;
-}
+const getClient = useApiClient(props.baseUrl || "", props.authToken);
 
 const traces = computed<TraceRecord[]>(() => {
   const d = props.data;
@@ -143,25 +132,18 @@ function getBarStyle(
   };
 }
 
-const tableRef = ref<HTMLTableElement | null>(null);
-let cleanupResize: (() => void) | null = null;
+const { tableRef } = useResizableTable(() => traces.value);
 
-function attachResize() {
-  if (cleanupResize) cleanupResize();
-  cleanupResize = null;
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value);
-    }
-  });
-}
-
-watch(traces, attachResize);
-onMounted(attachResize);
 onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize();
   if (fetchAbortController) fetchAbortController.abort();
 });
+
+function dbgDurationClass(ms: number): string {
+  const sev = durationSeverity(ms)
+  if (sev === 'very-slow') return 'ss-dbg-very-slow'
+  if (sev === 'slow') return 'ss-dbg-slow'
+  return ''
+}
 </script>
 
 <template>
@@ -318,7 +300,7 @@ onBeforeUnmount(() => {
                 {{ t.statusCode }}
               </span>
             </td>
-            <td :class="['ss-dbg-duration', t.totalDuration > 500 ? 'ss-dbg-very-slow' : t.totalDuration > 100 ? 'ss-dbg-slow' : '']">
+            <td :class="['ss-dbg-duration', dbgDurationClass(t.totalDuration)]">
               {{ formatDuration(t.totalDuration) }}
             </td>
             <td class="ss-dbg-c-muted" style="text-align: center">

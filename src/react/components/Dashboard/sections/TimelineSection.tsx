@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 
-import { ApiClient } from '../../../../core/api-client.js'
-import { timeAgo, formatTime } from '../../../../core/formatters.js'
+import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
+import { normalizeTraceFields } from '../../../../core/trace-utils.js'
+import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
 import { DataTable } from '../shared/DataTable.js'
@@ -10,31 +11,12 @@ import { Pagination } from '../shared/Pagination.js'
 import { WaterfallChart } from '../shared/WaterfallChart.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
+import type { TraceDetail } from '../../../../core/trace-utils.js'
 
 interface TimelineSectionProps {
   options?: DashboardHookOptions
   /** When false, show a "tracing disabled" message instead of fetching. Defaults to true. */
   tracingEnabled?: boolean
-}
-
-interface TraceDetail {
-  method?: string
-  url?: string
-  status_code?: number
-  statusCode?: number
-  total_duration?: number
-  totalDuration?: number
-  spanCount?: number
-  spans?: Array<{
-    id: string
-    label: string
-    startOffset: number
-    duration: number
-    category: string
-    parentId?: string
-    metadata?: Record<string, unknown>
-  }> | string
-  warnings?: string[] | string
 }
 
 export function TimelineSection({ options = {}, tracingEnabled = true }: TimelineSectionProps) {
@@ -47,16 +29,7 @@ export function TimelineSection({ options = {}, tracingEnabled = true }: Timelin
   const { data, meta, isLoading, error } = useDashboardData('traces', { ...options, page, search })
   const traces = (data as Record<string, unknown>[]) || []
 
-  const clientRef = useRef<ApiClient | null>(null)
-  const getClient = useCallback(() => {
-    if (!clientRef.current) {
-      clientRef.current = new ApiClient({
-        baseUrl: options.baseUrl || '',
-        authToken: options.authToken,
-      })
-    }
-    return clientRef.current
-  }, [options.baseUrl, options.authToken])
+  const getClient = useApiClient(options.baseUrl || '', options.authToken)
 
   // Fetch individual trace detail when selectedId changes
   useEffect(() => {
@@ -99,38 +72,7 @@ export function TimelineSection({ options = {}, tracingEnabled = true }: Timelin
   }
 
   if (selectedId && traceDetail) {
-    // Parse spans from string if they come as JSON strings
-    let spans: TraceDetail['spans'] = traceDetail.spans
-    if (typeof spans === 'string') {
-      try {
-        spans = JSON.parse(spans)
-      } catch {
-        spans = []
-      }
-    }
-    const parsedSpans = (Array.isArray(spans) ? spans : []) as Array<{
-      id: string
-      label: string
-      startOffset: number
-      duration: number
-      category: string
-      parentId?: string
-      metadata?: Record<string, unknown>
-    }>
-
-    // Parse warnings from string if they come as JSON strings
-    let warnings: TraceDetail['warnings'] = traceDetail.warnings
-    if (typeof warnings === 'string') {
-      try {
-        warnings = JSON.parse(warnings)
-      } catch {
-        warnings = []
-      }
-    }
-    const parsedWarnings = (Array.isArray(warnings) ? warnings : []) as string[]
-
-    const duration = traceDetail.total_duration || traceDetail.totalDuration || 0
-    const spanCount = traceDetail.spanCount ?? parsedSpans.length
+    const normalized = normalizeTraceFields(traceDetail as unknown as Record<string, unknown>)
 
     return (
       <div>
@@ -138,17 +80,17 @@ export function TimelineSection({ options = {}, tracingEnabled = true }: Timelin
           <button type="button" className="ss-dash-btn" onClick={handleBack}>
             ← Back
           </button>
-          <MethodBadge method={traceDetail.method || ''} />
-          <span style={{ color: 'var(--ss-text)' }}>{traceDetail.url}</span>
-          <StatusBadge code={traceDetail.status_code || traceDetail.statusCode || 0} />
+          <MethodBadge method={normalized.method} />
+          <span style={{ color: 'var(--ss-text)' }}>{normalized.url}</span>
+          <StatusBadge code={normalized.statusCode} />
           <span className="ss-dash-tl-meta">
-            {duration.toFixed(1)}ms &middot; {spanCount} spans
+            {normalized.totalDuration.toFixed(1)}ms &middot; {normalized.spanCount} spans
           </span>
         </div>
         <WaterfallChart
-          spans={parsedSpans}
-          totalDuration={duration}
-          warnings={parsedWarnings}
+          spans={normalized.spans}
+          totalDuration={normalized.totalDuration}
+          warnings={normalized.warnings}
         />
       </div>
     )
@@ -226,7 +168,7 @@ export function TimelineSection({ options = {}, tracingEnabled = true }: Timelin
                   width: '80px',
                   render: (v: number) => (
                     <span
-                      className={`ss-dash-duration ${v > 500 ? 'ss-dash-very-slow' : v > 100 ? 'ss-dash-slow' : ''}`}
+                      className={`ss-dash-duration ${durationSeverity(v) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(v) === 'slow' ? 'ss-dash-slow' : ''}`}
                     >
                       {v.toFixed(1)}ms
                     </span>

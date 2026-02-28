@@ -7,9 +7,9 @@
 
 import { ref, onMounted } from 'vue'
 
-import { ApiClient, fetchFeatures, DEFAULT_FEATURES } from '../../core/index.js'
+import { detectFeatures, DEFAULT_FEATURES } from '../../core/index.js'
 
-import type { FeatureConfig, FeatureFlags } from '../../core/index.js'
+import type { FeatureConfig } from '../../core/index.js'
 
 export interface UseFeaturesOptions {
   /** Base URL for API requests. */
@@ -20,27 +20,6 @@ export interface UseFeaturesOptions {
   authToken?: string
 }
 
-/**
- * Flatten a {@link FeatureFlags} response into a flat {@link FeatureConfig}.
- */
-function toFeatureConfig(flags: FeatureFlags): FeatureConfig {
-  return {
-    tracing: flags.features?.tracing ?? false,
-    process: flags.features?.process ?? false,
-    system: flags.features?.system ?? false,
-    http: flags.features?.http ?? false,
-    db: flags.features?.db ?? false,
-    redis: flags.features?.redis ?? false,
-    queues: flags.features?.queues ?? false,
-    cache: flags.features?.cache ?? false,
-    app: flags.features?.app ?? false,
-    log: flags.features?.log ?? false,
-    emails: flags.features?.emails ?? false,
-    dashboard: flags.features?.dashboard ?? false,
-    customPanes: flags.customPanes ?? [],
-  }
-}
-
 export function useFeatures(options: UseFeaturesOptions = {}) {
   const { baseUrl = '', debugEndpoint = '/admin/api/debug', authToken } = options
 
@@ -48,15 +27,8 @@ export function useFeatures(options: UseFeaturesOptions = {}) {
   const loading = ref(true)
 
   onMounted(async () => {
-    const client = new ApiClient({ baseUrl, authToken })
-    try {
-      const flags = await fetchFeatures(client, debugEndpoint)
-      features.value = toFeatureConfig(flags)
-    } catch {
-      // Use defaults on failure
-    } finally {
-      loading.value = false
-    }
+    features.value = await detectFeatures({ baseUrl, debugEndpoint, authToken })
+    loading.value = false
   })
 
   return {

@@ -2,33 +2,16 @@
 /**
  * Queue management tab for the debug panel.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import { timeAgo, formatDuration, formatTime } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { JOB_STATUS_FILTERS, getJobStatusCssClass } from '../../../../core/job-utils.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 
-interface JobEntry {
-  id: string
-  name: string
-  status: string
-  data?: unknown
-  payload?: unknown
-  attempts: number
-  duration: number | null
-  error?: string
-  failedReason?: string | null
-  timestamp: number
-  createdAt?: number
-}
-
-interface JobTabData {
-  stats?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
-  overview?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
-  jobs?: JobEntry[]
-}
+import type { JobRecord, JobsApiResponse } from '../../../../core/types.js'
 
 const props = defineProps<{
-  data: JobTabData | null
+  data: JobsApiResponse | null
 }>()
 
 const emit = defineEmits<{
@@ -37,43 +20,20 @@ const emit = defineEmits<{
 
 const activeFilter = ref('all')
 
-const FILTERS = ['all', 'active', 'waiting', 'delayed', 'completed', 'failed'] as const
-
 const jobData = computed(() => props.data || {})
 const stats = computed(() => jobData.value.stats || jobData.value.overview || {})
 
-const jobs = computed<JobEntry[]>(() => {
+const jobs = computed<JobRecord[]>(() => {
   const arr = jobData.value.jobs || []
   if (activeFilter.value === 'all') return arr
-  return arr.filter((j: JobEntry) => j.status === activeFilter.value)
+  return arr.filter((j: JobRecord) => j.status === activeFilter.value)
 })
-
-function statusClass(status: string): string {
-  return `ss-dbg-badge ss-dbg-job-status-${status}`
-}
 
 function handleRetry(jobId: string) {
   emit('retryJob', jobId)
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(jobs, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+const { tableRef } = useResizableTable(() => jobs.value)
 </script>
 
 <template>
@@ -104,7 +64,7 @@ onBeforeUnmount(() => {
 
       <div class="ss-dbg-log-filters">
         <button
-          v-for="f in FILTERS"
+          v-for="f in JOB_STATUS_FILTERS"
           :key="f"
           :class="['ss-dbg-job-filter', { 'ss-dbg-active': activeFilter === f }]"
           @click="activeFilter = f"
@@ -134,7 +94,7 @@ onBeforeUnmount(() => {
           <td class="ss-dbg-c-dim">{{ j.id }}</td>
           <td class="ss-dbg-c-sql">{{ j.name }}</td>
           <td>
-            <span :class="statusClass(j.status)">{{ j.status }}</span>
+            <span :class="`ss-dbg-badge ${getJobStatusCssClass(j.status)}`">{{ j.status }}</span>
           </td>
           <td>
             <JsonViewer :value="j.payload || j.data" :max-len="60" class-prefix="ss-dbg" />

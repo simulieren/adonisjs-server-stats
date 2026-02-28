@@ -7,41 +7,19 @@
  */
 import { ref, computed, inject, type Ref } from 'vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
-import { ApiClient, DashboardApi } from '../../../../core/index.js'
+import { DashboardApi, formatTtl, formatCacheSize } from '../../../../core/index.js'
+import { useApiClient } from '../../../composables/useApiClient.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 import FilterBar from '../shared/FilterBar.vue'
+import type {
+  DashboardCacheKeyEntry,
+  DashboardCacheResponse,
+} from '../../../../core/types.js'
 
 const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
-
-interface CacheStats {
-  connected?: boolean
-  hits?: number
-  misses?: number
-  hitRate?: number
-  memoryUsedBytes?: number
-  memoryUsedHuman?: string
-  connectedClients?: number
-  totalKeys?: number
-  keyCount?: number
-}
-
-interface CacheKeyEntry {
-  key: string
-  type: string
-  ttl: number
-  size?: number | null
-}
-
-interface CacheResponse {
-  available?: boolean
-  stats?: CacheStats | null
-  keys?: CacheKeyEntry[]
-  data?: CacheKeyEntry[]
-  cursor?: string
-}
 
 const {
   data,
@@ -55,8 +33,8 @@ const {
   refreshKey,
 })
 
-const cacheClient = new ApiClient({ baseUrl: baseUrl || '', authToken })
-const cacheApi = new DashboardApi(cacheClient, dashboardEndpoint || '/__stats/api')
+const getCacheClient = useApiClient(baseUrl || '', authToken)
+const cacheApi = new DashboardApi(getCacheClient(), dashboardEndpoint || '/__stats/api')
 
 const search = ref('')
 const selectedKey = ref<string | null>(null)
@@ -64,11 +42,11 @@ const keyValue = ref<unknown>(null)
 const keyValueLoading = ref(false)
 const keyValueError = ref<string | null>(null)
 
-const cacheData = computed<CacheResponse | null>(() => {
-  return data.value as CacheResponse | null
+const cacheData = computed<DashboardCacheResponse | null>(() => {
+  return data.value as DashboardCacheResponse | null
 })
 
-const keys = computed<CacheKeyEntry[]>(() => {
+const keys = computed<DashboardCacheKeyEntry[]>(() => {
   return cacheData.value?.keys || cacheData.value?.data || []
 })
 
@@ -182,8 +160,8 @@ async function handleKeyClick(key: string) {
                 </span>
               </td>
               <td><span style="color: var(--ss-muted)">{{ k.type }}</span></td>
-              <td>{{ k.size !== null && k.size !== undefined ? k.size + 'B' : '-' }}</td>
-              <td>{{ k.ttl > 0 ? `${k.ttl}s` : '-' }}</td>
+              <td>{{ k.size !== null && k.size !== undefined && k.size > 0 ? formatCacheSize(k.size) : '-' }}</td>
+              <td>{{ k.ttl > 0 ? formatTtl(k.ttl) : '-' }}</td>
               <td>
                 <button
                   type="button"

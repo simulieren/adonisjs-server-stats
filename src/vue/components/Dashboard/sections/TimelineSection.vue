@@ -6,11 +6,15 @@
  * CSS classes match the React TimelineSection.
  */
 import { ref, computed, inject, type Ref } from 'vue'
-import { ApiClient, timeAgo, formatTime } from '../../../../core/index.js'
+import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js'
+import { useApiClient } from '../../../composables/useApiClient.js'
+import { parseTraceSpans, parseTraceWarnings } from '../../../../core/trace-utils.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import WaterfallChart from '../shared/WaterfallChart.vue'
+
+import type { TraceDetail } from '../../../../core/trace-utils.js'
 
 const props = withDefaults(defineProps<{
   /** When false, show a "tracing disabled" message instead of fetching. Defaults to true. */
@@ -23,18 +27,6 @@ const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
-
-interface TraceDetail {
-  method?: string
-  url?: string
-  status_code?: number
-  statusCode?: number
-  total_duration?: number
-  totalDuration?: number
-  spanCount?: number
-  spans?: unknown[] | string
-  warnings?: string[] | string
-}
 
 const {
   data,
@@ -61,13 +53,7 @@ const traces = computed<Record<string, unknown>[]>(() => {
   return (d.data || d.traces || data.value || []) as Record<string, unknown>[]
 })
 
-let apiClient: ApiClient | null = null
-function getClient(): ApiClient {
-  if (!apiClient) {
-    apiClient = new ApiClient({ baseUrl, authToken })
-  }
-  return apiClient
-}
+const getClient = useApiClient(baseUrl, authToken)
 
 async function selectTrace(id: number) {
   selectedId.value = id
@@ -94,21 +80,13 @@ function handleSearch(term: string) {
   setSearch(term)
 }
 
-function parseSpans(raw: unknown[] | string | undefined): unknown[] {
-  if (!raw) return []
-  if (typeof raw === 'string') {
-    try { return JSON.parse(raw) } catch { return [] }
-  }
-  return Array.isArray(raw) ? raw : []
+function dashDurationClass(ms: number): string {
+  const sev = durationSeverity(ms)
+  if (sev === 'very-slow') return 'ss-dash-very-slow'
+  if (sev === 'slow') return 'ss-dash-slow'
+  return ''
 }
 
-function parseWarnings(raw: string[] | string | undefined): string[] {
-  if (!raw) return []
-  if (typeof raw === 'string') {
-    try { return JSON.parse(raw) } catch { return [] }
-  }
-  return Array.isArray(raw) ? raw : []
-}
 </script>
 
 <template>
@@ -134,13 +112,13 @@ function parseWarnings(raw: string[] | string | undefined): string[] {
         <span class="ss-dash-tl-meta">
           {{ (traceDetail.total_duration || traceDetail.totalDuration || 0).toFixed(1) }}ms
           &middot;
-          {{ traceDetail.spanCount ?? parseSpans(traceDetail.spans).length }} spans
+          {{ traceDetail.spanCount ?? parseTraceSpans(traceDetail.spans).length }} spans
         </span>
       </div>
       <WaterfallChart
-        :spans="parseSpans(traceDetail.spans) as any"
+        :spans="parseTraceSpans(traceDetail.spans) as any"
         :total-duration="traceDetail.total_duration || traceDetail.totalDuration || 0"
-        :warnings="parseWarnings(traceDetail.warnings)"
+        :warnings="parseTraceWarnings(traceDetail.warnings)"
       />
     </template>
 
@@ -218,7 +196,7 @@ function parseWarnings(raw: string[] | string | undefined): string[] {
                 </td>
                 <td>
                   <span
-                    :class="`ss-dash-duration ${((t.totalDuration as number) || (t.total_duration as number) || 0) > 500 ? 'ss-dash-very-slow' : ((t.totalDuration as number) || (t.total_duration as number) || 0) > 100 ? 'ss-dash-slow' : ''}`"
+                    :class="`ss-dash-duration ${dashDurationClass((t.totalDuration as number) || (t.total_duration as number) || 0)}`"
                   >
                     {{ ((t.totalDuration as number) || (t.total_duration as number) || 0).toFixed(1) }}ms
                   </span>

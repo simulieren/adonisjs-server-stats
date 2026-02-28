@@ -96,7 +96,8 @@ export default { components: { ExplainPlanNode } }
  * CSS classes match the React QueriesSection.
  */
 import { ref, computed, inject, watch, type Ref } from 'vue'
-import { timeAgo, formatTime } from '../../../../core/index.js'
+import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js'
+import { SLOW_DURATION_MS } from '../../../../core/constants.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
@@ -189,7 +190,7 @@ const summary = computed(() => {
     const dur = (q.duration as number) || 0
     totalDur += dur
     count++
-    if (dur > 100) slow++
+    if (dur > SLOW_DURATION_MS) slow++
   }
   for (const c of sqlCounts.value.values()) {
     if (c > 1) duplicates += c
@@ -250,6 +251,13 @@ async function handleExplain(queryId: number) {
   } finally {
     explainLoading.value = null
   }
+}
+
+function dashDurationClass(ms: number): string {
+  const sev = durationSeverity(ms)
+  if (sev === 'very-slow') return 'ss-dash-very-slow'
+  if (sev === 'slow') return 'ss-dash-slow'
+  return ''
 }
 </script>
 
@@ -322,13 +330,13 @@ async function handleExplain(queryId: number) {
               </td>
               <td><span style="color: var(--ss-muted); text-align: center; display: block">{{ (g.count as number) || 0 }}</span></td>
               <td>
-                <span :class="`ss-dash-duration ${((g.avgDuration as number) || 0) > 500 ? 'ss-dash-very-slow' : ((g.avgDuration as number) || 0) > 100 ? 'ss-dash-slow' : ''}`">
+                <span :class="`ss-dash-duration ${dashDurationClass((g.avgDuration as number) || 0)}`">
                   {{ ((g.avgDuration as number) || 0).toFixed(2) }}ms
                 </span>
               </td>
               <td><span class="ss-dash-duration">{{ ((g.minDuration as number) || 0).toFixed(2) }}ms</span></td>
               <td>
-                <span :class="`ss-dash-duration ${((g.maxDuration as number) || 0) > 500 ? 'ss-dash-very-slow' : ((g.maxDuration as number) || 0) > 100 ? 'ss-dash-slow' : ''}`">
+                <span :class="`ss-dash-duration ${dashDurationClass((g.maxDuration as number) || 0)}`">
                   {{ ((g.maxDuration as number) || 0).toFixed(2) }}ms
                 </span>
               </td>
@@ -398,7 +406,7 @@ async function handleExplain(queryId: number) {
                   </div>
                 </td>
                 <td>
-                  <span :class="`ss-dash-duration ${((q.duration as number) || 0) > 500 ? 'ss-dash-very-slow' : ((q.duration as number) || 0) > 100 ? 'ss-dash-slow' : ''}`">
+                  <span :class="`ss-dash-duration ${dashDurationClass((q.duration as number) || 0)}`">
                     {{ ((q.duration as number) || 0).toFixed(2) }}ms
                   </span>
                 </td>

@@ -2,19 +2,10 @@ import { render } from 'preact'
 import { useState } from 'preact/hooks'
 import { StatsBar } from '../../react/components/StatsBar/StatsBar.js'
 import { DebugPanel } from '../../react/components/DebugPanel/DebugPanel.js'
+import { readConfig } from '../bootstrap.js'
+import type { EdgeBarConfig } from '../types.js'
 
-interface BarConfig {
-  endpoint?: string
-  pollInterval?: number
-  channelName?: string
-  authToken?: string
-  showDebug?: boolean
-  debugEndpoint?: string
-  dashboardPath?: string | null
-}
-
-const configEl = document.getElementById('ss-bar-config')
-const config: BarConfig = configEl ? JSON.parse(configEl.textContent || '{}') : {}
+const config = readConfig<EdgeBarConfig>('ss-bar-config')
 
 /** Wrapper component to manage shared debug panel open state. */
 function StatsBarApp() {

@@ -6,84 +6,20 @@
  * CSS classes match the React InternalsSection / InternalsContent.
  */
 import { ref, computed, inject, watch, onMounted, onUnmounted, type Ref } from 'vue'
-import { ApiClient, UnauthorizedError, SECTION_REFRESH_MS } from '../../../../core/index.js'
+import { UnauthorizedError, SECTION_REFRESH_MS } from '../../../../core/index.js'
+import { useApiClient } from '../../../composables/useApiClient.js'
+import { formatUptime, timeAgo, formatDuration } from '../../../../core/formatters.js'
+import {
+  getTimerLabel,
+  getIntegrationLabel,
+  getIntegrationStatus,
+  getIntegrationDetails,
+  formatCollectorConfig,
+  fillPercent,
+  classifyStatus,
+} from '../../../../core/internals-utils.js'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface CollectorInfo {
-  name: string
-  label: string
-  status: 'healthy' | 'errored' | 'stopped'
-  lastError: string | null
-  lastErrorAt: number | null
-  config: Record<string, unknown>
-}
-
-interface BufferInfo {
-  current: number
-  max: number
-}
-
-interface TimerInfo {
-  active: boolean
-  intervalMs?: number
-  debounceMs?: number
-}
-
-interface DiagnosticsResponse {
-  package: {
-    version: string
-    nodeVersion: string
-    adonisVersion: string
-    uptime?: number
-  }
-  config: {
-    intervalMs: number
-    transport: string
-    channelName: string
-    endpoint: string | false
-    skipInTest: boolean
-    hasOnStatsCallback: boolean
-    hasShouldShowCallback: boolean
-  }
-  devToolbar: {
-    enabled: boolean
-    maxQueries: number
-    maxEvents: number
-    maxEmails: number
-    maxTraces: number
-    slowQueryThresholdMs: number
-    tracing: boolean
-    dashboard: boolean
-    dashboardPath: string
-    debugEndpoint: string
-    retentionDays: number
-    dbPath: string
-    persistDebugData: boolean | string
-    excludeFromTracing: string[]
-    customPaneCount: number
-  }
-  collectors: CollectorInfo[]
-  buffers: Record<string, BufferInfo>
-  timers: Record<string, TimerInfo>
-  transmit: {
-    available: boolean
-    channels: string[]
-  }
-  integrations: Record<string, { active?: boolean; available?: boolean; mode?: string }>
-  storage: {
-    ready: boolean
-    dbPath: string
-    fileSizeMb: number
-    walSizeMb: number
-    retentionDays: number
-    tables: Array<{ name: string; rowCount: number }>
-    lastCleanupAt: number | null
-  } | null
-  uptime?: number
-}
+import type { DiagnosticsResponse, DiagnosticsTimerInfo } from '../../../../core/types.js'
 
 // ---------------------------------------------------------------------------
 // Inject dependencies
@@ -107,12 +43,12 @@ const revealedKeys = ref(new Set<string>())
 // Data fetching - from debug endpoint (not dashboard API)
 // ---------------------------------------------------------------------------
 
-let client: ApiClient
+const getClient = useApiClient(baseUrl, authToken)
 let timer: ReturnType<typeof setInterval> | null = null
 
 async function fetchDiagnostics() {
   try {
-    const result = await client.fetch<DiagnosticsResponse>(
+    const result = await getClient().fetch<DiagnosticsResponse>(
       `${debugEndpoint}/diagnostics`
     )
     diagnostics.value = result
@@ -134,7 +70,6 @@ async function fetchDiagnostics() {
 }
 
 onMounted(() => {
-  client = new ApiClient({ baseUrl, authToken })
   isLoading.value = true
   error.value = null
   fetchDiagnostics()
@@ -162,96 +97,16 @@ function toggleReveal(key: string) {
   }
 }
 
-function formatMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60_000) return `${ms / 1000}s`
-  if (ms < 3_600_000) return `${ms / 60_000}m`
-  return `${ms / 3_600_000}h`
-}
-
-function formatUptime(seconds?: number): string {
-  if (!seconds && seconds !== 0) return '-'
-  const s = Math.floor(seconds)
-  const d = Math.floor(s / 86400)
-  const h = Math.floor((s % 86400) / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  if (d > 0) return `${d}d ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  if (m > 0) return `${m}m ${s % 60}s`
-  return `${s}s`
-}
-
-function timeAgo(ts: number | null): string {
-  if (!ts) return '-'
-  const diff = Math.floor((Date.now() - ts) / 1000)
-  if (diff < 60) return `${diff}s ago`
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
-
-function fillPercent(buf: BufferInfo): number {
-  if (!buf.max) return 0
-  return Math.round((buf.current / buf.max) * 100)
-}
-
-function formatConfigValue(value: unknown): string {
-  if (value === null || value === undefined) return '-'
-  if (typeof value === 'boolean') return value ? 'true' : 'false'
-  if (typeof value === 'number') return String(value)
-  if (typeof value === 'string') return value
-  if (Array.isArray(value)) return value.join(', ') || '-'
-  try { return JSON.stringify(value) } catch { return String(value) }
-}
-
-function isSecret(key: string): boolean {
-  const lower = key.toLowerCase()
-  return lower.includes('password') || lower.includes('secret') || lower.includes('token') || lower.includes('key')
-}
-
-function formatCollectorConfig(config: Record<string, unknown>): Array<{ key: string; value: string; secret: boolean }> {
-  return Object.entries(config).map(([k, v]) => ({ key: k, value: formatConfigValue(v), secret: isSecret(k) }))
-}
-
-const TIMER_LABELS: Record<string, string> = {
-  collectionInterval: 'Stats Collection',
-  dashboardBroadcast: 'Dashboard Broadcast',
-  debugBroadcast: 'Debug Broadcast',
-  persistFlush: 'Persist Flush',
-  retentionCleanup: 'Retention Cleanup',
-}
-
-function formatTimerInterval(t: TimerInfo): string {
-  if (t.debounceMs !== undefined) return `${formatMs(t.debounceMs)} (debounce)`
-  if (t.intervalMs !== undefined) return formatMs(t.intervalMs)
-  return '-'
-}
-
-const INTEGRATION_LABELS: Record<string, string> = {
-  prometheus: 'Prometheus',
-  pinoHook: 'Pino Log Hook',
-  edgePlugin: 'Edge Plugin',
-  cacheInspector: 'Cache Inspector',
-  queueInspector: 'Queue Inspector',
-}
-
-function integrationStatus(info: { active?: boolean; available?: boolean }): string {
-  if ('active' in info) return info.active ? 'active' : 'inactive'
-  if ('available' in info) return info.available ? 'available' : 'unavailable'
-  return 'unknown'
-}
-
 function dotClass(status: string): string {
-  if (['healthy', 'active', 'connected', 'available', 'ready'].includes(status)) return 'ss-dash-dot-ok'
-  if (['errored', 'unavailable'].includes(status)) return 'ss-dash-dot-err'
+  const kind = classifyStatus(status)
+  if (kind === 'ok') return 'ss-dash-dot-ok'
+  if (kind === 'err') return 'ss-dash-dot-err'
   return ''
 }
 
-function integrationDetails(key: string, info: Record<string, unknown>): string {
-  if (key === 'pinoHook' && info.mode) return `Mode: ${info.mode}`
-  if (key === 'edgePlugin' && info.active) return '@serverStats() tag registered'
-  if (key === 'cacheInspector') return info.available ? 'Redis dependency detected' : 'Redis not installed'
-  if (key === 'queueInspector') return info.available ? 'Queue dependency detected' : '@rlanz/bull-queue not installed'
+function formatTimerInterval(t: DiagnosticsTimerInfo): string {
+  if (t.debounceMs !== undefined) return `${formatDuration(t.debounceMs)} (debounce)`
+  if (t.intervalMs !== undefined) return formatDuration(t.intervalMs)
   return '-'
 }
 
@@ -264,7 +119,7 @@ const bufferEntries = computed(() => {
   return Object.entries(diagnostics.value.buffers).map(([name, buf]) => ({
     name: name.charAt(0).toUpperCase() + name.slice(1),
     ...buf,
-    percent: fillPercent(buf),
+    percent: fillPercent(buf.current, buf.max),
   }))
 })
 
@@ -272,7 +127,7 @@ const timerEntries = computed(() => {
   if (!diagnostics.value?.timers) return []
   return Object.entries(diagnostics.value.timers).map(([key, t]) => ({
     key,
-    label: TIMER_LABELS[key] || key,
+    label: getTimerLabel(key),
     ...t,
     interval: formatTimerInterval(t),
   }))
@@ -297,9 +152,9 @@ const integrationEntries = computed(() => {
     for (const [key, info] of Object.entries(diagnostics.value.integrations)) {
       entries.push({
         key,
-        label: INTEGRATION_LABELS[key] || key,
-        status: integrationStatus(info),
-        details: integrationDetails(key, info as Record<string, unknown>),
+        label: getIntegrationLabel(key),
+        status: getIntegrationStatus(info),
+        details: getIntegrationDetails(key, info),
       })
     }
   }

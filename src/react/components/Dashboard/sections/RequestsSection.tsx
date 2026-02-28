@@ -1,7 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 
-import { ApiClient } from '../../../../core/api-client.js'
-import { timeAgo, formatTime } from '../../../../core/formatters.js'
+import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
+import { normalizeTraceFields } from '../../../../core/trace-utils.js'
+import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
 import { DataTable } from '../shared/DataTable.js'
@@ -10,31 +11,10 @@ import { Pagination } from '../shared/Pagination.js'
 import { WaterfallChart } from '../shared/WaterfallChart.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
+import type { TraceDetail } from '../../../../core/trace-utils.js'
 
 interface RequestsSectionProps {
   options?: DashboardHookOptions
-}
-
-interface TraceDetail {
-  method?: string
-  url?: string
-  status_code?: number
-  statusCode?: number
-  total_duration?: number
-  totalDuration?: number
-  duration?: number
-  spanCount?: number
-  span_count?: number
-  spans: Array<{
-    id: string
-    label: string
-    startOffset: number
-    duration: number
-    category: string
-    parentId?: string
-    metadata?: Record<string, unknown>
-  }> | string
-  warnings: string[] | string
 }
 
 export function RequestsSection({ options = {} }: RequestsSectionProps) {
@@ -55,16 +35,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
     sortDir,
   })
 
-  const clientRef = useRef<ApiClient | null>(null)
-  const getClient = useCallback(() => {
-    if (!clientRef.current) {
-      clientRef.current = new ApiClient({
-        baseUrl: options.baseUrl || '',
-        authToken: options.authToken,
-      })
-    }
-    return clientRef.current
-  }, [options.baseUrl, options.authToken])
+  const getClient = useApiClient(options.baseUrl || '', options.authToken)
 
   const handleRowClick = useCallback(
     (row: Record<string, unknown>) => {
@@ -100,39 +71,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
   const requests = (data as Record<string, unknown>[]) || []
 
   if (selectedTrace) {
-    // Parse spans from string if they come as JSON strings
-    let spans: TraceDetail['spans'] = selectedTrace.spans
-    if (typeof spans === 'string') {
-      try {
-        spans = JSON.parse(spans)
-      } catch {
-        spans = []
-      }
-    }
-    const parsedSpans = (Array.isArray(spans) ? spans : []) as Array<{
-      id: string
-      label: string
-      startOffset: number
-      duration: number
-      category: 'request' | 'middleware' | 'db' | 'view' | 'mail' | 'event' | 'custom'
-      parentId: string | null
-      metadata?: Record<string, unknown>
-    }>
-
-    // Parse warnings from string if they come as JSON strings
-    let warnings: TraceDetail['warnings'] = selectedTrace.warnings
-    if (typeof warnings === 'string') {
-      try {
-        warnings = JSON.parse(warnings)
-      } catch {
-        warnings = []
-      }
-    }
-    const parsedWarnings = (Array.isArray(warnings) ? warnings : []) as string[]
-
-    const statusCode = selectedTrace.status_code || selectedTrace.statusCode || 0
-    const duration = selectedTrace.total_duration || selectedTrace.totalDuration || selectedTrace.duration || 0
-    const spanCount = selectedTrace.span_count || selectedTrace.spanCount || 0
+    const normalized = normalizeTraceFields(selectedTrace as unknown as Record<string, unknown>)
 
     return (
       <div>
@@ -140,17 +79,17 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
           <button type="button" className="ss-dash-btn" onClick={() => setSelectedTrace(null)}>
             ← Back to Requests
           </button>
-          <MethodBadge method={selectedTrace.method || ''} />
-          <span style={{ color: 'var(--ss-text)' }}>{selectedTrace.url}</span>
-          <StatusBadge code={statusCode} />
+          <MethodBadge method={normalized.method} />
+          <span style={{ color: 'var(--ss-text)' }}>{normalized.url}</span>
+          <StatusBadge code={normalized.statusCode} />
           <span className="ss-dash-tl-meta">
-            {duration.toFixed(1)}ms &middot; {spanCount} spans
+            {normalized.totalDuration.toFixed(1)}ms &middot; {normalized.spanCount} spans
           </span>
         </div>
         <WaterfallChart
-          spans={parsedSpans}
-          totalDuration={duration}
-          warnings={parsedWarnings}
+          spans={normalized.spans}
+          totalDuration={normalized.totalDuration}
+          warnings={normalized.warnings}
         />
       </div>
     )
@@ -237,7 +176,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                     const dur = ((row as Record<string, unknown>).total_duration || (row as Record<string, unknown>).totalDuration || (row as Record<string, unknown>).duration || 0) as number
                     return (
                       <span
-                        className={`ss-dash-duration ${dur > 500 ? 'ss-dash-very-slow' : dur > 100 ? 'ss-dash-slow' : ''}`}
+                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
                       >
                         {dur.toFixed(1)}ms
                       </span>

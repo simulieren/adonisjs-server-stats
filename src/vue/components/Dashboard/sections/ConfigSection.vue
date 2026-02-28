@@ -7,26 +7,16 @@
  */
 import { ref, computed, inject, type Ref } from 'vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
+import {
+  isRedactedValue,
+  collectTopLevelObjectKeys,
+} from '../../../../core/config-utils.js'
+import type { ConfigValue, RedactedValue } from '../../../../core/config-utils.js'
 
 const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const baseUrl = inject<string>('ss-base-url', '')
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
-
-interface RedactedValue {
-  __redacted: true
-  __value: string | number | boolean | null
-}
-
-type ConfigValue =
-  | string
-  | number
-  | boolean
-  | null
-  | undefined
-  | RedactedValue
-  | ConfigValue[]
-  | { [key: string]: ConfigValue }
 
 interface ConfigNode {
   key: string
@@ -75,23 +65,18 @@ function getActiveData(): Record<string, unknown> {
   return activeTab.value === 'app' ? configData.value.app : configData.value.env
 }
 
-function flattenConfig(obj: Record<string, unknown>, prefix = ''): ConfigNode[] {
+function flattenConfigNodes(obj: Record<string, unknown>, prefix = ''): ConfigNode[] {
   const nodes: ConfigNode[] = []
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key
-    const isRedacted =
-      value !== null &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      '__redacted' in (value as Record<string, unknown>) &&
-      (value as RedactedValue).__redacted
-    if (value && typeof value === 'object' && !Array.isArray(value) && !isRedacted) {
+    const redacted = isRedactedValue(value as ConfigValue)
+    if (value && typeof value === 'object' && !Array.isArray(value) && !redacted) {
       nodes.push({ key: fullKey, value: value as ConfigValue, type: 'section' })
     } else {
       nodes.push({
         key: fullKey,
-        value: isRedacted ? (value as RedactedValue).__value : (value as ConfigValue),
-        redacted: isRedacted || false,
+        value: redacted ? (value as RedactedValue).value : (value as ConfigValue),
+        redacted: redacted || false,
         type: typeof value,
       })
     }
@@ -101,7 +86,7 @@ function flattenConfig(obj: Record<string, unknown>, prefix = ''): ConfigNode[] 
 
 const filteredNodes = computed(() => {
   const d = getActiveData()
-  const nodes = flattenConfig(d)
+  const nodes = flattenConfigNodes(d)
   if (!search.value.trim()) return nodes
   const term = search.value.toLowerCase()
   return nodes.filter((n) => n.key.toLowerCase().includes(term))
@@ -154,20 +139,9 @@ function copyConfig() {
   })
 }
 
-function collectTopLevelObjectKeys(obj: Record<string, unknown>): string[] {
-  const keys: string[] = []
-  for (const key of Object.keys(obj)) {
-    const value = obj[key]
-    if (value !== null && typeof value === 'object' && !Array.isArray(value) && !('__redacted' in (value as Record<string, unknown>))) {
-      keys.push(key)
-    }
-  }
-  return keys
-}
-
 function expandAll() {
   const source = activeTab.value === 'app' ? configData.value.app : configData.value.env
-  const allKeys = collectTopLevelObjectKeys(source)
+  const allKeys = collectTopLevelObjectKeys(source as ConfigValue)
   expandedSections.value = new Set(allKeys)
 }
 

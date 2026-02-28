@@ -2,9 +2,10 @@
 /**
  * SQL queries table tab for the debug panel.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed } from 'vue'
 import { formatDuration, durationSeverity, formatTime, timeAgo } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { filterQueries, countDuplicateQueries, computeQuerySummary } from '../../../../core/query-utils.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import type { QueryRecord } from '../../../../core/index.js'
 
 const props = defineProps<{
@@ -15,41 +16,15 @@ const props = defineProps<{
 const search = ref('')
 const expandedIds = new Set<number>()
 
-const queries = computed<QueryRecord[]>(() => {
-  if (!props.data) return []
-  const d = props.data
-  const arr = (Array.isArray(d) ? d : d.queries) || []
-  if (!search.value.trim()) return arr
-  const term = search.value.toLowerCase()
-  return arr.filter(
-    (q: QueryRecord) =>
-      q.sql.toLowerCase().includes(term) ||
-      (q.model && q.model.toLowerCase().includes(term)) ||
-      q.method.toLowerCase().includes(term)
-  )
-})
-
 const allQueries = computed<QueryRecord[]>(() => {
   if (!props.data) return []
   const d = props.data
   return (Array.isArray(d) ? d : d.queries) || []
 })
 
-const dupCounts = computed(() => {
-  const counts: Record<string, number> = {}
-  for (const q of allQueries.value) {
-    counts[q.sql] = (counts[q.sql] || 0) + 1
-  }
-  return counts
-})
-
-const summaryStats = computed(() => {
-  const all = allQueries.value
-  const slowCount = all.filter((q) => q.duration > 100).length
-  const dupCount = Object.values(dupCounts.value).filter((c) => c > 1).length
-  const avgDuration = all.length > 0 ? all.reduce((sum, q) => sum + q.duration, 0) / all.length : 0
-  return { slowCount, dupCount, avgDuration }
-})
+const queries = computed<QueryRecord[]>(() => filterQueries(allQueries.value, search.value))
+const dupCounts = computed(() => countDuplicateQueries(allQueries.value))
+const summaryStats = computed(() => computeQuerySummary(allQueries.value, dupCounts.value))
 
 const summary = computed(() => {
   let s = `${queries.value.length} queries`
@@ -78,24 +53,7 @@ function durationClass(ms: number): string {
   return ''
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(queries, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+const { tableRef } = useResizableTable(() => queries.value)
 </script>
 
 <template>

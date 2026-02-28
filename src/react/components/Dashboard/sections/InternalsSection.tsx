@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 
-import { ApiClient, UnauthorizedError } from '../../../../core/api-client.js'
+import { UnauthorizedError } from '../../../../core/api-client.js'
 import { SECTION_REFRESH_MS } from '../../../../core/constants.js'
+import { useApiClient } from '../../../hooks/useApiClient.js'
 import { InternalsContent } from '../../shared/InternalsContent.js'
 
-import type { DashboardHookOptions } from '../../../../core/types.js'
-import type { DiagnosticsResponse } from '../../shared/InternalsContent.js'
+import type { DashboardHookOptions, DiagnosticsResponse } from '../../../../core/types.js'
 
 interface InternalsSectionProps {
   options?: DashboardHookOptions
@@ -28,15 +28,9 @@ export function InternalsSection({
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
 
-  const clientRef = useRef<ApiClient | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const getClient = useCallback(() => {
-    if (!clientRef.current) {
-      clientRef.current = new ApiClient({ baseUrl, authToken })
-    }
-    return clientRef.current
-  }, [baseUrl, authToken])
+  const getClient = useApiClient(baseUrl, authToken)
 
   const fetchData = useCallback(async () => {
     try {

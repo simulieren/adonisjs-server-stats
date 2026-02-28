@@ -7,6 +7,14 @@
  */
 import { ref, computed, inject, type Ref } from 'vue'
 import { timeAgo, formatTime } from '../../../../core/index.js'
+import {
+  LOG_LEVELS,
+  resolveLogLevel,
+  resolveLogMessage,
+  resolveLogTimestamp,
+  resolveLogRequestId,
+  getLogLevelCssClass,
+} from '../../../../core/log-utils.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
@@ -15,8 +23,6 @@ const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
-
-const LOG_LEVELS = ['all', 'error', 'warn', 'info', 'debug'] as const
 
 const {
   data,
@@ -138,22 +144,6 @@ function removeStructuredFilter(index: number) {
   syncStructuredFilters()
 }
 
-/**
- * Extract request ID from a log entry, checking both top-level fields
- * and nested `log.data` fields (matching React's extraction logic).
- */
-function getReqId(log: Record<string, unknown>): string {
-  const logData = (log.data || {}) as Record<string, unknown>
-  return (
-    (log.requestId as string) ||
-    (log.request_id as string) ||
-    (log['x-request-id'] as string) ||
-    (logData.requestId as string) ||
-    (logData.request_id as string) ||
-    (logData['x-request-id'] as string) ||
-    ''
-  )
-}
 </script>
 
 <template>
@@ -267,28 +257,28 @@ function getReqId(log: Record<string, unknown>): string {
           :key="(log.id as string) || i"
           class="ss-dash-log-entry"
         >
-          <span :class="`ss-dash-log-level ss-dash-log-level-${((log.level as string) || (log.levelName as string) || (log.level_name as string) || 'info').toLowerCase()}`">
-            {{ ((log.level as string) || (log.levelName as string) || (log.level_name as string) || 'info').toUpperCase() }}
+          <span :class="`ss-dash-log-level ${getLogLevelCssClass(resolveLogLevel(log), 'ss-dash-log-level')}`">
+            {{ resolveLogLevel(log).toUpperCase() }}
           </span>
           <span
             class="ss-dash-log-time"
-            :title="formatTime(((log.createdAt || log.created_at || log.time || log.timestamp || 0) as string))"
+            :title="resolveLogTimestamp(log) ? formatTime(resolveLogTimestamp(log)) : ''"
           >
-            {{ (log.createdAt || log.created_at || log.time || log.timestamp) ? timeAgo((log.createdAt || log.created_at || log.time || log.timestamp) as string) : '-' }}
+            {{ resolveLogTimestamp(log) ? timeAgo(resolveLogTimestamp(log)) : '-' }}
           </span>
           <span
-            v-if="getReqId(log)"
+            v-if="resolveLogRequestId(log)"
             class="ss-dash-log-reqid"
-            :title="getReqId(log)"
+            :title="resolveLogRequestId(log)"
             role="button"
             tabindex="0"
-            @click="handleReqIdClick(getReqId(log))"
-            @keydown.enter="handleReqIdClick(getReqId(log))"
+            @click="handleReqIdClick(resolveLogRequestId(log))"
+            @keydown.enter="handleReqIdClick(resolveLogRequestId(log))"
           >
-            {{ getReqId(log).slice(0, 8) }}
+            {{ resolveLogRequestId(log).slice(0, 8) }}
           </span>
           <span v-else class="ss-dash-log-reqid-empty">--</span>
-          <span class="ss-dash-log-msg">{{ (log.message as string) || (log.msg as string) || '' }}</span>
+          <span class="ss-dash-log-msg">{{ resolveLogMessage(log) }}</span>
         </div>
       </div>
     </template>

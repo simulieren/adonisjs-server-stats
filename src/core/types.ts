@@ -386,6 +386,10 @@ export interface CacheStats {
   totalHits: number
   totalMisses: number
   keys: CacheEntry[]
+  /** Number of cache keys (may differ from `keys.length` when paginated). */
+  keyCount?: number
+  /** Memory used by the cache store in megabytes. */
+  memoryUsedMb?: number
 }
 
 /**
@@ -396,11 +400,69 @@ export interface CacheEntry {
   type: string
   ttl: number
   size: number
+  /** Cached value (populated when inspecting a single key in the debug panel). */
+  value?: string | number | boolean | Record<string, unknown> | unknown[] | null
+}
+
+// ---------------------------------------------------------------------------
+// Cache types (dashboard)
+// ---------------------------------------------------------------------------
+
+/**
+ * Redis / cache store statistics returned by the dashboard cache endpoint.
+ */
+export interface DashboardCacheStats {
+  connected: boolean
+  hits: number
+  misses: number
+  hitRate: number
+  memoryUsedBytes: number
+  memoryUsedHuman: string
+  connectedClients: number
+  totalKeys: number
+  keyCount?: number
+}
+
+/**
+ * Individual cache key entry in the dashboard cache inspector.
+ */
+export interface DashboardCacheKeyEntry {
+  key: string
+  type: string
+  ttl: number
+  size?: number | null
+}
+
+/**
+ * Full response from the dashboard cache API endpoint.
+ */
+export interface DashboardCacheResponse {
+  available: boolean
+  stats: DashboardCacheStats | null
+  keys?: DashboardCacheKeyEntry[]
+  data?: DashboardCacheKeyEntry[]
+  cursor: string
 }
 
 // ---------------------------------------------------------------------------
 // Job / queue types (debug panel)
 // ---------------------------------------------------------------------------
+
+/**
+ * Server response shape from the dashboard API `/api/jobs` endpoint.
+ *
+ * The server may return jobs under `jobs` or `data`, and stats under
+ * `stats` or `overview`. We handle all variants to stay compatible
+ * with different queue inspector implementations.
+ */
+export interface JobsApiResponse {
+  available?: boolean
+  overview?: JobStats
+  stats?: JobStats
+  data?: JobRecord[]
+  jobs?: JobRecord[]
+  total?: number
+}
 
 /**
  * Aggregate queue statistics.
@@ -550,4 +612,95 @@ export interface SortState {
   field: string
   /** Sort direction. */
   direction: 'asc' | 'desc'
+}
+
+// ---------------------------------------------------------------------------
+// Diagnostics types (used by InternalsContent / InternalsTab)
+// ---------------------------------------------------------------------------
+
+/**
+ * Buffer usage info returned by the diagnostics endpoint.
+ */
+export interface DiagnosticsBufferInfo {
+  current: number
+  max: number
+}
+
+/**
+ * Collector metadata returned by the diagnostics endpoint.
+ */
+export interface DiagnosticsCollectorInfo {
+  name: string
+  label: string
+  status: 'healthy' | 'errored' | 'stopped'
+  lastError: string | null
+  lastErrorAt: number | null
+  config: Record<string, unknown>
+}
+
+/**
+ * Timer state returned by the diagnostics endpoint.
+ */
+export interface DiagnosticsTimerInfo {
+  active: boolean
+  intervalMs?: number
+  debounceMs?: number
+}
+
+/**
+ * Full diagnostics response from `GET {debugEndpoint}/diagnostics`.
+ *
+ * Used by both React `InternalsContent` and Vue `InternalsTab` / `InternalsSection`.
+ */
+export interface DiagnosticsResponse {
+  package: {
+    version: string
+    nodeVersion: string
+    adonisVersion: string
+    uptime?: number
+  }
+  config: {
+    intervalMs: number
+    transport: string
+    channelName: string
+    endpoint: string | false
+    skipInTest: boolean
+    hasOnStatsCallback: boolean
+    hasShouldShowCallback: boolean
+  }
+  devToolbar: {
+    enabled: boolean
+    maxQueries: number
+    maxEvents: number
+    maxEmails: number
+    maxTraces: number
+    slowQueryThresholdMs: number
+    tracing: boolean
+    dashboard: boolean
+    dashboardPath: string
+    debugEndpoint: string
+    retentionDays: number
+    dbPath: string
+    persistDebugData: boolean | string
+    excludeFromTracing: string[]
+    customPaneCount: number
+  }
+  collectors: DiagnosticsCollectorInfo[]
+  buffers: Record<string, DiagnosticsBufferInfo>
+  timers: Record<string, DiagnosticsTimerInfo>
+  transmit: {
+    available: boolean
+    channels: string[]
+  }
+  integrations: Record<string, { active?: boolean; available?: boolean; mode?: string }>
+  storage: {
+    ready: boolean
+    dbPath: string
+    fileSizeMb: number
+    walSizeMb: number
+    retentionDays: number
+    tables: Array<{ name: string; rowCount: number }>
+    lastCleanupAt: number | null
+  } | null
+  uptime?: number
 }

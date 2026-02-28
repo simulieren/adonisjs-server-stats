@@ -6,6 +6,7 @@
 // Pure functions with no DOM or framework dependencies.
 // ---------------------------------------------------------------------------
 
+import { SLOW_DURATION_MS, VERY_SLOW_DURATION_MS } from './constants.js'
 import type { ThresholdColor } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -15,17 +16,22 @@ import type { ThresholdColor } from './types.js'
 /**
  * Format a duration in seconds as a human-readable uptime string.
  *
- * Examples: `"2d 5h"`, `"3h 12m"`, `"7m"`, `"0m"`.
+ * Examples: `"2d 5h"`, `"3h 12m"`, `"7m 30s"`, `"45s"`, `"-"`.
  *
- * @param seconds - Uptime in seconds.
+ * Returns `'-'` when the input is `undefined`, `null`, or falsy (except `0`).
+ *
+ * @param seconds - Uptime in seconds (optional).
  */
-export function formatUptime(seconds: number): string {
-  const d = Math.floor(seconds / 86400)
-  const h = Math.floor((seconds % 86400) / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
+export function formatUptime(seconds?: number | null): string {
+  if (!seconds && seconds !== 0) return '-'
+  const s = Math.floor(seconds)
+  const d = Math.floor(s / 86400)
+  const h = Math.floor((s % 86400) / 3600)
+  const m = Math.floor((s % 3600) / 60)
   if (d > 0) return `${d}d ${h}h`
   if (h > 0) return `${h}h ${m}m`
-  return `${m}m`
+  if (m > 0) return `${m}m ${s % 60}s`
+  return `${s}s`
 }
 
 // ---------------------------------------------------------------------------
@@ -313,8 +319,8 @@ export function statusColor(statusCode: number): ThresholdColor {
  * @param ms - Duration in milliseconds.
  */
 export function durationSeverity(ms: number): 'normal' | 'slow' | 'very-slow' {
-  if (ms > 500) return 'very-slow'
-  if (ms > 100) return 'slow'
+  if (ms > VERY_SLOW_DURATION_MS) return 'very-slow'
+  if (ms > SLOW_DURATION_MS) return 'slow'
   return 'normal'
 }
 
@@ -380,4 +386,43 @@ export function compactPreview(value: unknown, maxLen: number = 100): string {
       : s
   }
   return String(value)
+}
+
+// ---------------------------------------------------------------------------
+// Cache TTL
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a TTL value in seconds as a compact human-readable string.
+ *
+ * Examples: `"no expiry"`, `"45s"`, `"5m"`, `"2h"`, `"3d"`.
+ *
+ * @param seconds - TTL in seconds. Negative values mean no expiry.
+ */
+export function formatTtl(seconds: number): string {
+  if (seconds < 0) return 'no expiry'
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`
+  return `${Math.floor(seconds / 86400)}d`
+}
+
+// ---------------------------------------------------------------------------
+// Cache size
+// ---------------------------------------------------------------------------
+
+/**
+ * Format a byte count as a compact cache-size string.
+ *
+ * Unlike {@link formatBytes} (which starts at MB), this handles small
+ * byte counts typical of individual cache entries.
+ *
+ * Examples: `"128B"`, `"4.2KB"`, `"1.5MB"`.
+ *
+ * @param bytes - Value in bytes.
+ */
+export function formatCacheSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
 }

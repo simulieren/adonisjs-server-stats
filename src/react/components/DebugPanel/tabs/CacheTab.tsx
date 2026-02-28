@@ -2,12 +2,12 @@ import React, {
   useState,
   useMemo,
   useCallback,
-  useRef,
-  useEffect,
 } from "react";
 
-import { initResizableColumns } from "../../../../core/resizable-columns.js";
+import { formatTtl, formatCacheSize } from "../../../../core/formatters.js";
 import { useDebugData } from "../../../hooks/useDebugData.js";
+import { useDashboardApiBase } from "../../../hooks/useDashboardApiBase.js";
+import { useResizableTable } from "../../../hooks/useResizableTable.js";
 import { JsonViewer } from "../../shared/JsonViewer.js";
 
 import type {
@@ -22,19 +22,13 @@ interface CacheTabProps {
 }
 
 export function CacheTab({ options, dashboardPath }: CacheTabProps) {
-  // Cache & jobs live on the dashboard API, not the debug endpoint.
-  // Override the debugEndpoint so useDebugData fetches from the correct URL.
-  const dashApiBase = useMemo(
-    () => (dashboardPath ? dashboardPath.replace(/\/+$/, "") + "/api" : null),
-    [dashboardPath],
-  );
-  const cacheOptions = useMemo(
-    () => (dashApiBase ? { ...options, debugEndpoint: dashApiBase } : options),
-    [dashApiBase, options],
+  const { dashApiBase, resolvedOptions } = useDashboardApiBase(
+    dashboardPath,
+    options,
   );
   const { data, isLoading, error } = useDebugData<CacheStats>(
     "cache",
-    cacheOptions,
+    resolvedOptions,
   );
   const [search, setSearch] = useState("");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -76,12 +70,7 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
     [selectedKey, options, dashApiBase],
   );
 
-  const tableRef = useRef<HTMLTableElement>(null);
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current);
-    }
-  }, [keys]);
+  const tableRef = useResizableTable([keys]);
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading cache data...</div>;
@@ -187,10 +176,10 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
                 <td className="ss-dbg-c-sql">{entry.key}</td>
                 <td className="ss-dbg-c-muted">{entry.type}</td>
                 <td className="ss-dbg-c-muted">
-                  {entry.ttl > 0 ? `${entry.ttl}s` : "-"}
+                  {entry.ttl > 0 ? formatTtl(entry.ttl) : "-"}
                 </td>
                 <td className="ss-dbg-c-dim">
-                  {entry.size > 0 ? `${entry.size}B` : "-"}
+                  {entry.size > 0 ? formatCacheSize(entry.size) : "-"}
                 </td>
               </tr>
             ))}

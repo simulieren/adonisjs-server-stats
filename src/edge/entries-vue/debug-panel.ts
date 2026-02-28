@@ -1,14 +1,9 @@
 import { createApp } from 'vue'
 import DebugPanel from '../../vue/components/DebugPanel/DebugPanel.vue'
+import { readConfig } from '../bootstrap.js'
+import type { EdgeDebugConfig } from '../types.js'
 
-interface DebugConfig {
-  debugEndpoint?: string
-  authToken?: string
-  dashboardPath?: string | null
-}
-
-const configEl = document.getElementById('ss-dbg-config')
-const config: DebugConfig = configEl ? JSON.parse(configEl.textContent || '{}') : {}
+const config = readConfig<EdgeDebugConfig>('ss-dbg-config')
 
 const root = document.getElementById('ss-dbg-panel')
 if (root) {

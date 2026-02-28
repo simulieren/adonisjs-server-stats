@@ -1,23 +1,23 @@
 import React, { useState, useMemo, useCallback } from 'react'
 
 import { formatTime, timeAgo } from '../../../../core/formatters.js'
+import {
+  LOG_LEVELS,
+  resolveLogLevel,
+  resolveLogMessage,
+  resolveLogTimestamp,
+  resolveLogRequestId,
+  getLogLevelCssClass,
+  filterLogsByLevel,
+} from '../../../../core/log-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
 import type { DebugPanelProps } from '../../../../core/types.js'
-
-interface LogEntry {
-  level: string
-  msg: string
-  time: number
-  requestId?: string
-  [key: string]: string | number | boolean | undefined
-}
+import type { LogEntry } from '../../../../core/log-utils.js'
 
 interface LogsTabProps {
   options?: DebugPanelProps
 }
-
-const LOG_LEVELS = ['all', 'error', 'warn', 'info', 'debug'] as const
 
 export function LogsTab({ options }: LogsTabProps) {
   const { data, isLoading, error } = useDebugData<LogEntry[] | { logs?: LogEntry[]; entries?: LogEntry[] }>('logs', options)
@@ -25,82 +25,24 @@ export function LogsTab({ options }: LogsTabProps) {
   const [search, setSearch] = useState('')
   const [reqIdFilter, setReqIdFilter] = useState('')
 
-  /** Resolve the log level from whichever field the backend provides. */
-  const resolveLevel = useCallback(
-    (l: LogEntry) =>
-      (
-        (l.levelName as string) ||
-        (l.level_name as string) ||
-        (typeof l.level === 'string' ? l.level : '') ||
-        'info'
-      ).toLowerCase(),
-    []
-  )
-
-  /** Resolve the message from whichever field the backend provides. */
-  const resolveMsg = useCallback(
-    (l: LogEntry) => (l.msg as string) || (l.message as string) || JSON.stringify(l),
-    []
-  )
-
-  /** Resolve the timestamp from whichever field the backend provides. */
-  const resolveTime = useCallback(
-    (l: LogEntry) => (l.time as number) || (l.timestamp as number) || 0,
-    []
-  )
-
-  /** Resolve the request ID from whichever field the backend provides. */
-  const resolveReqId = useCallback(
-    (l: LogEntry) =>
-      (l.requestId as string) ||
-      (l.request_id as string) ||
-      (l['x-request-id'] as string) ||
-      '',
-    []
-  )
-
   const logs = useMemo(() => {
     let items: LogEntry[] = Array.isArray(data)
       ? data
       : (data?.logs || data?.entries || [])
-    if (levelFilter !== 'all') {
-      items = items.filter((l) => {
-        const level = resolveLevel(l)
-        if (levelFilter === 'error') return level === 'error' || level === 'fatal'
-        return level === levelFilter
-      })
-    }
+    items = filterLogsByLevel(items, levelFilter)
     if (reqIdFilter) {
       const f = reqIdFilter.toLowerCase()
       items = items.filter((l) => {
-        const rid = resolveReqId(l).toLowerCase()
+        const rid = resolveLogRequestId(l).toLowerCase()
         return rid.includes(f)
       })
     }
     if (search) {
       const s = search.toLowerCase()
-      items = items.filter((l) => resolveMsg(l).toLowerCase().includes(s))
+      items = items.filter((l) => resolveLogMessage(l).toLowerCase().includes(s))
     }
     return items
-  }, [data, levelFilter, search, reqIdFilter, resolveLevel, resolveMsg, resolveReqId])
-
-  const levelClass = useCallback((level: string) => {
-    switch (level) {
-      case 'error':
-      case 'fatal':
-        return 'ss-dbg-log-level-error'
-      case 'warn':
-        return 'ss-dbg-log-level-warn'
-      case 'info':
-        return 'ss-dbg-log-level-info'
-      case 'debug':
-        return 'ss-dbg-log-level-debug'
-      case 'trace':
-        return 'ss-dbg-log-level-trace'
-      default:
-        return 'ss-dbg-log-level-info'
-    }
-  }, [])
+  }, [data, levelFilter, search, reqIdFilter])
 
   const handleReqIdClick = useCallback((reqId: string) => {
     setReqIdFilter((prev) => (prev === reqId ? '' : reqId))
@@ -159,14 +101,14 @@ export function LogsTab({ options }: LogsTabProps) {
           <div className="ss-dbg-empty">No log entries</div>
         ) : (
           logs.slice(-200).reverse().map((log, i) => {
-            const level = resolveLevel(log)
-            const msg = resolveMsg(log)
-            const ts = resolveTime(log)
-            const reqId = resolveReqId(log)
+            const level = resolveLogLevel(log)
+            const msg = resolveLogMessage(log)
+            const ts = resolveLogTimestamp(log)
+            const reqId = resolveLogRequestId(log)
 
             return (
               <div key={i} className="ss-dbg-log-entry">
-                <span className={`ss-dbg-log-level ${levelClass(level)}`}>
+                <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
                   {level.toUpperCase()}
                 </span>
                 <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>{ts ? timeAgo(ts) : '-'}</span>

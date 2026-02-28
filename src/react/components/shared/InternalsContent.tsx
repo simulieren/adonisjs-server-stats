@@ -1,152 +1,27 @@
 import React, { useState, useCallback } from 'react'
 import { TAB_ICONS } from '../../../core/icons.js'
+import { formatUptime, timeAgo, formatDuration } from '../../../core/formatters.js'
+import {
+  isSecretKey,
+  formatConfigVal,
+  getTimerLabel,
+  getIntegrationLabel,
+  classifyStatus,
+} from '../../../core/internals-utils.js'
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface BufferInfo {
-  current: number
-  max: number
-}
-
-interface CollectorInfo {
-  name: string
-  label: string
-  status: 'healthy' | 'errored' | 'stopped'
-  lastError: string | null
-  lastErrorAt: number | null
-  config: Record<string, unknown>
-}
-
-interface TimerInfo {
-  active: boolean
-  intervalMs?: number
-  debounceMs?: number
-}
-
-interface DiagnosticsResponse {
-  package: {
-    version: string
-    nodeVersion: string
-    adonisVersion: string
-    uptime?: number
-  }
-  config: {
-    intervalMs: number
-    transport: string
-    channelName: string
-    endpoint: string | false
-    skipInTest: boolean
-    hasOnStatsCallback: boolean
-    hasShouldShowCallback: boolean
-  }
-  devToolbar: {
-    enabled: boolean
-    maxQueries: number
-    maxEvents: number
-    maxEmails: number
-    maxTraces: number
-    slowQueryThresholdMs: number
-    tracing: boolean
-    dashboard: boolean
-    dashboardPath: string
-    debugEndpoint: string
-    retentionDays: number
-    dbPath: string
-    persistDebugData: boolean | string
-    excludeFromTracing: string[]
-    customPaneCount: number
-  }
-  collectors: CollectorInfo[]
-  buffers: Record<string, BufferInfo>
-  timers: Record<string, TimerInfo>
-  transmit: {
-    available: boolean
-    channels: string[]
-  }
-  integrations: Record<string, { active?: boolean; available?: boolean; mode?: string }>
-  storage: {
-    ready: boolean
-    dbPath: string
-    fileSizeMb: number
-    walSizeMb: number
-    retentionDays: number
-    tables: Array<{ name: string; rowCount: number }>
-    lastCleanupAt: number | null
-  } | null
-}
+import type { DiagnosticsResponse } from '../../../core/types.js'
 
 export type { DiagnosticsResponse }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const SECRET_KEYS = ['password', 'secret', 'token', 'key', 'credential', 'auth']
-
-function isSecretKey(key: string): boolean {
-  const lower = key.toLowerCase()
-  return SECRET_KEYS.some((s) => lower.includes(s))
-}
-
-function formatRelativeTime(timestamp: number): string {
-  const diff = Date.now() - timestamp
-  const seconds = Math.floor(diff / 1000)
-  if (seconds < 60) return `${seconds}s ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
-
-function formatNumber(n: number): string {
-  return n.toLocaleString()
-}
-
-function formatMs(ms: number): string {
-  if (ms < 1000) return `${ms}ms`
-  if (ms < 60_000) return `${ms / 1000}s`
-  if (ms < 3_600_000) return `${ms / 60_000}m`
-  return `${ms / 3_600_000}h`
-}
-
-function formatUptime(seconds?: number): string {
-  if (!seconds && seconds !== 0) return '-'
-  const s = Math.floor(seconds)
-  const d = Math.floor(s / 86400)
-  const h = Math.floor((s % 86400) / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  if (d > 0) return `${d}d ${h}h`
-  if (h > 0) return `${h}h ${m}m`
-  if (m > 0) return `${m}m ${s % 60}s`
-  return `${s}s`
-}
-
-function formatConfigVal(val: unknown): string {
-  if (val === null || val === undefined) return '-'
-  if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean')
-    return String(val)
-  if (Array.isArray(val)) return val.join(', ') || '-'
-  try {
-    return JSON.stringify(val)
-  } catch {
-    return String(val)
-  }
-}
 
 // ---------------------------------------------------------------------------
 // StatusDot
 // ---------------------------------------------------------------------------
 
 function StatusDot({ status, prefix }: { status: string; prefix: string }) {
+  const kind = classifyStatus(status)
   let cls = `${prefix}-dot`
-  if (['healthy', 'active', 'connected', 'available', 'ready'].includes(status)) {
-    cls += ` ${prefix}-dot-ok`
-  } else if (['errored', 'unavailable'].includes(status)) {
-    cls += ` ${prefix}-dot-err`
-  }
+  if (kind === 'ok') cls += ` ${prefix}-dot-ok`
+  else if (kind === 'err') cls += ` ${prefix}-dot-err`
   return <span className={cls} />
 }
 
@@ -312,24 +187,6 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
     [revealedConfigs, toggleReveal, p]
   )
 
-  // Timer display names
-  const timerLabels: Record<string, string> = {
-    collectionInterval: 'Stats Collection',
-    dashboardBroadcast: 'Dashboard Broadcast',
-    debugBroadcast: 'Debug Broadcast',
-    persistFlush: 'Persist Flush',
-    retentionCleanup: 'Retention Cleanup',
-  }
-
-  // Integration display names
-  const integrationLabels: Record<string, string> = {
-    prometheus: 'Prometheus',
-    pinoHook: 'Pino Log Hook',
-    edgePlugin: 'Edge Plugin',
-    cacheInspector: 'Cache Inspector',
-    queueInspector: 'Queue Inspector',
-  }
-
   return (
     <div>
       {/* 1. Package Info — compact card row */}
@@ -371,7 +228,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                         {c.lastError}
                         {c.lastErrorAt && (
                           <span className={`${p}-c-dim`} style={{ fontSize: '10px' }}>
-                            {formatRelativeTime(c.lastErrorAt)}
+                            {timeAgo(c.lastErrorAt)}
                           </span>
                         )}
                       </>
@@ -404,7 +261,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
             <tr key={name}>
               <td style={{ textTransform: 'capitalize' }}>{name}</td>
               <td>
-                {formatNumber(buf.current)} / {formatNumber(buf.max)}
+                {buf.current.toLocaleString()} / {buf.max.toLocaleString()}
               </td>
               <td>
                 <ProgressBar current={buf.current} max={buf.max} prefix={p} />
@@ -427,7 +284,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
         <tbody>
           {Object.entries(data.timers).map(([name, timer]) => (
             <tr key={name}>
-              <td>{timerLabels[name] || name}</td>
+              <td>{getTimerLabel(name)}</td>
               <td>
                 <StatusDot status={timer.active ? 'active' : 'inactive'} prefix={p} />
                 <span className={timer.active ? `${p}-c-green` : `${p}-c-dim`}>
@@ -438,9 +295,9 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                 {!timer.active ? (
                   <span className={`${p}-c-dim`}>&mdash;</span>
                 ) : timer.intervalMs ? (
-                  formatMs(timer.intervalMs)
+                  formatDuration(timer.intervalMs)
                 ) : timer.debounceMs ? (
-                  `${formatMs(timer.debounceMs)} (debounce)`
+                  `${formatDuration(timer.debounceMs)} (debounce)`
                 ) : (
                   '-'
                 )}
@@ -494,7 +351,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
 
             return (
               <tr key={name}>
-                <td>{integrationLabels[name] || name}</td>
+                <td>{getIntegrationLabel(name)}</td>
                 <td>
                   <StatusDot status={isActive ? 'active' : 'inactive'} prefix={p} />
                   {statusLabel}
@@ -547,7 +404,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                 <td>Last Cleanup</td>
                 <td>
                   {data.storage.lastCleanupAt
-                    ? formatRelativeTime(data.storage.lastCleanupAt)
+                    ? timeAgo(data.storage.lastCleanupAt)
                     : '-'}
                 </td>
               </tr>
@@ -566,7 +423,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                 {data.storage.tables.map((t) => (
                   <tr key={t.name}>
                     <td><code>{t.name}</code></td>
-                    <td>{formatNumber(t.rowCount)}</td>
+                    <td>{t.rowCount.toLocaleString()}</td>
                   </tr>
                 ))}
               </tbody>

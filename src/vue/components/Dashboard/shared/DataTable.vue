@@ -5,8 +5,7 @@
  * Supports sortable columns, row click handlers,
  * and slot-based cell rendering.
  */
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 
 export interface Column {
   key: string
@@ -39,24 +38,7 @@ function handleSort(col: Column) {
   }
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(() => props.rows, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+const { tableRef } = useResizableTable(() => props.rows)
 </script>
 
 <template>

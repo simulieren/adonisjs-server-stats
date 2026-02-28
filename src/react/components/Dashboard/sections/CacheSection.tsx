@@ -1,38 +1,15 @@
 import React, { useState, useCallback } from 'react'
 
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
+import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
 
-import type { DashboardHookOptions } from '../../../../core/types.js'
-
-interface CacheStats {
-  connected: boolean
-  hits: number
-  misses: number
-  hitRate: number
-  memoryUsedBytes: number
-  memoryUsedHuman: string
-  connectedClients: number
-  totalKeys: number
-  keyCount?: number
-}
-
-interface CacheKeyEntry {
-  key: string
-  type: string
-  ttl: number
-  size?: number | null
-}
-
-interface CacheResponse {
-  available: boolean
-  stats: CacheStats | null
-  keys?: CacheKeyEntry[]
-  data?: CacheKeyEntry[]
-  cursor: string
-}
+import type {
+  DashboardHookOptions,
+  DashboardCacheResponse,
+} from '../../../../core/types.js'
 
 interface CacheSectionProps {
   options?: DashboardHookOptions
@@ -45,7 +22,7 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
   const [keyValueLoading, setKeyValueLoading] = useState(false)
   const [keyValueError, setKeyValueError] = useState<string | null>(null)
 
-  const { data, isLoading, mutate, getApi } = useDashboardData<CacheResponse>('cache', {
+  const { data, isLoading, mutate, getApi } = useDashboardData<DashboardCacheResponse>('cache', {
     ...options,
     search,
   })
@@ -171,13 +148,13 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
                 label: 'Size',
                 width: '60px',
                 render: (v: number | null | undefined) =>
-                  v !== null && v !== undefined ? v + 'B' : '-',
+                  v !== null && v !== undefined && v > 0 ? formatCacheSize(v) : '-',
               },
               {
                 key: 'ttl',
                 label: 'TTL',
                 width: '70px',
-                render: (v: number) => (v > 0 ? `${v}s` : '-'),
+                render: (v: number) => (v > 0 ? formatTtl(v) : '-'),
               },
               {
                 key: '_actions',

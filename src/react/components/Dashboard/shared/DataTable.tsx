@@ -1,6 +1,6 @@
-import React, { useCallback, useRef, useEffect } from 'react'
+import React, { useCallback } from 'react'
 
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { useResizableTable } from '../../../hooks/useResizableTable.js'
 
 interface Column<T> {
   key: string
@@ -47,13 +47,7 @@ export function DataTable<T extends Record<string, unknown>>({
     [onSort]
   )
 
-  const tableRef = useRef<HTMLTableElement>(null)
-
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current)
-    }
-  }, [data, columns])
+  const tableRef = useResizableTable([data, columns])
 
   if (data.length === 0) {
     return <div className="ss-dash-empty">{emptyMessage}</div>

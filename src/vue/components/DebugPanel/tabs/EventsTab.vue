@@ -2,9 +2,9 @@
 /**
  * Events table tab for the debug panel.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import { timeAgo, formatTime } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 import { TAB_ICONS } from '../../../../core/icons.js'
 import type { EventRecord } from '../../../../core/index.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
@@ -33,24 +33,7 @@ const summary = computed(() => {
   return `${arr.length} events`
 })
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(events, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+const { tableRef } = useResizableTable(() => events.value)
 </script>
 
 <template>

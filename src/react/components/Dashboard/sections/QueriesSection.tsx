@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 
-import { timeAgo, formatTime } from '../../../../core/formatters.js'
+import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
+import { SLOW_DURATION_MS } from '../../../../core/constants.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
@@ -349,7 +350,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
       const dur = (q.duration as number) || 0
       totalDur += dur
       count++
-      if (dur > 100) slow++
+      if (dur > SLOW_DURATION_MS) slow++
     }
     // Count duplicates from sqlCounts
     const counts = new Map<string, number>()
@@ -473,7 +474,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   render: (v: unknown) => {
                     const dur = (v as number) || 0
                     return (
-                      <span className={`ss-dash-duration ${dur > 500 ? 'ss-dash-very-slow' : dur > 100 ? 'ss-dash-slow' : ''}`}>
+                      <span className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}>
                         {dur.toFixed(2) + 'ms'}
                       </span>
                     )
@@ -496,7 +497,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   render: (v: unknown) => {
                     const dur = (v as number) || 0
                     return (
-                      <span className={`ss-dash-duration ${dur > 500 ? 'ss-dash-very-slow' : dur > 100 ? 'ss-dash-slow' : ''}`}>
+                      <span className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}>
                         {dur.toFixed(2) + 'ms'}
                       </span>
                     )
@@ -587,7 +588,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   const dur = (v as number) || 0
                   return (
                   <span
-                    className={`ss-dash-duration ${dur > 500 ? 'ss-dash-very-slow' : dur > 100 ? 'ss-dash-slow' : ''}`}
+                    className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
                   >
                     {dur.toFixed(2) + 'ms'}
                   </span>

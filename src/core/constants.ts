@@ -14,3 +14,13 @@ export const SECTION_REFRESH_MS = 10000
 
 /** Refresh interval for debug panel tabs (ms). */
 export const DEBUG_REFRESH_MS = 3000
+
+// ---------------------------------------------------------------------------
+// Duration severity thresholds
+// ---------------------------------------------------------------------------
+
+/** Duration (ms) above which a query/request is considered slow. */
+export const SLOW_DURATION_MS = 100
+
+/** Duration (ms) above which a query/request is considered very slow. */
+export const VERY_SLOW_DURATION_MS = 500

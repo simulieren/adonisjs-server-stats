@@ -2,9 +2,9 @@
 /**
  * Route table tab for the debug panel.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import type { RouteRecord } from '../../../../core/index.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
 
 const props = defineProps<{
   data: { routes?: RouteRecord[] } | RouteRecord[] | null
@@ -38,24 +38,7 @@ function isCurrentRoute(route: RouteRecord): boolean {
   return props.currentUrl.includes(route.pattern.replace(/:[^/]+/g, ''))
 }
 
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(routes, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+const { tableRef } = useResizableTable(() => routes.value)
 </script>
 
 <template>

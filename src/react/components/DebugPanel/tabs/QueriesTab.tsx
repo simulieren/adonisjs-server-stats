@@ -1,8 +1,9 @@
-import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 
-import { formatTime, formatDuration, timeAgo } from '../../../../core/formatters.js'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
+import { formatTime, formatDuration, timeAgo, durationSeverity } from '../../../../core/formatters.js'
+import { filterQueries, countDuplicateQueries, computeQuerySummary } from '../../../../core/query-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { useResizableTable } from '../../../hooks/useResizableTable.js'
 
 import type { QueryRecord, DebugPanelProps } from '../../../../core/types.js'
 
@@ -15,45 +16,16 @@ export function QueriesTab({ options }: QueriesTabProps) {
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState<number | null>(null)
 
-  const queries = useMemo(() => {
-    const items = data?.queries || []
-    if (!search) return items
-    const lower = search.toLowerCase()
-    return items.filter(
-      (q) =>
-        q.sql.toLowerCase().includes(lower) ||
-        (q.model && q.model.toLowerCase().includes(lower)) ||
-        q.method.toLowerCase().includes(lower)
-    )
-  }, [data, search])
-
-  // Detect duplicates (same SQL appearing more than once)
-  const dupCounts = useMemo(() => {
-    const counts: Record<string, number> = {}
-    for (const q of data?.queries || []) {
-      counts[q.sql] = (counts[q.sql] || 0) + 1
-    }
-    return counts
-  }, [data])
-
-  const summaryStats = useMemo(() => {
-    const all = data?.queries || []
-    const slowCount = all.filter((q) => q.duration > 100).length
-    const dupCount = Object.values(dupCounts).filter((c) => c > 1).length
-    const avgDuration = all.length > 0 ? all.reduce((sum, q) => sum + q.duration, 0) / all.length : 0
-    return { slowCount, dupCount, avgDuration }
-  }, [data, dupCounts])
+  const allQueries = useMemo(() => data?.queries || [], [data])
+  const queries = useMemo(() => filterQueries(allQueries, search), [allQueries, search])
+  const dupCounts = useMemo(() => countDuplicateQueries(allQueries), [allQueries])
+  const summaryStats = useMemo(() => computeQuerySummary(allQueries, dupCounts), [allQueries, dupCounts])
 
   const toggleExpand = useCallback((id: number) => {
     setExpandedId((prev) => (prev === id ? null : id))
   }, [])
 
-  const tableRef = useRef<HTMLTableElement>(null)
-  useEffect(() => {
-    if (tableRef.current) {
-      return initResizableColumns(tableRef.current)
-    }
-  }, [queries])
+  const tableRef = useResizableTable([queries])
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading queries...</div>
@@ -123,7 +95,7 @@ export function QueriesTab({ options }: QueriesTabProps) {
                   {q.inTransaction && <span className="ss-dbg-dup"> TXN</span>}
                 </td>
                 <td
-                  className={`ss-dbg-duration ${q.duration > 500 ? 'ss-dbg-very-slow' : q.duration > 100 ? 'ss-dbg-slow' : ''}`}
+                  className={`ss-dbg-duration ${durationSeverity(q.duration) === 'very-slow' ? 'ss-dbg-very-slow' : durationSeverity(q.duration) === 'slow' ? 'ss-dbg-slow' : ''}`}
                 >
                   {formatDuration(q.duration)}
                 </td>

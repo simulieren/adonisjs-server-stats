@@ -7,6 +7,12 @@
  */
 import { ref, computed, inject, type Ref } from 'vue'
 import { timeAgo, formatDuration, formatTime } from '../../../../core/index.js'
+import {
+  JOB_STATUS_FILTERS,
+  getJobStatusBadgeColor,
+  extractJobs as extractJobsFromData,
+  extractJobStats,
+} from '../../../../core/job-utils.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 import FilterBar from '../shared/FilterBar.vue'
@@ -16,8 +22,6 @@ const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
-
-const JOB_STATUSES = ['all', 'active', 'waiting', 'delayed', 'completed', 'failed'] as const
 
 const {
   data,
@@ -40,32 +44,9 @@ const search = ref('')
 const statusFilter = ref('all')
 const retryStates = ref<Record<string, 'pending' | 'success' | 'error'>>({})
 
-interface JobsResponse {
-  jobs?: Record<string, unknown>[]
-  stats?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
-  overview?: { active: number; waiting: number; delayed: number; completed: number; failed: number }
-}
+const jobs = computed<Record<string, unknown>[]>(() => extractJobsFromData(data.value))
 
-const jobs = computed<Record<string, unknown>[]>(() => {
-  if (!data.value) return []
-  const d = data.value as JobsResponse | Record<string, unknown>[]
-  if (Array.isArray(d)) return d
-  return d.jobs || (d as Record<string, unknown>).data as Record<string, unknown>[] || []
-})
-
-const stats = computed(() => {
-  if (!data.value || Array.isArray(data.value)) return null
-  const d = data.value as JobsResponse
-  return d.stats || d.overview || null
-})
-
-const statusColor: Record<string, string> = {
-  active: 'blue',
-  waiting: 'amber',
-  delayed: 'purple',
-  completed: 'green',
-  failed: 'red',
-}
+const stats = computed(() => extractJobStats(data.value))
 
 function handleSearch(term: string) {
   search.value = term
@@ -130,7 +111,7 @@ async function handleRetry(jobId: string) {
     >
       <div class="ss-dash-btn-group">
         <button
-          v-for="status in JOB_STATUSES"
+          v-for="status in JOB_STATUS_FILTERS"
           :key="status"
           type="button"
           :class="`ss-dash-btn ${statusFilter === status ? 'ss-dash-active' : ''}`"
@@ -177,7 +158,7 @@ async function handleRetry(jobId: string) {
                 <span style="color: var(--ss-text)" :title="(j.name as string)">{{ j.name }}</span>
               </td>
               <td>
-                <span :class="`ss-dash-badge ss-dash-badge-${statusColor[(j.status as string)] || 'muted'}`">
+                <span :class="`ss-dash-badge ss-dash-badge-${getJobStatusBadgeColor(j.status as string)}`">
                   {{ j.status }}
                 </span>
               </td>

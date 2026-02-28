@@ -2,35 +2,18 @@
 /**
  * Redis key browser tab for the debug panel.
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { computed, ref } from 'vue'
 import JsonViewer from '../../shared/JsonViewer.vue'
-import { initResizableColumns } from '../../../../core/resizable-columns.js'
-
-interface CacheKey {
-  key: string
-  type: string
-  ttl: number
-  size: number
-  value?: string | number | boolean | Record<string, unknown> | unknown[] | null
-}
-
-interface CacheTabData {
-  stats?: {
-    hitRate: number
-    totalHits: number
-    totalMisses: number
-    keyCount: number
-    memoryUsedMb: number
-  }
-  keys?: CacheKey[]
-}
+import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
+import type { CacheStats, CacheEntry } from '../../../../core/types.js'
 
 const props = defineProps<{
-  data: CacheTabData | null
+  data: { stats?: CacheStats; keys?: CacheEntry[] } | null
 }>()
 
 const search = ref('')
-const selectedKey = ref<CacheKey | null>(null)
+const selectedKey = ref<CacheEntry | null>(null)
 
 const cacheData = computed(() => {
   return props.data || {}
@@ -38,45 +21,14 @@ const cacheData = computed(() => {
 
 const stats = computed(() => cacheData.value.stats || {})
 
-const keys = computed<CacheKey[]>(() => {
+const keys = computed<CacheEntry[]>(() => {
   const arr = cacheData.value.keys || []
   if (!search.value.trim()) return arr
   const term = search.value.toLowerCase()
-  return arr.filter((k: CacheKey) => k.key.toLowerCase().includes(term))
+  return arr.filter((k: CacheEntry) => k.key.toLowerCase().includes(term))
 })
 
-function formatTtl(seconds: number): string {
-  if (seconds < 0) return 'no expiry'
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`
-  return `${Math.floor(seconds / 86400)}d`
-}
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes}B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
-}
-
-const tableRef = ref<HTMLTableElement | null>(null)
-let cleanupResize: (() => void) | null = null
-
-function attachResize() {
-  if (cleanupResize) cleanupResize()
-  cleanupResize = null
-  nextTick(() => {
-    if (tableRef.value) {
-      cleanupResize = initResizableColumns(tableRef.value)
-    }
-  })
-}
-
-watch(keys, attachResize)
-onMounted(attachResize)
-onBeforeUnmount(() => {
-  if (cleanupResize) cleanupResize()
-})
+const { tableRef } = useResizableTable(() => keys.value)
 </script>
 
 <template>
@@ -141,7 +93,7 @@ onBeforeUnmount(() => {
             <td class="ss-dbg-c-sql">{{ k.key }}</td>
             <td class="ss-dbg-c-muted">{{ k.type }}</td>
             <td class="ss-dbg-c-dim">{{ formatTtl(k.ttl) }}</td>
-            <td class="ss-dbg-c-dim">{{ formatSize(k.size) }}</td>
+            <td class="ss-dbg-c-dim">{{ formatCacheSize(k.size) }}</td>
           </tr>
         </tbody>
       </table>
