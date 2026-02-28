@@ -10,7 +10,12 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useServerStats } from '../../composables/useServerStats.js'
 import { useFeatures } from '../../composables/useFeatures.js'
 import { useTheme } from '../../composables/useTheme.js'
-import { getMetricsByGroup, getVisibleMetricGroups, formatBytes } from '../../../core/index.js'
+import {
+  getMetricsByGroup,
+  getVisibleMetricGroups,
+  detectMetricGroupsFromStats,
+  formatBytes,
+} from '../../../core/index.js'
 import type { StatsBarConfig } from '../../../core/index.js'
 import MetricCard from './MetricCard.vue'
 
@@ -59,12 +64,20 @@ watch(isUnauthorized, (unauthorized) => {
   if (unauthorized) visible.value = false
 })
 
-// Group metrics for rendering with separators, filtered by enabled features
+// Group metrics for rendering with separators, filtered by available data.
+// Primary: detect groups from actual stats data (mirrors old vanilla JS behavior).
+// Fallback: use feature flags from the debug endpoint before stats arrive.
+const visibleGroups = computed(() => {
+  if (stats.value) {
+    return detectMetricGroupsFromStats(stats.value as unknown as Record<string, unknown>)
+  }
+  return getVisibleMetricGroups(features.value)
+})
+
 const metricGroups = computed(() => {
-  const visibleGroups = getVisibleMetricGroups(features.value)
   const groups = getMetricsByGroup()
   return Array.from(groups.entries())
-    .filter(([name]) => visibleGroups.has(name))
+    .filter(([name]) => visibleGroups.value.has(name))
     .map(([name, metrics]) => ({
       name,
       metrics,
@@ -105,7 +118,7 @@ const themeAttr = computed(() => theme.value)
   >
     <div class="ss-bar-left">
       <button
-        v-if="features.tracing || features.redis || features.queues"
+        v-if="features.tracing || visibleGroups.has('redis') || visibleGroups.has('queue')"
         type="button"
         class="ss-dbg-btn"
         title="Open debug panel"
@@ -142,11 +155,13 @@ const themeAttr = computed(() => theme.value)
     @click="toggleVisibility"
   >
     <span v-if="!visible" class="ss-toggle-summary">
-      <span v-if="features.process" class="ss-value ss-green">{{ cpuSummary }}</span>
-      <span v-if="features.process" class="ss-value ss-green">{{ memSummary }}</span>
-      <span v-if="features.redis" :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']">{{
-        redisSummary
-      }}</span>
+      <span v-if="visibleGroups.has('process')" class="ss-value ss-green">{{ cpuSummary }}</span>
+      <span v-if="visibleGroups.has('process')" class="ss-value ss-green">{{ memSummary }}</span>
+      <span
+        v-if="visibleGroups.has('redis')"
+        :class="['ss-value', stats?.redisOk ? 'ss-green' : 'ss-red']"
+        >{{ redisSummary }}</span
+      >
     </span>
     <span v-if="visible" class="ss-toggle-label" style="color: #737373">hide stats</span>
     <span class="ss-toggle-arrow">{{ visible ? '\u25BC' : '\u25B2' }}</span>

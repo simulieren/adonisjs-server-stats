@@ -98,6 +98,10 @@ export function registerDashboardRoutes(
         .get('/api/cache/:key', bind('cacheKey'))
         .as('server-stats.cache.show')
         .where('key', /.*/)
+      router
+        .delete('/api/cache/:key', bind('cacheKeyDelete'))
+        .as('server-stats.cache.delete')
+        .where('key', /.*/)
 
       // Jobs / Queue
       router.get('/api/jobs', bind('jobs')).as('server-stats.jobs')

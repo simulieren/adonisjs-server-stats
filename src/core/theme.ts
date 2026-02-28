@@ -8,6 +8,17 @@
 export const STORAGE_KEY = 'ss-dash-theme'
 
 /**
+ * Custom DOM event name used to synchronize theme changes
+ * across multiple component trees within the same tab.
+ *
+ * The native `storage` event only fires in *other* tabs, so
+ * components rendered as separate React/Vue roots on the same
+ * page (e.g. StatsBar and DebugPanel) would never learn about
+ * each other's changes. This custom event fills that gap.
+ */
+const THEME_CHANGE_EVENT = 'ss-theme-change'
+
+/**
  * The two supported theme values.
  */
 export type Theme = 'dark' | 'light'
@@ -33,14 +44,20 @@ export function getTheme(): Theme {
 }
 
 /**
- * Persist a theme preference to `localStorage`.
+ * Persist a theme preference to `localStorage` and notify
+ * all in-page listeners via a custom DOM event.
  *
- * Other tabs will be notified via the `storage` event, which
- * listeners created by {@link onThemeChange} will pick up.
+ * Other tabs will be notified via the native `storage` event,
+ * which listeners created by {@link onThemeChange} also handle.
  */
 export function setTheme(theme: Theme): void {
   if (typeof window === 'undefined') return
   localStorage.setItem(STORAGE_KEY, theme)
+
+  // Dispatch a same-tab custom event so that all useTheme() /
+  // useTheme composable instances re-render immediately.
+  // The native `storage` event only fires in *other* tabs.
+  window.dispatchEvent(new CustomEvent(THEME_CHANGE_EVENT, { detail: theme }))
 }
 
 /**
@@ -56,14 +73,26 @@ export function toggleTheme(): Theme {
 }
 
 /**
- * Subscribe to theme changes from other tabs (`storage` event)
- * and from system preference changes (`prefers-color-scheme`).
+ * Subscribe to theme changes from:
+ * - Same-tab components (via custom {@link THEME_CHANGE_EVENT} event)
+ * - Other tabs (via native `storage` event)
+ * - System preference changes (via `prefers-color-scheme` media query)
  *
  * @param callback - Invoked with the new theme value whenever it changes.
  * @returns An unsubscribe function that removes all listeners.
  */
 export function onThemeChange(callback: (theme: Theme) => void): () => void {
   if (typeof window === 'undefined') return () => {}
+
+  // Listen for same-tab theme changes via custom event.
+  // This is the primary in-page synchronization mechanism
+  // (mirrors the old vanilla JS `window.__ssApplyBarTheme()` pattern).
+  const handleCustom = (event: Event) => {
+    const theme = (event as CustomEvent<Theme>).detail
+    if (theme === 'dark' || theme === 'light') {
+      callback(theme)
+    }
+  }
 
   // Listen for cross-tab changes via localStorage
   const handleStorage = (event: StorageEvent) => {
@@ -88,10 +117,12 @@ export function onThemeChange(callback: (theme: Theme) => void): () => void {
     }
   }
 
+  window.addEventListener(THEME_CHANGE_EVENT, handleCustom)
   window.addEventListener('storage', handleStorage)
   mediaQuery.addEventListener('change', handleMedia)
 
   return () => {
+    window.removeEventListener(THEME_CHANGE_EVENT, handleCustom)
     window.removeEventListener('storage', handleStorage)
     mediaQuery.removeEventListener('change', handleMedia)
   }

@@ -1,6 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 
-import { getVisibleMetricGroups } from '../../../core/feature-detect.js'
+import {
+  getVisibleMetricGroups,
+  detectMetricGroupsFromStats,
+} from '../../../core/feature-detect.js'
 import { METRIC_DEFINITIONS } from '../../../core/metrics.js'
 import { useFeatures } from '../../hooks/useFeatures.js'
 import { useServerStats } from '../../hooks/useServerStats.js'
@@ -14,6 +17,12 @@ interface StatsBarProps extends StatsBarPropsBase {
   featureOptions?: DebugPanelProps
   /** Whether to auto-hide on 403. */
   autoHideOnUnauthorized?: boolean
+  /** Callback to toggle the debug panel (renders wrench button in bar-left). */
+  onOpenDebugPanel?: () => void
+  /** Whether the debug panel is currently open (controls active styling on wrench). */
+  debugPanelOpen?: boolean
+  /** Callback invoked when the live (SSE/Transmit) connection state changes. */
+  onConnectionChange?: (isConnected: boolean) => void
 }
 
 /**
@@ -23,9 +32,21 @@ interface StatsBarProps extends StatsBarPropsBase {
  * and a show/hide toggle persisted to localStorage.
  */
 export function StatsBar(props: StatsBarProps) {
-  const { featureOptions, autoHideOnUnauthorized = true, ...statsOptions } = props
+  const {
+    featureOptions,
+    autoHideOnUnauthorized = true,
+    onOpenDebugPanel,
+    debugPanelOpen = false,
+    onConnectionChange,
+    ...statsOptions
+  } = props
 
-  const { stats, getHistory, isStale, unauthorized } = useServerStats(statsOptions)
+  const { stats, getHistory, isConnected, isStale, unauthorized } = useServerStats(statsOptions)
+
+  // Report connection state changes to parent
+  useEffect(() => {
+    onConnectionChange?.(isConnected)
+  }, [isConnected, onConnectionChange])
   const { features } = useFeatures(featureOptions)
   const { theme } = useTheme()
 
@@ -67,8 +88,18 @@ export function StatsBar(props: StatsBarProps) {
     return () => el.removeEventListener('wheel', handler)
   }, [])
 
-  // Visible metric groups based on features
-  const visibleGroups = useMemo(() => getVisibleMetricGroups(features), [features])
+  // Visible metric groups: derive from actual stats data when available,
+  // fall back to feature flags from the debug endpoint.
+  // This mirrors the old vanilla JS behavior where groups were shown
+  // based on what data the server actually sends, not what the debug
+  // endpoint reports.
+  const visibleGroups = useMemo(() => {
+    if (stats) {
+      return detectMetricGroupsFromStats(stats as unknown as Record<string, unknown>)
+    }
+    // Before stats arrive, use feature flags (if available) for initial render
+    return getVisibleMetricGroups(features)
+  }, [stats, features])
 
   // Filter metrics by visible groups
   const visibleMetrics = useMemo(
@@ -105,24 +136,59 @@ export function StatsBar(props: StatsBarProps) {
         title={visible ? 'Hide stats bar' : 'Show stats bar'}
         data-ss-theme={theme}
       >
-        <span className="ss-toggle-arrow">{visible ? '\u25BC' : '\u25B2'}</span>
-        {visible && <span className="ss-toggle-label">hide stats</span>}
-        {!visible && stats && features.process && (
-          <div className="ss-toggle-summary" style={{ display: 'flex' }}>
-            <span className="ss-label">CPU</span>
-            <span
-              className={`ss-value ${stats.cpuPercent > 80 ? 'ss-red' : stats.cpuPercent > 50 ? 'ss-amber' : 'ss-green'}`}
-            >
-              {stats.cpuPercent.toFixed(0)}%
-            </span>
-          </div>
+        {!visible && stats && (
+          <span className="ss-toggle-summary" style={{ display: 'flex' }}>
+            {visibleGroups.has('process') && (
+              <>
+                <span
+                  className={`ss-value ${stats.cpuPercent > 80 ? 'ss-red' : stats.cpuPercent > 50 ? 'ss-amber' : 'ss-green'}`}
+                >
+                  {stats.cpuPercent.toFixed(0)}%
+                </span>
+                <span className="ss-value ss-green">
+                  {stats.memHeapUsed !== undefined
+                    ? Math.round(stats.memHeapUsed / (1024 * 1024)) + 'M'
+                    : '-'}
+                </span>
+              </>
+            )}
+            {visibleGroups.has('redis') && stats.redisOk !== undefined && (
+              <span className={`ss-value ${stats.redisOk ? 'ss-green' : 'ss-red'}`}>
+                {stats.redisOk ? '\u2713' : '\u2717'}
+              </span>
+            )}
+          </span>
         )}
+        {visible && <span className="ss-toggle-label" style={{ color: '#737373' }}>hide stats</span>}
+        <span className="ss-toggle-arrow">{visible ? '\u25BC' : '\u25B2'}</span>
       </button>
 
       {/* Stats bar */}
-      <div ref={barRef} className={`ss-bar ${visible ? '' : 'ss-hidden'}`} data-ss-theme={theme}>
+      <div ref={barRef} className={visible ? 'ss-bar' : 'ss-bar ss-hidden'} data-ss-theme={theme}>
         <div className="ss-bar-left">
-          <div className={`ss-dot ${isStale ? 'ss-stale' : ''}`} />
+          {onOpenDebugPanel && (
+            <button
+              type="button"
+              className={`ss-dbg-btn ${debugPanelOpen ? 'ss-dbg-active' : ''}`}
+              onClick={onOpenDebugPanel}
+              title="Toggle debug panel"
+              id="ss-dbg-wrench"
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+              </svg>
+            </button>
+          )}
+          <div className={isStale ? 'ss-dot ss-stale' : 'ss-dot'} />
         </div>
 
         <div ref={scrollRef} className="ss-bar-scroll" id="ss-bar-scroll">

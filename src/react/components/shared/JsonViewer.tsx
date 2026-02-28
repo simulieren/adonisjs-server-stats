@@ -6,12 +6,13 @@ interface JsonViewerProps {
   data: unknown
   maxPreviewLength?: number
   className?: string
+  classPrefix?: 'ss-dash' | 'ss-dbg'
 }
 
 /**
  * Compact JSON preview with click-to-expand functionality.
  */
-export function JsonViewer({ data, maxPreviewLength = 100, className = '' }: JsonViewerProps) {
+export function JsonViewer({ data, maxPreviewLength = 100, className = '', classPrefix = 'ss-dash' }: JsonViewerProps) {
   const [expanded, setExpanded] = useState(false)
 
   const parsed = useMemo(() => {
@@ -52,13 +53,13 @@ export function JsonViewer({ data, maxPreviewLength = 100, className = '' }: Jso
   }, [fullJson])
 
   if (!data && data !== 0 && data !== false) {
-    return <span className="ss-dim">-</span>
+    return <span className={`ss-dim ${classPrefix}-c-dim`}>-</span>
   }
 
   return (
-    <div className={`ss-json-viewer ${className}`}>
+    <div className={`${classPrefix}-data-cell ${className}`}>
       <span
-        className="ss-data-preview"
+        className={`${classPrefix}-data-preview`}
         onClick={handleToggle}
         role="button"
         tabIndex={0}
@@ -67,9 +68,9 @@ export function JsonViewer({ data, maxPreviewLength = 100, className = '' }: Jso
         {preview}
       </span>
       {expanded && (
-        <div className="ss-data-full" onClick={handleToggle}>
+        <div className={`${classPrefix}-data-full`} onClick={handleToggle}>
           <button
-            className="ss-copy-btn"
+            className={`${classPrefix}-copy-btn`}
             onClick={(e) => {
               e.stopPropagation()
               handleCopy()

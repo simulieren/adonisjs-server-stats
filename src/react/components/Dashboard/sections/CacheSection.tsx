@@ -7,11 +7,31 @@ import { FilterBar } from '../shared/FilterBar.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
 
+interface CacheStats {
+  connected: boolean
+  hits: number
+  misses: number
+  hitRate: number
+  memoryUsedBytes: number
+  memoryUsedHuman: string
+  connectedClients: number
+  totalKeys: number
+  keyCount?: number
+}
+
+interface CacheKeyEntry {
+  key: string
+  type: string
+  ttl: number
+  size?: number | null
+}
+
 interface CacheResponse {
-  hitRate?: number
-  totalHits?: number
-  totalMisses?: number
-  keys?: Array<{ key: string; type: string; ttl: number; size: number }>
+  available: boolean
+  stats: CacheStats | null
+  keys?: CacheKeyEntry[]
+  data?: CacheKeyEntry[]
+  cursor: string
 }
 
 interface CacheSectionProps {
@@ -21,8 +41,11 @@ interface CacheSectionProps {
 export function CacheSection({ options = {} }: CacheSectionProps) {
   const [search, setSearch] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
+  const [keyValue, setKeyValue] = useState<unknown>(null)
+  const [keyValueLoading, setKeyValueLoading] = useState(false)
+  const [keyValueError, setKeyValueError] = useState<string | null>(null)
 
-  const { data, isLoading, mutate } = useDashboardData<CacheResponse>('cache', {
+  const { data, isLoading, mutate, getApi } = useDashboardData<CacheResponse>('cache', {
     ...options,
     search,
   })
@@ -33,91 +56,169 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
       if (!confirm(`Delete cache key "${key}"?`)) return
       try {
         await mutate(`cache/${encodeURIComponent(key)}`, 'delete')
+        // Clear selection if the deleted key was selected
+        if (selectedKey === key) {
+          setSelectedKey(null)
+          setKeyValue(null)
+          setKeyValueError(null)
+        }
       } catch {
         // Silently fail
       }
     },
-    [mutate]
+    [mutate, selectedKey]
+  )
+
+  const handleKeyClick = useCallback(
+    async (key: string) => {
+      if (selectedKey === key) {
+        setSelectedKey(null)
+        setKeyValue(null)
+        setKeyValueError(null)
+        return
+      }
+      setSelectedKey(key)
+      setKeyValue(null)
+      setKeyValueError(null)
+      setKeyValueLoading(true)
+      try {
+        const api = getApi()
+        const result = await api.fetchCacheKey(key)
+        setKeyValue(
+          result.value !== undefined
+            ? result.value
+            : result.data !== undefined
+              ? result.data
+              : result
+        )
+        setKeyValueError(null)
+      } catch {
+        setKeyValue(null)
+        setKeyValueError('Failed to fetch key value')
+      } finally {
+        setKeyValueLoading(false)
+      }
+    },
+    [selectedKey, getApi]
   )
 
   return (
     <div>
       {/* Stats */}
-      {cacheData && (
-        <div className="ss-dash-stats-row">
-          <div className="ss-dash-stat-card">
-            <span className="ss-dash-stat-label">Hit Rate</span>
-            <span className="ss-dash-stat-value">{(cacheData.hitRate ?? 0).toFixed(1)}%</span>
+      {cacheData?.available && cacheData?.stats && (
+        <div className="ss-dash-cache-stats">
+          <div className="ss-dash-cache-stat">
+            <span className="ss-dash-cache-stat-label">Hit Rate:</span>
+            <span className="ss-dash-cache-stat-value">
+              {(cacheData.stats.hitRate ?? 0).toFixed(1)}%
+            </span>
           </div>
-          <div className="ss-dash-stat-card">
-            <span className="ss-dash-stat-label">Total Hits</span>
-            <span className="ss-dash-stat-value">{cacheData.totalHits ?? 0}</span>
+          <div className="ss-dash-cache-stat">
+            <span className="ss-dash-cache-stat-label">Hits:</span>
+            <span className="ss-dash-cache-stat-value">{cacheData.stats.hits ?? 0}</span>
           </div>
-          <div className="ss-dash-stat-card">
-            <span className="ss-dash-stat-label">Total Misses</span>
-            <span className="ss-dash-stat-value">{cacheData.totalMisses ?? 0}</span>
+          <div className="ss-dash-cache-stat">
+            <span className="ss-dash-cache-stat-label">Misses:</span>
+            <span className="ss-dash-cache-stat-value">{cacheData.stats.misses ?? 0}</span>
+          </div>
+          <div className="ss-dash-cache-stat">
+            <span className="ss-dash-cache-stat-label">Keys:</span>
+            <span className="ss-dash-cache-stat-value">
+              {cacheData.stats.totalKeys || cacheData.stats.keyCount || cacheData.keys?.length || 0}
+            </span>
           </div>
         </div>
       )}
 
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="Filter cache keys..." />
+      <FilterBar search={search} onSearchChange={setSearch} placeholder="Filter cache keys..." summary={`${(cacheData?.keys || cacheData?.data || []).length} keys`} />
 
       {isLoading && !data ? (
         <div className="ss-dash-empty">Loading cache...</div>
-      ) : !cacheData ? (
+      ) : !cacheData || !cacheData.available ? (
         <div className="ss-dash-empty">Cache inspector not available</div>
       ) : (
-        <DataTable
-          columns={[
-            {
-              key: 'key',
-              label: 'Key',
-              render: (v: string) => <span style={{ color: 'var(--ss-sql-color)' }}>{v}</span>,
-            },
-            { key: 'type', label: 'Type', width: '70px' },
-            {
-              key: 'ttl',
-              label: 'TTL',
-              width: '70px',
-              render: (v: number) => (v > 0 ? `${v}s` : '-'),
-            },
-            {
-              key: 'size',
-              label: 'Size',
-              width: '70px',
-              render: (v: number) => (v > 0 ? `${v}B` : '-'),
-            },
-            {
-              key: '_actions',
-              label: '',
-              width: '60px',
-              render: (_: unknown, row: Record<string, unknown>) => (
-                <button
-                  type="button"
-                  className="ss-dash-btn-danger"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDelete(row.key as string)
-                  }}
-                >
-                  Delete
-                </button>
-              ),
-            },
-          ]}
-          data={cacheData.keys || []}
-          keyField="key"
-          onRowClick={(row: Record<string, unknown>) =>
-            setSelectedKey(selectedKey === row.key ? null : (row.key as string))
-          }
-          emptyMessage="No cache keys found"
-        />
+        <div className="ss-dash-table-wrap">
+          <DataTable
+            columns={[
+              {
+                key: 'key',
+                label: 'Key',
+                render: (v: string) => (
+                  <span
+                    title={v}
+                    style={{
+                      color: 'var(--ss-sql-color)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      display: 'block',
+                    }}
+                  >
+                    {v}
+                  </span>
+                ),
+              },
+              {
+                key: 'type',
+                label: 'Type',
+                width: '70px',
+                render: (v: string) => (
+                  <span style={{ color: 'var(--ss-muted)' }}>{v}</span>
+                ),
+              },
+              {
+                key: 'size',
+                label: 'Size',
+                width: '60px',
+                render: (v: number | null | undefined) =>
+                  v !== null && v !== undefined ? v + 'B' : '-',
+              },
+              {
+                key: 'ttl',
+                label: 'TTL',
+                width: '70px',
+                render: (v: number) => (v > 0 ? `${v}s` : '-'),
+              },
+              {
+                key: '_actions',
+                label: '',
+                width: '60px',
+                render: (_: unknown, row: Record<string, unknown>) => (
+                  <button
+                    type="button"
+                    className="ss-dash-retry-btn"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleDelete(row.key as string)
+                    }}
+                  >
+                    Delete
+                  </button>
+                ),
+              },
+            ]}
+            data={cacheData.keys || cacheData.data || []}
+            keyField="key"
+            onRowClick={(row: Record<string, unknown>) =>
+              handleKeyClick(row.key as string)
+            }
+            emptyMessage="No cache keys found"
+          />
+        </div>
       )}
 
       {selectedKey && (
-        <div className="ss-dash-detail-panel">
+        <div className="ss-dash-cache-detail">
           <h4>Key: {selectedKey}</h4>
-          <JsonViewer data={selectedKey} />
+          {keyValueLoading ? (
+            <div className="ss-dash-empty">Loading value...</div>
+          ) : keyValueError ? (
+            <div className="ss-dash-empty" style={{ color: 'var(--ss-red-fg)' }}>
+              {keyValueError}
+            </div>
+          ) : (
+            <JsonViewer data={keyValue} />
+          )}
         </div>
       )}
     </div>

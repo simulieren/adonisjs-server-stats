@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.react.json",
+  "compilerOptions": {
+    "jsxImportSource": "preact"
+  },
+  "include": [
+    "src/react/**/*.ts",
+    "src/react/**/*.tsx",
+    "src/core/**/*.ts",
+    "src/edge/entries/**/*.ts",
+    "src/edge/entries/**/*.tsx"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

@@ -38,6 +38,11 @@ export interface TransmitSubscriptionHandle {
  * @param config - Subscription configuration.
  * @returns A handle with `subscribe()` and `unsubscribe()` methods.
  */
+/** Minimal interface for the Transmit constructor. */
+interface TransmitConstructor {
+  new (options: Record<string, unknown>): TransmitClient
+}
+
 /** Minimal interface for a Transmit client instance. */
 interface TransmitClient {
   subscription(channel: string): TransmitSubscription
@@ -50,6 +55,27 @@ interface TransmitSubscription {
   delete(): Promise<void>
 }
 
+/** Resolve the Transmit constructor from window global or dynamic import. */
+async function resolveTransmitClass(): Promise<TransmitConstructor | null> {
+  // 1. Check for window.Transmit (injected by the Edge template inline script)
+  if (
+    typeof window !== 'undefined' &&
+    (window as unknown as Record<string, unknown>).Transmit &&
+    typeof (window as unknown as Record<string, unknown>).Transmit === 'function'
+  ) {
+    return (window as unknown as Record<string, TransmitConstructor>).Transmit
+  }
+
+  // 2. Fall back to dynamic import (works in bundled environments)
+  try {
+    // @ts-expect-error -- @adonisjs/transmit-client is an optional peer dependency
+    const mod = await import('@adonisjs/transmit-client')
+    return mod.Transmit ?? mod.default ?? null
+  } catch {
+    return null
+  }
+}
+
 export function createTransmitSubscription(
   config: TransmitSubscriptionConfig
 ): TransmitSubscriptionHandle {
@@ -59,10 +85,11 @@ export function createTransmitSubscription(
 
   const subscribe = async (): Promise<void> => {
     try {
-      // Dynamic import — fails gracefully if not installed
-      // @ts-expect-error -- @adonisjs/transmit-client is an optional peer dependency
-      const mod = await import('@adonisjs/transmit-client')
-      const Transmit = mod.Transmit ?? mod.default
+      const Transmit = await resolveTransmitClass()
+
+      if (!Transmit) {
+        throw new Error('Transmit client not available (neither window.Transmit nor @adonisjs/transmit-client)')
+      }
 
       if (disposed) return
 

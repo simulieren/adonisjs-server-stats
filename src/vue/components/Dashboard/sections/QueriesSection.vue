@@ -129,15 +129,15 @@ onBeforeUnmount(() => {
         :summary="`${props.total} queries`"
         @update:model-value="handleSearch"
       />
-      <div class="ss-dash-view-toggle">
+      <div class="ss-dash-btn-group">
         <button
-          :class="['ss-dash-view-btn', { 'ss-dash-view-active': viewMode === 'list' }]"
+          :class="['ss-dash-btn', { 'ss-dash-active': viewMode === 'list' }]"
           @click="viewMode = 'list'"
         >
           List
         </button>
         <button
-          :class="['ss-dash-view-btn', { 'ss-dash-view-active': viewMode === 'grouped' }]"
+          :class="['ss-dash-btn', { 'ss-dash-active': viewMode === 'grouped' }]"
           @click="switchToGrouped"
         >
           Grouped
@@ -188,7 +188,7 @@ onBeforeUnmount(() => {
               <td>
                 <button
                   v-if="q.method === 'select'"
-                  class="ss-dash-action-btn"
+                  class="ss-dash-explain-btn"
                   @click="handleExplain(q.id)"
                 >
                   {{ explainQueryId === q.id ? 'Hide' : 'EXPLAIN' }}
@@ -196,8 +196,8 @@ onBeforeUnmount(() => {
               </td>
             </tr>
             <!-- EXPLAIN result -->
-            <tr v-if="explainQueryId === q.id && explainResult">
-              <td colspan="7" style="padding: 8px 12px">
+            <tr v-if="explainQueryId === q.id && explainResult" class="ss-dash-explain-row">
+              <td colspan="7" class="ss-dash-explain">
                 <pre class="ss-dash-explain-result">{{
                   JSON.stringify(explainResult, null, 2)
                 }}</pre>

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 
-import { timeAgo } from '../../../../core/formatters.js'
+import { timeAgo, formatTime } from '../../../../core/formatters.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
@@ -21,9 +21,10 @@ export function EmailsTab({ options }: EmailsTabProps) {
     const lower = search.toLowerCase()
     return items.filter(
       (e) =>
-        e.subject.toLowerCase().includes(lower) ||
-        e.to.toLowerCase().includes(lower) ||
-        e.from.toLowerCase().includes(lower)
+        (e.subject || '').toLowerCase().includes(lower) ||
+        (e.to || '').toLowerCase().includes(lower) ||
+        (e.from || '').toLowerCase().includes(lower) ||
+        (e.mailer || '').toLowerCase().includes(lower)
     )
   }, [data, search])
 
@@ -74,7 +75,7 @@ export function EmailsTab({ options }: EmailsTabProps) {
               </div>
             )}
           </div>
-          <button className="ss-dbg-close" onClick={closePreview} type="button">
+          <button className="ss-dbg-btn-clear" onClick={closePreview} type="button">
             {'\u00D7'}
           </button>
         </div>
@@ -111,13 +112,25 @@ export function EmailsTab({ options }: EmailsTabProps) {
         <div className="ss-dbg-empty">No emails captured</div>
       ) : (
         <table ref={tableRef} className="ss-dbg-table">
+          <colgroup>
+            <col style={{ width: '50px' }} />
+            <col style={{ width: '140px' }} />
+            <col style={{ width: '140px' }} />
+            <col />
+            <col style={{ width: '70px' }} />
+            <col style={{ width: '80px' }} />
+            <col style={{ width: '40px' }} />
+            <col style={{ width: '80px' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>
-              <th>Subject</th>
+              <th>From</th>
               <th>To</th>
-              <th>Mailer</th>
+              <th>Subject</th>
               <th>Status</th>
+              <th>Mailer</th>
+              <th title="Attachments">{'\u{1F4CE}'}</th>
               <th>Time</th>
             </tr>
           </thead>
@@ -128,18 +141,42 @@ export function EmailsTab({ options }: EmailsTabProps) {
                 className="ss-dbg-email-row"
                 onClick={() => setPreviewId(email.id)}
               >
-                <td>{email.id}</td>
-                <td>{email.subject}</td>
-                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>{email.id}</td>
+                <td
+                  className="ss-dbg-c-secondary"
+                  title={email.from}
+                >
+                  {email.from}
+                </td>
+                <td
+                  className="ss-dbg-c-secondary"
+                  title={email.to}
+                >
                   {email.to}
                 </td>
-                <td>{email.mailer}</td>
+                <td className="ss-dbg-c-sql">
+                  {email.subject}
+                </td>
                 <td>
                   <span className={`ss-dbg-email-status ${statusColorMap[email.status] || ''}`}>
                     {email.status}
                   </span>
                 </td>
-                <td className="ss-dbg-event-time">{timeAgo(email.timestamp)}</td>
+                <td className="ss-dbg-c-muted">{email.mailer}</td>
+                <td className="ss-dbg-c-dim" style={{ textAlign: 'center' }}>
+                  {email.attachmentCount > 0 ? email.attachmentCount : '-'}
+                </td>
+                <td className="ss-dbg-event-time" title={formatTime(
+                    email.timestamp ||
+                      (email as unknown as Record<string, number>).created_at ||
+                      (email as unknown as Record<string, number>).createdAt
+                  )}>
+                  {timeAgo(
+                    email.timestamp ||
+                      (email as unknown as Record<string, number>).created_at ||
+                      (email as unknown as Record<string, number>).createdAt
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

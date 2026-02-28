@@ -48,6 +48,8 @@ export interface RequestFilters {
   statusMax?: number
   durationMin?: number
   durationMax?: number
+  /** General text search across method and url */
+  search?: string
 }
 
 export interface QueryFilters {
@@ -57,13 +59,19 @@ export interface QueryFilters {
   durationMin?: number
   durationMax?: number
   requestId?: number
+  /** General text search across sql_text, model, and connection */
+  search?: string
 }
 
 export interface EventFilters {
   eventName?: string
+  /** General text search across event_name */
+  search?: string
 }
 
 export interface EmailFilters {
+  /** General text search across from_addr, to_addr, and subject */
+  search?: string
   from?: string
   to?: string
   subject?: string
@@ -84,6 +92,8 @@ export interface TraceFilters {
   url?: string
   statusMin?: number
   statusMax?: number
+  /** General text search across method and url */
+  search?: string
 }
 
 export interface PaginatedResult<T> {
@@ -415,7 +425,9 @@ export class DashboardStore {
       await this.db('server_stats_logs').insert({
         level: levelName,
         message: String(entry.msg || entry.message || ''),
-        request_id: entry.requestId ? String(entry.requestId) : null,
+        request_id: (entry.request_id || entry.requestId || entry['x-request-id'])
+          ? String(entry.request_id || entry.requestId || entry['x-request-id'])
+          : null,
         data: JSON.stringify(entry),
       })
     } catch (err) {
@@ -493,6 +505,12 @@ export class DashboardStore {
       if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
       if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
       if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((qb) => {
+          qb.where('url', 'like', term).orWhere('method', 'like', term)
+        })
+      }
     })
   }
 
@@ -509,6 +527,14 @@ export class DashboardStore {
       if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
       if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
       if (filters?.requestId) query.where('request_id', filters.requestId)
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((qb) => {
+          qb.where('sql_text', 'like', term)
+            .orWhere('model', 'like', term)
+            .orWhere('connection', 'like', term)
+        })
+      }
     })
   }
 
@@ -518,7 +544,8 @@ export class DashboardStore {
    */
   async getQueriesGrouped(
     limit: number = 200,
-    sort: string = 'total_duration'
+    sort: string = 'total_duration',
+    search?: string
   ): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
@@ -529,7 +556,7 @@ export class DashboardStore {
     }
     const orderCol = validSorts[sort] || 'total_duration'
 
-    return this.db('server_stats_queries')
+    const query = this.db('server_stats_queries')
       .select(
         'sql_normalized',
         this.db.raw('COUNT(*) as count'),
@@ -541,6 +568,12 @@ export class DashboardStore {
       .groupBy('sql_normalized')
       .orderBy(orderCol, 'desc')
       .limit(limit)
+
+    if (search) {
+      query.where('sql_normalized', 'like', `%${search}%`)
+    }
+
+    return query
   }
 
   /** Paginated event history with optional filters. */
@@ -551,6 +584,9 @@ export class DashboardStore {
   ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_events', page, perPage, (query) => {
       if (filters?.eventName) query.where('event_name', 'like', `%${filters.eventName}%`)
+      if (filters?.search) {
+        query.where('event_name', 'like', `%${filters.search}%`)
+      }
     })
   }
 
@@ -562,6 +598,14 @@ export class DashboardStore {
     excludeBody: boolean = false
   ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_emails', page, perPage, (query) => {
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((sub) => {
+          sub.where('from_addr', 'like', term)
+            .orWhere('to_addr', 'like', term)
+            .orWhere('subject', 'like', term)
+        })
+      }
       if (filters?.from) query.where('from_addr', 'like', `%${filters.from}%`)
       if (filters?.to) query.where('to_addr', 'like', `%${filters.to}%`)
       if (filters?.subject) query.where('subject', 'like', `%${filters.subject}%`)
@@ -643,6 +687,12 @@ export class DashboardStore {
       if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
       if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
       if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((qb) => {
+          qb.where('url', 'like', term).orWhere('method', 'like', term)
+        })
+      }
     })
   }
 

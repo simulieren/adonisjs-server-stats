@@ -18,8 +18,10 @@ interface DataTableProps<T> {
   sortDir?: 'asc' | 'desc'
   onSort?: (key: string) => void
   onRowClick?: (row: T) => void
+  rowClassName?: string | ((row: T) => string)
   emptyMessage?: string
   className?: string
+  renderAfterRow?: (row: T, index: number) => React.ReactNode
 }
 
 /**
@@ -33,8 +35,10 @@ export function DataTable<T extends Record<string, unknown>>({
   sortDir,
   onSort,
   onRowClick,
+  rowClassName,
   emptyMessage = 'No data',
   className = '',
+  renderAfterRow,
 }: DataTableProps<T>) {
   const handleSort = useCallback(
     (key: string) => {
@@ -57,12 +61,16 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <table ref={tableRef} className={`ss-dash-table ${className}`}>
+      <colgroup>
+        {columns.map((col) => (
+          <col key={col.key} style={col.width ? { width: col.width } : undefined} />
+        ))}
+      </colgroup>
       <thead>
         <tr>
           {columns.map((col) => (
             <th
               key={col.key}
-              style={col.width ? { minWidth: col.width } : undefined}
               onClick={col.sortable ? () => handleSort(col.key) : undefined}
               className={col.sortable ? 'ss-dash-sortable' : ''}
             >
@@ -77,11 +85,18 @@ export function DataTable<T extends Record<string, unknown>>({
         </tr>
       </thead>
       <tbody>
-        {data.map((row, i) => (
+        {data.map((row, i) => {
+          const extraClass = rowClassName
+            ? typeof rowClassName === 'function'
+              ? rowClassName(row)
+              : rowClassName
+            : ''
+          const clickClass = onRowClick ? 'ss-dash-clickable' : ''
+          return (
+          <React.Fragment key={row[keyField] ?? i}>
           <tr
-            key={row[keyField] ?? i}
             onClick={onRowClick ? () => onRowClick(row) : undefined}
-            className={onRowClick ? 'ss-dash-clickable' : ''}
+            className={`${clickClass} ${extraClass}`.trim()}
           >
             {columns.map((col) => (
               <td key={col.key}>
@@ -89,7 +104,10 @@ export function DataTable<T extends Record<string, unknown>>({
               </td>
             ))}
           </tr>
-        ))}
+          {renderAfterRow ? renderAfterRow(row, i) : null}
+          </React.Fragment>
+          )
+        })}
       </tbody>
     </table>
   )

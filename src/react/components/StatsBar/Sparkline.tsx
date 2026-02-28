@@ -27,35 +27,54 @@ export function Sparkline({
     [data, width, height]
   )
 
+  const gradientId = useMemo(() => 'ss-grad-' + Math.random().toString(36).slice(2, 8), [])
+
+  const wrapStyle = { '--ss-accent': color } as React.CSSProperties
+
   if (!sparkline) {
     return (
-      <svg width={width} height={height} className={className} style={{ display: 'block' }}>
-        <text x={width / 2} y={height / 2 + 3} textAnchor="middle" fill="#737373" fontSize="9">
-          collecting...
-        </text>
-      </svg>
+      <div className={`ss-dash-sparkline ${className}`} style={wrapStyle}>
+        <svg
+          width={width}
+          height={height}
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ display: 'block' }}
+        >
+          <text x={width / 2} y={height / 2 + 3} textAnchor="middle" fill="#737373" fontSize="9">
+            collecting{'\u2026'}
+          </text>
+        </svg>
+      </div>
     )
   }
 
-  const gradId = `sg-${color.replace('#', '')}-${Math.random().toString(36).slice(2, 6)}`
+  const resolvedColor = color || 'var(--ss-accent)'
 
   return (
-    <svg width={width} height={height} className={className} style={{ display: 'block' }}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={color} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <path d={sparkline.areaPath} fill={`url(#${gradId})`} />
-      <polyline
-        points={sparkline.points}
-        fill="none"
-        stroke={color}
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-        strokeLinecap="round"
-      />
-    </svg>
+    <div className={`ss-dash-sparkline ${className}`} style={wrapStyle}>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        style={{ display: 'block' }}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={resolvedColor} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={resolvedColor} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        <path d={sparkline.areaPath} fill={`url(#${gradientId})`} />
+        <path
+          className="ss-dash-sparkline-line"
+          d={'M' + sparkline.points.replace(/ /g, ' L')}
+          fill="none"
+          stroke={resolvedColor}
+          strokeWidth="1.5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
   )
 }

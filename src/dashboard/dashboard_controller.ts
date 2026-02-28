@@ -29,13 +29,28 @@ const STYLES_DIR = join(SRC_DIR, '..', 'styles')
 
 interface PaginatedResponse<T> {
   data: T[]
-  total: number
-  page: number
+  meta: {
+    total: number
+    page: number
+    perPage: number
+    lastPage: number
+  }
+}
+
+function paginatedResponse<T>(
+  data: T[],
+  total: number,
+  page: number,
   perPage: number
+): PaginatedResponse<T> {
+  return {
+    data,
+    meta: { total, page, perPage, lastPage: Math.max(1, Math.ceil(total / perPage)) },
+  }
 }
 
 function emptyPage<T>(page: number, perPage: number): PaginatedResponse<T> {
-  return { data: [], total: 0, page, perPage }
+  return { data: [], meta: { total: 0, page, perPage, lastPage: 1 } }
 }
 
 interface ChartBucket {
@@ -105,17 +120,12 @@ export default class DashboardController {
       css: this.cachedCss,
       js: this.cachedJs,
       transmitClient: this.cachedTransmitClient,
-      dashboardPath: dashPath,
-      showTracing: !!toolbarConfig.tracing,
-      customPanes: toolbarConfig.panes || [],
       dashConfig: {
-        basePath: dashPath,
-        tracing: !!toolbarConfig.tracing,
+        baseUrl: '',
+        dashboardEndpoint: dashPath + '/api',
         debugEndpoint: toolbarConfig.debugEndpoint || '/admin/api/debug',
-        panes: (toolbarConfig.panes || []).map((p: { id: string; label: string }) => ({
-          id: p.id,
-          label: p.label,
-        })),
+        channelName: 'server-stats/dashboard',
+        backUrl: '/',
       },
     })
   }
@@ -200,14 +210,15 @@ export default class DashboardController {
         method: qs.method ? qs.method.toUpperCase() : undefined,
         url: qs.url || undefined,
         status: qs.status ? Number(qs.status) : undefined,
+        search: qs.search || undefined,
       })
 
-      return {
-        data: result.data.map(formatRequest),
-        total: result.total,
-        page: result.page,
-        perPage: result.perPage,
-      }
+      return paginatedResponse(
+        result.data.map(formatRequest),
+        result.total,
+        result.page,
+        result.perPage
+      )
     })
   }
 
@@ -245,14 +256,15 @@ export default class DashboardController {
         model: qs.model || undefined,
         method: qs.method || undefined,
         connection: qs.connection || undefined,
+        search: qs.search || undefined,
       })
 
-      return {
-        data: result.data.map(formatQuery),
-        total: result.total,
-        page: result.page,
-        perPage: result.perPage,
-      }
+      return paginatedResponse(
+        result.data.map(formatQuery),
+        result.total,
+        result.page,
+        result.perPage
+      )
     })
   }
 
@@ -262,7 +274,8 @@ export default class DashboardController {
       const limit = clamp(Number(qs.limit) || 50, 1, 200)
       const sort = qs.sort || 'total_duration'
 
-      const groups = await this.dashboardStore.getQueriesGrouped(limit, sort)
+      const search = qs.search || undefined
+      const groups = await this.dashboardStore.getQueriesGrouped(limit, sort, search)
 
       const totalTime = groups.reduce(
         (sum: number, g: Record<string, unknown>) => sum + ((g.total_duration as number) || 0),
@@ -361,20 +374,21 @@ export default class DashboardController {
     return this.withDb(response, 'events', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getEvents(page, perPage, {
         eventName: qs.event_name || undefined,
+        search: qs.search || undefined,
       })
 
-      return {
-        data: result.data.map((e: Record<string, unknown>) => ({
+      return paginatedResponse(
+        result.data.map((e: Record<string, unknown>) => ({
           id: e.id,
           requestId: e.request_id,
           eventName: e.event_name,
           data: safeParseJson(e.data),
           createdAt: e.created_at,
         })),
-        total: result.total,
-        page: result.page,
-        perPage: result.perPage,
-      }
+        result.total,
+        result.page,
+        result.perPage
+      )
     })
   }
 
@@ -382,11 +396,30 @@ export default class DashboardController {
   // Routes
   // ---------------------------------------------------------------------------
 
-  async routes({ response }: HttpContext) {
-    const routes = this.debugStore.routes.getRoutes()
+  async routes({ request, response }: HttpContext) {
+    const qs = request.qs()
+    const search = (qs.search || '').toLowerCase()
+    let routes = this.debugStore.routes.getRoutes()
+
+    if (search) {
+      routes = routes.filter((r) => {
+        const pattern = (r.pattern || '').toLowerCase()
+        const handler = (r.handler || '').toLowerCase()
+        const name = (r.name || '').toLowerCase()
+        const method = (r.method || '').toLowerCase()
+        return (
+          pattern.includes(search) ||
+          handler.includes(search) ||
+          name.includes(search) ||
+          method.includes(search)
+        )
+      })
+    }
+
+    const total = routes.length
     return response.json({
-      routes,
-      total: this.debugStore.routes.getRouteCount(),
+      data: routes,
+      meta: { total, page: 1, perPage: total || 1, lastPage: 1 },
     })
   }
 
@@ -405,13 +438,16 @@ export default class DashboardController {
       operator: 'equals' | 'contains' | 'startsWith'
       value: string
     }[] = []
+
+    const operatorMap: Record<string, 'equals' | 'contains' | 'startsWith'> = {
+      equals: 'equals',
+      contains: 'contains',
+      starts_with: 'startsWith',
+    }
+
+    // Support legacy single-filter format: field=, operator=, value=
     if (qs.field && qs.value !== undefined) {
       const op = qs.operator || 'equals'
-      const operatorMap: Record<string, 'equals' | 'contains' | 'startsWith'> = {
-        equals: 'equals',
-        contains: 'contains',
-        starts_with: 'startsWith',
-      }
       structured.push({
         field: qs.field,
         operator: operatorMap[op] || 'equals',
@@ -419,16 +455,32 @@ export default class DashboardController {
       })
     }
 
+    // Support indexed filter format: filter_field_0, filter_op_0, filter_value_0, ...
+    for (let i = 0; i < 20; i++) {
+      const field = qs[`filter_field_${i}`]
+      const value = qs[`filter_value_${i}`]
+      if (field && value !== undefined) {
+        const op = qs[`filter_op_${i}`] || 'equals'
+        structured.push({
+          field,
+          operator: operatorMap[op] || 'equals',
+          value,
+        })
+      } else {
+        break
+      }
+    }
+
     return this.withDb(response, 'logs', emptyPage(page, perPage), async () => {
       const result = await this.dashboardStore.getLogs(page, perPage, {
         level: qs.level || undefined,
-        search: qs.message || undefined,
-        requestId: qs.request_id || undefined,
+        search: qs.message || qs.search || undefined,
+        requestId: qs.request_id || qs.requestId || undefined,
         structured: structured.length > 0 ? structured : undefined,
       })
 
-      return {
-        data: result.data.map((l: Record<string, unknown>) => ({
+      return paginatedResponse(
+        result.data.map((l: Record<string, unknown>) => ({
           id: l.id,
           level: l.level,
           message: l.message,
@@ -436,10 +488,10 @@ export default class DashboardController {
           data: safeParseJson(l.data),
           createdAt: l.created_at,
         })),
-        total: result.total,
-        page: result.page,
-        perPage: result.perPage,
-      }
+        result.total,
+        result.page,
+        result.perPage
+      )
     })
   }
 
@@ -457,6 +509,7 @@ export default class DashboardController {
         page,
         perPage,
         {
+          search: qs.search || undefined,
           from: qs.from || undefined,
           to: qs.to || undefined,
           subject: qs.subject || undefined,
@@ -466,12 +519,12 @@ export default class DashboardController {
         true
       )
 
-      return {
-        data: result.data.map(formatEmail),
-        total: result.total,
-        page: result.page,
-        perPage: result.perPage,
-      }
+      return paginatedResponse(
+        result.data.map(formatEmail),
+        result.total,
+        result.page,
+        result.perPage
+      )
     })
   }
 
@@ -500,10 +553,16 @@ export default class DashboardController {
     const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
 
     return this.withDb(response, 'traces', emptyPage(page, perPage), async () => {
-      const result = await this.dashboardStore.getTraces(page, perPage)
+      const result = await this.dashboardStore.getTraces(page, perPage, {
+        method: qs.method ? qs.method.toUpperCase() : undefined,
+        url: qs.url || undefined,
+        search: qs.search || undefined,
+        statusMin: qs.status_min ? Number(qs.status_min) : undefined,
+        statusMax: qs.status_max ? Number(qs.status_max) : undefined,
+      })
 
-      return {
-        data: result.data.map((t: Record<string, unknown>) => ({
+      return paginatedResponse(
+        result.data.map((t: Record<string, unknown>) => ({
           id: t.id,
           requestId: t.request_id,
           method: t.method,
@@ -514,10 +573,10 @@ export default class DashboardController {
           warningCount: safeParseJsonArray(t.warnings).length,
           createdAt: t.created_at,
         })),
-        total: result.total,
-        page: result.page,
-        perPage: result.perPage,
-      }
+        result.total,
+        result.page,
+        result.perPage
+      )
     })
   }
 
@@ -547,7 +606,8 @@ export default class DashboardController {
     }
 
     const qs = request.qs()
-    const pattern = qs.pattern || '*'
+    const searchTerm = qs.search || qs.pattern || ''
+    const pattern = searchTerm ? `*${searchTerm}*` : '*'
     const cursor = qs.cursor || '0'
     const count = clamp(Number(qs.count) || 100, 1, 500)
 
@@ -585,6 +645,23 @@ export default class DashboardController {
     }
   }
 
+  async cacheKeyDelete({ params, response }: HttpContext) {
+    const inspector = await this.getInspector('cache')
+    if (!inspector) {
+      return response.notFound({ error: 'Cache not available' })
+    }
+
+    try {
+      const key = decodeURIComponent(params.key)
+      const deleted = await inspector.deleteKey(key)
+      if (!deleted) return response.notFound({ error: 'Key not found' })
+
+      return response.json({ deleted: true })
+    } catch {
+      return response.internalServerError({ error: 'Failed to delete cache key' })
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Jobs / Queue
   // ---------------------------------------------------------------------------
@@ -603,6 +680,7 @@ export default class DashboardController {
 
     const qs = request.qs()
     const status = qs.status || 'all'
+    const searchTerm = qs.search || ''
     const page = Math.max(1, Number(qs.page) || 1)
     const perPage = clamp(Number(qs.perPage) || Number(qs.limit) || 25, 1, 100)
 
@@ -612,12 +690,25 @@ export default class DashboardController {
         inspector.listJobs(status, page, perPage),
       ])
 
+      // Filter jobs by search term (name match) if provided
+      let filteredJobs = jobList.jobs
+      let filteredTotal = jobList.total
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase()
+        filteredJobs = jobList.jobs.filter(
+          (j) =>
+            j.name?.toLowerCase().includes(term) ||
+            j.id?.toString().toLowerCase().includes(term)
+        )
+        filteredTotal = filteredJobs.length
+      }
+
       return response.json({
         available: true,
         overview,
         stats: overview,
-        jobs: jobList.jobs,
-        total: jobList.total,
+        jobs: filteredJobs,
+        total: filteredTotal,
         page,
         perPage,
       })
@@ -676,7 +767,7 @@ export default class DashboardController {
     const envData = this.configInspector.getEnvVars()
 
     return response.json({
-      config: configData.config,
+      app: configData.config,
       env: envData.env,
     })
   }

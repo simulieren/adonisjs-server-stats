@@ -48,7 +48,7 @@ function copyToClipboard() {
 </script>
 
 <template>
-  <div class="ss-dbg-event-data">
+  <div class="ss-dbg-data-cell">
     <span class="ss-dbg-data-preview" @click="toggle">
       {{ preview }}
     </span>

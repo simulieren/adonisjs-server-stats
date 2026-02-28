@@ -153,17 +153,31 @@ function StatusDot({ status, prefix }: { status: string; prefix: string }) {
 // RedactedValue
 // ---------------------------------------------------------------------------
 
+const EyeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const EyeOffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+    <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+  </svg>
+)
+
 function RedactedValue({ value }: { value: string }) {
   const [revealed, setRevealed] = useState(false)
 
-  return revealed ? (
-    <span>{value}</span>
-  ) : (
+  return (
     <span>
-      {'••••••••'}{' '}
+      {revealed ? value : '••••••••'}{' '}
       <button
         type="button"
-        onClick={() => setRevealed(true)}
+        onClick={() => setRevealed((prev) => !prev)}
         style={{
           background: 'none',
           border: '1px solid var(--ss-border)',
@@ -172,9 +186,10 @@ function RedactedValue({ value }: { value: string }) {
           fontSize: '10px',
           color: 'var(--ss-dim)',
           cursor: 'pointer',
+          verticalAlign: 'middle',
         }}
       >
-        reveal
+        {revealed ? <EyeOffIcon /> : <EyeIcon />}
       </button>
     </span>
   )
@@ -189,15 +204,15 @@ function ProgressBar({ current, max, prefix }: { current: number; max: number; p
   const isFull = pct >= 100
 
   return (
-    <span className={`${prefix}-bar`}>
-      <span className={`${prefix}-bar-track`}>
-        <span
+    <div className={`${prefix}-bar`}>
+      <div className={`${prefix}-bar-track`}>
+        <div
           className={`${prefix}-bar-fill${isFull ? ` ${prefix}-bar-fill-warn` : ''}`}
           style={{ width: `${pct}%` }}
         />
-      </span>
+      </div>
       <span className={`${prefix}-bar-pct${isFull ? ` ${prefix}-bar-pct-warn` : ''}`}>{pct}%</span>
-    </span>
+    </div>
   )
 }
 
@@ -269,7 +284,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
       if (value === null || value === undefined) return <span className={`${p}-c-dim`}>null</span>
       if (typeof value === 'boolean')
         return (
-          <span style={{ color: value ? 'var(--ss-green-fg)' : 'var(--ss-red-fg)' }}>
+          <span className={value ? `${p}-c-green` : `${p}-c-red`}>
             {String(value)}
           </span>
         )
@@ -277,11 +292,9 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
       const strVal = formatConfigVal(value)
       if (isSecretKey(key)) {
         const isRevealed = revealedConfigs.has(key)
-        return isRevealed ? (
-          <span>{strVal}</span>
-        ) : (
+        return (
           <span>
-            {'••••••••'}{' '}
+            {isRevealed ? strVal : '••••••••'}{' '}
             <button
               type="button"
               onClick={() => toggleReveal(key)}
@@ -293,9 +306,10 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                 fontSize: '10px',
                 color: 'var(--ss-dim)',
                 cursor: 'pointer',
+                verticalAlign: 'middle',
               }}
             >
-              reveal
+              {isRevealed ? <EyeOffIcon /> : <EyeIcon />}
             </button>
           </span>
         )
@@ -326,7 +340,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
   return (
     <div>
       {/* 1. Package Info — compact card row */}
-      <h3 className={`${p}-section-title`}>Package Info</h3>
+      <h3 className={`${p}-internals-title`}>Package Info</h3>
       <div className={`${p}-info-cards`}>
         <InfoCard label="Version" value={data.package.version || '-'} prefix={p} />
         <InfoCard label="Node.js" value={data.package.nodeVersion || '-'} prefix={p} />
@@ -335,57 +349,55 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
       </div>
 
       {/* 2. Collectors — merged name+label column */}
-      <h3 className={`${p}-section-title`}>Collectors</h3>
-      {data.collectors.length === 0 ? (
-        <div className={`${p}-c-dim`} style={{ fontSize: '12px', padding: '8px 0' }}>
-          No collectors registered
-        </div>
-      ) : (
-        <table className={tableClassName}>
-          <thead>
-            <tr>
-              <th>Collector</th>
-              <th>Status</th>
-              <th>Last Error</th>
-              <th>Config</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.collectors.map((c) => (
-              <tr key={c.name}>
-                <td>
-                  <span style={{ fontFamily: 'monospace', fontSize: '11px' }}>{c.name}</span>
-                  {c.label && c.label !== c.name && <span className={`${p}-c-dim`}>{c.label}</span>}
-                </td>
-                <td>
-                  <StatusDot status={c.status} prefix={p} />
-                  {c.status}
-                </td>
-                <td className={c.lastError ? `${p}-c-red` : `${p}-c-dim`}>
-                  {c.lastError ? (
-                    <>
-                      {c.lastError}
-                      {c.lastErrorAt && (
-                        <span className={`${p}-c-dim`} style={{ fontSize: '10px' }}>
-                          {formatRelativeTime(c.lastErrorAt)}
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    '-'
-                  )}
-                </td>
-                <td>
-                  <ConfigInline config={c.config} prefix={p} />
-                </td>
+      {data.collectors.length > 0 && (
+        <>
+          <h3 className={`${p}-internals-title`}>Collectors</h3>
+          <table className={tableClassName}>
+            <thead>
+              <tr>
+                <th>Collector</th>
+                <th>Status</th>
+                <th>Last Error</th>
+                <th>Config</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data.collectors.map((c) => (
+                <tr key={c.name}>
+                  <td>
+                    <code>{c.name}</code>
+                    {c.label && c.label !== c.name && <span className={`${p}-c-dim`}>{' '}{c.label}</span>}
+                  </td>
+                  <td>
+                    <StatusDot status={c.status} prefix={p} />
+                    {c.status}
+                  </td>
+                  <td className={c.lastError ? `${p}-c-red` : `${p}-c-dim`}>
+                    {c.lastError ? (
+                      <>
+                        {c.lastError}
+                        {c.lastErrorAt && (
+                          <span className={`${p}-c-dim`} style={{ fontSize: '10px' }}>
+                            {formatRelativeTime(c.lastErrorAt)}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      '-'
+                    )}
+                  </td>
+                  <td>
+                    <ConfigInline config={c.config} prefix={p} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
       )}
 
       {/* 3. Buffers */}
-      <h3 className={`${p}-section-title`}>Buffers</h3>
+      <h3 className={`${p}-internals-title`}>Buffers</h3>
       <table className={tableClassName}>
         <thead>
           <tr>
@@ -410,7 +422,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
       </table>
 
       {/* 4. Timers — human-readable intervals */}
-      <h3 className={`${p}-section-title`}>Timers</h3>
+      <h3 className={`${p}-internals-title`}>Timers</h3>
       <table className={tableClassName}>
         <thead>
           <tr>
@@ -430,11 +442,15 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                 </span>
               </td>
               <td>
-                {timer.intervalMs
-                  ? formatMs(timer.intervalMs)
-                  : timer.debounceMs
-                    ? `${formatMs(timer.debounceMs)} (debounce)`
-                    : '-'}
+                {!timer.active ? (
+                  <span className={`${p}-c-dim`}>&mdash;</span>
+                ) : timer.intervalMs ? (
+                  formatMs(timer.intervalMs)
+                ) : timer.debounceMs ? (
+                  `${formatMs(timer.debounceMs)} (debounce)`
+                ) : (
+                  '-'
+                )}
               </td>
             </tr>
           ))}
@@ -442,7 +458,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
       </table>
 
       {/* 5. Integrations */}
-      <h3 className={`${p}-section-title`}>Integrations</h3>
+      <h3 className={`${p}-internals-title`}>Integrations</h3>
       <table className={tableClassName}>
         <thead>
           <tr>
@@ -474,6 +490,15 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                 ? 'available'
                 : 'unavailable'
 
+            let detail: string = info.mode ? `Mode: ${info.mode}` : '-'
+            if (name === 'edgePlugin' && info.active) {
+              detail = '@serverStats() tag registered'
+            } else if (name === 'cacheInspector' && info.available) {
+              detail = 'Redis dependency detected'
+            } else if (name === 'queueInspector' && info.available) {
+              detail = 'Queue dependency detected'
+            }
+
             return (
               <tr key={name}>
                 <td>{integrationLabels[name] || name}</td>
@@ -482,7 +507,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                   {statusLabel}
                 </td>
                 <td className={`${p}-c-dim`} style={{ fontSize: '11px' }}>
-                  {info.mode ? `Mode: ${info.mode}` : '-'}
+                  {detail}
                 </td>
               </tr>
             )
@@ -493,11 +518,11 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
       {/* 6. Storage (conditional) */}
       {data.storage && (
         <>
-          <h3 className={`${p}-section-title`}>Storage</h3>
+          <h3 className={`${p}-internals-title`}>Storage (SQLite)</h3>
           <table className={tableClassName}>
             <thead>
               <tr>
-                <th>Metric</th>
+                <th style={{ width: '200px' }}>Metric</th>
                 <th>Value</th>
               </tr>
             </thead>
@@ -511,7 +536,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
               </tr>
               <tr>
                 <td>DB Path</td>
-                <td style={{ fontFamily: 'monospace', fontSize: '11px' }}>{data.storage.dbPath}</td>
+                <td><code>{data.storage.dbPath}</code></td>
               </tr>
               <tr>
                 <td>File Size</td>
@@ -547,7 +572,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
               <tbody>
                 {data.storage.tables.map((t) => (
                   <tr key={t.name}>
-                    <td style={{ fontFamily: 'monospace', fontSize: '11px' }}>{t.name}</td>
+                    <td><code>{t.name}</code></td>
                     <td>{formatNumber(t.rowCount)}</td>
                   </tr>
                 ))}
@@ -558,11 +583,11 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
       )}
 
       {/* 7. Resolved Config */}
-      <h3 className={`${p}-section-title`}>Resolved Config</h3>
+      <h3 className={`${p}-internals-title`}>Resolved Config</h3>
       <table className={tableClassName}>
         <thead>
           <tr>
-            <th>Setting</th>
+            <th style={{ width: '200px' }}>Setting</th>
             <th>Value</th>
           </tr>
         </thead>
@@ -598,11 +623,11 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
         </tbody>
       </table>
 
-      <h3 className={`${p}-section-title`}>DevToolbar Config</h3>
+      <h4 className={`${p}-internals-title`}>DevToolbar</h4>
       <table className={tableClassName}>
         <thead>
           <tr>
-            <th>Setting</th>
+            <th style={{ width: '200px' }}>Setting</th>
             <th>Value</th>
           </tr>
         </thead>

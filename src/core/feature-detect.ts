@@ -132,3 +132,101 @@ export function getVisibleMetricGroups(features: FeatureFlags | FeatureConfig): 
 
   return groups
 }
+
+/**
+ * Detect which metric groups should be visible based on the actual stats
+ * data received from the server.
+ *
+ * This is used as the primary mechanism for the stats bar to determine
+ * which groups to show, mirroring the old vanilla JS behavior where
+ * groups were displayed based on what data the server actually sends.
+ *
+ * Unlike {@link getVisibleMetricGroups} which relies on the debug config
+ * endpoint, this function inspects the stats payload directly. This
+ * ensures groups are shown even when the debug endpoint is unavailable
+ * or not configured (e.g. when `showDebug` is false).
+ *
+ * @param stats - The server stats snapshot (partial, since not all fields
+ *                may be present depending on configured collectors).
+ * @returns A set of visible metric group names.
+ */
+export function detectMetricGroupsFromStats(stats: Record<string, unknown>): Set<string> {
+  const groups = new Set<string>()
+
+  // Process group: present if cpuPercent or uptime has data
+  if (hasValue(stats.cpuPercent) || hasValue(stats.uptime) || hasString(stats.nodeVersion)) {
+    groups.add('process')
+  }
+
+  // Memory group: present if heap/rss (from process collector) or system memory data exists
+  if (hasValue(stats.memHeapUsed) || hasValue(stats.memRss)) {
+    groups.add('memory')
+  }
+  if (hasValue(stats.systemMemoryTotalMb) || hasValue(stats.systemMemoryFreeMb)) {
+    groups.add('memory')
+  }
+
+  // HTTP group: present if any HTTP collector fields exist
+  if (
+    hasValue(stats.requestsPerSecond) ||
+    hasValue(stats.avgResponseTimeMs) ||
+    hasValue(stats.errorRate) ||
+    hasValue(stats.activeHttpConnections)
+  ) {
+    groups.add('http')
+  }
+
+  // DB group: present if any pool fields exist (dbPoolMax can be 0 during startup)
+  if (
+    hasValue(stats.dbPoolMax) ||
+    hasValue(stats.dbPoolUsed) ||
+    hasValue(stats.dbPoolFree) ||
+    hasValue(stats.dbPoolPending)
+  ) {
+    groups.add('db')
+  }
+
+  // Redis group: present if redisOk field exists (even if false, it means redis collector is active)
+  if (stats.redisOk !== undefined && stats.redisOk !== null) {
+    groups.add('redis')
+  }
+
+  // Queue group: present if queue fields exist
+  if (
+    hasValue(stats.queueActive) ||
+    hasValue(stats.queueWaiting) ||
+    hasValue(stats.queueWorkerCount)
+  ) {
+    groups.add('queue')
+  }
+
+  // App group: present if app-specific fields exist
+  if (
+    hasValue(stats.onlineUsers) ||
+    hasValue(stats.pendingWebhooks) ||
+    hasValue(stats.pendingEmails)
+  ) {
+    groups.add('app')
+  }
+
+  // Log group: present if log fields exist
+  if (hasValue(stats.logErrorsLast5m) || hasValue(stats.logEntriesPerMinute)) {
+    groups.add('log')
+  }
+
+  return groups
+}
+
+/**
+ * Check if a value is a number (including 0).
+ */
+function hasValue(v: unknown): v is number {
+  return typeof v === 'number' && !Number.isNaN(v)
+}
+
+/**
+ * Check if a value is a non-empty string.
+ */
+function hasString(v: unknown): v is string {
+  return typeof v === 'string' && v.length > 0
+}

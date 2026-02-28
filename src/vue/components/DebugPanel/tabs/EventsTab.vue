@@ -72,9 +72,9 @@ onBeforeUnmount(() => {
       </thead>
       <tbody>
         <tr v-for="e in events" :key="e.id">
-          <td style="color: var(--ss-dim)">{{ e.id }}</td>
-          <td>
-            <span class="ss-dbg-event-name">{{ e.event }}</span>
+          <td class="ss-dbg-c-dim">{{ e.id }}</td>
+          <td class="ss-dbg-event-name">
+            {{ e.event }}
             <a
               v-if="dashboardPath"
               :href="`${dashboardPath}#events?id=${e.id}`"
@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
               </svg>
             </a>
           </td>
-          <td>
+          <td class="ss-dbg-event-data">
             <JsonViewer :value="e.data" />
           </td>
           <td class="ss-dbg-event-time">{{ timeAgo(e.timestamp) }}</td>

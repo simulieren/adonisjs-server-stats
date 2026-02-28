@@ -61,15 +61,19 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
 
   const formatCell = (value: unknown, col: (typeof pane.columns)[0]): React.ReactNode => {
     if (value === null || value === undefined) {
-      return <span style={{ color: 'var(--ss-dim)' }}>-</span>
+      return <span className="ss-dbg-c-dim">-</span>
     }
 
     const fmt = col.format || 'text'
     switch (fmt) {
       case 'time':
-        return typeof value === 'number' ? formatTime(value) : String(value)
+        return (
+          <span className="ss-dbg-event-time" title={formatTime(value as number)}>
+            {typeof value === 'number' ? timeAgo(value) : String(value)}
+          </span>
+        )
       case 'timeAgo':
-        return <span className="ss-dbg-event-time">{timeAgo(value as string)}</span>
+        return <span className="ss-dbg-event-time" title={formatTime(value as string)}>{timeAgo(value as string)}</span>
       case 'duration': {
         const ms = typeof value === 'number' ? value : parseFloat(String(value))
         if (isNaN(ms)) return String(value)

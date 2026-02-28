@@ -73,12 +73,21 @@ export function useDashboardData(
     const currentSection = section()
     if (!currentSection) return
 
+    // Extract extra filter keys (everything except 'search') as filters record
+    const extraFilters: Record<string, string> = {}
+    for (const [key, value] of Object.entries(filter)) {
+      if (key !== 'search' && value !== '' && value !== undefined && value !== null) {
+        extraFilters[key] = String(value)
+      }
+    }
+
     const qs = buildQueryParams({
       page: pagination.page,
       perPage: pagination.perPage,
       search: filter.search || undefined,
       sort: sort.column || undefined,
       sortDir: sort.column ? sort.direction : undefined,
+      filters: Object.keys(extraFilters).length > 0 ? extraFilters : undefined,
       timeRange: currentSection === 'overview' ? timeRange.value : undefined,
     })
 

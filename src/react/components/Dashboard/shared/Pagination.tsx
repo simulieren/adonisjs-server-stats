@@ -34,17 +34,17 @@ export function Pagination({
 
   return (
     <div className={`ss-dash-pagination ${className}`}>
-      <span className="ss-dash-pagination-info">
+      <span className="ss-dash-page-info">
         Page {page} of {lastPage} ({total} total)
       </span>
-      <div className="ss-dash-pagination-buttons">
+      <div className="ss-dash-pagination-controls">
         <button
           type="button"
           className="ss-dash-page-btn"
           onClick={handlePrev}
           disabled={page <= 1}
         >
-          Prev
+          &laquo; Prev
         </button>
         {pages.map((p, i) =>
           p === '...' ? (
@@ -55,7 +55,7 @@ export function Pagination({
             <button
               key={p}
               type="button"
-              className={`ss-dash-page-btn ${p === page ? 'ss-dash-page-active' : ''}`}
+              className={`ss-dash-page-btn ${p === page ? 'ss-dash-active' : ''}`}
               onClick={() => onPageChange(p as number)}
             >
               {p}
@@ -68,7 +68,7 @@ export function Pagination({
           onClick={handleNext}
           disabled={page >= lastPage}
         >
-          Next
+          Next &raquo;
         </button>
       </div>
     </div>

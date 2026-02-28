@@ -5,8 +5,13 @@
  * Shows a label + value badge with optional color coding.
  * On hover, shows a tooltip with sparkline and stats.
  * On click, pins the tooltip.
+ *
+ * The tooltip is teleported to the nearest .ss-bar ancestor so it is
+ * not clipped by the scroll container (overflow-x: auto on .ss-bar-scroll).
+ * Position is calculated relative to the badge, matching the old vanilla JS
+ * positionTooltip behaviour.
  */
-import { ref, computed } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { formatStatNum, computeStats } from '../../../core/index.js'
 import type { MetricDefinition, ServerStats } from '../../../core/index.js'
 import Sparkline from './Sparkline.vue'
@@ -26,6 +31,100 @@ const emit = defineEmits<{
 
 const hovered = ref(false)
 const pinned = ref(false)
+const badgeRef = ref<HTMLElement | null>(null)
+const tooltipRef = ref<HTMLElement | null>(null)
+
+/** Teleport target: the closest .ss-bar ancestor element. */
+const teleportTarget = ref<HTMLElement | null>(null)
+
+const tooltipStyle = ref<Record<string, string>>({
+  position: 'absolute',
+  bottom: '100%',
+  left: '0',
+  marginBottom: '10px',
+  zIndex: '180',
+})
+
+onMounted(() => {
+  if (badgeRef.value) {
+    teleportTarget.value = badgeRef.value.closest('.ss-bar') as HTMLElement | null
+  }
+})
+
+/**
+ * Compute tooltip position relative to .ss-bar, matching the old
+ * vanilla JS positionTooltip behaviour:
+ *   left = badge centre relative to bar left
+ *   bottom = 100% (above the bar)
+ *   edge-clamp so the tooltip never overflows the viewport.
+ */
+function updateTooltipPosition() {
+  const badge = badgeRef.value
+  const tip = tooltipRef.value
+  const bar = teleportTarget.value
+  if (!badge || !tip || !bar) return
+
+  const badgeRect = badge.getBoundingClientRect()
+  const barRect = bar.getBoundingClientRect()
+
+  const leftPos = badgeRect.left - barRect.left + badgeRect.width / 2
+
+  tooltipStyle.value = {
+    position: 'absolute',
+    bottom: '100%',
+    left: `${leftPos}px`,
+    transform: 'translateX(-50%)',
+    marginBottom: '10px',
+    zIndex: '180',
+  }
+
+  // Edge-clamp after the browser paints
+  requestAnimationFrame(() => {
+    if (!tooltipRef.value) return
+    const tipRect = tooltipRef.value.getBoundingClientRect()
+    let shift = 0
+    if (tipRect.left < 8) {
+      shift = 8 - tipRect.left
+    } else if (tipRect.right > window.innerWidth - 8) {
+      shift = window.innerWidth - 8 - tipRect.right
+    }
+    if (shift) {
+      tooltipStyle.value = {
+        ...tooltipStyle.value,
+        transform: `translateX(calc(-50% + ${shift}px))`,
+      }
+    }
+  })
+}
+
+// Re-position tooltip whenever it becomes visible
+const showTooltip = computed(() => hovered.value || pinned.value)
+
+watch(showTooltip, (visible) => {
+  if (visible) {
+    nextTick(updateTooltipPosition)
+  }
+})
+
+// Re-position when the scroll container scrolls
+let scrollEl: Element | null = null
+function onScroll() {
+  if (showTooltip.value) updateTooltipPosition()
+}
+function onResize() {
+  if (showTooltip.value) updateTooltipPosition()
+}
+
+onMounted(() => {
+  scrollEl = badgeRef.value?.closest('.ss-bar-scroll') ?? null
+  scrollEl?.addEventListener('scroll', onScroll)
+  window.addEventListener('resize', onResize)
+})
+
+onBeforeUnmount(() => {
+  scrollEl?.removeEventListener('scroll', onScroll)
+  window.removeEventListener('resize', onResize)
+})
 
 const displayValue = computed(() => {
   if (!props.stats) return '...'
@@ -81,35 +180,28 @@ function onClick() {
 function closeTooltip() {
   pinned.value = false
 }
-
-const showTooltip = computed(() => hovered.value || pinned.value)
 </script>
 
 <template>
   <div
     v-if="isVisible"
+    ref="badgeRef"
     :id="`ss-b-${metric.id}`"
     :class="['ss-badge', { 'ss-pinned': pinned }]"
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
     @click="onClick"
-    style="position: relative"
   >
     <span class="ss-label">{{ metric.label }}</span>
     <span :class="['ss-value', `ss-${colorClass}`]">{{ displayValue }}</span>
+  </div>
 
-    <!-- Tooltip -->
+  <!-- Tooltip teleported to .ss-bar so it is not clipped by .ss-bar-scroll overflow -->
+  <Teleport v-if="showTooltip && teleportTarget" :to="teleportTarget">
     <div
-      v-if="showTooltip"
+      ref="tooltipRef"
       :class="['ss-tooltip', { 'ss-pinned': pinned }]"
-      style="
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        margin-bottom: 10px;
-        z-index: 180;
-      "
+      :style="tooltipStyle"
     >
       <div class="ss-tooltip-inner" style="position: relative">
         <button v-if="pinned" class="ss-tooltip-close" @click.stop="closeTooltip">&times;</button>
@@ -139,5 +231,5 @@ const showTooltip = computed(() => hovered.value || pinned.value)
       </div>
       <div class="ss-tooltip-arrow"></div>
     </div>
-  </div>
+  </Teleport>
 </template>

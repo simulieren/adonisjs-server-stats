@@ -132,6 +132,7 @@ export {
   detectFeatures,
   DEFAULT_FEATURES,
   getVisibleMetricGroups,
+  detectMetricGroupsFromStats,
 } from './feature-detect.js'
 
 // -- Metrics ----------------------------------------------------------------

@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 
-import { timeAgo, formatDuration } from '../../../../core/formatters.js'
+import { ApiClient } from '../../../../core/api-client.js'
+import { timeAgo, formatTime } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
 import { DataTable } from '../shared/DataTable.js'
@@ -12,118 +13,245 @@ import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface TimelineSectionProps {
   options?: DashboardHookOptions
+  /** When false, show a "tracing disabled" message instead of fetching. Defaults to true. */
+  tracingEnabled?: boolean
 }
 
-export function TimelineSection({ options = {} }: TimelineSectionProps) {
+interface TraceDetail {
+  method?: string
+  url?: string
+  status_code?: number
+  statusCode?: number
+  total_duration?: number
+  totalDuration?: number
+  spanCount?: number
+  spans?: Array<{
+    id: string
+    label: string
+    startOffset: number
+    duration: number
+    category: string
+    parentId?: string
+    metadata?: Record<string, unknown>
+  }> | string
+  warnings?: string[] | string
+}
+
+export function TimelineSection({ options = {}, tracingEnabled = true }: TimelineSectionProps) {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [traceDetail, setTraceDetail] = useState<TraceDetail | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
 
-  const { data, meta, isLoading } = useDashboardData('traces', { ...options, page, search })
+  const { data, meta, isLoading, error } = useDashboardData('traces', { ...options, page, search })
   const traces = (data as Record<string, unknown>[]) || []
 
-  // Fetch individual trace detail
-  const { data: traceDetail } = useDashboardData(
-    selectedId ? `traces/${selectedId}` : 'traces',
-    selectedId ? options : { ...options, page: 0 } // Only fetch when selected
-  )
+  const clientRef = useRef<ApiClient | null>(null)
+  const getClient = useCallback(() => {
+    if (!clientRef.current) {
+      clientRef.current = new ApiClient({
+        baseUrl: options.baseUrl || '',
+        authToken: options.authToken,
+      })
+    }
+    return clientRef.current
+  }, [options.baseUrl, options.authToken])
+
+  // Fetch individual trace detail when selectedId changes
+  useEffect(() => {
+    if (!selectedId) {
+      setTraceDetail(null)
+      return
+    }
+
+    let cancelled = false
+    setDetailLoading(true)
+
+    const endpoint = options.dashboardEndpoint || '/__stats/api'
+    getClient()
+      .fetch<TraceDetail>(`${endpoint}/traces/${selectedId}`)
+      .then((result) => {
+        if (!cancelled) {
+          setTraceDetail(result)
+          setDetailLoading(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDetailLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedId, getClient, options.dashboardEndpoint])
 
   const handleBack = useCallback(() => setSelectedId(null), [])
 
-  interface TraceDetail {
-    method?: string
-    url?: string
-    status_code?: number
-    statusCode?: number
-    total_duration?: number
-    totalDuration?: number
-    spans?: Array<{
+  if (!tracingEnabled) {
+    return (
+      <div className="ss-dash-empty">
+        Tracing is not enabled. Enable tracing in your server-stats config to use the timeline.
+      </div>
+    )
+  }
+
+  if (selectedId && traceDetail) {
+    // Parse spans from string if they come as JSON strings
+    let spans: TraceDetail['spans'] = traceDetail.spans
+    if (typeof spans === 'string') {
+      try {
+        spans = JSON.parse(spans)
+      } catch {
+        spans = []
+      }
+    }
+    const parsedSpans = (Array.isArray(spans) ? spans : []) as Array<{
       id: string
       label: string
       startOffset: number
       duration: number
       category: string
+      parentId?: string
+      metadata?: Record<string, unknown>
     }>
-    warnings?: string[]
-  }
 
-  if (selectedId && traceDetail) {
-    const trace = traceDetail as TraceDetail
+    // Parse warnings from string if they come as JSON strings
+    let warnings: TraceDetail['warnings'] = traceDetail.warnings
+    if (typeof warnings === 'string') {
+      try {
+        warnings = JSON.parse(warnings)
+      } catch {
+        warnings = []
+      }
+    }
+    const parsedWarnings = (Array.isArray(warnings) ? warnings : []) as string[]
+
+    const duration = traceDetail.total_duration || traceDetail.totalDuration || 0
+    const spanCount = traceDetail.spanCount ?? parsedSpans.length
+
     return (
       <div>
-        <div className="ss-dash-detail-header">
+        <div className="ss-dash-tl-detail-header">
           <button type="button" className="ss-dash-btn" onClick={handleBack}>
-            Back
+            ← Back
           </button>
-          <MethodBadge method={trace.method || ''} />
-          <span style={{ color: 'var(--ss-text)' }}>{trace.url}</span>
-          <StatusBadge code={trace.status_code || trace.statusCode || 0} />
-          <span style={{ color: 'var(--ss-dim)' }}>
-            {formatDuration(trace.total_duration || trace.totalDuration || 0)}
+          <MethodBadge method={traceDetail.method || ''} />
+          <span style={{ color: 'var(--ss-text)' }}>{traceDetail.url}</span>
+          <StatusBadge code={traceDetail.status_code || traceDetail.statusCode || 0} />
+          <span className="ss-dash-tl-meta">
+            {duration.toFixed(1)}ms &middot; {spanCount} spans
           </span>
         </div>
         <WaterfallChart
-          spans={trace.spans || []}
-          totalDuration={trace.total_duration || trace.totalDuration || 0}
+          spans={parsedSpans}
+          totalDuration={duration}
+          warnings={parsedWarnings}
         />
-        {trace.warnings && trace.warnings.length > 0 && (
-          <div className="ss-dash-warnings">
-            <h4>Warnings</h4>
-            {trace.warnings.map((w: string, i: number) => (
-              <div key={i} className="ss-dash-warning">
-                {w}
-              </div>
-            ))}
-          </div>
-        )}
+      </div>
+    )
+  }
+
+  if (selectedId && detailLoading) {
+    return (
+      <div>
+        <div className="ss-dash-tl-detail-header">
+          <button type="button" className="ss-dash-btn" onClick={handleBack}>
+            ← Back
+          </button>
+        </div>
+        <div className="ss-dash-empty">Loading trace detail...</div>
       </div>
     )
   }
 
   return (
     <div>
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="Filter traces..." />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter traces..."
+        summary={`${meta?.total ?? 0} traces`}
+      />
+
+      {error && <div className="ss-dash-empty">Failed to load traces</div>}
+
       {isLoading && !data ? (
         <div className="ss-dash-empty">Loading traces...</div>
       ) : (
         <>
-          <DataTable
-            columns={[
-              {
-                key: 'method',
-                label: 'Method',
-                width: '70px',
-                render: (v: string) => <MethodBadge method={v} />,
-              },
-              {
-                key: 'url',
-                label: 'URL',
-                render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span>,
-              },
-              {
-                key: 'status_code',
-                label: 'Status',
-                width: '60px',
-                render: (v: number) => <StatusBadge code={v} />,
-              },
-              {
-                key: 'total_duration',
-                label: 'Duration',
-                width: '80px',
-                render: (v: number) => formatDuration(v),
-              },
-              { key: 'span_count', label: 'Spans', width: '50px' },
-              {
-                key: 'created_at',
-                label: 'Time',
-                width: '80px',
-                render: (v: string) => <span className="ss-dash-event-time">{timeAgo(v)}</span>,
-              },
-            ]}
-            data={traces}
-            onRowClick={(row: Record<string, unknown>) => setSelectedId(row.id as number)}
-            emptyMessage="No traces recorded"
-          />
+          <div className="ss-dash-table-wrap">
+            <DataTable
+              columns={[
+                {
+                  key: 'id',
+                  label: '#',
+                  width: '40px',
+                  render: (v: number) => <span style={{ color: 'var(--ss-dim)' }}>{v}</span>,
+                },
+                {
+                  key: 'method',
+                  label: 'Method',
+                  width: '70px',
+                  render: (v: string) => <MethodBadge method={v} />,
+                },
+                {
+                  key: 'url',
+                  label: 'URL',
+                  render: (v: string) => (
+                    <span
+                      style={{
+                        color: 'var(--ss-text)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                      title={v}
+                    >
+                      {v}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'statusCode',
+                  label: 'Status',
+                  width: '60px',
+                  render: (v: number) => <StatusBadge code={v} />,
+                },
+                {
+                  key: 'totalDuration',
+                  label: 'Duration',
+                  width: '80px',
+                  render: (v: number) => (
+                    <span
+                      className={`ss-dash-duration ${v > 500 ? 'ss-dash-very-slow' : v > 100 ? 'ss-dash-slow' : ''}`}
+                    >
+                      {v.toFixed(1)}ms
+                    </span>
+                  ),
+                },
+                {
+                  key: 'spanCount',
+                  label: 'Spans',
+                  width: '50px',
+                  render: (v: number) => (
+                    <span style={{ color: 'var(--ss-muted)', textAlign: 'center' }}>{v}</span>
+                  ),
+                },
+                {
+                  key: 'createdAt',
+                  label: 'Time',
+                  width: '80px',
+                  render: (v: string) => <span className="ss-dash-event-time" title={formatTime(v)}>{timeAgo(v)}</span>,
+                },
+              ]}
+              data={traces}
+              onRowClick={(row: Record<string, unknown>) => setSelectedId(row.id as number)}
+              emptyMessage="No traces recorded"
+            />
+          </div>
           {meta && (
             <Pagination
               page={meta.page}

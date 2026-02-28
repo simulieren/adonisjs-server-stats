@@ -76,6 +76,17 @@ export class DashboardApi {
   }
 
   /**
+   * Fetch the value of a specific cache key.
+   *
+   * @param key - Cache key (will be URI-encoded).
+   */
+  async fetchCacheKey(key: string) {
+    return this.client.fetch<Record<string, unknown>>(
+      `${this.basePath}/cache/${encodeURIComponent(key)}`
+    )
+  }
+
+  /**
    * Delete a cache entry by key.
    *
    * @param key - Cache key (will be URI-encoded).

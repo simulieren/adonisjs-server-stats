@@ -33,7 +33,8 @@
   --ss-purple-bg: #2e1065;
   --ss-purple-fg: #c084fc;
   --ss-sql-color: #93c5fd;
-  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ss-text-primary: var(--ss-text);
   --ss-reqid-bg: #1e1b2e;
   --ss-reqid-fg: #6d28d9;
@@ -42,7 +43,7 @@
 }
 
 /* ── Theme: Dark (explicit toggle override) ───────────────────── */
-[data-theme='dark'] {
+[data-theme="dark"] {
   --ss-bg: #0f0f0f;
   --ss-surface: #171717;
   --ss-surface-alt: #141414;
@@ -70,7 +71,8 @@
   --ss-purple-bg: #2e1065;
   --ss-purple-fg: #c084fc;
   --ss-sql-color: #93c5fd;
-  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ss-text-primary: var(--ss-text);
   --ss-reqid-bg: #1e1b2e;
   --ss-reqid-fg: #6d28d9;
@@ -80,7 +82,7 @@
 
 /* ── Theme: Light ──────────────────────────────────────────────── */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
+  :root:not([data-theme="dark"]) {
     --ss-bg: #fafafa;
     --ss-surface: #ffffff;
     --ss-surface-alt: #f5f5f5;
@@ -117,7 +119,7 @@
 }
 
 /* ── Theme: Light (explicit toggle override) ──────────────────── */
-[data-theme='light'] {
+[data-theme="light"] {
   --ss-bg: #fafafa;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;
@@ -153,7 +155,7 @@
 }
 
 /* ── Theme override via data attribute ─────────────────────────── */
-[data-theme='light'] {
+[data-theme="light"] {
   --ss-bg: #fafafa;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;
@@ -381,7 +383,7 @@ body {
   background: var(--ss-hover-accent);
 }
 .ss-dash-nav-item.ss-dash-active::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 4px;
@@ -419,11 +421,15 @@ body {
 
 .ss-dash-nav-badge {
   margin-left: auto;
-  font-size: 9px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: var(--ss-border-dim);
-  color: var(--ss-muted);
+  font-size: 10px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 9px;
+  background: var(--ss-red-fg);
+  color: #fff;
+  padding: 0 5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -501,6 +507,8 @@ body {
   flex: 1;
   min-width: 200px;
   padding: 5px 10px;
+  padding-left: 28px;
+  padding-right: 24px;
   font-size: 11px;
   font-family: inherit;
   color: var(--ss-text);
@@ -516,11 +524,63 @@ body {
   color: var(--ss-dim);
 }
 
+.ss-dash-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.ss-dash-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 400px;
+}
+
+.ss-dash-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--ss-dim);
+  pointer-events: none;
+}
+
+.ss-dash-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ss-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+.ss-dash-search-clear:hover {
+  color: var(--ss-text);
+}
+
+.ss-dash-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
 .ss-dash-summary {
-  font-size: 11px;
-  color: var(--ss-muted);
+  font-size: 12px;
+  color: var(--ss-dim);
   white-space: nowrap;
-  padding: 0 4px;
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
@@ -564,10 +624,34 @@ body {
   border-radius: 0 4px 4px 0;
 }
 
+.ss-dash-filter-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--ss-border);
+  background: var(--ss-surface);
+  color: var(--ss-dim);
+  cursor: pointer;
+}
+.ss-dash-filter-btn.ss-dash-active {
+  background: var(--ss-accent);
+  color: #fff;
+  border-color: var(--ss-accent);
+}
+
+.ss-dash-level-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
 /* ── Tables ────────────────────────────────────────────────────── */
 .ss-dash-table-wrap {
   flex: 1;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
+  margin: 0 -2px;
+  padding: 0 2px;
   scrollbar-width: thin;
   scrollbar-color: var(--ss-border) transparent;
 }
@@ -576,6 +660,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-size: 11px;
+  table-layout: fixed;
 }
 .ss-dash-table th {
   position: sticky;
@@ -599,6 +684,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  max-width: 0;
   color: var(--ss-text);
 }
 /* Column resize handles */
@@ -635,6 +721,25 @@ body {
 }
 .ss-dash-table tr.ss-dash-clickable:hover td {
   background: var(--ss-hover-accent);
+}
+
+.ss-dash-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.ss-dash-sortable:hover {
+  color: var(--ss-accent);
+}
+
+.ss-dash-sort-arrow {
+  font-size: 10px;
+  color: var(--ss-accent);
+  margin-left: 2px;
+}
+
+.ss-dash-data-cell {
+  position: relative;
+  max-width: 300px;
 }
 
 /* ── Method badges ─────────────────────────────────────────────── */
@@ -853,6 +958,13 @@ body {
   flex-shrink: 0;
   flex-wrap: wrap;
   align-items: center;
+}
+
+/* When log filters are inside the shared FilterBar, strip redundant chrome */
+.ss-dash-filter-controls .ss-dash-log-filters {
+  padding: 0;
+  border-bottom: none;
+  background: none;
 }
 
 .ss-dash-log-filter {
@@ -1078,6 +1190,23 @@ body {
   flex: 1;
   border: none;
   background: #fff;
+}
+
+.ss-dash-email-preview-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--ss-dim);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.ss-dash-email-preview-close:hover {
+  background: var(--ss-surface);
+  color: var(--ss-text);
 }
 
 .ss-dash-email-row {
@@ -1423,6 +1552,11 @@ body {
   letter-spacing: 0.04em;
 }
 
+.ss-dash-chart-area {
+  position: relative;
+  min-height: 160px;
+}
+
 .ss-dash-chart {
   width: 100%;
   height: 220px;
@@ -1436,6 +1570,9 @@ body {
   transition:
     r 0.15s ease,
     opacity 0.15s ease;
+}
+.ss-dash-chart-svg .ss-dash-chart-dot-err {
+  fill: var(--ss-red-fg);
 }
 .ss-dash-chart-svg .ss-dash-chart-hover-zone {
   cursor: crosshair;
@@ -1546,6 +1683,18 @@ body {
   flex-shrink: 0;
 }
 
+.ss-dash-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ss-dash-page-ellipsis {
+  padding: 4px 6px;
+  color: var(--ss-dim);
+  font-size: 12px;
+}
+
 .ss-dash-page-btn {
   padding: 3px 10px;
   font-size: 10px;
@@ -1576,6 +1725,33 @@ body {
 }
 
 /* ── Config viewer ─────────────────────────────────────────────── */
+.ss-dash-config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+}
+.ss-dash-config-tab {
+  padding: 4px 12px;
+  font-size: 11px;
+  font-family: inherit;
+  border: 1px solid var(--ss-border-dim);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ss-muted);
+  white-space: nowrap;
+}
+.ss-dash-config-tab:hover {
+  border-color: var(--ss-dim);
+  color: var(--ss-text-secondary);
+}
+.ss-dash-config-tab.ss-dash-active {
+  border-color: var(--ss-accent);
+  color: var(--ss-accent);
+}
+
 .ss-dash-config-table-wrap {
   flex: 1;
   overflow: auto;
@@ -1735,7 +1911,8 @@ body {
   opacity: 0;
   transition: opacity 0.1s;
 }
-tr:hover .ss-dash-copy-row-btn {
+tr:hover .ss-dash-copy-row-btn,
+.ss-dash-config-section-header:hover .ss-dash-copy-row-btn {
   opacity: 1;
 }
 .ss-dash-copy-row-btn:hover {
@@ -1904,6 +2081,11 @@ tr:hover .ss-dash-copy-row-btn {
   min-width: 0;
 }
 
+/* ── Utility: dim text ────────────────────────────────────────── */
+.ss-dim {
+  color: var(--ss-dim);
+}
+
 .ss-dash-widget-stat {
   display: flex;
   justify-content: space-between;
@@ -1939,8 +2121,30 @@ tr:hover .ss-dash-copy-row-btn {
 .ss-dash-c-amber {
   color: var(--ss-amber-fg);
 }
+.ss-dash-c-secondary {
+  color: var(--ss-text-secondary);
+}
+.ss-dash-c-text {
+  color: var(--ss-text);
+}
+.ss-dash-c-sql {
+  color: var(--ss-sql-color);
+}
+.ss-dash-c-blue {
+  color: var(--ss-blue-fg);
+}
+.ss-dash-c-purple {
+  color: var(--ss-purple-fg);
+}
+.ss-dash-c-accent {
+  color: var(--ss-accent);
+}
+.ss-dash-c-border {
+  color: var(--ss-border);
+}
 
 /* ── Section title (reused by internals + Vue) ────────────────── */
+.ss-dash-internals-title,
 .ss-dash-section-title {
   margin: 20px 0 6px;
   padding: 0 12px 6px;
@@ -1951,6 +2155,7 @@ tr:hover .ss-dash-copy-row-btn {
   color: var(--ss-muted);
   border-bottom: 1px solid var(--ss-border);
 }
+.ss-dash-internals-title:first-child,
 .ss-dash-section-title:first-child {
   margin-top: 4px;
 }
@@ -2033,4 +2238,10 @@ tr:hover .ss-dash-copy-row-btn {
 }
 .ss-dash-bar-pct-warn {
   color: var(--ss-amber-fg);
+}
+
+/* ── Tooltip trigger ─────────────────────────────────────────── */
+.ss-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
 }

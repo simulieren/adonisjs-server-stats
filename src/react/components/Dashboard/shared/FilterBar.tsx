@@ -4,17 +4,21 @@ interface FilterBarProps {
   search: string
   onSearchChange: (value: string) => void
   placeholder?: string
+  summary?: React.ReactNode
   children?: React.ReactNode
   className?: string
 }
 
 /**
- * Search/filter bar with optional additional controls.
+ * Search/filter bar with optional summary text and additional controls.
+ * Matches the old vanilla JS `.ss-dash-search-bar` layout:
+ *   [summary] [search input] [extra controls]
  */
 export function FilterBar({
   search,
   onSearchChange,
   placeholder = 'Search...',
+  summary,
   children,
   className = '',
 }: FilterBarProps) {
@@ -24,6 +28,7 @@ export function FilterBar({
 
   return (
     <div className={`ss-dash-filter-bar ${className}`}>
+      {summary !== null && summary !== undefined && <span className="ss-dash-summary">{summary}</span>}
       <div className="ss-dash-search-wrapper">
         <svg
           className="ss-dash-search-icon"

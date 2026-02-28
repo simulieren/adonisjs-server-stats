@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 
-import { timeAgo } from '../../../../core/formatters.js'
+import { timeAgo, formatTime } from '../../../../core/formatters.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
@@ -19,7 +19,11 @@ export function EventsTab({ options }: EventsTabProps) {
     const items = data?.events || []
     if (!search) return items
     const lower = search.toLowerCase()
-    return items.filter((e) => e.event.toLowerCase().includes(lower))
+    return items.filter(
+      (e) =>
+        (e.event || '').toLowerCase().includes(lower) ||
+        (e.data || '').toLowerCase().includes(lower)
+    )
   }, [data, search])
 
   const tableRef = useRef<HTMLTableElement>(null)
@@ -54,6 +58,12 @@ export function EventsTab({ options }: EventsTabProps) {
         <div className="ss-dbg-empty">No events captured</div>
       ) : (
         <table ref={tableRef} className="ss-dbg-table">
+          <colgroup>
+            <col style={{ width: '50px' }} />
+            <col style={{ width: '20%' }} />
+            <col />
+            <col style={{ width: '80px' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>
@@ -63,18 +73,24 @@ export function EventsTab({ options }: EventsTabProps) {
             </tr>
           </thead>
           <tbody>
-            {events.map((evt) => (
-              <tr key={evt.id}>
-                <td>{evt.id}</td>
-                <td>
-                  <span className="ss-dbg-event-name">{evt.event}</span>
-                </td>
-                <td className="ss-dbg-event-data">
-                  <JsonViewer data={evt.data} maxPreviewLength={80} />
-                </td>
-                <td className="ss-dbg-event-time">{timeAgo(evt.timestamp)}</td>
-              </tr>
-            ))}
+            {events.map((evt) => {
+              const ts =
+                evt.timestamp ||
+                (evt as unknown as Record<string, number>).created_at ||
+                (evt as unknown as Record<string, number>).createdAt
+              return (
+                <tr key={evt.id}>
+                  <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>{evt.id}</td>
+                  <td className="ss-dbg-event-name">
+                    {evt.event}
+                  </td>
+                  <td className="ss-dbg-event-data">
+                    <JsonViewer data={evt.data} maxPreviewLength={80} classPrefix="ss-dbg" />
+                  </td>
+                  <td className="ss-dbg-event-time" title={formatTime(ts)}>{timeAgo(ts)}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       )}

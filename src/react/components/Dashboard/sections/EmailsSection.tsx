@@ -1,13 +1,12 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 
-import { timeAgo } from '../../../../core/formatters.js'
+import { timeAgo, formatTime } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
-import { Badge } from '../../shared/Badge.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 
-import type { BadgeColor, DashboardHookOptions } from '../../../../core/types.js'
+import type { DashboardHookOptions } from '../../../../core/types.js'
 
 interface EmailsSectionProps {
   options?: DashboardHookOptions
@@ -21,6 +20,8 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
 
   const { data, meta, isLoading } = useDashboardData('emails', { ...options, page, search })
   const emails = (data as Record<string, unknown>[]) || []
+
+  useEffect(() => setPage(1), [search])
 
   const handlePreview = useCallback(
     async (email: Record<string, unknown>) => {
@@ -46,36 +47,44 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
     [options]
   )
 
-  const statusColor: Record<string, string> = {
-    sent: 'green',
-    sending: 'amber',
-    queued: 'blue',
-    failed: 'red',
-  }
-
   if (previewId && previewHtml) {
     const email = emails.find((e) => e.id === previewId)
     return (
-      <div className="ss-dash-email-preview">
+      <div className="ss-dash-email-preview" id="ss-dash-email-preview">
         <div className="ss-dash-email-preview-header">
-          <div>
+          <div className="ss-dash-email-preview-meta" id="ss-dash-email-preview-meta">
             {email && (
               <>
-                <div>
-                  <strong>Subject:</strong> {email.subject as string}
-                </div>
-                <div>
-                  <strong>From:</strong> {(email.from_addr || email.from) as string}
-                </div>
-                <div>
-                  <strong>To:</strong> {(email.to_addr || email.to) as string}
-                </div>
+                <strong>Subject:</strong> {email.subject as string}
+                &nbsp;&nbsp;|&nbsp;&nbsp;<strong>From:</strong>{' '}
+                {(email.from_addr || email.from) as string}
+                &nbsp;&nbsp;|&nbsp;&nbsp;<strong>To:</strong>{' '}
+                {(email.to_addr || email.to) as string}
+                {(email.cc || email.cc_addr) && (
+                  <>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;<strong>CC:</strong>{' '}
+                    {(email.cc || email.cc_addr) as string}
+                  </>
+                )}
+                &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Status:</strong>{' '}
+                <span
+                  className={`ss-dash-badge ss-dash-email-status-${email.status as string}`}
+                >
+                  {email.status as string}
+                </span>
+                {(email.mailer as string) && (
+                  <>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Mailer:</strong>{' '}
+                    {email.mailer as string}
+                  </>
+                )}
               </>
             )}
           </div>
           <button
             type="button"
             className="ss-dash-btn"
+            id="ss-dash-email-preview-close"
             onClick={() => {
               setPreviewId(null)
               setPreviewHtml(null)
@@ -85,10 +94,11 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
           </button>
         </div>
         <iframe
+          className="ss-dash-email-iframe"
+          id="ss-dash-email-iframe"
           srcDoc={previewHtml}
           title="Email preview"
           sandbox=""
-          style={{ flex: 1, border: 'none', background: '#fff' }}
         />
       </div>
     )
@@ -96,40 +106,160 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
 
   return (
     <div>
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="Filter emails..." />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter emails..."
+        summary={`${meta?.total ?? 0} emails`}
+      />
       {isLoading && !data ? (
         <div className="ss-dash-empty">Loading emails...</div>
       ) : (
         <>
-          <DataTable
-            columns={[
-              { key: 'id', label: '#', width: '40px' },
-              {
-                key: 'subject',
-                label: 'Subject',
-                render: (v: string) => <span style={{ color: 'var(--ss-text)' }}>{v}</span>,
-              },
-              { key: 'to_addr', label: 'To', width: '150px' },
-              { key: 'mailer', label: 'Mailer', width: '70px' },
-              {
-                key: 'status',
-                label: 'Status',
-                width: '80px',
-                render: (v: string) => (
-                  <Badge color={(statusColor[v] || 'muted') as BadgeColor}>{v}</Badge>
-                ),
-              },
-              {
-                key: 'created_at',
-                label: 'Time',
-                width: '80px',
-                render: (v: string) => <span className="ss-dash-event-time">{timeAgo(v)}</span>,
-              },
-            ]}
-            data={emails}
-            onRowClick={handlePreview}
-            emptyMessage="No emails recorded"
-          />
+          <div className="ss-dash-table-wrap">
+            <DataTable
+              columns={[
+                {
+                  key: 'id',
+                  label: '#',
+                  width: '40px',
+                  render: (v: unknown) => (
+                    <span style={{ color: 'var(--ss-dim)' }}>{v as string}</span>
+                  ),
+                },
+                {
+                  key: 'from',
+                  label: 'From',
+                  width: '150px',
+                  render: (_v: unknown, row: Record<string, unknown>) => {
+                    const from = (row.from_addr || row.from || '') as string
+                    return (
+                      <span
+                        title={from}
+                        style={{
+                          color: 'var(--ss-text-secondary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'block',
+                        }}
+                      >
+                        {from}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'to',
+                  label: 'To',
+                  width: '150px',
+                  render: (_v: unknown, row: Record<string, unknown>) => {
+                    const to = (row.to_addr || row.to || '') as string
+                    return (
+                      <span
+                        title={to}
+                        style={{
+                          color: 'var(--ss-text-secondary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'block',
+                        }}
+                      >
+                        {to}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'subject',
+                  label: 'Subject',
+                  render: (v: unknown) => {
+                    const subject = (v || '') as string
+                    return (
+                      <span
+                        title={subject}
+                        style={{
+                          color: 'var(--ss-sql-color)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'block',
+                        }}
+                      >
+                        {subject}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  width: '80px',
+                  render: (v: unknown) => {
+                    const status = (v || '') as string
+                    return (
+                      <span className={`ss-dash-badge ss-dash-email-status-${status}`}>
+                        {status}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'attachmentCount',
+                  label: 'ATT',
+                  width: '40px',
+                  render: (_v: unknown, row: Record<string, unknown>) => {
+                    const count = (row.attachment_count || row.attachmentCount || 0) as number
+                    return count > 0 ? (
+                      <span style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}>{count}</span>
+                    ) : (
+                      <span style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}>-</span>
+                    )
+                  },
+                },
+                {
+                  key: 'mailer',
+                  label: 'Mailer',
+                  width: '70px',
+                  render: (v: unknown) => {
+                    const mailer = (v || '') as string
+                    return (
+                      <span
+                        title={mailer}
+                        style={{
+                          color: 'var(--ss-muted)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          display: 'block',
+                        }}
+                      >
+                        {mailer}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'createdAt',
+                  label: 'Time',
+                  width: '80px',
+                  render: (_v: unknown, row: Record<string, unknown>) => {
+                    const ts = (row.createdAt || row.created_at || row.timestamp) as string
+                    return (
+                      <span className="ss-dash-event-time" style={{ whiteSpace: 'nowrap' }} title={formatTime(ts)}>
+                        {timeAgo(ts)}
+                      </span>
+                    )
+                  },
+                },
+              ]}
+              data={emails}
+              onRowClick={handlePreview}
+              rowClassName="ss-dash-email-row"
+              emptyMessage="No emails captured yet"
+            />
+          </div>
           {meta && (
             <Pagination
               page={meta.page}

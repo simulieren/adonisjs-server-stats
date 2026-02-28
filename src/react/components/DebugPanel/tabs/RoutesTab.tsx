@@ -59,6 +59,13 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
         <div className="ss-dbg-empty">No routes found</div>
       ) : (
         <table ref={tableRef} className="ss-dbg-table">
+          <colgroup>
+            <col style={{ width: '70px' }} />
+            <col style={{ width: '25%' }} />
+            <col style={{ width: '15%' }} />
+            <col />
+            <col style={{ width: '20%' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>Method</th>
@@ -70,7 +77,10 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
           </thead>
           <tbody>
             {routes.map((route, i) => {
-              const isCurrentRoute = currentPath && route.pattern === currentPath
+              const isCurrentRoute = currentPath && (
+                route.pattern === currentPath ||
+                new RegExp('^' + route.pattern.replace(/:[^/]+/g, '[^/]+') + '$').test(currentPath)
+              )
               return (
                 <tr
                   key={`${route.method}-${route.pattern}-${i}`}
@@ -81,10 +91,10 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
                       {route.method}
                     </span>
                   </td>
-                  <td style={{ color: 'var(--ss-text)' }}>{route.pattern}</td>
-                  <td style={{ color: 'var(--ss-dim)' }}>{route.name || '-'}</td>
-                  <td style={{ color: 'var(--ss-text-secondary)' }}>{route.handler}</td>
-                  <td style={{ color: 'var(--ss-dim)', fontSize: '10px' }}>
+                  <td className="ss-dbg-c-text">{route.pattern}</td>
+                  <td className="ss-dbg-c-muted">{route.name || '-'}</td>
+                  <td className="ss-dbg-c-sql">{route.handler}</td>
+                  <td className="ss-dbg-c-dim" style={{ fontSize: '10px' }}>
                     {route.middleware.length > 0 ? route.middleware.join(', ') : '-'}
                   </td>
                 </tr>

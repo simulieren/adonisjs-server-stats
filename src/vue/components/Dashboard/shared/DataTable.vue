@@ -69,13 +69,19 @@ onBeforeUnmount(() => {
 
   <div v-else class="ss-dash-table-wrap">
     <table ref="tableRef" class="ss-dash-table">
+      <colgroup>
+        <col
+          v-for="col in columns"
+          :key="col.key"
+          :style="col.width ? { width: col.width } : undefined"
+        />
+      </colgroup>
       <thead>
         <tr>
           <th
             v-for="col in columns"
             :key="col.key"
             :style="{
-              minWidth: col.width || undefined,
               textAlign: col.align || 'left',
               cursor: col.sortable ? 'pointer' : 'default',
             }"

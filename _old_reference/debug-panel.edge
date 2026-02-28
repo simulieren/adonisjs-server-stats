@@ -1,0 +1,158 @@
+<div id="ss-dbg-panel" class="ss-dbg-panel" data-logs-endpoint="{{ logsEndpoint }}" data-tracing="{{ showTracing ? '1' : '0' }}" data-debug-endpoint="{{ debugEndpoint }}"@if(dashboardPath) data-dashboard-path="{{ dashboardPath }}"@end>
+  <div class="ss-dbg-tabs">
+    <div class="ss-dbg-tabs-scroll">
+      @if(showTracing)
+        <button type="button" class="ss-dbg-tab ss-dbg-active" data-ss-dbg-tab="timeline"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>Timeline</button>
+        <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="queries"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Queries</button>
+      @else
+        <button type="button" class="ss-dbg-tab ss-dbg-active" data-ss-dbg-tab="queries"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>Queries</button>
+      @end
+      <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="events"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>Events</button>
+      <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="routes"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Routes</button>
+      <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="logs"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>Logs</button>
+      <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="emails"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg>Emails</button>
+      @if(dashboardPath)
+        <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="cache"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg>Cache</button>
+        <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="jobs"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Jobs</button>
+        <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="config"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Config</button>
+      @end
+      <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="internals"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>Internals</button>
+      @each(pane in customPanes)
+        <button type="button" class="ss-dbg-tab" data-ss-dbg-tab="{{ pane.id }}"><svg class="ss-dbg-tab-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>{{ pane.label }}</button>
+      @end
+    </div>
+    <div class="ss-dbg-tabs-right">
+      <span id="ss-dbg-conn-mode" class="ss-dbg-conn-mode ss-dbg-conn-polling" title="Polling">polling</span>
+      <span id="ss-dbg-query-badge" class="ss-dbg-summary"></span>
+      <button type="button" class="ss-dbg-theme-toggle" id="ss-dbg-theme-btn" title="Toggle theme">&#9728;</button>
+      @if(dashboardPath)
+        <span id="ss-dbg-mini-stats" class="ss-dbg-mini-stats"></span>
+        <a href="{{ dashboardPath }}" target="_blank" class="ss-dbg-dashboard-link" id="ss-dbg-dashboard-link" title="Open full dashboard">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+        </a>
+      @end
+      <button type="button" class="ss-dbg-close" id="ss-dbg-close" title="Close debug panel">&times;</button>
+    </div>
+  </div>
+  <div class="ss-dbg-content">
+    @if(showTracing)
+      <div id="ss-dbg-pane-timeline" class="ss-dbg-pane ss-dbg-active">
+        <div id="ss-dbg-timeline-list">
+          <div class="ss-dbg-search-bar">
+            <input type="text" class="ss-dbg-search" id="ss-dbg-search-timeline" placeholder="Filter by URL or method..." />
+            <span id="ss-dbg-timeline-summary" class="ss-dbg-summary"></span>
+          </div>
+          <div id="ss-dbg-timeline-body"><div class="ss-dbg-empty">Loading traces...</div></div>
+        </div>
+        <div id="ss-dbg-timeline-detail" style="display:none">
+          <div class="ss-dbg-tl-detail-header">
+            <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-tl-back">&larr; Back</button>
+            <span id="ss-dbg-tl-detail-title" class="ss-dbg-summary"></span>
+          </div>
+          <div id="ss-dbg-tl-waterfall"></div>
+        </div>
+      </div>
+    @end
+    <div id="ss-dbg-pane-queries" class="ss-dbg-pane{{ showTracing ? '' : ' ss-dbg-active' }}">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-queries" placeholder="Filter queries by SQL, model, or method..." />
+        <span id="ss-dbg-queries-summary" class="ss-dbg-summary"></span>
+        <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-queries-clear">Clear</button>
+      </div>
+      <div id="ss-dbg-queries-body"><div class="ss-dbg-empty">Loading queries...</div></div>
+    </div>
+    <div id="ss-dbg-pane-events" class="ss-dbg-pane">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-events" placeholder="Filter events by name..." />
+        <span id="ss-dbg-events-summary" class="ss-dbg-summary"></span>
+        <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-events-clear">Clear</button>
+      </div>
+      <div id="ss-dbg-events-body"><div class="ss-dbg-empty">Loading events...</div></div>
+    </div>
+    <div id="ss-dbg-pane-routes" class="ss-dbg-pane">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-routes" placeholder="Filter routes by path, name, or handler..." />
+        <span id="ss-dbg-routes-summary" class="ss-dbg-summary"></span>
+      </div>
+      <div id="ss-dbg-routes-body"><div class="ss-dbg-empty">Loading routes...</div></div>
+    </div>
+    <div id="ss-dbg-pane-logs" class="ss-dbg-pane">
+      <div class="ss-dbg-log-filters">
+        <button type="button" class="ss-dbg-log-filter ss-dbg-active" data-ss-dbg-level="all">All</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="error">Error</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="warn">Warn</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="info">Info</button>
+        <button type="button" class="ss-dbg-log-filter" data-ss-dbg-level="debug">Debug</button>
+        <input type="text" class="ss-dbg-search ss-dbg-reqid-input" id="ss-dbg-log-reqid" placeholder="Filter by request ID..." />
+        <button type="button" class="ss-dbg-btn-clear ss-dbg-reqid-clear" id="ss-dbg-log-reqid-clear" style="display:none">Clear</button>
+      </div>
+      <div id="ss-dbg-logs-body"><div class="ss-dbg-empty">Loading logs...</div></div>
+    </div>
+    <div id="ss-dbg-pane-emails" class="ss-dbg-pane" style="position:relative">
+      <div class="ss-dbg-search-bar">
+        <input type="text" class="ss-dbg-search" id="ss-dbg-search-emails" placeholder="Filter emails by from, to, subject, or mailer..." />
+        <span id="ss-dbg-emails-summary" class="ss-dbg-summary"></span>
+        <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-emails-clear">Clear</button>
+      </div>
+      <div id="ss-dbg-emails-body"><div class="ss-dbg-empty">Loading emails...</div></div>
+      <div id="ss-dbg-email-preview" class="ss-dbg-email-preview" style="display:none">
+        <div class="ss-dbg-email-preview-header">
+          <div id="ss-dbg-email-preview-meta" class="ss-dbg-email-preview-meta"></div>
+          <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-email-preview-close">Close</button>
+        </div>
+        <iframe id="ss-dbg-email-iframe" class="ss-dbg-email-iframe" sandbox="allow-same-origin" src="about:blank"></iframe>
+      </div>
+    </div>
+    @if(dashboardPath)
+      <div id="ss-dbg-pane-cache" class="ss-dbg-pane">
+        <div id="ss-dbg-cache-stats-area" class="ss-dbg-cache-stats"></div>
+        <div class="ss-dbg-search-bar">
+          <input type="text" class="ss-dbg-search" id="ss-dbg-search-cache" placeholder="Filter cache keys..." />
+          <span id="ss-dbg-cache-summary" class="ss-dbg-summary"></span>
+        </div>
+        <div id="ss-dbg-cache-body"><div class="ss-dbg-empty">Loading cache...</div></div>
+      </div>
+      <div id="ss-dbg-pane-jobs" class="ss-dbg-pane">
+        <div id="ss-dbg-jobs-stats-area" class="ss-dbg-job-stats-area"></div>
+        <div class="ss-dbg-search-bar">
+          <button type="button" class="ss-dbg-job-filter ss-dbg-active" data-ss-dbg-job-status="all">All</button>
+          <button type="button" class="ss-dbg-job-filter" data-ss-dbg-job-status="completed">Completed</button>
+          <button type="button" class="ss-dbg-job-filter" data-ss-dbg-job-status="failed">Failed</button>
+          <button type="button" class="ss-dbg-job-filter" data-ss-dbg-job-status="active">Active</button>
+          <button type="button" class="ss-dbg-job-filter" data-ss-dbg-job-status="waiting">Waiting</button>
+          <span id="ss-dbg-jobs-summary" class="ss-dbg-summary"></span>
+        </div>
+        <div id="ss-dbg-jobs-body"><div class="ss-dbg-empty">Loading jobs...</div></div>
+      </div>
+      <div id="ss-dbg-pane-config" class="ss-dbg-pane">
+        <div class="ss-dbg-search-bar">
+          <button type="button" class="ss-dbg-config-tab ss-dbg-active" data-ss-dbg-config-tab="config">App Config</button>
+          <button type="button" class="ss-dbg-config-tab" data-ss-dbg-config-tab="env">Env Vars</button>
+          <input type="text" class="ss-dbg-search" id="ss-dbg-search-config" placeholder="Search config keys..." />
+          <span id="ss-dbg-config-summary" class="ss-dbg-summary"></span>
+        </div>
+        <div id="ss-dbg-config-body"><div class="ss-dbg-empty">Loading config...</div></div>
+      </div>
+    @end
+    <div id="ss-dbg-pane-internals" class="ss-dbg-pane">
+      <div id="ss-dbg-internals-body"><div class="ss-dbg-empty">Loading internals...</div></div>
+    </div>
+    @each(pane in customPanes)
+      <div id="ss-dbg-pane-{{ pane.id }}" class="ss-dbg-pane">
+        @if(pane.search || pane.clearable)
+          <div class="ss-dbg-search-bar">
+            @if(pane.search)
+              <input type="text" class="ss-dbg-search" id="ss-dbg-search-{{ pane.id }}" placeholder="{{ pane.search.placeholder || 'Filter...' }}" />
+            @end
+            <span id="ss-dbg-{{ pane.id }}-summary" class="ss-dbg-summary"></span>
+            @if(pane.clearable)
+              <button type="button" class="ss-dbg-btn-clear" id="ss-dbg-{{ pane.id }}-clear">Clear</button>
+            @end
+          </div>
+        @end
+        <div id="ss-dbg-{{ pane.id }}-body"><div class="ss-dbg-empty">Loading {{ pane.label }}...</div></div>
+      </div>
+    @end
+  </div>
+</div>
+<script type="application/json" id="ss-dbg-custom-panes-config">{{{ JSON.stringify(customPanes) }}}</script>

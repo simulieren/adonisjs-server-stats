@@ -131,15 +131,15 @@ onBeforeUnmount(() => {
       </thead>
       <tbody>
         <tr v-for="j in jobs" :key="j.id">
-          <td style="color: var(--ss-dim)">{{ j.id }}</td>
-          <td style="color: var(--ss-text)">{{ j.name }}</td>
+          <td class="ss-dbg-c-dim">{{ j.id }}</td>
+          <td class="ss-dbg-c-sql">{{ j.name }}</td>
           <td>
             <span :class="statusClass(j.status)">{{ j.status }}</span>
           </td>
           <td>
             <JsonViewer :value="j.payload || j.data" :max-len="60" />
           </td>
-          <td style="color: var(--ss-muted); text-align: center">
+          <td class="ss-dbg-c-muted" style="text-align: center">
             {{ j.attempts }}
           </td>
           <td class="ss-dbg-duration">

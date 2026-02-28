@@ -38,7 +38,7 @@ export function buildQueryString(
   const params = new URLSearchParams()
 
   params.set('page', String(pagination.page))
-  params.set('limit', String(pagination.perPage))
+  params.set('perPage', String(pagination.perPage))
 
   if (filters) {
     if (filters.search) {
@@ -166,7 +166,7 @@ export function buildQueryParams(options: {
 
   if (options.page !== null && options.page !== undefined) params.set('page', String(options.page))
   if (options.perPage !== null && options.perPage !== undefined)
-    params.set('limit', String(options.perPage))
+    params.set('perPage', String(options.perPage))
   if (options.search) params.set('search', options.search)
   if (options.sort) params.set('sort', options.sort)
   if (options.sortDir) params.set('direction', options.sortDir)

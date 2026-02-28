@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server Stats Dashboard</title>
+  <style>{{{ css }}}</style>
+</head>
+<body>
+  <div id="ss-dash" data-path="{{ dashboardPath }}" data-tracing="{{ showTracing ? '1' : '0' }}">
+
+    {{-- ── Header ──────────────────────────────────────────────── --}}
+    <div class="ss-dash-header">
+      <div class="ss-dash-header-left">
+        <span class="ss-dash-logo">Server Stats</span>
+        <span class="ss-dash-logo-sub">Dashboard</span>
+      </div>
+      <div class="ss-dash-header-center">
+        <span class="ss-dash-live-dot" id="ss-dash-live-dot"></span>
+        <span class="ss-dash-live-label" id="ss-dash-live-label">Polling</span>
+      </div>
+      <div class="ss-dash-header-right">
+        <button type="button" class="ss-dash-theme-btn" id="ss-dash-theme-btn" title="Toggle theme">&#x263D;</button>
+        <a href="/" class="ss-dash-back-link" title="Back to app">&larr; App</a>
+      </div>
+    </div>
+
+    {{-- ── Body: Sidebar + Main ────────────────────────────────── --}}
+    <div class="ss-dash-body">
+
+      {{-- ── Sidebar ─────────────────────────────────────────────── --}}
+      <div class="ss-dash-sidebar" id="ss-dash-sidebar">
+        <nav class="ss-dash-nav">
+
+          {{-- Overview --}}
+          <button type="button" class="ss-dash-nav-item ss-dash-active" data-ss-section="overview">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+            <span class="ss-dash-nav-label">Overview</span>
+          </button>
+
+          {{-- Requests --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="requests">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>
+            <span class="ss-dash-nav-label">Requests</span>
+            <span class="ss-dash-nav-badge" id="ss-dash-badge-requests"></span>
+          </button>
+
+          {{-- Queries --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="queries">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+            <span class="ss-dash-nav-label">Queries</span>
+            <span class="ss-dash-nav-badge" id="ss-dash-badge-queries"></span>
+          </button>
+
+          {{-- Events --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="events">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+            <span class="ss-dash-nav-label">Events</span>
+          </button>
+
+          {{-- Routes --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="routes">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></span>
+            <span class="ss-dash-nav-label">Routes</span>
+          </button>
+
+          {{-- Logs --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="logs">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg></span>
+            <span class="ss-dash-nav-label">Logs</span>
+            <span class="ss-dash-nav-badge ss-dash-badge-red" id="ss-dash-badge-logs"></span>
+          </button>
+
+          {{-- Emails --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="emails">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><path d="M22 6l-10 7L2 6"/></svg></span>
+            <span class="ss-dash-nav-label">Emails</span>
+          </button>
+
+          {{-- Timeline (if tracing) --}}
+          @if(showTracing)
+            <button type="button" class="ss-dash-nav-item" data-ss-section="timeline">
+              <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>
+              <span class="ss-dash-nav-label">Timeline</span>
+            </button>
+          @end
+
+          {{-- Cache --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="cache">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><path d="M22 12H2"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg></span>
+            <span class="ss-dash-nav-label">Cache</span>
+          </button>
+
+          {{-- Jobs --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="jobs">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+            <span class="ss-dash-nav-label">Jobs</span>
+          </button>
+
+          {{-- Config --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="config">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+            <span class="ss-dash-nav-label">Config</span>
+          </button>
+
+          {{-- Internals --}}
+          <button type="button" class="ss-dash-nav-item" data-ss-section="internals">
+            <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></span>
+            <span class="ss-dash-nav-label">Internals</span>
+          </button>
+
+          {{-- Separator before custom panes --}}
+          @if(customPanes && customPanes.length)
+            <div class="ss-dash-nav-sep"></div>
+            @each(pane in customPanes)
+              <button type="button" class="ss-dash-nav-item" data-ss-section="{{ pane.id }}">
+                <span class="ss-dash-nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg></span>
+                <span class="ss-dash-nav-label">{{ pane.label }}</span>
+              </button>
+            @end
+          @end
+
+        </nav>
+
+        {{-- Collapse toggle --}}
+        <button type="button" class="ss-dash-sidebar-toggle" id="ss-dash-sidebar-toggle" title="Toggle sidebar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+      </div>
+
+      {{-- ── Main content ──────────────────────────────────────── --}}
+      <div class="ss-dash-main">
+
+        {{-- ═══ Overview ═══ --}}
+        <div id="ss-dash-pane-overview" class="ss-dash-pane ss-dash-active">
+          <div id="ss-dash-overview-content">
+            <div class="ss-dash-empty">Loading overview...</div>
+          </div>
+        </div>
+
+        {{-- ═══ Requests ═══ --}}
+        <div id="ss-dash-pane-requests" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div id="ss-dash-requests-list" class="ss-dash-list-view">
+              <div class="ss-dash-search-bar">
+                <span id="ss-dash-requests-summary" class="ss-dash-summary"></span>
+              </div>
+              <div class="ss-dash-table-wrap" id="ss-dash-requests-body">
+                <div class="ss-dash-empty">Loading requests...</div>
+              </div>
+              <div class="ss-dash-pagination" id="ss-dash-pagination-requests"></div>
+            </div>
+            <div id="ss-dash-requests-detail" class="ss-dash-detail-view">
+              <div class="ss-dash-tl-detail-header">
+                <button type="button" class="ss-dash-btn" id="ss-dash-requests-back">&larr; Back</button>
+                <span id="ss-dash-requests-detail-title" class="ss-dash-summary"></span>
+              </div>
+              <div id="ss-dash-requests-waterfall" class="ss-dash-tl-waterfall"></div>
+            </div>
+          </div>
+        </div>
+
+        {{-- ═══ Queries ═══ --}}
+        <div id="ss-dash-pane-queries" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div class="ss-dash-search-bar">
+              <span id="ss-dash-queries-summary" class="ss-dash-summary"></span>
+              <button type="button" class="ss-dash-btn" id="ss-dash-queries-group-btn">Grouped</button>
+            </div>
+            <div class="ss-dash-table-wrap" id="ss-dash-queries-body">
+              <div class="ss-dash-empty">Loading queries...</div>
+            </div>
+            <div class="ss-dash-pagination" id="ss-dash-pagination-queries"></div>
+          </div>
+        </div>
+
+        {{-- ═══ Events ═══ --}}
+        <div id="ss-dash-pane-events" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div class="ss-dash-search-bar">
+              <span id="ss-dash-events-summary" class="ss-dash-summary"></span>
+            </div>
+            <div class="ss-dash-table-wrap" id="ss-dash-events-body">
+              <div class="ss-dash-empty">Loading events...</div>
+            </div>
+            <div class="ss-dash-pagination" id="ss-dash-pagination-events"></div>
+          </div>
+        </div>
+
+        {{-- ═══ Routes ═══ --}}
+        <div id="ss-dash-pane-routes" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div class="ss-dash-search-bar">
+              <span id="ss-dash-routes-summary" class="ss-dash-summary"></span>
+            </div>
+            <div class="ss-dash-table-wrap" id="ss-dash-routes-body">
+              <div class="ss-dash-empty">Loading routes...</div>
+            </div>
+          </div>
+        </div>
+
+        {{-- ═══ Logs ═══ --}}
+        <div id="ss-dash-pane-logs" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            {{-- Level filters --}}
+            <div class="ss-dash-log-filters">
+              <button type="button" class="ss-dash-log-filter ss-dash-active" data-ss-log-level="all">All</button>
+              <button type="button" class="ss-dash-log-filter" data-ss-log-level="error">Error</button>
+              <button type="button" class="ss-dash-log-filter" data-ss-log-level="warn">Warn</button>
+              <button type="button" class="ss-dash-log-filter" data-ss-log-level="info">Info</button>
+              <button type="button" class="ss-dash-log-filter" data-ss-log-level="debug">Debug</button>
+              <input type="text" class="ss-dash-search ss-dash-reqid-input" id="ss-dash-log-reqid-input" placeholder="Filter by request ID..." />
+              <button type="button" class="ss-dash-btn ss-dash-reqid-clear" id="ss-dash-log-reqid-clear" style="display:none">Clear</button>
+            </div>
+            {{-- Structured search --}}
+            <div class="ss-dash-structured-search">
+              <select class="ss-dash-filter-select" id="ss-dash-log-filter-field">
+                <option value="level">level</option>
+                <option value="message">message</option>
+                <option value="request_id">request_id</option>
+                <option value="userId">userId</option>
+                <option value="email">email</option>
+                <option value="path">path</option>
+              </select>
+              <select class="ss-dash-filter-select" id="ss-dash-log-filter-op">
+                <option value="equals">equals</option>
+                <option value="contains">contains</option>
+                <option value="starts_with">starts with</option>
+              </select>
+              <input type="text" class="ss-dash-filter-input" id="ss-dash-log-filter-value" placeholder="Value..." />
+              <button type="button" class="ss-dash-btn" id="ss-dash-log-add-filter">Add Filter</button>
+              <div class="ss-dash-filter-chips" id="ss-dash-log-filter-chips"></div>
+              <div class="ss-dash-saved-filters">
+                <select class="ss-dash-saved-select" id="ss-dash-log-saved-select">
+                  <option value="">Saved Filters...</option>
+                </select>
+                <button type="button" class="ss-dash-btn" id="ss-dash-log-save-filter">Save</button>
+                <button type="button" class="ss-dash-btn" id="ss-dash-log-delete-filter">Delete</button>
+              </div>
+            </div>
+            {{-- Log entries --}}
+            <div class="ss-dash-log-entries" id="ss-dash-logs-body">
+              <div class="ss-dash-empty">Loading logs...</div>
+            </div>
+            <div class="ss-dash-pagination" id="ss-dash-pagination-logs"></div>
+          </div>
+        </div>
+
+        {{-- ═══ Emails ═══ --}}
+        <div id="ss-dash-pane-emails" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner" style="position:relative">
+            <div class="ss-dash-search-bar">
+              <span id="ss-dash-emails-summary" class="ss-dash-summary"></span>
+            </div>
+            <div class="ss-dash-table-wrap" id="ss-dash-emails-body">
+              <div class="ss-dash-empty">Loading emails...</div>
+            </div>
+            <div class="ss-dash-pagination" id="ss-dash-pagination-emails"></div>
+            {{-- Email preview overlay --}}
+            <div id="ss-dash-email-preview" class="ss-dash-email-preview" style="display:none">
+              <div class="ss-dash-email-preview-header">
+                <div id="ss-dash-email-preview-meta" class="ss-dash-email-preview-meta"></div>
+                <button type="button" class="ss-dash-btn" id="ss-dash-email-preview-close">Close</button>
+              </div>
+              <iframe id="ss-dash-email-iframe" class="ss-dash-email-iframe" sandbox="allow-same-origin" src="about:blank"></iframe>
+            </div>
+          </div>
+        </div>
+
+        {{-- ═══ Timeline ═══ --}}
+        @if(showTracing)
+          <div id="ss-dash-pane-timeline" class="ss-dash-pane">
+            <div class="ss-dash-pane-inner">
+              <div id="ss-dash-timeline-list" class="ss-dash-list-view">
+                <div class="ss-dash-search-bar">
+                  <span id="ss-dash-timeline-summary" class="ss-dash-summary"></span>
+                </div>
+                <div class="ss-dash-table-wrap" id="ss-dash-timeline-body">
+                  <div class="ss-dash-empty">Loading traces...</div>
+                </div>
+                <div class="ss-dash-pagination" id="ss-dash-pagination-timeline"></div>
+              </div>
+              <div id="ss-dash-timeline-detail" class="ss-dash-detail-view">
+                <div class="ss-dash-tl-detail-header">
+                  <button type="button" class="ss-dash-btn" id="ss-dash-timeline-back">&larr; Back</button>
+                  <span id="ss-dash-timeline-detail-title" class="ss-dash-summary"></span>
+                </div>
+                <div id="ss-dash-timeline-waterfall" class="ss-dash-tl-waterfall"></div>
+              </div>
+            </div>
+          </div>
+        @end
+
+        {{-- ═══ Cache ═══ --}}
+        <div id="ss-dash-pane-cache" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div id="ss-dash-cache-stats-area"></div>
+            <div class="ss-dash-table-wrap" id="ss-dash-cache-body">
+              <div class="ss-dash-empty">Loading cache...</div>
+            </div>
+            <div id="ss-dash-cache-detail"></div>
+          </div>
+        </div>
+
+        {{-- ═══ Jobs ═══ --}}
+        <div id="ss-dash-pane-jobs" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div id="ss-dash-jobs-stats-area"></div>
+            <div class="ss-dash-search-bar">
+              <div class="ss-dash-btn-group">
+                <button type="button" class="ss-dash-btn ss-dash-active" data-ss-job-status="">All</button>
+                <button type="button" class="ss-dash-btn" data-ss-job-status="active">Active</button>
+                <button type="button" class="ss-dash-btn" data-ss-job-status="waiting">Waiting</button>
+                <button type="button" class="ss-dash-btn" data-ss-job-status="completed">Completed</button>
+                <button type="button" class="ss-dash-btn" data-ss-job-status="failed">Failed</button>
+              </div>
+            </div>
+            <div class="ss-dash-table-wrap" id="ss-dash-jobs-body">
+              <div class="ss-dash-empty">Loading jobs...</div>
+            </div>
+            <div class="ss-dash-pagination" id="ss-dash-pagination-jobs"></div>
+          </div>
+        </div>
+
+        {{-- ═══ Config ═══ --}}
+        <div id="ss-dash-pane-config" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div class="ss-dash-search-bar">
+              <div class="ss-dash-btn-group">
+                <button class="ss-dash-btn ss-dash-active" data-config-tab="config">App Config</button>
+                <button class="ss-dash-btn" data-config-tab="env">Env Vars</button>
+              </div>
+              <input type="text" class="ss-dash-search" id="ss-dash-config-search" placeholder="Search keys and values..." />
+              <button type="button" class="ss-dash-btn" id="ss-dash-config-expand-all">Expand All</button>
+              <button type="button" class="ss-dash-btn" id="ss-dash-config-collapse-all">Collapse All</button>
+              <button type="button" class="ss-dash-btn" id="ss-dash-config-copy">Copy JSON</button>
+            </div>
+            <div id="ss-dash-config-body">
+              <div class="ss-dash-empty">Loading config...</div>
+            </div>
+          </div>
+        </div>
+
+        {{-- ═══ Internals ═══ --}}
+        <div id="ss-dash-pane-internals" class="ss-dash-pane">
+          <div class="ss-dash-pane-inner">
+            <div id="ss-dash-internals-body">
+              <div class="ss-dash-empty">Loading internals...</div>
+            </div>
+          </div>
+        </div>
+
+        {{-- ═══ Custom Panes ═══ --}}
+        @each(pane in customPanes)
+          <div id="ss-dash-pane-{{ pane.id }}" class="ss-dash-pane">
+            <div class="ss-dash-pane-inner">
+              @if(pane.search || pane.clearable)
+                <div class="ss-dash-search-bar">
+                  @if(pane.search)
+                    <input type="text" class="ss-dash-search" id="ss-dash-search-{{ pane.id }}" placeholder="{{ pane.search.placeholder || 'Filter...' }}" />
+                  @end
+                  <span id="ss-dash-{{ pane.id }}-summary" class="ss-dash-summary"></span>
+                  @if(pane.clearable)
+                    <button type="button" class="ss-dash-btn" id="ss-dash-{{ pane.id }}-clear">Clear</button>
+                  @end
+                </div>
+              @end
+              <div class="ss-dash-table-wrap" id="ss-dash-{{ pane.id }}-body">
+                <div class="ss-dash-empty">Loading {{ pane.label }}...</div>
+              </div>
+            </div>
+          </div>
+        @end
+
+      </div>
+    </div>
+  </div>
+
+  {{-- ── Config JSON ────────────────────────────────────────────── --}}
+  <script type="application/json" id="ss-dash-config">{{{ JSON.stringify(dashConfig) }}}</script>
+
+  {{-- ── Transmit client (enables real-time updates if installed) ── --}}
+  @if(transmitClient)
+    <script>
+      try {
+        {{{ transmitClient }}}
+        console.log('[server-stats] Transmit client initialized, window.Transmit =', typeof window.Transmit);
+      } catch(e) {
+        console.warn('[server-stats] Transmit client failed to load:', e.message || e);
+      }
+    </script>
+  @end
+
+  {{-- ── Dashboard JS ───────────────────────────────────────────── --}}
+  <script>{{{ js }}}</script>
+</body>
+</html>

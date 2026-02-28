@@ -24,7 +24,8 @@ const emails = computed<EmailRecord[]>(() => {
     (e: EmailRecord) =>
       e.subject.toLowerCase().includes(term) ||
       e.from.toLowerCase().includes(term) ||
-      e.to.toLowerCase().includes(term)
+      e.to.toLowerCase().includes(term) ||
+      (e.mailer && e.mailer.toLowerCase().includes(term))
   )
 })
 
@@ -122,8 +123,8 @@ onBeforeUnmount(() => {
         </thead>
         <tbody>
           <tr v-for="e in emails" :key="e.id" class="ss-dbg-email-row" @click="openPreview(e)">
-            <td style="color: var(--ss-dim)">{{ e.id }}</td>
-            <td style="color: var(--ss-text)">
+            <td class="ss-dbg-c-dim">{{ e.id }}</td>
+            <td class="ss-dbg-c-text">
               {{ e.subject }}
               <a
                 v-if="dashboardPath"
@@ -144,14 +145,14 @@ onBeforeUnmount(() => {
                 </svg>
               </a>
             </td>
-            <td style="color: var(--ss-text-secondary)">{{ e.to }}</td>
-            <td style="color: var(--ss-muted)">{{ e.mailer }}</td>
+            <td class="ss-dbg-c-secondary">{{ e.to }}</td>
+            <td class="ss-dbg-c-muted">{{ e.mailer }}</td>
             <td>
               <span :class="['ss-dbg-email-status', statusClass(e.status)]">
                 {{ e.status }}
               </span>
             </td>
-            <td style="color: var(--ss-dim); text-align: center">
+            <td class="ss-dbg-c-dim" style="text-align: center">
               {{ e.attachmentCount || 0 }}
             </td>
             <td class="ss-dbg-event-time">{{ timeAgo(e.timestamp) }}</td>

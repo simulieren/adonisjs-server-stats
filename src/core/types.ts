@@ -63,6 +63,8 @@ export interface DashboardPageProps {
   dashboardEndpoint?: string
   /** Optional auth token for Bearer auth. */
   authToken?: string
+  /** Transmit channel name for live updates. Defaults to `'server-stats/dashboard'`. */
+  channelName?: string
   /** CSS class overrides for the root element. */
   className?: string
 }
@@ -83,6 +85,8 @@ export interface DebugPanelConfig extends DebugPanelProps {
   dashboardPath?: string
   /** Whether tracing is enabled. */
   tracingEnabled?: boolean
+  /** Whether the stats bar is connected via Transmit (SSE) for live updates. */
+  isLive?: boolean
 }
 
 /**
@@ -301,6 +305,8 @@ export interface DashboardHookOptions extends DashboardPageProps {
   sortDir?: 'asc' | 'desc'
   filters?: Record<string, string>
   timeRange?: TimeRange
+  /** Incrementing key to trigger a refetch (used by live mode). */
+  refreshKey?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -349,7 +355,7 @@ export type DashboardSection =
 /**
  * Pre-defined time range options for dashboard queries.
  */
-export type TimeRange = '1h' | '6h' | '24h' | '7d'
+export type TimeRange = '5m' | '15m' | '30m' | '1h' | '6h' | '24h' | '7d'
 
 // ---------------------------------------------------------------------------
 // Paginated response envelope
@@ -437,9 +443,23 @@ export interface OverviewMetrics {
   p95ResponseTime: number
   requestsPerMinute: number
   errorRate: number
-  slowestEndpoints: { url: string; avgDuration: number; count: number }[]
+  totalRequests: number
+  slowestEndpoints: { url?: string; pattern?: string; avgDuration: number; count: number }[]
   queryStats: { total: number; avgDuration: number; perRequest: number }
-  recentErrors: { level: string; message: string }[]
+  recentErrors: { id?: number; level: string; message: string; timestamp?: number | string }[]
+  topEvents: { eventName?: string; name?: string; event_name?: string; event?: string; count: number }[]
+  emailActivity: { sent: number; queued: number; failed: number }
+  logLevelBreakdown: { error: number; warn: number; info: number; debug: number }
+  cacheStats: { available: boolean; totalKeys: number; hitRate: number; memoryUsedHuman: string } | null
+  jobQueueStatus: { available: boolean; active: number; waiting: number; failed: number; completed: number } | null
+  statusDistribution: { '2xx': number; '3xx': number; '4xx': number; '5xx': number }
+  slowestQueries: { sqlNormalized?: string; normalizedSql?: string; sql_normalized?: string; sql?: string; avgDuration: number; count: number }[]
+  sparklines?: {
+    avgResponseTime?: number[]
+    p95ResponseTime?: number[]
+    requestsPerMinute?: number[]
+    errorRate?: number[]
+  }
 }
 
 /**

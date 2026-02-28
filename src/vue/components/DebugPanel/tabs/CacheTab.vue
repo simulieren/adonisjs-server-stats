@@ -114,7 +114,7 @@ onBeforeUnmount(() => {
       <button class="ss-dbg-close" @click="selectedKey = null">&larr; Back</button>
       <div style="margin-top: 8px">
         <strong>{{ selectedKey.key }}</strong>
-        <span style="color: var(--ss-muted); margin-left: 8px">
+        <span class="ss-dbg-c-muted" style="margin-left: 8px">
           {{ selectedKey.type }} &middot; TTL: {{ formatTtl(selectedKey.ttl) }}
         </span>
       </div>
@@ -138,10 +138,10 @@ onBeforeUnmount(() => {
         </thead>
         <tbody>
           <tr v-for="k in keys" :key="k.key" style="cursor: pointer" @click="selectedKey = k">
-            <td style="color: var(--ss-sql-color)">{{ k.key }}</td>
-            <td style="color: var(--ss-muted)">{{ k.type }}</td>
-            <td style="color: var(--ss-dim)">{{ formatTtl(k.ttl) }}</td>
-            <td style="color: var(--ss-dim)">{{ formatSize(k.size) }}</td>
+            <td class="ss-dbg-c-sql">{{ k.key }}</td>
+            <td class="ss-dbg-c-muted">{{ k.type }}</td>
+            <td class="ss-dbg-c-dim">{{ formatTtl(k.ttl) }}</td>
+            <td class="ss-dbg-c-dim">{{ formatSize(k.size) }}</td>
           </tr>
         </tbody>
       </table>

@@ -2,59 +2,21 @@
 {{{ css }}}
 </style>
 
-<div id="ss-bar" class="ss-bar" data-endpoint="{{ endpoint }}" data-interval="{{ intervalMs }}">
-  <div class="ss-bar-left">
-    @if(showDebug)
-      <button type="button" id="ss-dbg-wrench" class="ss-dbg-btn" title="Open debug panel">🔍 Open debug panel</button>
-    @end
-    <div id="ss-dot" class="ss-dot"></div>
-  </div>
-  <div id="ss-bar-scroll" class="ss-bar-scroll">
-    @each((group, gi) in groups)
-      <div class="ss-group">
-        @each(badge in group)
-          <div id="ss-b-{{ badge.id }}" class="ss-badge{{ badge.href ? ' ss-badge-link' : '' }}">
-            <span class="ss-label">{{ badge.label }}</span>
-            <span class="ss-value ss-green">...</span>
-          </div>
-        @end
-      </div>
-      @if(gi < groups.length - 1)
-        <div class="ss-group-sep"></div>
-      @end
-    @end
-  </div>
-</div>
-
-<button type="button" id="ss-toggle" class="ss-toggle ss-visible">
-  <span id="ss-toggle-summary" class="ss-toggle-summary" style="display:none">
-    @if(hasProcess)
-      <span data-ts="cpu" class="ss-value ss-green">...</span>
-      <span data-ts="mem" class="ss-value ss-green">...</span>
-    @end
-    @if(hasRedis)
-      <span data-ts="redis" class="ss-value ss-green">...</span>
-    @end
-  </span>
-  <span class="ss-toggle-label" style="color:#737373">hide stats</span>
-  <span class="ss-toggle-arrow">▼</span>
-</button>
-
-<script type="module">
-{{{ js }}}
-</script>
+<div id="ss-bar"></div>
+<script type="application/json" id="ss-bar-config">{{{ JSON.stringify(barConfig) }}}</script>
 
 @if(showDebug)
   <style>{{{ debugCss }}}</style>
-  @include('ss::debug-panel')
-  @if(transmitClient)
-    <script>
-      try {
-        if (typeof window.Transmit === 'undefined') {
-          {{{ transmitClient }}}
-        }
-      } catch(e) { /* Transmit client failed to load */ }
-    </script>
-  @end
-  <script type="module">{{{ debugJs }}}</script>
 @end
+
+@if(transmitClient)
+  <script>
+    try {
+      if (typeof window.Transmit === 'undefined') {
+        {{{ transmitClient }}}
+      }
+    } catch(e) { /* Transmit client failed to load */ }
+  </script>
+@end
+
+<script>{{{ js }}}</script>

@@ -96,7 +96,7 @@ onBeforeUnmount(() => {
       </thead>
       <tbody>
         <tr v-for="q in queries" :key="q.id">
-          <td style="color: var(--ss-dim)">{{ q.id }}</td>
+          <td class="ss-dbg-c-dim">{{ q.id }}</td>
           <td>
             <span
               :class="['ss-dbg-sql', { 'ss-dbg-expanded': isExpanded(q.id) }]"
@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
               {{ q.method }}
             </span>
           </td>
-          <td style="color: var(--ss-text-secondary)">{{ q.model || '-' }}</td>
+          <td class="ss-dbg-c-muted">{{ q.model || '-' }}</td>
           <td>
             <span :class="['ss-dbg-duration', durationClass(q.duration)]">
               {{ formatDuration(q.duration) }}

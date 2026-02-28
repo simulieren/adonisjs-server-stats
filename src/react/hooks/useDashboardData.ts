@@ -12,6 +12,9 @@ import type { DashboardSection, DashboardHookOptions, PaginatedResponse } from '
  *
  * Supports pagination, search, sort, filters, and time range.
  * Auto-refreshes periodically while active.
+ *
+ * Distinguishes between "initial load" (first mount, section change) and
+ * "silent refresh" (auto-poll, refreshKey change) to avoid UI flickering.
  */
 export function useDashboardData<T = unknown>(
   section: DashboardSection,
@@ -28,6 +31,7 @@ export function useDashboardData<T = unknown>(
     sortDir,
     filters,
     timeRange,
+    refreshKey,
   } = options
 
   const [data, setData] = useState<T | null>(null)
@@ -38,6 +42,11 @@ export function useDashboardData<T = unknown>(
   const clientRef = useRef<ApiClient | null>(null)
   const apiRef = useRef<DashboardApi | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  /** Track previous section to detect section changes vs refreshes */
+  const prevSectionRef = useRef<DashboardSection>(section)
+  /** Track whether we have successfully fetched data at least once */
+  const hasFetchedRef = useRef(false)
 
   const getClient = useCallback(() => {
     if (!clientRef.current) {
@@ -53,55 +62,86 @@ export function useDashboardData<T = unknown>(
     return apiRef.current
   }, [getClient, dashboardEndpoint])
 
-  const fetchData = useCallback(async () => {
-    try {
-      const api = getApi()
-      const params = buildQueryParams({
-        page,
-        perPage,
-        search,
-        sort,
-        sortDir,
-        filters,
-        timeRange,
-      })
+  /**
+   * Core fetch logic. When `silent` is true, errors are swallowed
+   * (keeping stale data visible) and loading state is not modified.
+   */
+  const doFetch = useCallback(
+    async (silent: boolean) => {
+      try {
+        const api = getApi()
+        const sortParam = sort
+          ? sort.replace(/[A-Z]/g, (c: string) => '_' + c.toLowerCase())
+          : sort
+        const params = buildQueryParams({
+          page,
+          perPage,
+          search,
+          sort: sortParam,
+          sortDir,
+          filters,
+          timeRange,
+        })
 
-      const result = await api.fetchSection(section, params || undefined)
+        const result = await api.fetchSection(section, params || undefined)
 
-      // Handle both paginated and non-paginated responses
-      if (result && result.data !== undefined && result.meta !== undefined) {
-        setData(result.data as T)
-        setMeta(result.meta)
-      } else {
-        setData(result as T)
-        setMeta(null)
-      }
-      setError(null)
-      setIsLoading(false)
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        setError(err)
-        setIsLoading(false)
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
+        // Handle both paginated and non-paginated responses
+        if (result && result.data !== undefined && result.meta !== undefined) {
+          setData(result.data as T)
+          setMeta(result.meta)
+        } else {
+          setData(result as T)
+          setMeta(null)
         }
-        return
+        setError(null)
+        setIsLoading(false)
+        hasFetchedRef.current = true
+      } catch (err) {
+        if (err instanceof UnauthorizedError) {
+          setError(err)
+          setIsLoading(false)
+          if (timerRef.current) {
+            clearInterval(timerRef.current)
+            timerRef.current = null
+          }
+          return
+        }
+
+        // On silent refresh failures, keep showing stale data
+        if (!silent) {
+          setError(err instanceof Error ? err : new Error(String(err)))
+          setIsLoading(false)
+        }
       }
-      setError(err instanceof Error ? err : new Error(String(err)))
-      setIsLoading(false)
-    }
-  }, [section, getApi, page, perPage, search, sort, sortDir, filters, timeRange])
+    },
+    [section, getApi, page, perPage, search, sort, sortDir, filters, timeRange]
+  )
 
   useEffect(() => {
-    setIsLoading(true)
-    setError(null)
+    const sectionChanged = prevSectionRef.current !== section
+    prevSectionRef.current = section
 
-    fetchData()
+    // Determine if this is an initial load or a section change.
+    // In those cases, show loading state and clear stale data.
+    // Otherwise (auto-refresh interval restart, refreshKey change),
+    // fetch silently without flashing loading UI.
+    const isInitialOrSectionChange = sectionChanged || !hasFetchedRef.current
+
+    if (isInitialOrSectionChange) {
+      setIsLoading(true)
+      setError(null)
+      setData(null)
+      setMeta(null)
+      hasFetchedRef.current = false
+      doFetch(false)
+    } else {
+      // Silent refresh: don't clear data or show loading
+      doFetch(true)
+    }
 
     // Auto-refresh: overview every 5s, other sections every 10s
     const interval = section === 'overview' ? OVERVIEW_REFRESH_MS : SECTION_REFRESH_MS
-    timerRef.current = setInterval(fetchData, interval)
+    timerRef.current = setInterval(() => doFetch(true), interval)
 
     return () => {
       if (timerRef.current) {
@@ -109,11 +149,12 @@ export function useDashboardData<T = unknown>(
         timerRef.current = null
       }
     }
-  }, [section, fetchData])
+    // refreshKey triggers a refetch when live data arrives
+  }, [section, doFetch, refreshKey])
 
   const refresh = useCallback(() => {
-    fetchData()
-  }, [fetchData])
+    doFetch(true)
+  }, [doFetch])
 
   /** Execute a mutation (POST/DELETE) against the dashboard API. */
   const mutate = useCallback(
@@ -123,14 +164,14 @@ export function useDashboardData<T = unknown>(
       try {
         const result = method === 'post' ? await client.post(url, body) : await client.delete(url)
         // Refresh after mutation
-        await fetchData()
+        await doFetch(true)
         return result
       } catch (err) {
         throw err instanceof Error ? err : new Error(String(err))
       }
     },
-    [dashboardEndpoint, getClient, fetchData]
+    [dashboardEndpoint, getClient, doFetch]
   )
 
-  return { data, meta, isLoading, error, refresh, mutate } as const
+  return { data, meta, isLoading, error, refresh, mutate, getApi } as const
 }

@@ -11,6 +11,7 @@ export const DEBUG_TAB_PATHS: Record<string, string> = {
   timeline: '/traces',
   cache: '/cache',
   jobs: '/jobs',
+  config: '/config',
   internals: '/diagnostics',
 }
 

@@ -149,6 +149,9 @@
 .ss-badge-link {
   cursor: pointer;
 }
+.ss-badge-link:hover {
+  opacity: 0.85;
+}
 .ss-badge:hover {
   background: var(--ss-hover);
 }
@@ -223,6 +226,16 @@
 }
 .ss-toggle.ss-collapsed {
   bottom: 12px;
+}
+
+.ss-toggle-arrow {
+  font-size: 8px;
+  line-height: 1;
+}
+.ss-toggle-label {
+  font-size: 10px;
+  color: #737373;
+  margin-left: 4px;
 }
 
 .ss-toggle-summary {

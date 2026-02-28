@@ -79,123 +79,38 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
     const intervalMs = config.intervalMs || 3000
     const showDebug = !!config.devToolbar?.enabled
 
-    // Determine which collectors are configured
-    const collectorNames = new Set((config.collectors ?? []).map((c) => c.name))
-    const hasProcess = collectorNames.has('process')
-    const hasSystem = collectorNames.has('system')
-    const hasHttp = collectorNames.has('http')
-    const hasDb = collectorNames.has('db_pool')
-    const hasRedis = collectorNames.has('redis')
-    const hasQueue = collectorNames.has('queue')
-    const hasApp = collectorNames.has('app')
-    const hasLog = collectorNames.has('log')
+    const channelName = config.channelName || 'admin/server-stats'
 
-    // Badge groups for the Edge template — only include configured collectors
-    // Memory badges come from two collectors: process (HEAP, RSS) and system (SYS)
-    const memoryBadges: { id: string; label: string }[] = []
-    if (hasProcess) {
-      memoryBadges.push({ id: 'mem', label: 'HEAP' }, { id: 'rss', label: 'RSS' })
-    }
-    if (hasSystem) {
-      memoryBadges.push({ id: 'sys', label: 'SYS' })
+    const barConfig: Record<string, unknown> = {
+      endpoint,
+      pollInterval: intervalMs,
+      channelName,
+      showDebug,
+      ...(showDebug && {
+        debugEndpoint: config.devToolbar?.debugEndpoint || '/admin/api/debug',
+        dashboardPath: config.devToolbar?.dashboard
+          ? config.devToolbar.dashboardPath || '/__stats'
+          : null,
+      }),
     }
 
-    const groups = [
-      // Process (only if process collector is configured)
-      ...(hasProcess
-        ? [
-            [
-              { id: 'node', label: 'NODE' },
-              { id: 'up', label: 'UP' },
-              { id: 'cpu', label: 'CPU' },
-              { id: 'evt', label: 'EVT' },
-            ],
-          ]
-        : []),
-      // Memory (HEAP/RSS from process, SYS from system)
-      ...(memoryBadges.length > 0 ? [memoryBadges] : []),
-      // HTTP (only if http collector is configured)
-      ...(hasHttp
-        ? [
-            [
-              { id: 'rps', label: 'REQ/s' },
-              { id: 'avg', label: 'AVG' },
-              { id: 'err', label: 'ERR' },
-              { id: 'conn', label: 'CONN' },
-            ],
-          ]
-        : []),
-      // DB (only if db_pool collector is configured)
-      ...(hasDb ? [[{ id: 'db', label: 'DB' }]] : []),
-      // Redis (only if redis collector is configured)
-      ...(hasRedis
-        ? [
-            [
-              { id: 'redis', label: 'REDIS' },
-              { id: 'rmem', label: 'MEM' },
-              { id: 'rkeys', label: 'KEYS' },
-              { id: 'rhit', label: 'HIT' },
-            ],
-          ]
-        : []),
-      // Queue (only if queue collector is configured)
-      ...(hasQueue
-        ? [
-            [
-              { id: 'q', label: 'Q' },
-              { id: 'workers', label: 'WORKERS' },
-            ],
-          ]
-        : []),
-      // App (only if app collector is configured)
-      ...(hasApp
-        ? [
-            [
-              { id: 'users', label: 'USERS' },
-              { id: 'hooks', label: 'HOOKS' },
-              { id: 'mail', label: 'MAIL' },
-            ],
-          ]
-        : []),
-      // Logs (only if log collector is configured)
-      ...(hasLog
-        ? [
-            [
-              { id: 'logerr', label: 'LOG ERR' },
-              { id: 'lograte', label: 'LOG/m' },
-            ],
-          ]
-        : []),
-      // Debug (conditional)
-      ...(showDebug ? [[{ id: 'dbg-queries', label: 'QRY' }]] : []),
-    ]
+    // Always try to load the Transmit client — both the stats bar and the
+    // debug panel use it for live (SSE) updates.
+    const transmitClient = loadTransmitClient(join(process.cwd(), 'package.json'))
+    if (!transmitClient) {
+      log.info('@adonisjs/transmit-client not found — will use polling')
+    }
 
     const state: Record<string, unknown> = {
       css,
       js,
-      endpoint,
-      intervalMs,
+      barConfig,
       showDebug,
-      hasProcess,
-      hasRedis,
-      groups,
+      transmitClient,
     }
 
     if (showDebug) {
-      const debugEndpoint = config.devToolbar?.debugEndpoint || '/admin/api/debug'
       state.debugCss = read('../styles/debug-panel.css')
-      state.debugJs = read('client/debug-panel.js')
-      state.debugEndpoint = debugEndpoint
-      state.logsEndpoint = debugEndpoint + '/logs'
-      state.customPanes = config.devToolbar?.panes || []
-      state.showTracing = !!config.devToolbar?.tracing
-      state.dashboardPath = config.devToolbar?.dashboard
-        ? config.devToolbar.dashboardPath || '/__stats'
-        : null
-      state.transmitClient = loadTransmitClient(join(process.cwd(), 'package.json'))
-      if (!state.transmitClient) {
-        log.info('@adonisjs/transmit-client not found — debug panel will use polling')
-      }
     }
 
     // Pre-render via Template directly — bypasses edge.createRenderer() which

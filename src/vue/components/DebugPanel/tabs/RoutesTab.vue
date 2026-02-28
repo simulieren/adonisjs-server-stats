@@ -88,10 +88,10 @@ onBeforeUnmount(() => {
               {{ r.method }}
             </span>
           </td>
-          <td style="color: var(--ss-text)">{{ r.pattern }}</td>
-          <td style="color: var(--ss-muted)">{{ r.name || '-' }}</td>
-          <td style="color: var(--ss-text-secondary)">{{ r.handler }}</td>
-          <td style="color: var(--ss-dim); font-size: 10px">
+          <td class="ss-dbg-c-text">{{ r.pattern }}</td>
+          <td class="ss-dbg-c-muted">{{ r.name || '-' }}</td>
+          <td class="ss-dbg-c-sql">{{ r.handler }}</td>
+          <td class="ss-dbg-c-dim" style="font-size: 10px">
             {{ r.middleware.length > 0 ? r.middleware.join(', ') : '-' }}
           </td>
         </tr>

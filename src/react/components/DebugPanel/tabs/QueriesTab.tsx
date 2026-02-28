@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 
-import { formatTime, formatDuration } from '../../../../core/formatters.js'
+import { formatTime, formatDuration, timeAgo } from '../../../../core/formatters.js'
 import { initResizableColumns } from '../../../../core/resizable-columns.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
@@ -27,7 +27,7 @@ export function QueriesTab({ options }: QueriesTabProps) {
     )
   }, [data, search])
 
-  // Detect duplicates (same SQL appearing 3+ times)
+  // Detect duplicates (same SQL appearing more than once)
   const dupCounts = useMemo(() => {
     const counts: Record<string, number> = {}
     for (const q of data?.queries || []) {
@@ -35,6 +35,14 @@ export function QueriesTab({ options }: QueriesTabProps) {
     }
     return counts
   }, [data])
+
+  const summaryStats = useMemo(() => {
+    const all = data?.queries || []
+    const slowCount = all.filter((q) => q.duration > 100).length
+    const dupCount = Object.values(dupCounts).filter((c) => c > 1).length
+    const avgDuration = all.length > 0 ? all.reduce((sum, q) => sum + q.duration, 0) / all.length : 0
+    return { slowCount, dupCount, avgDuration }
+  }, [data, dupCounts])
 
   const toggleExpand = useCallback((id: number) => {
     setExpandedId((prev) => (prev === id ? null : id))
@@ -65,13 +73,26 @@ export function QueriesTab({ options }: QueriesTabProps) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
-        <span className="ss-dbg-summary">{queries.length} queries</span>
+        <span className="ss-dbg-summary">
+          {queries.length} queries
+          {summaryStats.slowCount > 0 && ` | ${summaryStats.slowCount} slow`}
+          {summaryStats.dupCount > 0 && ` | ${summaryStats.dupCount} dup`}
+          {queries.length > 0 && ` | avg ${formatDuration(summaryStats.avgDuration)}`}
+        </span>
       </div>
 
       {queries.length === 0 ? (
         <div className="ss-dbg-empty">No queries captured</div>
       ) : (
         <table ref={tableRef} className="ss-dbg-table">
+          <colgroup>
+            <col style={{ width: '50px' }} />
+            <col />
+            <col style={{ width: '80px' }} />
+            <col style={{ width: '70px' }} />
+            <col style={{ width: '100px' }} />
+            <col style={{ width: '80px' }} />
+          </colgroup>
           <thead>
             <tr>
               <th>#</th>
@@ -85,7 +106,7 @@ export function QueriesTab({ options }: QueriesTabProps) {
           <tbody>
             {queries.map((q) => (
               <tr key={q.id}>
-                <td>{q.id}</td>
+                <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>{q.id}</td>
                 <td>
                   <span
                     className={`ss-dbg-sql ${expandedId === q.id ? 'ss-dbg-expanded' : ''}`}
@@ -96,26 +117,24 @@ export function QueriesTab({ options }: QueriesTabProps) {
                   >
                     {q.sql}
                   </span>
-                  {dupCounts[q.sql] >= 3 && (
+                  {dupCounts[q.sql] > 1 && (
                     <span className="ss-dbg-dup"> x{dupCounts[q.sql]}</span>
                   )}
                   {q.inTransaction && <span className="ss-dbg-dup"> TXN</span>}
                 </td>
-                <td>
-                  <span
-                    className={`ss-dbg-duration ${q.duration > 500 ? 'ss-dbg-very-slow' : q.duration > 100 ? 'ss-dbg-slow' : ''}`}
-                  >
-                    {formatDuration(q.duration)}
-                  </span>
+                <td
+                  className={`ss-dbg-duration ${q.duration > 500 ? 'ss-dbg-very-slow' : q.duration > 100 ? 'ss-dbg-slow' : ''}`}
+                >
+                  {formatDuration(q.duration)}
                 </td>
                 <td>
                   <span className={`ss-dbg-method ss-dbg-method-${q.method.toLowerCase()}`}>
                     {q.method}
                   </span>
                 </td>
-                <td style={{ color: 'var(--ss-text-secondary)' }}>{q.model || '-'}</td>
-                <td style={{ color: 'var(--ss-dim)', fontSize: '10px' }}>
-                  {formatTime(q.timestamp)}
+                <td className="ss-dbg-c-muted">{q.model || '-'}</td>
+                <td className="ss-dbg-event-time" title={formatTime(q.timestamp)}>
+                  {timeAgo(q.timestamp)}
                 </td>
               </tr>
             ))}

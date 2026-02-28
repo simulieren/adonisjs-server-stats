@@ -51,6 +51,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   color: var(--ss-text);
   box-shadow: 0 -8px 24px var(--ss-shadow);
+  overflow-x: hidden;
 }
 
 /* ── Theme: Light (auto via system preference) ────────────────── */
@@ -234,13 +235,15 @@
 /* Tab content */
 .ss-dbg-content {
   flex: 1;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 0;
 }
 .ss-dbg-pane {
   display: none;
   height: 100%;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -304,6 +307,7 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 11px;
+  table-layout: fixed;
 }
 .ss-dbg-table th {
   position: sticky;
@@ -420,24 +424,47 @@
 /* Event list */
 .ss-dbg-event-name {
   color: var(--ss-sql-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ss-dbg-event-data {
   color: var(--ss-muted);
   font-size: 10px;
   position: relative;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ss-dbg-event-time {
   color: var(--ss-dim);
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .ss-dbg-data-preview {
   cursor: pointer;
   color: var(--ss-text-secondary);
   border-bottom: 1px dashed var(--ss-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 .ss-dbg-data-preview:hover {
   color: var(--ss-text);
+}
+/* Data cell wrapper used by JsonViewer */
+.ss-dbg-data-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* When expanded data is shown, allow the cell to wrap */
+.ss-dbg-event-data:has(.ss-dbg-data-full),
+.ss-dbg-data-cell:has(.ss-dbg-data-full) {
+  white-space: normal;
+  overflow: visible;
 }
 .ss-dbg-data-full {
   margin: 4px 0 0;
@@ -702,11 +729,20 @@
 .ss-dbg-tl-detail-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
+  gap: 6px;
+  padding: 5px 12px;
   border-bottom: 1px solid var(--ss-border-dim);
   background: var(--ss-surface-alt);
   flex-shrink: 0;
+  font-size: 11px;
+}
+.ss-dbg-tl-detail-url {
+  color: var(--ss-text);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 #ss-dbg-tl-waterfall {
   padding: 8px 12px;
@@ -785,8 +821,8 @@
 
 .ss-dbg-tl-legend {
   display: flex;
-  gap: 12px;
-  padding: 6px 12px;
+  gap: 10px;
+  padding: 4px 12px;
   border-bottom: 1px solid var(--ss-border-dim);
   background: var(--ss-surface-alt);
   font-size: 10px;
@@ -798,8 +834,8 @@
   gap: 4px;
 }
 .ss-dbg-tl-legend-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -1219,6 +1255,103 @@
   display: none;
 }
 
+.ss-dbg-config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ss-border-faint);
+}
+
+.ss-dbg-config-env-table {
+  table-layout: fixed;
+}
+
+.ss-dbg-config-inner-table {
+  font-size: 11px;
+  table-layout: fixed;
+}
+.ss-dbg-config-inner-table th {
+  background: var(--ss-surface-alt);
+}
+.ss-dbg-config-inner-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ss-dbg-config-inner-table td:hover {
+  white-space: normal;
+  word-break: break-all;
+}
+
+.ss-dbg-config-section-body {
+  padding: 0 0 4px 0;
+  background: var(--ss-surface-alt);
+}
+
+.ss-dbg-env-key {
+  width: 200px;
+  min-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ss-dbg-env-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 0;
+}
+
+.ss-dbg-copy-row-btn {
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--ss-dim);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+tr:hover .ss-dbg-copy-row-btn,
+.ss-dbg-config-section-header:hover .ss-dbg-copy-row-btn {
+  opacity: 1;
+}
+.ss-dbg-copy-row-btn:hover {
+  color: var(--ss-text);
+  border-color: var(--ss-border);
+}
+.ss-dbg-copy-row-btn.ss-dbg-copy-row-ok {
+  color: var(--ss-green-fg);
+  opacity: 1;
+}
+
+.ss-dbg-btn-group {
+  display: inline-flex;
+  gap: 0;
+}
+.ss-dbg-btn-group .ss-dbg-btn {
+  border-radius: 0;
+  margin-left: -1px;
+}
+.ss-dbg-btn-group .ss-dbg-btn:first-child {
+  border-radius: 4px 0 0 4px;
+  margin-left: 0;
+}
+.ss-dbg-btn-group .ss-dbg-btn:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.ss-dbg-config-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+  max-width: 280px;
+}
+
 /* Wrench button in stats bar */
 .ss-dbg-btn {
   display: flex;
@@ -1288,6 +1421,15 @@
 .ss-dbg-c-green {
   color: var(--ss-green-fg);
 }
+.ss-dbg-c-blue {
+  color: var(--ss-blue-fg);
+}
+.ss-dbg-c-purple {
+  color: var(--ss-purple-fg);
+}
+.ss-dbg-c-accent {
+  color: var(--ss-accent);
+}
 .ss-dbg-c-border {
   color: var(--ss-border);
 }
@@ -1299,12 +1441,12 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--ss-muted);
-  margin: 16px 0 4px;
-  padding: 0 0 4px;
+  margin: 20px 0 8px;
+  padding: 0 10px 6px;
   border-bottom: 1px solid var(--ss-border);
 }
 .ss-dbg-internals-title:first-child {
-  margin-top: 0;
+  margin-top: 4px;
 }
 
 /* ── Compact info cards ───────────────────────────────────────── */
@@ -1386,4 +1528,9 @@
 }
 .ss-dbg-bar-pct-warn {
   color: var(--ss-amber-fg);
+}
+
+/* ── Utility: dim text ───────────────────────────────────────── */
+.ss-dim {
+  color: var(--ss-dim);
 }

@@ -10,11 +10,16 @@ import { ApiClient, UnauthorizedError, getDebugTabPath } from '../../core/index.
 
 import type { DebugTab } from '../../core/index.js'
 
+/** Tabs that live on the dashboard API, not the debug endpoint. */
+const DASHBOARD_TABS = new Set(['cache', 'jobs', 'config'])
+
 export interface UseDebugDataOptions {
   /** Base URL for API requests. */
   baseUrl?: string
   /** Debug endpoint base path. */
   debugEndpoint?: string
+  /** Dashboard API base path (used for cache/jobs tabs). */
+  dashboardEndpoint?: string
   /** Auth token for API requests. */
   authToken?: string
   /** Auto-refresh interval in ms. */
@@ -25,6 +30,7 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
   const {
     baseUrl = '',
     debugEndpoint = '/admin/api/debug',
+    dashboardEndpoint,
     authToken,
     refreshInterval = 3000,
   } = options
@@ -43,10 +49,13 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
     if (!currentTab) return
 
     const path = getDebugTabPath(currentTab)
+    const endpoint = DASHBOARD_TABS.has(currentTab) && dashboardEndpoint
+      ? dashboardEndpoint
+      : debugEndpoint
 
     loading.value = true
     try {
-      const result = await client.fetch(`${debugEndpoint}${path}`)
+      const result = await client.fetch(`${endpoint}${path}`)
       data.value = result
       error.value = null
     } catch (err) {
