@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 
 import { getLogStreamService } from '../collectors/log_collector.js'
-import { registerDashboardRoutes } from '../dashboard/dashboard_routes.js'
 import { DashboardStore } from '../dashboard/dashboard_store.js'
+import { DataAccess } from '../data/data_access.js'
 import { DebugStore } from '../debug/debug_store.js'
 import { StatsEngine } from '../engine/stats_engine.js'
 import { LogStreamService } from '../log_stream/log_stream_service.js'
@@ -13,10 +13,10 @@ import {
   setExcludedPrefixes,
   setOnRequestComplete,
 } from '../middleware/request_tracking_middleware.js'
-import { registerDebugRoutes } from '../routes/debug_routes.js'
-import { registerStatsRoutes } from '../routes/stats_routes.js'
+import { registerAllRoutes } from '../routes/register_routes.js'
 import { log, dim, bold } from '../utils/logger.js'
 
+import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
@@ -44,6 +44,7 @@ export default class ServerStatsProvider {
   private flushTimer: ReturnType<typeof setInterval> | null = null
   private statsController: ServerStatsController | null = null
   private debugController: DebugController | null = null
+  private apiController: ApiController | null = null
 
   // Diagnostics tracking
   private pinoHookActive: boolean = false
@@ -74,30 +75,40 @@ export default class ServerStatsProvider {
 
     if (router && !this.app.inProduction) {
       const registeredPaths: string[] = []
-      // Cast once — the AdonisJS router satisfies all three route-file interfaces
-      const r = router as Parameters<typeof registerStatsRoutes>[0] &
-        Parameters<typeof registerDebugRoutes>[0] &
-        Parameters<typeof registerDashboardRoutes>[0]
-
-      // ── Auto-register stats bar endpoint ───────────────────────
-      if (typeof config.endpoint === 'string') {
-        registerStatsRoutes(r, config.endpoint, () => this.statsController, config.shouldShow)
-        registeredPaths.push(config.endpoint)
-      }
-
-      // ── Auto-register debug toolbar routes ─────────────────────
+      const r = router as import('../routes/router_types.js').AdonisRouter
       const toolbarConfig = config.devToolbar
-      if (toolbarConfig?.enabled) {
-        const debugEndpoint = toolbarConfig.debugEndpoint ?? '/admin/api/debug'
-        registerDebugRoutes(r, debugEndpoint, () => this.debugController, config.shouldShow)
-        registeredPaths.push(debugEndpoint + '/*')
 
-        // ── Auto-register dashboard routes ─────────────────────────
-        if (toolbarConfig.dashboard) {
-          const dashPath = toolbarConfig.dashboardPath ?? '/__stats'
-          registerDashboardRoutes(r, dashPath, () => this.dashboardController, config.shouldShow)
-          registeredPaths.push(dashPath + '/*')
-        }
+      // Derive endpoint paths for route registration
+      const statsEndpoint = typeof config.endpoint === 'string' ? config.endpoint : false
+      const debugEndpoint =
+        toolbarConfig?.enabled ? (toolbarConfig.debugEndpoint ?? '/admin/api/debug') : undefined
+      const dashboardPath =
+        toolbarConfig?.enabled && toolbarConfig.dashboard
+          ? (toolbarConfig.dashboardPath ?? '/__stats')
+          : undefined
+
+      // ── Register all routes via the unified registrar ──────────
+      registerAllRoutes({
+        router: r,
+        getApiController: () => this.apiController,
+        getStatsController: () => this.statsController,
+        getDebugController: () => this.debugController,
+        getDashboardController: () => this.dashboardController,
+        statsEndpoint,
+        debugEndpoint,
+        dashboardPath,
+        shouldShow: config.shouldShow,
+      })
+
+      // Track which paths were registered for logging
+      if (typeof statsEndpoint === 'string') {
+        registeredPaths.push(statsEndpoint)
+      }
+      if (debugEndpoint) {
+        registeredPaths.push(debugEndpoint + '/*')
+      }
+      if (dashboardPath) {
+        registeredPaths.push(dashboardPath + '/*')
       }
 
       // Log registered routes
@@ -318,6 +329,16 @@ export default class ServerStatsProvider {
       if (prefixes.length > 0) {
         setExcludedPrefixes(prefixes)
       }
+
+      // Create the unified ApiController now that both stores are available
+      if (this.debugStore) {
+        const logPath = this.app.makePath('logs', 'adonisjs.log')
+        const dataAccess = new DataAccess(this.debugStore, this.dashboardStore, logPath)
+        const { ApiController: ApiControllerClass } = await import(
+          '../controller/api_controller.js'
+        )
+        this.apiController = new ApiControllerClass(dataAccess)
+      }
     }
 
     let transmit: unknown = null
@@ -409,10 +430,9 @@ export default class ServerStatsProvider {
     await this.debugStore.start(emitter, router)
 
     // Create the debug controller (makes the debug routes functional)
-    const logPath = this.app.makePath('logs', 'adonisjs.log')
     const serverConfig = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     const DebugControllerClass = (await import('../controller/debug_controller.js')).default
-    this.debugController = new DebugControllerClass(this.debugStore, logPath, serverConfig, {
+    this.debugController = new DebugControllerClass(this.debugStore, serverConfig, {
       getEngine: () => this.engine,
       getDashboardStore: () => this.dashboardStore,
       getProviderDiagnostics: () => this.getDiagnostics(),
@@ -516,7 +536,6 @@ export default class ServerStatsProvider {
     const DashboardControllerClass = (await import('../dashboard/dashboard_controller.js')).default
     this.dashboardController = new DashboardControllerClass(
       this.dashboardStore,
-      this.debugStore!,
       this.app
     )
 

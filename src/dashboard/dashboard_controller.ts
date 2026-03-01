@@ -10,7 +10,6 @@ import { CacheInspector } from './integrations/cache_inspector.js'
 import { ConfigInspector } from './integrations/config_inspector.js'
 import { QueueInspector } from './integrations/queue_inspector.js'
 
-import type { DebugStore } from '../debug/debug_store.js'
 import type { DevToolbarOptions, ResolvedServerStatsConfig } from '../types.js'
 import type { DashboardStore } from './dashboard_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -65,8 +64,13 @@ interface ChartBucket {
 /**
  * Controller for the full-page dashboard.
  *
- * Serves the dashboard HTML page and all JSON API endpoints.
- * Delegates all data access to the DashboardStore.
+ * Serves the dashboard HTML page and dashboard-specific JSON API
+ * endpoints (overview, requests, grouped queries, query explain,
+ * cache, jobs, config, saved filters).
+ *
+ * Data resource endpoints (queries, events, emails, traces, routes,
+ * logs) are handled by the unified ApiController — see
+ * `src/controller/api_controller.ts`.
  */
 export default class DashboardController {
   private cacheInspector: CacheInspector | null = null
@@ -80,7 +84,6 @@ export default class DashboardController {
 
   constructor(
     private dashboardStore: DashboardStore,
-    private debugStore: DebugStore,
     private app: ApplicationService
   ) {
     this.configInspector = new ConfigInspector(app)
@@ -247,33 +250,6 @@ export default class DashboardController {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // Queries
-  // ---------------------------------------------------------------------------
-
-  async queries({ request, response }: HttpContext) {
-    const qs = request.qs()
-    const page = Math.max(1, Number(qs.page) || 1)
-    const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
-
-    return this.withDb(response, 'queries', emptyPage(page, perPage), async () => {
-      const result = await this.dashboardStore.getQueries(page, perPage, {
-        durationMin: qs.duration_min ? Number(qs.duration_min) : undefined,
-        model: qs.model || undefined,
-        method: qs.method || undefined,
-        connection: qs.connection || undefined,
-        search: qs.search || undefined,
-      })
-
-      return paginatedResponse(
-        result.data.map(formatQuery),
-        result.total,
-        result.page,
-        result.perPage
-      )
-    })
-  }
-
   async queriesGrouped({ request, response }: HttpContext) {
     return this.withDb(response, 'queriesGrouped', { groups: [] }, async () => {
       const qs = request.qs()
@@ -365,239 +341,6 @@ export default class DashboardController {
         error: 'EXPLAIN failed',
         message: (error as Error)?.message ?? 'Unknown error',
       })
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Events
-  // ---------------------------------------------------------------------------
-
-  async events({ request, response }: HttpContext) {
-    const qs = request.qs()
-    const page = Math.max(1, Number(qs.page) || 1)
-    const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
-
-    return this.withDb(response, 'events', emptyPage(page, perPage), async () => {
-      const result = await this.dashboardStore.getEvents(page, perPage, {
-        eventName: qs.event_name || undefined,
-        search: qs.search || undefined,
-      })
-
-      return paginatedResponse(
-        result.data.map((e: Record<string, unknown>) => ({
-          id: e.id,
-          requestId: e.request_id,
-          eventName: e.event_name,
-          data: safeParseJson(e.data),
-          createdAt: e.created_at,
-        })),
-        result.total,
-        result.page,
-        result.perPage
-      )
-    })
-  }
-
-  // ---------------------------------------------------------------------------
-  // Routes
-  // ---------------------------------------------------------------------------
-
-  async routes({ request, response }: HttpContext) {
-    const qs = request.qs()
-    const search = (qs.search || '').toLowerCase()
-    let routes = this.debugStore.routes.getRoutes()
-
-    if (search) {
-      routes = routes.filter((r) => {
-        const pattern = (r.pattern || '').toLowerCase()
-        const handler = (r.handler || '').toLowerCase()
-        const name = (r.name || '').toLowerCase()
-        const method = (r.method || '').toLowerCase()
-        return (
-          pattern.includes(search) ||
-          handler.includes(search) ||
-          name.includes(search) ||
-          method.includes(search)
-        )
-      })
-    }
-
-    const total = routes.length
-    return response.json({
-      data: routes,
-      meta: { total, page: 1, perPage: total || 1, lastPage: 1 },
-    })
-  }
-
-  // ---------------------------------------------------------------------------
-  // Logs
-  // ---------------------------------------------------------------------------
-
-  async logs({ request, response }: HttpContext) {
-    const qs = request.qs()
-    const page = Math.max(1, Number(qs.page) || 1)
-    const perPage = clamp(Number(qs.perPage) || 50, 1, 200)
-
-    // Build structured filters from query string
-    const structured: {
-      field: string
-      operator: 'equals' | 'contains' | 'startsWith'
-      value: string
-    }[] = []
-
-    const operatorMap: Record<string, 'equals' | 'contains' | 'startsWith'> = {
-      equals: 'equals',
-      contains: 'contains',
-      starts_with: 'startsWith',
-    }
-
-    // Support legacy single-filter format: field=, operator=, value=
-    if (qs.field && qs.value !== undefined) {
-      const op = qs.operator || 'equals'
-      structured.push({
-        field: qs.field,
-        operator: operatorMap[op] || 'equals',
-        value: qs.value,
-      })
-    }
-
-    // Support indexed filter format: filter_field_0, filter_op_0, filter_value_0, ...
-    for (let i = 0; i < 20; i++) {
-      const field = qs[`filter_field_${i}`]
-      const value = qs[`filter_value_${i}`]
-      if (field && value !== undefined) {
-        const op = qs[`filter_op_${i}`] || 'equals'
-        structured.push({
-          field,
-          operator: operatorMap[op] || 'equals',
-          value,
-        })
-      } else {
-        break
-      }
-    }
-
-    return this.withDb(response, 'logs', emptyPage(page, perPage), async () => {
-      const result = await this.dashboardStore.getLogs(page, perPage, {
-        level: qs.level || undefined,
-        search: qs.message || qs.search || undefined,
-        requestId: qs.request_id || qs.requestId || undefined,
-        structured: structured.length > 0 ? structured : undefined,
-      })
-
-      return paginatedResponse(
-        result.data.map((l: Record<string, unknown>) => ({
-          id: l.id,
-          level: l.level,
-          message: l.message,
-          requestId: l.request_id,
-          data: safeParseJson(l.data),
-          createdAt: l.created_at,
-        })),
-        result.total,
-        result.page,
-        result.perPage
-      )
-    })
-  }
-
-  // ---------------------------------------------------------------------------
-  // Emails
-  // ---------------------------------------------------------------------------
-
-  async emails({ request, response }: HttpContext) {
-    const qs = request.qs()
-    const page = Math.max(1, Number(qs.page) || 1)
-    const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
-
-    return this.withDb(response, 'emails', emptyPage(page, perPage), async () => {
-      const result = await this.dashboardStore.getEmails(
-        page,
-        perPage,
-        {
-          search: qs.search || undefined,
-          from: qs.from || undefined,
-          to: qs.to || undefined,
-          subject: qs.subject || undefined,
-          status: qs.status || undefined,
-          mailer: qs.mailer || undefined,
-        },
-        true
-      )
-
-      return paginatedResponse(
-        result.data.map(formatEmail),
-        result.total,
-        result.page,
-        result.perPage
-      )
-    })
-  }
-
-  async emailPreview({ params, response }: HttpContext) {
-    if (!this.dashboardStore.isReady()) {
-      return response.notFound({ error: 'Not found' })
-    }
-
-    try {
-      const html = await this.dashboardStore.getEmailHtml(Number(params.id))
-      if (!html) return response.notFound({ error: 'Email not found' })
-
-      return response.header('Content-Type', 'text/html; charset=utf-8').send(html)
-    } catch {
-      return response.notFound({ error: 'Not found' })
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Traces
-  // ---------------------------------------------------------------------------
-
-  async traces({ request, response }: HttpContext) {
-    const qs = request.qs()
-    const page = Math.max(1, Number(qs.page) || 1)
-    const perPage = clamp(Number(qs.perPage) || 25, 1, 100)
-
-    return this.withDb(response, 'traces', emptyPage(page, perPage), async () => {
-      const result = await this.dashboardStore.getTraces(page, perPage, {
-        method: qs.method ? qs.method.toUpperCase() : undefined,
-        url: qs.url || undefined,
-        search: qs.search || undefined,
-        statusMin: qs.status_min ? Number(qs.status_min) : undefined,
-        statusMax: qs.status_max ? Number(qs.status_max) : undefined,
-      })
-
-      return paginatedResponse(
-        result.data.map((t: Record<string, unknown>) => ({
-          id: t.id,
-          requestId: t.request_id,
-          method: t.method,
-          url: t.url,
-          statusCode: t.status_code,
-          totalDuration: t.total_duration,
-          spanCount: t.span_count,
-          warningCount: safeParseJsonArray(t.warnings).length,
-          createdAt: t.created_at,
-        })),
-        result.total,
-        result.page,
-        result.perPage
-      )
-    })
-  }
-
-  async traceDetail({ params, response }: HttpContext) {
-    if (!this.dashboardStore.isReady()) {
-      return response.notFound({ error: 'Not found' })
-    }
-
-    try {
-      const trace = await this.dashboardStore.getTraceDetail(Number(params.id))
-      if (!trace) return response.notFound({ error: 'Trace not found' })
-
-      return response.json(formatTrace(trace))
-    } catch {
-      return response.notFound({ error: 'Not found' })
     }
   }
 
@@ -1014,22 +757,6 @@ function formatTrace(t: Record<string, unknown>) {
     spans: safeParseJson(t.spans) ?? [],
     warnings: safeParseJsonArray(t.warnings),
     createdAt: t.created_at,
-  }
-}
-
-function formatEmail(e: Record<string, unknown>) {
-  return {
-    id: e.id,
-    from: e.from_addr,
-    to: e.to_addr,
-    cc: e.cc,
-    bcc: e.bcc,
-    subject: e.subject,
-    mailer: e.mailer,
-    status: e.status,
-    messageId: e.message_id,
-    attachmentCount: e.attachment_count,
-    createdAt: e.created_at,
   }
 }
 

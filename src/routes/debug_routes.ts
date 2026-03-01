@@ -2,12 +2,7 @@ import { createAccessMiddleware } from './access_middleware.js'
 
 import type DebugController from '../controller/debug_controller.js'
 import type { HttpContext } from '@adonisjs/core/http'
-
-/** Minimal interface for the AdonisJS router used in route registration. */
-interface AdonisRouter {
-  get(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): unknown }
-  group(callback: () => void): { prefix(path: string): { use(middleware: unknown[]): void } }
-}
+import type { AdonisRouter } from './router_types.js'
 
 /**
  * Register all debug toolbar API routes under the given base path.
@@ -43,16 +38,12 @@ export function registerDebugRoutes(
 
   router
     .group(() => {
+      // Non-data endpoints stay on DebugController
       router.get('/config', bind('config')).as('server-stats.debug.config')
-      router.get('/queries', bind('queries')).as('server-stats.debug.queries')
-      router.get('/events', bind('events')).as('server-stats.debug.events')
-      router.get('/routes', bind('routes')).as('server-stats.debug.routes')
-      router.get('/logs', bind('logs')).as('server-stats.debug.logs')
-      router.get('/emails', bind('emails')).as('server-stats.debug.emails')
-      router.get('/emails/:id/preview', bind('emailPreview')).as('server-stats.debug.emailPreview')
-      router.get('/traces', bind('traces')).as('server-stats.debug.traces')
-      router.get('/traces/:id', bind('traceDetail')).as('server-stats.debug.traceDetail')
       router.get('/diagnostics', bind('diagnostics')).as('server-stats.debug.diagnostics')
+
+      // Note: data resource endpoints (queries, events, emails, traces,
+      // routes, logs) are now handled by ApiController via register_routes.ts.
     })
     .prefix(base)
     .use(middleware)

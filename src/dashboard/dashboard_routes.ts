@@ -2,22 +2,7 @@ import { createAccessMiddleware } from '../routes/access_middleware.js'
 
 import type DashboardController from './dashboard_controller.js'
 import type { HttpContext } from '@adonisjs/core/http'
-
-/** Minimal interface for the AdonisJS router used in route registration. */
-interface AdonisRouter {
-  get(
-    pattern: string,
-    handler: (ctx: HttpContext) => unknown
-  ): { as(name: string): AdonisRoute; where(key: string, matcher: RegExp): AdonisRoute }
-  post(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute }
-  delete(pattern: string, handler: (ctx: HttpContext) => unknown): { as(name: string): AdonisRoute }
-  group(callback: () => void): { prefix(path: string): { use(middleware: unknown[]): void } }
-}
-
-interface AdonisRoute {
-  as(name: string): AdonisRoute
-  where(key: string, matcher: RegExp): AdonisRoute
-}
+import type { AdonisRouter } from '../routes/router_types.js'
 
 /**
  * Register all dashboard routes under the configured path.
@@ -68,29 +53,14 @@ export function registerDashboardRoutes(
       router.get('/api/requests', bind('requests')).as('server-stats.requests')
       router.get('/api/requests/:id', bind('requestDetail')).as('server-stats.requests.show')
 
-      // Queries
-      router.get('/api/queries', bind('queries')).as('server-stats.queries')
+      // Queries (grouped + explain stay on DashboardController)
       router.get('/api/queries/grouped', bind('queriesGrouped')).as('server-stats.queries.grouped')
       router
         .get('/api/queries/:id/explain', bind('queryExplain'))
         .as('server-stats.queries.explain')
 
-      // Events
-      router.get('/api/events', bind('events')).as('server-stats.events')
-
-      // Routes
-      router.get('/api/routes', bind('routes')).as('server-stats.routes')
-
-      // Logs
-      router.get('/api/logs', bind('logs')).as('server-stats.logs')
-
-      // Emails
-      router.get('/api/emails', bind('emails')).as('server-stats.emails')
-      router.get('/api/emails/:id/preview', bind('emailPreview')).as('server-stats.emails.preview')
-
-      // Traces
-      router.get('/api/traces', bind('traces')).as('server-stats.traces')
-      router.get('/api/traces/:id', bind('traceDetail')).as('server-stats.traces.show')
+      // Note: data resource endpoints (queries, events, emails, traces,
+      // routes, logs) are now handled by ApiController via register_routes.ts.
 
       // Cache
       router.get('/api/cache', bind('cacheStats')).as('server-stats.cache')
