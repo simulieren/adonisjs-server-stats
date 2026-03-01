@@ -448,18 +448,23 @@ export interface AdvancedConfig {
  * Top-level configuration for `adonisjs-server-stats`.
  *
  * Pass this to {@link defineConfig} in `config/server_stats.ts`.
+ * All fields are optional — `defineConfig({})` works out of the box.
  *
  * @example
  * ```ts
+ * // Minimal — zero config, auto-detects everything
  * import { defineConfig } from 'adonisjs-server-stats'
- * import { processCollector, httpCollector } from 'adonisjs-server-stats/collectors'
+ * export default defineConfig({})
+ * ```
  *
+ * @example
+ * ```ts
+ * // Common setup
+ * import { defineConfig } from 'adonisjs-server-stats'
  * export default defineConfig({
- *   intervalMs: 3000,
- *   transport: 'transmit',
- *   channelName: 'admin/server-stats',
- *   endpoint: '/admin/api/server-stats',
- *   collectors: [processCollector(), httpCollector()],
+ *   authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+ *   toolbar: true,
+ *   dashboard: true,
  * })
  * ```
  */
@@ -472,6 +477,7 @@ export interface ServerStatsConfig {
    * CPU and network overhead.
    *
    * @default 3000
+   * @deprecated Use {@link pollInterval} instead. Will be removed in the next major version.
    */
   intervalMs?: number
 
@@ -484,6 +490,7 @@ export interface ServerStatsConfig {
    *   HTTP endpoint.
    *
    * @default 'transmit'
+   * @deprecated Use {@link realtime} instead (`true` = transmit, `false` = none). Will be removed in the next major version.
    */
   transport?: 'transmit' | 'none'
 
@@ -494,6 +501,7 @@ export interface ServerStatsConfig {
    * Only relevant when `transport` is `'transmit'`.
    *
    * @default 'admin/server-stats'
+   * @deprecated Use `advanced.channelName` instead. Will be removed in the next major version.
    */
   channelName?: string
 
@@ -504,6 +512,7 @@ export interface ServerStatsConfig {
    * (e.g. if you provide your own controller).
    *
    * @default '/admin/api/server-stats'
+   * @deprecated Use {@link statsEndpoint} instead. Will be removed in the next major version.
    */
   endpoint?: string | false
 
@@ -537,6 +546,7 @@ export interface ServerStatsConfig {
    * and speeds up the test suite.
    *
    * @default true
+   * @deprecated Use `advanced.skipInTest` instead. Will be removed in the next major version.
    */
   skipInTest?: boolean
 
@@ -565,6 +575,7 @@ export interface ServerStatsConfig {
    * table, and live logs.
    *
    * @see {@link DevToolbarOptions}
+   * @deprecated Use {@link toolbar}, {@link dashboard}, and {@link advanced} instead. Will be removed in the next major version.
    */
   devToolbar?: DevToolbarOptions
 
@@ -589,6 +600,8 @@ export interface ServerStatsConfig {
    * // Only in development
    * shouldShow: () => process.env.NODE_ENV === 'development'
    * ```
+   *
+   * @deprecated Use {@link authorize} instead. Will be removed in the next major version.
    */
   shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
 
