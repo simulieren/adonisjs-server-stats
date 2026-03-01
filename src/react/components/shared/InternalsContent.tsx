@@ -196,6 +196,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
         <InfoCard label="Node.js" value={data.package.nodeVersion || '-'} prefix={p} />
         <InfoCard label="AdonisJS" value={data.package.adonisVersion || '-'} prefix={p} />
         <InfoCard label="Uptime" value={formatUptime(data.package.uptime)} prefix={p} />
+        <InfoCard label="Renderer" value={data.devToolbar?.renderer || 'preact'} prefix={p} />
       </div>
 
       {/* 2. Collectors — merged name+label column */}

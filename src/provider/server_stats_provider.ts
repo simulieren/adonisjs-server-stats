@@ -709,6 +709,7 @@ export default class ServerStatsProvider {
         retentionDays: toolbarConfig?.retentionDays ?? 7,
         dbPath: toolbarConfig?.dbPath ?? '.adonisjs/server-stats/dashboard.sqlite3',
         persistDebugData: toolbarConfig?.persistDebugData ?? false,
+        renderer: toolbarConfig?.renderer ?? 'preact',
         excludeFromTracing: toolbarConfig?.excludeFromTracing ?? [],
         customPaneCount: toolbarConfig?.panes?.length ?? 0,
       },

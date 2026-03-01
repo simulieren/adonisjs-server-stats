@@ -690,6 +690,7 @@ export interface DiagnosticsResponse {
     retentionDays: number
     dbPath: string
     persistDebugData: boolean | string
+    renderer: string
     excludeFromTracing: string[]
     customPaneCount: number
   }

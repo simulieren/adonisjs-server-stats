@@ -186,6 +186,7 @@ const integrationEntries = computed(() => {
             { label: 'Node.js', value: diagnostics.package?.nodeVersion || '-' },
             { label: 'AdonisJS', value: diagnostics.package?.adonisVersion || '-' },
             { label: 'Uptime', value: formatUptime(diagnostics.uptime || diagnostics.package?.uptime) },
+            { label: 'Renderer', value: diagnostics.devToolbar?.renderer || 'preact' },
           ]"
           :key="card.label"
           class="ss-dash-info-card"

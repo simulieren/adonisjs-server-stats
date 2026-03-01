@@ -191,6 +191,7 @@ const integrationEntries = computed(() => {
             { label: 'Node.js', value: d.package?.nodeVersion || '-' },
             { label: 'AdonisJS', value: d.package?.adonisVersion || '-' },
             { label: 'Uptime', value: formatUptime(d.package?.uptime) },
+            { label: 'Renderer', value: d.devToolbar?.renderer || 'preact' },
           ]"
           :key="card.label"
           class="ss-dbg-info-card"
