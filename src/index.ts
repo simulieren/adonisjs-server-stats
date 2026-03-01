@@ -8,8 +8,12 @@ export type {
   MetricValue,
   ServerStats,
   ServerStatsConfig,
+  ResolvedServerStatsConfig,
   LogStats,
   DevToolbarOptions,
+  ToolbarConfig,
+  DashboardConfig,
+  AdvancedConfig,
 } from './types.js'
 export type {
   DebugPane,

@@ -21,7 +21,8 @@ import type DebugController from '../controller/debug_controller.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { DevToolbarConfig } from '../debug/types.js'
-import type { ServerStatsConfig } from '../types.js'
+import type { MetricCollector } from '../collectors/collector.js'
+import type { ResolvedServerStatsConfig } from '../types.js'
 import type { ApplicationService } from '@adonisjs/core/types'
 
 /** Minimal interface for the AdonisJS IoC container with singleton registration. */
@@ -50,12 +51,13 @@ export default class ServerStatsProvider {
   private prometheusActive: boolean = false
   private transmitAvailable: boolean = false
   private transmitChannels: string[] = []
-  private resolvedConfig: ServerStatsConfig | null = null
+  private resolvedConfig: ResolvedServerStatsConfig | null = null
+  private resolvedCollectors: MetricCollector[] = []
 
   constructor(protected app: ApplicationService) {}
 
   async boot() {
-    const config = this.app.config.get<ServerStatsConfig>('server_stats')
+    const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     if (!config) return
 
     // Wire up the per-request shouldShow callback
@@ -250,13 +252,24 @@ export default class ServerStatsProvider {
   }
 
   async ready() {
-    const config = this.app.config.get<ServerStatsConfig>('server_stats')
+    const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     if (!config) return
 
     if (this.app.inTest && config.skipInTest !== false) return
 
     this.resolvedConfig = config
-    this.engine = new StatsEngine(config.collectors)
+
+    let collectors: MetricCollector[]
+    if (!config.collectors || config.collectors === 'auto') {
+      const { autoDetectCollectors } = await import('../collectors/auto_detect.js')
+      const result = await autoDetectCollectors()
+      collectors = result.collectors
+      log.info(`${bold(String(result.active))} of ${bold(String(result.total))} collectors active`)
+    } else {
+      collectors = config.collectors
+    }
+    this.resolvedCollectors = collectors
+    this.engine = new StatsEngine(collectors)
 
     // Bind engine to container so the controller can access it
     ;(this.app.container as unknown as ContainerWithSingleton).singleton(
@@ -397,7 +410,7 @@ export default class ServerStatsProvider {
 
     // Create the debug controller (makes the debug routes functional)
     const logPath = this.app.makePath('logs', 'adonisjs.log')
-    const serverConfig = this.app.config.get<ServerStatsConfig>('server_stats')
+    const serverConfig = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     const DebugControllerClass = (await import('../controller/debug_controller.js')).default
     this.debugController = new DebugControllerClass(this.debugStore, logPath, serverConfig, {
       getEngine: () => this.engine,
@@ -648,10 +661,10 @@ export default class ServerStatsProvider {
         },
         edgePlugin: { active: this.edgePluginActive },
         cacheInspector: {
-          available: (config?.collectors ?? []).some((c) => c.name === 'redis'),
+          available: this.resolvedCollectors.some((c) => c.name === 'redis'),
         },
         queueInspector: {
-          available: (config?.collectors ?? []).some((c) => c.name === 'queue'),
+          available: this.resolvedCollectors.some((c) => c.name === 'queue'),
         },
       },
       config: {

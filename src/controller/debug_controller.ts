@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import type { DashboardStore } from '../dashboard/dashboard_store.js'
 import type { DebugStore } from '../debug/debug_store.js'
 import type { StatsEngine } from '../engine/stats_engine.js'
-import type { ServerStatsConfig } from '../types.js'
+import type { ResolvedServerStatsConfig } from '../types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
 const LEVEL_NAMES: Record<number, string> = {
@@ -29,7 +29,7 @@ export default class DebugController {
   constructor(
     private store: DebugStore,
     logPath: string,
-    private serverConfig?: ServerStatsConfig,
+    private serverConfig?: ResolvedServerStatsConfig,
     diagnosticsDeps?: DiagnosticsDeps
   ) {
     this.logPath = logPath
@@ -41,7 +41,10 @@ export default class DebugController {
     const toolbarConfig = cfg?.devToolbar
 
     // Derive feature flags from the actual config
-    const collectorNames = new Set((cfg?.collectors ?? []).map((c) => c.name))
+    const rawCollectors = cfg?.collectors
+    const collectorNames = new Set(
+      Array.isArray(rawCollectors) ? rawCollectors.map((c) => c.name) : []
+    )
 
     const features = {
       statsBar: true,

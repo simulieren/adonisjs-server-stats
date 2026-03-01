@@ -2,7 +2,15 @@
 // Re-exports from the main package
 // ---------------------------------------------------------------------------
 
-export type { ServerStats, MetricValue, ServerStatsConfig, DevToolbarOptions } from '../types.js'
+export type {
+  ServerStats,
+  MetricValue,
+  ServerStatsConfig,
+  ResolvedServerStatsConfig,
+  DevToolbarOptions,
+  ToolbarConfig,
+  AdvancedConfig,
+} from '../types.js'
 export type {
   DebugPane,
   DebugPaneColumn,

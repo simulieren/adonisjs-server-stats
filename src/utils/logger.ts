@@ -2,7 +2,8 @@ const TAG = '\x1b[36m[ \x1b[1m🔍 server-stats\x1b[0m\x1b[36m ]\x1b[0m'
 
 export const dim = (s: string) => `\x1b[2m${s}\x1b[0m`
 export const bold = (s: string) => `\x1b[1m${s}\x1b[0m`
-const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`
+export const green = (s: string) => `\x1b[32m${s}\x1b[0m`
+export const yellow = (s: string) => `\x1b[33m${s}\x1b[0m`
 
 export const log = {
   /** Tagged info message. */

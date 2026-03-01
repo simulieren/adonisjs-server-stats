@@ -400,6 +400,47 @@ export interface DevToolbarOptions {
 }
 
 // ---------------------------------------------------------------------------
+// Simplified config aliases (Phase 1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Toolbar settings (new simplified config).
+ * Maps to the relevant fields in DevToolbarOptions.
+ */
+export interface ToolbarConfig {
+  slowQueryThreshold?: number
+  tracing?: boolean
+  persist?: boolean
+  panes?: DebugPane[]
+  excludeFromTracing?: string[]
+}
+
+/**
+ * Dashboard settings (new simplified config).
+ * Maps to devToolbar.dashboard + devToolbar.dashboardPath + devToolbar.retentionDays.
+ */
+export interface DashboardConfig {
+  path?: string
+  retentionDays?: number
+}
+
+/**
+ * Advanced options that most users never need.
+ */
+export interface AdvancedConfig {
+  skipInTest?: boolean
+  channelName?: string
+  debugEndpoint?: string
+  renderer?: 'preact' | 'vue'
+  dbPath?: string
+  persistPath?: string
+  maxQueries?: number
+  maxEvents?: number
+  maxEmails?: number
+  maxTraces?: number
+}
+
+// ---------------------------------------------------------------------------
 // Main config
 // ---------------------------------------------------------------------------
 
@@ -432,7 +473,7 @@ export interface ServerStatsConfig {
    *
    * @default 3000
    */
-  intervalMs: number
+  intervalMs?: number
 
   /**
    * How collected stats are pushed to connected clients.
@@ -444,7 +485,7 @@ export interface ServerStatsConfig {
    *
    * @default 'transmit'
    */
-  transport: 'transmit' | 'none'
+  transport?: 'transmit' | 'none'
 
   /**
    * Transmit channel name used for SSE broadcasting.
@@ -454,7 +495,7 @@ export interface ServerStatsConfig {
    *
    * @default 'admin/server-stats'
    */
-  channelName: string
+  channelName?: string
 
   /**
    * HTTP endpoint path that returns the latest stats snapshot as JSON.
@@ -464,14 +505,18 @@ export interface ServerStatsConfig {
    *
    * @default '/admin/api/server-stats'
    */
-  endpoint: string | false
+  endpoint?: string | false
 
   /**
-   * Array of collector instances that will be run each tick.
+   * Collector instances that will be run each tick, or `'auto'`
+   * to let the package auto-detect available collectors.
    *
-   * Order does not matter -- all collectors run in parallel via
-   * `Promise.all`. Each collector contributes a subset of fields
-   * to the merged {@link ServerStats} snapshot.
+   * When an array is provided, order does not matter -- all
+   * collectors run in parallel via `Promise.all`. Each collector
+   * contributes a subset of fields to the merged
+   * {@link ServerStats} snapshot.
+   *
+   * @default 'auto'
    *
    * @example
    * ```ts
@@ -483,7 +528,7 @@ export interface ServerStatsConfig {
    * ]
    * ```
    */
-  collectors: MetricCollector[]
+  collectors?: 'auto' | MetricCollector[]
 
   /**
    * Skip metric collection during test runs (`NODE_ENV=test`).
@@ -545,5 +590,64 @@ export interface ServerStatsConfig {
    * shouldShow: () => process.env.NODE_ENV === 'development'
    * ```
    */
+  shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+
+  // ---------------------------------------------------------------------------
+  // New aliases (Phase 1 — non-breaking additions)
+  // ---------------------------------------------------------------------------
+
+  /** Alias for `intervalMs`. New preferred name. */
+  pollInterval?: number
+  /** Alias for `transport`. `true` = 'transmit', `false` = 'none'. */
+  realtime?: boolean
+  /** Alias for `endpoint`. New preferred name. */
+  statsEndpoint?: string | false
+  /** Alias for `shouldShow`. New preferred name. */
+  authorize?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+  /** Enable toolbar. Alias for `devToolbar`. `true` = enabled with defaults. */
+  toolbar?: boolean | ToolbarConfig
+  /** Enable dashboard. Top-level shortcut for `devToolbar.dashboard`. `true` = enabled at /__stats. */
+  dashboard?: boolean | DashboardConfig
+  /** Advanced options. */
+  advanced?: AdvancedConfig
+}
+
+// ---------------------------------------------------------------------------
+// Resolved config (all defaults applied)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fully resolved configuration with all defaults applied.
+ *
+ * This is the return type of {@link defineConfig}. Consumers that
+ * read from `app.config.get('server_stats')` receive this type,
+ * so all required fields are guaranteed to be present.
+ */
+export interface ResolvedServerStatsConfig {
+  /** Collection interval in milliseconds. Always present after `defineConfig()`. */
+  intervalMs: number
+
+  /** Transport mode. Always present after `defineConfig()`. */
+  transport: 'transmit' | 'none'
+
+  /** Transmit channel name. Always present after `defineConfig()`. */
+  channelName: string
+
+  /** HTTP endpoint path or `false` to disable. Always present after `defineConfig()`. */
+  endpoint: string | false
+
+  /** Collectors array or `'auto'`. Always present after `defineConfig()`. */
+  collectors: 'auto' | MetricCollector[]
+
+  /** Whether to skip collection in test environments. Always present after `defineConfig()`. */
+  skipInTest: boolean
+
+  /** Optional per-tick callback. */
+  onStats?: (stats: Partial<ServerStats>) => void
+
+  /** Optional dev toolbar configuration. */
+  devToolbar?: DevToolbarOptions
+
+  /** Optional access-control callback. */
   shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
 }

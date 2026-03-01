@@ -20,6 +20,7 @@ export type {
   ServerStats,
   MetricValue,
   ServerStatsConfig,
+  ResolvedServerStatsConfig,
   DevToolbarOptions,
   // Re-exported from debug types
   DebugPane,

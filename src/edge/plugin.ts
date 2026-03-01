@@ -7,7 +7,7 @@ import { Template } from 'edge.js'
 import { log } from '../utils/logger.js'
 import { loadTransmitClient } from '../utils/transmit_client.js'
 
-import type { ServerStatsConfig } from '../types.js'
+import type { ResolvedServerStatsConfig } from '../types.js'
 
 /** Minimal interface for the Edge.js engine used in the plugin. */
 interface EdgeEngine {
@@ -65,7 +65,7 @@ const read = (rel: string) => readFileSync(join(DIR, rel), 'utf-8')
  * @serverStats()
  * ```
  */
-export function edgePluginServerStats(config: ServerStatsConfig) {
+export function edgePluginServerStats(config: ResolvedServerStatsConfig) {
   return (edge: EdgeEngine) => {
     // Mount Edge views under the `ss` disk (needed for @include resolution)
     edge.mount('ss', join(DIR, 'views'))

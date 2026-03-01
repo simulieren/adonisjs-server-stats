@@ -11,3 +11,5 @@ export type { QueueCollectorOptions, QueueRedisConnection } from './queue_collec
 export { logCollector, getLogStreamService } from './log_collector.js'
 export type { LogCollectorOptions } from './log_collector.js'
 export { appCollector } from './app_collector.js'
+export { autoDetectCollectors } from './auto_detect.js'
+export type { AutoDetectResult } from './auto_detect.js'

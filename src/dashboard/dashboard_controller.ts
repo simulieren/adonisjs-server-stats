@@ -11,7 +11,7 @@ import { ConfigInspector } from './integrations/config_inspector.js'
 import { QueueInspector } from './integrations/queue_inspector.js'
 
 import type { DebugStore } from '../debug/debug_store.js'
-import type { DevToolbarOptions, ServerStatsConfig } from '../types.js'
+import type { DevToolbarOptions, ResolvedServerStatsConfig } from '../types.js'
 import type { DashboardStore } from './dashboard_store.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
@@ -95,7 +95,7 @@ export default class DashboardController {
       return ctx.response.forbidden({ error: 'Access denied' })
     }
 
-    const config = this.app.config.get<ServerStatsConfig>('server_stats')
+    const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     const toolbarConfig: Partial<DevToolbarOptions> = config?.devToolbar ?? {}
 
     if (!this.cachedCss) {
@@ -867,7 +867,7 @@ export default class DashboardController {
   }
 
   private checkAccess(ctx: HttpContext): boolean {
-    const config = this.app.config.get<ServerStatsConfig>('server_stats')
+    const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     if (!config?.shouldShow) return true
 
     try {
@@ -878,7 +878,7 @@ export default class DashboardController {
   }
 
   private getDashboardPath(): string {
-    const config = this.app.config.get<ServerStatsConfig>('server_stats')
+    const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     return config?.devToolbar?.dashboardPath ?? '/__stats'
   }
 
