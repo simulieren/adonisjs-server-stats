@@ -11,6 +11,7 @@ export default defineConfig(
     entries: {
       'stats-bar': resolve(__dirname, 'src/edge/entries/stats-bar.tsx'),
       'debug-panel': resolve(__dirname, 'src/edge/entries/debug-panel.tsx'),
+      'debug-panel-deferred': resolve(__dirname, 'src/edge/entries/debug-panel-deferred.tsx'),
       'dashboard': resolve(__dirname, 'src/edge/entries/dashboard.tsx'),
     },
     outDir: 'src/edge/client',

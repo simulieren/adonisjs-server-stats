@@ -39,15 +39,16 @@ const CustomPaneTab = defineAsyncComponent(
   () => import("./tabs/CustomPaneTab.vue"),
 );
 
-const props = withDefaults(defineProps<DebugPanelConfig>(), {
+const props = withDefaults(defineProps<DebugPanelConfig & { defaultOpen?: boolean }>(), {
   baseUrl: "",
   debugEndpoint: "/admin/api/debug",
   dashboardPath: "/__stats",
   tracingEnabled: false,
   isLive: false,
+  defaultOpen: false,
 });
 
-const isOpen = ref(false);
+const isOpen = ref(props.defaultOpen);
 const activeTab = ref<string>("queries");
 
 const { theme } = useTheme();

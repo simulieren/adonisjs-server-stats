@@ -116,6 +116,7 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
 
     if (showDebug) {
       state.debugCss = read('../styles/debug-panel.css')
+      state.debugDeferredJs = read(clientDir + '/debug-panel-deferred.js')
     }
 
     // Pre-render via Template directly — bypasses edge.createRenderer() which

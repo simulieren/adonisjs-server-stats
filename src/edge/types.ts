@@ -35,3 +35,23 @@ export interface EdgeDashConfig {
   backUrl?: string
   channelName?: string
 }
+
+// ---------------------------------------------------------------------------
+// Deferred debug panel global interface
+// ---------------------------------------------------------------------------
+
+/**
+ * The deferred debug panel entry registers itself onto `window.__ssDebugPanel`.
+ * The slim stats-bar entry evaluates the inert `<script type="text/plain">`
+ * on first use and then calls these helpers to mount/unmount the panel.
+ */
+export interface DeferredDebugPanel {
+  mount(container: HTMLElement, config: EdgeDebugConfig, isLive: boolean): void
+  unmount(container: HTMLElement): void
+}
+
+declare global {
+  interface Window {
+    __ssDebugPanel?: DeferredDebugPanel
+  }
+}
