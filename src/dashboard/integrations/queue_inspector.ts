@@ -1,6 +1,43 @@
 import type { ApplicationService } from '@adonisjs/core/types'
 
 // ---------------------------------------------------------------------------
+// Minimal interfaces for BullMQ types
+// ---------------------------------------------------------------------------
+
+/** Minimal interface for a BullMQ Job as accessed by the inspector. */
+interface BullMQJob {
+  id: string | number
+  name: string
+  data: Record<string, unknown> | null
+  opts: Record<string, unknown>
+  timestamp: number
+  processedOn: number | null
+  finishedOn: number | null
+  failedReason: string | null
+  stacktrace: string[]
+  returnvalue: unknown
+  attemptsMade: number
+  progress: number | object
+  delay?: number
+  getState(): Promise<string>
+  retry(): Promise<void>
+}
+
+/** Minimal interface for a BullMQ Queue as accessed by the inspector. */
+interface BullMQQueue {
+  getJobCounts(...statuses: string[]): Promise<Record<string, number>>
+  getJobs(statuses: string[], start: number, end: number): Promise<(BullMQJob | null)[]>
+  getJob(id: string): Promise<BullMQJob | null>
+}
+
+/** Minimal interface for the @rlanz/bull-queue manager. */
+interface QueueManager {
+  get?(name: string): BullMQQueue | null
+  getOrSet?(name: string): BullMQQueue
+  getJobCounts?(...statuses: string[]): Promise<Record<string, number>>
+}
+
+// ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
 
@@ -28,14 +65,17 @@ export interface QueueJobSummary {
   /** Bull job ID. */
   id: string
 
-  /** Job name / type. */
+  /** Human-readable job name (cleaned from file URLs). */
   name: string
 
   /** Current job status. */
   status: 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'paused'
 
   /** Job payload (data). */
-  data: any
+  data: Record<string, unknown> | null
+
+  /** Alias for `data` — used by some frontends. */
+  payload: Record<string, unknown> | null
 
   /** Number of attempts so far. */
   attempts: number
@@ -52,6 +92,9 @@ export interface QueueJobSummary {
   /** When the job was added (Unix timestamp ms). */
   createdAt: number
 
+  /** Alias for `createdAt` — BullMQ compat. */
+  timestamp: number
+
   /** When processing started (Unix timestamp ms), or null. */
   processedAt: number | null
 
@@ -67,10 +110,10 @@ export interface QueueJobDetail extends QueueJobSummary {
   stackTrace: string[]
 
   /** Return value from the job handler, if any. */
-  returnValue: any
+  returnValue: unknown
 
   /** Job options (delay, priority, repeat, etc.). */
-  opts: Record<string, any>
+  opts: Record<string, unknown>
 }
 
 export interface QueueJobListResult {
@@ -86,6 +129,7 @@ export interface QueueJobListResult {
 // ---------------------------------------------------------------------------
 
 type JobStatus = 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'paused'
+const ALL_STATUSES: JobStatus[] = ['active', 'waiting', 'delayed', 'completed', 'failed', 'paused']
 
 /**
  * Inspects Bull Queue jobs, counts, and allows retrying failed jobs.
@@ -95,14 +139,14 @@ type JobStatus = 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'pa
  * All methods catch errors and return safe defaults.
  */
 export class QueueInspector {
-  constructor(private queueManager: any) {}
+  constructor(private queueManager: QueueManager) {}
 
   /**
    * Detect whether `@rlanz/bull-queue` is available in the application container.
    */
   static async isAvailable(app: ApplicationService): Promise<boolean> {
     try {
-      await app.container.make('queue')
+      await app.container.make('rlanz/queue')
       return true
     } catch {
       return false
@@ -151,12 +195,12 @@ export class QueueInspector {
   /**
    * List jobs filtered by status with pagination.
    *
-   * @param status   Job status to filter by.
+   * @param status   Job status to filter by, or `'all'` for every status.
    * @param page     Page number (1-based).
    * @param perPage  Jobs per page.
    */
   async listJobs(
-    status: JobStatus = 'active',
+    status: JobStatus | 'all' = 'all',
     page = 1,
     perPage = 25
   ): Promise<QueueJobListResult> {
@@ -167,19 +211,29 @@ export class QueueInspector {
       const start = (page - 1) * perPage
       const end = start + perPage - 1
 
+      const statuses: JobStatus[] = status === 'all' ? ALL_STATUSES : [status]
+
       const [rawJobs, counts] = await Promise.all([
-        queue.getJobs([status], start, end) as Promise<any[]>,
-        queue.getJobCounts(status) as Promise<Record<string, number>>,
+        queue.getJobs(statuses, start, end) as Promise<(BullMQJob | null)[]>,
+        queue.getJobCounts(...ALL_STATUSES) as Promise<Record<string, number>>,
       ])
 
       const jobs: QueueJobSummary[] = (rawJobs ?? [])
-        .filter((job: any) => job !== null && job !== undefined)
-        .map((job: any) => this.formatJobSummary(job, status))
+        .filter((job: BullMQJob | null): job is BullMQJob => job !== null && job !== undefined)
+        .map((job: BullMQJob) => {
+          const jobState = this.inferStatus(job) ?? (status === 'all' ? 'completed' : status)
+          return this.formatJobSummary(job, jobState)
+        })
 
-      return {
-        jobs,
-        total: counts[status] ?? 0,
-      }
+      // Sort by creation time descending (newest first)
+      jobs.sort((a, b) => b.createdAt - a.createdAt)
+
+      const total =
+        status === 'all'
+          ? ALL_STATUSES.reduce((sum, s) => sum + (counts[s] ?? 0), 0)
+          : (counts[status] ?? 0)
+
+      return { jobs, total }
     } catch {
       return { jobs: [], total: 0 }
     }
@@ -237,26 +291,25 @@ export class QueueInspector {
   // ---------------------------------------------------------------------------
 
   /**
-   * Get the underlying Bull Queue instance from the queue manager.
+   * Get the underlying BullMQ Queue instance from the queue manager.
    *
-   * `@rlanz/bull-queue` exposes the BullMQ Queue via `.queue` on the manager
-   * or via `.useQueue()`. We try both patterns for compatibility.
+   * `@rlanz/bull-queue` exposes queues via `.get(name)` or `.getOrSet(name)`.
    */
-  private getQueue(): any {
+  private getQueue(): BullMQQueue | null {
     try {
-      // @rlanz/bull-queue v3+ exposes queue directly
-      if (this.queueManager.queue) {
-        return this.queueManager.queue
+      // @rlanz/bull-queue: .get(name) returns the BullMQ Queue instance
+      if (typeof this.queueManager.get === 'function') {
+        return this.queueManager.get('default') ?? null
       }
 
-      // Try getting the default queue
-      if (typeof this.queueManager.useQueue === 'function') {
-        return this.queueManager.useQueue('default')
+      // Fallback: .getOrSet(name) lazily creates the queue if needed
+      if (typeof this.queueManager.getOrSet === 'function') {
+        return this.queueManager.getOrSet('default')
       }
 
-      // Fallback: the manager itself may be a Queue instance
+      // Last resort: the manager itself is already a Queue instance
       if (typeof this.queueManager.getJobCounts === 'function') {
-        return this.queueManager
+        return this.queueManager as unknown as BullMQQueue
       }
 
       return null
@@ -266,23 +319,63 @@ export class QueueInspector {
   }
 
   /**
+   * Infer a job's status from its internal fields (avoids async getState() call).
+   */
+  private inferStatus(job: BullMQJob): JobStatus | null {
+    if (job.failedReason || job.stacktrace?.length) return 'failed'
+    if (job.finishedOn) return 'completed'
+    if (job.processedOn) return 'active'
+    if (job.delay && job.delay > 0 && !job.processedOn) return 'delayed'
+    return null
+  }
+
+  /**
+   * Extract a human-readable job name from a raw Bull job name.
+   *
+   * `@rlanz/bull-queue` often stores the full file URL as the job name
+   * (e.g. `file:///Users/…/app/jobs/send_email.ts`). We extract just
+   * the class-style name from the filename.
+   */
+  private static cleanJobName(raw: string): string {
+    if (!raw || raw === '__default__') return 'default'
+
+    // Strip file:// URLs down to the filename
+    if (raw.startsWith('file://') || raw.startsWith('/')) {
+      const filename = raw.split('/').pop() ?? raw
+      // Remove extension and convert snake_case/kebab-case to PascalCase
+      const base = filename.replace(/\.(ts|js|mjs|cjs)$/, '')
+      return base
+        .split(/[-_]/)
+        .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+        .join('')
+    }
+
+    return raw
+  }
+
+  /**
    * Format a Bull job into our summary shape.
    */
-  private formatJobSummary(job: any, status: JobStatus): QueueJobSummary {
+  private formatJobSummary(job: BullMQJob, status: JobStatus): QueueJobSummary {
     const processedAt = job.processedOn ?? null
     const finishedAt = job.finishedOn ?? null
-    const duration = processedAt != null && finishedAt != null ? finishedAt - processedAt : null
+    const duration = processedAt !== null && finishedAt !== null ? finishedAt - processedAt : null
+    const createdAt = job.timestamp ?? 0
+
+    const data = job.data ?? null
 
     return {
       id: String(job.id),
-      name: job.name ?? 'unknown',
+      name: QueueInspector.cleanJobName(job.name ?? 'unknown'),
       status,
-      data: job.data ?? null,
+      data,
+      payload: data,
       attempts: job.attemptsMade ?? 0,
-      maxAttempts: job.opts?.attempts ?? 1,
+      maxAttempts: (job.opts?.attempts as number) ?? 1,
       progress: job.progress ?? 0,
       failedReason: job.failedReason ?? null,
-      createdAt: job.timestamp ?? 0,
+      createdAt,
+      timestamp: createdAt,
       processedAt,
       finishedAt,
       duration,

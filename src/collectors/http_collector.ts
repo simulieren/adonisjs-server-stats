@@ -1,4 +1,5 @@
 import { RequestMetrics } from '../engine/request_metrics.js'
+import { log } from '../utils/logger.js'
 
 import type { MetricCollector } from './collector.js'
 
@@ -76,14 +77,32 @@ export function httpCollector(opts?: HttpCollectorOptions): MetricCollector {
 
   return {
     name: 'http',
+    label: `http — buffer: ${(opts?.maxRecords ?? 10_000).toLocaleString()}, window: ${(opts?.windowMs ?? 60_000) / 1000}s`,
+
+    getConfig() {
+      return {
+        maxRecords: opts?.maxRecords ?? 10_000,
+        windowMs: opts?.windowMs ?? 60_000,
+      }
+    },
 
     collect() {
-      const m = metrics.getMetrics()
-      return {
-        requestsPerSecond: m.requestsPerSecond,
-        avgResponseTimeMs: m.averageResponseTimeMs,
-        errorRate: m.errorRate,
-        activeHttpConnections: m.activeConnections,
+      try {
+        const m = metrics.getMetrics()
+        return {
+          requestsPerSecond: m.requestsPerSecond,
+          avgResponseTimeMs: m.averageResponseTimeMs,
+          errorRate: m.errorRate,
+          activeHttpConnections: m.activeConnections,
+        }
+      } catch (error) {
+        log.warn(`http collector failed: ${(error as Error).message}`)
+        return {
+          requestsPerSecond: 0,
+          avgResponseTimeMs: 0,
+          errorRate: 0,
+          activeHttpConnections: 0,
+        }
       }
     },
   }

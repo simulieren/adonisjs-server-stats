@@ -1,4 +1,128 @@
 // ---------------------------------------------------------------------------
+// AdonisJS framework abstractions
+// ---------------------------------------------------------------------------
+
+/** Callback type for emitter event handlers. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type EmitterHandler = (...args: any[]) => void
+
+/**
+ * Minimal interface for the AdonisJS event emitter.
+ *
+ * Only the methods actually used by the debug collectors are declared,
+ * keeping the coupling to the framework as loose as possible.
+ *
+ * The handler parameter uses `any[]` because the AdonisJS emitter
+ * dispatches different payload shapes per event and the subscriber
+ * signatures vary accordingly (contravariance).
+ */
+export interface Emitter {
+  on(event: string, handler: EmitterHandler): void
+  off(event: string, handler: EmitterHandler): void
+  emit(event: string | ((...args: unknown[]) => unknown), data?: unknown): unknown
+}
+
+/**
+ * Minimal interface for the AdonisJS router.
+ *
+ * The `toJSON()` method returns a domain-keyed map of route arrays.
+ */
+export interface Router {
+  toJSON(): Record<string, RouteNode[]>
+}
+
+/**
+ * A single route entry as returned by `router.toJSON()`.
+ */
+export interface RouteNode {
+  methods?: string[]
+  pattern?: string
+  name?: string | null
+  handler?: string | ((...args: unknown[]) => unknown) | RouteHandler
+  middleware?: MiddlewareStore | MiddlewareItem[]
+}
+
+/**
+ * AdonisJS route handler — can be a string, a function, or a lazy-import
+ * descriptor with a `reference` property.
+ */
+export interface RouteHandler {
+  reference?: string | string[]
+  name?: string
+}
+
+/**
+ * AdonisJS middleware store attached to a route.
+ *
+ * In v6 this is a `@poppinss/middleware` instance exposing `.all()`.
+ */
+export interface MiddlewareStore {
+  all?(): Iterable<MiddlewareItem>
+}
+
+/**
+ * A single middleware item — can be a string name, a function, or an
+ * object with `name` and optional `args`.
+ */
+export interface MiddlewareItem {
+  name?: string
+  args?: unknown[]
+}
+
+// ---------------------------------------------------------------------------
+// Event payloads received from the AdonisJS emitter
+// ---------------------------------------------------------------------------
+
+/**
+ * Payload shape of the `db:query` event emitted by Lucid.
+ */
+export interface DbQueryEvent {
+  sql?: string
+  bindings?: unknown[]
+  duration?: number | [seconds: number, nanoseconds: number]
+  method?: string
+  model?: string | null
+  connection?: string
+  inTransaction?: boolean
+}
+
+/**
+ * Payload shape of AdonisJS mail events (`mail:sending`, `mail:sent`,
+ * `mail:queued`, `queued:mail:error`).
+ */
+export interface MailEventData {
+  message?: MailMessage
+  mailerName?: string
+  mailer?: string
+  response?: { messageId?: string }
+  messageId?: string
+
+  /* When the event payload itself is the message (flat shape) */
+  from?: unknown
+  to?: unknown
+  cc?: unknown
+  bcc?: unknown
+  subject?: string
+  html?: string | null
+  text?: string | null
+  attachments?: unknown[]
+}
+
+/**
+ * The nested `message` object inside a mail event payload.
+ */
+export interface MailMessage {
+  from?: unknown
+  to?: unknown
+  cc?: unknown
+  bcc?: unknown
+  subject?: string
+  html?: string | null
+  text?: string | null
+  attachments?: unknown[]
+}
+
+// ---------------------------------------------------------------------------
 // Debug data records
 // ---------------------------------------------------------------------------
 
@@ -16,7 +140,7 @@ export interface QueryRecord {
   sql: string
 
   /** Bound parameter values for the query placeholders. */
-  bindings: any[]
+  bindings: unknown[]
 
   /** Query execution time in **milliseconds**. */
   duration: number
@@ -161,7 +285,7 @@ export interface TraceSpan {
   duration: number
 
   /** Optional metadata (query bindings, status code, etc.). */
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 }
 
 /**

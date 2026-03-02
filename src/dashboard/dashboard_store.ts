@@ -1,7 +1,8 @@
-import { mkdir } from 'node:fs/promises'
+import { mkdir, stat as fsStat } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
 import { safeParseJson, safeParseJsonArray } from '../utils/json_helpers.js'
+import { log } from '../utils/logger.js'
 import { extractAddresses } from '../utils/mail_helpers.js'
 import { round } from '../utils/math_helpers.js'
 import { rangeToCutoff, rangeToMinutes, roundBucket } from '../utils/time_helpers.js'
@@ -10,10 +11,34 @@ import { autoMigrate, runRetentionCleanup } from './migrator.js'
 
 import type { DevToolbarConfig } from '../debug/types.js'
 import type { QueryRecord, EventRecord, EmailRecord, TraceRecord } from '../debug/types.js'
+import type { Knex } from 'knex'
+
+// ---------------------------------------------------------------------------
+// Minimal interface for an AdonisJS-style event emitter
+// ---------------------------------------------------------------------------
+
+interface EventEmitter {
+  on(event: string, handler: (...args: unknown[]) => void): void
+  off(event: string, handler: (...args: unknown[]) => void): void
+}
 
 // ---------------------------------------------------------------------------
 // Filter types
 // ---------------------------------------------------------------------------
+
+export interface RequestInput {
+  method: string
+  url: string
+  statusCode: number
+  duration: number
+  spanCount?: number
+  warningCount?: number
+}
+
+export interface PersistRequestInput extends RequestInput {
+  queries: QueryRecord[]
+  trace: TraceRecord | null
+}
 
 export interface RequestFilters {
   method?: string
@@ -23,6 +48,8 @@ export interface RequestFilters {
   statusMax?: number
   durationMin?: number
   durationMax?: number
+  /** General text search across method and url */
+  search?: string
 }
 
 export interface QueryFilters {
@@ -32,13 +59,19 @@ export interface QueryFilters {
   durationMin?: number
   durationMax?: number
   requestId?: number
+  /** General text search across sql_text, model, and connection */
+  search?: string
 }
 
 export interface EventFilters {
   eventName?: string
+  /** General text search across event_name */
+  search?: string
 }
 
 export interface EmailFilters {
+  /** General text search across from_addr, to_addr, and subject */
+  search?: string
   from?: string
   to?: string
   subject?: string
@@ -59,6 +92,8 @@ export interface TraceFilters {
   url?: string
   statusMin?: number
   statusMax?: number
+  /** General text search across method and url */
+  search?: string
 }
 
 export interface PaginatedResult<T> {
@@ -68,6 +103,12 @@ export interface PaginatedResult<T> {
   perPage: number
   lastPage: number
 }
+
+// ---------------------------------------------------------------------------
+// Warn-once tracking for write-path and overview catch blocks
+// ---------------------------------------------------------------------------
+const warnedWritePaths = new Set<string>()
+let overviewWidgetWarned = false
 
 // ---------------------------------------------------------------------------
 // DashboardStore
@@ -81,13 +122,15 @@ export interface PaginatedResult<T> {
  * and self-exclusion of dashboard routes and server_stats connection queries.
  */
 export class DashboardStore {
-  private db: any = null
-  private emitter: any = null
+  private db: Knex | null = null
+  private emitter: EventEmitter | null = null
   private config: DevToolbarConfig
   private dashboardPath: string
   private retentionTimer: ReturnType<typeof setInterval> | null = null
   private chartAggregator: ChartAggregator | null = null
-  private handlers: { event: string; fn: (...args: any[]) => void }[] = []
+  private handlers: { event: string; fn: (...args: unknown[]) => void }[] = []
+  private dbFilePath: string = ''
+  private lastCleanupAt: number | null = null
 
   constructor(config: DevToolbarConfig) {
     this.config = config
@@ -102,10 +145,11 @@ export class DashboardStore {
    * Initialize the SQLite connection, run migrations and retention
    * cleanup, start chart aggregation, and wire event listeners.
    */
-  async start(_lucidDb: any, emitter: any, appRoot: string): Promise<void> {
+  async start(_lucidDb: unknown, emitter: EventEmitter | null, appRoot: string): Promise<void> {
     this.emitter = emitter
 
-    const dbFilePath = appRoot + '/' + this.config.dbPath
+    this.dbFilePath = appRoot + '/' + this.config.dbPath
+    const dbFilePath = this.dbFilePath
     await mkdir(dirname(dbFilePath), { recursive: true })
 
     // Create a standalone Knex connection to SQLite — bypasses Lucid's
@@ -123,14 +167,18 @@ export class DashboardStore {
 
     await autoMigrate(this.db)
     await runRetentionCleanup(this.db, this.config.retentionDays)
+    this.lastCleanupAt = Date.now()
 
     // Hourly retention cleanup
     this.retentionTimer = setInterval(
       async () => {
         try {
-          await runRetentionCleanup(this.db, this.config.retentionDays)
-        } catch {
-          // Silently ignore
+          if (this.db) {
+            await runRetentionCleanup(this.db, this.config.retentionDays)
+            this.lastCleanupAt = Date.now()
+          }
+        } catch (err) {
+          log.warn('dashboard: retention cleanup failed — ' + (err as Error)?.message)
         }
       },
       60 * 60 * 1000
@@ -165,21 +213,90 @@ export class DashboardStore {
     if (this.db && typeof this.db.destroy === 'function') {
       try {
         await this.db.destroy()
-      } catch {
-        // Ignore
+      } catch (err) {
+        log.warn('dashboard: error closing SQLite — ' + (err as Error)?.message)
       }
     }
     this.db = null
   }
 
   /** Get the raw Knex database connection (for DashboardController). */
-  getDb(): any {
+  getDb(): Knex | null {
     return this.db
   }
 
   /** Whether the store is initialized and ready. */
   isReady(): boolean {
     return this.db !== null
+  }
+
+  /** Get SQLite storage statistics for the diagnostics endpoint. */
+  async getStorageStats(): Promise<{
+    ready: boolean
+    dbPath: string
+    fileSizeMb: number
+    walSizeMb: number
+    retentionDays: number
+    tables: Array<{ name: string; rowCount: number }>
+    lastCleanupAt: number | null
+  }> {
+    if (!this.db) {
+      return {
+        ready: false,
+        dbPath: this.config.dbPath,
+        fileSizeMb: 0,
+        walSizeMb: 0,
+        retentionDays: this.config.retentionDays,
+        tables: [],
+        lastCleanupAt: null,
+      }
+    }
+
+    let fileSizeMb = 0
+    let walSizeMb = 0
+    try {
+      const s = await fsStat(this.dbFilePath)
+      fileSizeMb = Math.round((s.size / (1024 * 1024)) * 100) / 100
+    } catch {
+      // File may not exist yet
+    }
+    try {
+      const ws = await fsStat(this.dbFilePath + '-wal')
+      walSizeMb = Math.round((ws.size / (1024 * 1024)) * 100) / 100
+    } catch {
+      // WAL file may not exist
+    }
+
+    const tableNames = [
+      'server_stats_requests',
+      'server_stats_queries',
+      'server_stats_events',
+      'server_stats_emails',
+      'server_stats_logs',
+      'server_stats_traces',
+      'server_stats_metrics',
+      'server_stats_saved_filters',
+    ]
+
+    const tables: Array<{ name: string; rowCount: number }> = []
+    for (const name of tableNames) {
+      try {
+        const [row] = await this.db(name).count('* as count')
+        tables.push({ name, rowCount: Number(row.count) })
+      } catch {
+        tables.push({ name, rowCount: 0 })
+      }
+    }
+
+    return {
+      ready: true,
+      dbPath: this.config.dbPath,
+      fileSizeMb,
+      walSizeMb,
+      retentionDays: this.config.retentionDays,
+      tables,
+      lastCleanupAt: this.lastCleanupAt,
+    }
   }
 
   // =========================================================================
@@ -190,28 +307,26 @@ export class DashboardStore {
    * Record a completed request. Returns the inserted row ID, or null
    * if the request was self-excluded or an error occurred.
    */
-  async recordRequest(
-    method: string,
-    url: string,
-    statusCode: number,
-    duration: number,
-    spanCount: number = 0,
-    warningCount: number = 0
-  ): Promise<number | null> {
+  async recordRequest(input: RequestInput): Promise<number | null> {
     if (!this.db) return null
-    if (url.startsWith(this.dashboardPath)) return null
+    if (input.url.startsWith(this.dashboardPath)) return null
 
     try {
       const [id] = await this.db('server_stats_requests').insert({
-        method,
-        url,
-        status_code: statusCode,
-        duration: round(duration),
-        span_count: spanCount,
-        warning_count: warningCount,
+        method: input.method,
+        url: input.url,
+        status_code: input.statusCode,
+        duration: round(input.duration),
+        span_count: input.spanCount ?? 0,
+        warning_count: input.warningCount ?? 0,
       })
       return id
-    } catch {
+    } catch (err) {
+      const method_ = 'recordRequest'
+      if (!warnedWritePaths.has(method_)) {
+        warnedWritePaths.add(method_)
+        log.warn(`dashboard: ${method_} failed — ${(err as Error)?.message}`)
+      }
       return null
     }
   }
@@ -240,8 +355,12 @@ export class DashboardStore {
       for (let i = 0; i < rows.length; i += 50) {
         await this.db('server_stats_queries').insert(rows.slice(i, i + 50))
       }
-    } catch {
-      // Silently ignore
+    } catch (err) {
+      const method = 'recordQueries'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
+      }
     }
   }
 
@@ -259,8 +378,12 @@ export class DashboardStore {
       for (let i = 0; i < rows.length; i += 50) {
         await this.db('server_stats_events').insert(rows.slice(i, i + 50))
       }
-    } catch {
-      // Silently ignore
+    } catch (err) {
+      const method = 'recordEvents'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
+      }
     }
   }
 
@@ -282,8 +405,12 @@ export class DashboardStore {
         message_id: record.messageId,
         attachment_count: record.attachmentCount,
       })
-    } catch {
-      // Silently ignore
+    } catch (err) {
+      const method = 'recordEmail'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
+      }
     }
   }
 
@@ -298,11 +425,18 @@ export class DashboardStore {
       await this.db('server_stats_logs').insert({
         level: levelName,
         message: String(entry.msg || entry.message || ''),
-        request_id: entry.requestId ? String(entry.requestId) : null,
+        request_id:
+          entry.request_id || entry.requestId || entry['x-request-id']
+            ? String(entry.request_id || entry.requestId || entry['x-request-id'])
+            : null,
         data: JSON.stringify(entry),
       })
-    } catch {
-      // Silently ignore
+    } catch (err) {
+      const method = 'recordLog'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
+      }
     }
   }
 
@@ -321,8 +455,12 @@ export class DashboardStore {
         spans: JSON.stringify(trace.spans),
         warnings: trace.warnings.length > 0 ? JSON.stringify(trace.warnings) : null,
       })
-    } catch {
-      // Silently ignore
+    } catch (err) {
+      const method = 'recordTrace'
+      if (!warnedWritePaths.has(method)) {
+        warnedWritePaths.add(method)
+        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
+      }
     }
   }
 
@@ -330,28 +468,21 @@ export class DashboardStore {
    * Convenience: persist a full request with associated queries and trace.
    * Calls recordRequest, recordQueries, and recordTrace in sequence.
    */
-  async persistRequest(
-    method: string,
-    url: string,
-    statusCode: number,
-    duration: number,
-    queries: QueryRecord[],
-    trace: TraceRecord | null
-  ): Promise<number | null> {
-    const requestId = await this.recordRequest(
-      method,
-      url,
-      statusCode,
-      duration,
-      trace?.spanCount ?? 0,
-      trace?.warnings?.length ?? 0
-    )
+  async persistRequest(input: PersistRequestInput): Promise<number | null> {
+    const requestId = await this.recordRequest({
+      method: input.method,
+      url: input.url,
+      statusCode: input.statusCode,
+      duration: input.duration,
+      spanCount: input.trace?.spanCount ?? 0,
+      warningCount: input.trace?.warnings?.length ?? 0,
+    })
 
     if (requestId === null) return null
 
-    await this.recordQueries(requestId, queries)
-    if (trace) {
-      await this.recordTrace(requestId, trace)
+    await this.recordQueries(requestId, input.queries)
+    if (input.trace) {
+      await this.recordTrace(requestId, input.trace)
     }
 
     return requestId
@@ -366,7 +497,7 @@ export class DashboardStore {
     page: number = 1,
     perPage: number = 50,
     filters?: RequestFilters
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_requests', page, perPage, (query) => {
       if (filters?.method) query.where('method', filters.method)
       if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
@@ -375,6 +506,12 @@ export class DashboardStore {
       if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
       if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
       if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((qb) => {
+          qb.where('url', 'like', term).orWhere('method', 'like', term)
+        })
+      }
     })
   }
 
@@ -383,7 +520,7 @@ export class DashboardStore {
     page: number = 1,
     perPage: number = 50,
     filters?: QueryFilters
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_queries', page, perPage, (query) => {
       if (filters?.method) query.where('method', filters.method)
       if (filters?.model) query.where('model', filters.model)
@@ -391,6 +528,14 @@ export class DashboardStore {
       if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
       if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
       if (filters?.requestId) query.where('request_id', filters.requestId)
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((qb) => {
+          qb.where('sql_text', 'like', term)
+            .orWhere('model', 'like', term)
+            .orWhere('connection', 'like', term)
+        })
+      }
     })
   }
 
@@ -398,7 +543,11 @@ export class DashboardStore {
    * Grouped query patterns: aggregated by sql_normalized
    * with count, avg/min/max/total duration.
    */
-  async getQueriesGrouped(limit: number = 200, sort: string = 'total_duration'): Promise<any[]> {
+  async getQueriesGrouped(
+    limit: number = 200,
+    sort: string = 'total_duration',
+    search?: string
+  ): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
     const validSorts: Record<string, string> = {
@@ -408,7 +557,7 @@ export class DashboardStore {
     }
     const orderCol = validSorts[sort] || 'total_duration'
 
-    return this.db('server_stats_queries')
+    const query = this.db('server_stats_queries')
       .select(
         'sql_normalized',
         this.db.raw('COUNT(*) as count'),
@@ -420,6 +569,12 @@ export class DashboardStore {
       .groupBy('sql_normalized')
       .orderBy(orderCol, 'desc')
       .limit(limit)
+
+    if (search) {
+      query.where('sql_normalized', 'like', `%${search}%`)
+    }
+
+    return query
   }
 
   /** Paginated event history with optional filters. */
@@ -427,9 +582,12 @@ export class DashboardStore {
     page: number = 1,
     perPage: number = 50,
     filters?: EventFilters
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_events', page, perPage, (query) => {
       if (filters?.eventName) query.where('event_name', 'like', `%${filters.eventName}%`)
+      if (filters?.search) {
+        query.where('event_name', 'like', `%${filters.search}%`)
+      }
     })
   }
 
@@ -439,8 +597,17 @@ export class DashboardStore {
     perPage: number = 50,
     filters?: EmailFilters,
     excludeBody: boolean = false
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_emails', page, perPage, (query) => {
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((sub) => {
+          sub
+            .where('from_addr', 'like', term)
+            .orWhere('to_addr', 'like', term)
+            .orWhere('subject', 'like', term)
+        })
+      }
       if (filters?.from) query.where('from_addr', 'like', `%${filters.from}%`)
       if (filters?.to) query.where('to_addr', 'like', `%${filters.to}%`)
       if (filters?.subject) query.where('subject', 'like', `%${filters.subject}%`)
@@ -485,7 +652,7 @@ export class DashboardStore {
     page: number = 1,
     perPage: number = 50,
     filters?: LogFilters
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_logs', page, perPage, (query) => {
       if (filters?.level) query.where('level', filters.level)
       if (filters?.requestId) query.where('request_id', filters.requestId)
@@ -516,17 +683,23 @@ export class DashboardStore {
     page: number = 1,
     perPage: number = 50,
     filters?: TraceFilters
-  ): Promise<PaginatedResult<any>> {
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     return this.paginate('server_stats_traces', page, perPage, (query) => {
       if (filters?.method) query.where('method', filters.method)
       if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
       if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
       if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
+      if (filters?.search) {
+        const term = `%${filters.search}%`
+        query.where((qb) => {
+          qb.where('url', 'like', term).orWhere('method', 'like', term)
+        })
+      }
     })
   }
 
   /** Single trace with full span data. */
-  async getTraceDetail(id: number): Promise<any | null> {
+  async getTraceDetail(id: number): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
     const row = await this.db('server_stats_traces').where('id', id).first()
@@ -540,7 +713,7 @@ export class DashboardStore {
   }
 
   /** Single request with associated queries, events, and trace. */
-  async getRequestDetail(id: number): Promise<any | null> {
+  async getRequestDetail(id: number): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
     const request = await this.db('server_stats_requests').where('id', id).first()
@@ -575,13 +748,13 @@ export class DashboardStore {
    *
    * @param range — '1h' | '6h' | '24h' | '7d'
    */
-  async getOverviewMetrics(range: string = '1h'): Promise<any> {
+  async getOverviewMetrics(range: string = '1h'): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
     const cutoff = rangeToCutoff(range)
 
     // Recent requests for calculations
-    const requests: any[] = await this.db('server_stats_requests')
+    const requests: Record<string, unknown>[] = await this.db('server_stats_requests')
       .where('created_at', '>=', cutoff)
       .select('duration', 'status_code', 'url', 'created_at')
 
@@ -599,11 +772,11 @@ export class DashboardStore {
       }
     }
 
-    const durations = requests.map((r) => r.duration).sort((a: number, b: number) => a - b)
-    const avgResponseTime = durations.reduce((s: number, d: number) => s + d, 0) / total
+    const durations = requests.map((r) => r.duration as number).sort((a, b) => a - b)
+    const avgResponseTime = durations.reduce((s, d) => s + d, 0) / total
     const p95Index = Math.floor(total * 0.95)
     const p95ResponseTime = durations[Math.min(p95Index, total - 1)]
-    const errorCount = requests.filter((r) => r.status_code >= 400).length
+    const errorCount = requests.filter((r) => (r.status_code as number) >= 400).length
     const rangeMinutes = rangeToMinutes(range)
     const requestsPerMin = total / rangeMinutes
 
@@ -620,7 +793,7 @@ export class DashboardStore {
       .limit(5)
 
     // Query stats
-    const queryStats: any = await this.db('server_stats_queries')
+    const queryStats: Record<string, unknown> | undefined = await this.db('server_stats_queries')
       .where('created_at', '>=', cutoff)
       .select(
         this.db.raw('COUNT(*) as total'),
@@ -641,17 +814,17 @@ export class DashboardStore {
       requestsPerMinute: round(requestsPerMin),
       errorRate: round((errorCount / total) * 100),
       totalRequests: total,
-      slowestEndpoints: slowestEndpoints.map((s: any) => ({
+      slowestEndpoints: slowestEndpoints.map((s: Record<string, unknown>) => ({
         url: s.url,
         count: s.count,
         avgDuration: s.avg_duration,
       })),
       queryStats: {
-        total: queryStats?.total ?? 0,
-        avgDuration: queryStats?.avg_duration ?? 0,
-        perRequest: total > 0 ? round((queryStats?.total ?? 0) / total) : 0,
+        total: (queryStats?.total as number) ?? 0,
+        avgDuration: (queryStats?.avg_duration as number) ?? 0,
+        perRequest: total > 0 ? round(((queryStats?.total as number) ?? 0) / total) : 0,
       },
-      recentErrors: recentErrors.map((e: any) => ({
+      recentErrors: recentErrors.map((e: Record<string, unknown>) => ({
         id: e.id,
         message: e.message,
         createdAt: e.created_at,
@@ -664,7 +837,7 @@ export class DashboardStore {
    *
    * @param range — '1h' | '6h' | '24h' | '7d'
    */
-  async getChartData(range: string = '1h'): Promise<any[]> {
+  async getChartData(range: string = '1h'): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
     const cutoff = rangeToCutoff(range)
@@ -681,10 +854,20 @@ export class DashboardStore {
 
     // For 24h: group by 15-minute buckets; for 7d: group by hourly buckets
     const bucketMinutes = range === '7d' ? 60 : 15
-    const grouped = new Map<string, any>()
+    interface MetricsBucket {
+      bucket: string
+      request_count: number
+      avg_duration: number
+      p95_duration: number
+      error_count: number
+      query_count: number
+      avg_query_duration: number
+      _count: number
+    }
+    const grouped = new Map<string, MetricsBucket>()
 
     for (const row of rows) {
-      const bucketKey = roundBucket(row.bucket, bucketMinutes)
+      const bucketKey = roundBucket(row.bucket as string, bucketMinutes)
       if (!grouped.has(bucketKey)) {
         grouped.set(bucketKey, {
           bucket: bucketKey,
@@ -698,12 +881,12 @@ export class DashboardStore {
         })
       }
       const g = grouped.get(bucketKey)!
-      g.request_count += row.request_count
-      g.error_count += row.error_count
-      g.query_count += row.query_count
-      g.avg_duration += row.avg_duration
-      g.p95_duration = Math.max(g.p95_duration, row.p95_duration)
-      g.avg_query_duration += row.avg_query_duration
+      g.request_count += row.request_count as number
+      g.error_count += row.error_count as number
+      g.query_count += row.query_count as number
+      g.avg_duration += row.avg_duration as number
+      g.p95_duration = Math.max(g.p95_duration, row.p95_duration as number)
+      g.avg_query_duration += row.avg_query_duration as number
       g._count++
     }
 
@@ -798,18 +981,19 @@ export class DashboardStore {
         ])
 
       // Map top events
-      const topEvents = (topEventsRaw || []).map((r: any) => ({
-        eventName: r.event_name,
-        count: r.count,
+      const topEvents = (topEventsRaw || []).map((r: Record<string, unknown>) => ({
+        eventName: r.event_name as string,
+        count: r.count as number,
       }))
 
       // Map email activity
       const emailActivity = { sent: 0, queued: 0, failed: 0 }
       for (const row of emailStatusRaw || []) {
         const status = row.status as string
-        if (status === 'sent') emailActivity.sent = row.count
-        else if (status === 'queued') emailActivity.queued = row.count
-        else if (status === 'failed') emailActivity.failed = row.count
+        const count = row.count as number
+        if (status === 'sent') emailActivity.sent = count
+        else if (status === 'queued') emailActivity.queued = count
+        else if (status === 'failed') emailActivity.failed = count
       }
 
       // Map log level breakdown
@@ -817,7 +1001,7 @@ export class DashboardStore {
       for (const row of logLevelsRaw || []) {
         const level = row.level as string
         if (level in logLevelBreakdown) {
-          logLevelBreakdown[level as keyof typeof logLevelBreakdown] = row.count
+          logLevelBreakdown[level as keyof typeof logLevelBreakdown] = row.count as number
         }
       }
 
@@ -830,24 +1014,28 @@ export class DashboardStore {
       }
 
       // Map slowest queries
-      const slowestQueries = (slowQueriesRaw || []).map((r: any) => ({
-        sqlNormalized: r.sql_normalized,
-        avgDuration: r.avg_duration,
-        count: r.count,
+      const slowestQueries = (slowQueriesRaw || []).map((r: Record<string, unknown>) => ({
+        sqlNormalized: r.sql_normalized as string,
+        avgDuration: r.avg_duration as number,
+        count: r.count as number,
       }))
 
       return { topEvents, emailActivity, logLevelBreakdown, statusDistribution, slowestQueries }
-    } catch {
+    } catch (err) {
+      if (!overviewWidgetWarned) {
+        overviewWidgetWarned = true
+        log.warn('dashboard: getOverviewWidgets query failed — ' + (err as Error)?.message)
+      }
       return empty
     }
   }
 
   /** Get sparkline data points from pre-aggregated metrics. */
-  async getSparklineData(range: string): Promise<any[]> {
+  async getSparklineData(range: string): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
     const cutoff = rangeToCutoff(range)
-    const metrics: any[] = await this.db('server_stats_metrics')
+    const metrics: Record<string, unknown>[] = await this.db('server_stats_metrics')
       .where('created_at', '>=', cutoff)
       .orderBy('bucket', 'asc')
 
@@ -858,7 +1046,7 @@ export class DashboardStore {
   // Saved filters CRUD
   // =========================================================================
 
-  async getSavedFilters(section?: string): Promise<any[]> {
+  async getSavedFilters(section?: string): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
     const query = this.db('server_stats_saved_filters').orderBy('created_at', 'desc')
@@ -869,8 +1057,8 @@ export class DashboardStore {
   async createSavedFilter(
     name: string,
     section: string,
-    filterConfig: Record<string, any>
-  ): Promise<any> {
+    filterConfig: Record<string, unknown>
+  ): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
     const [id] = await this.db('server_stats_saved_filters').insert({
@@ -900,7 +1088,7 @@ export class DashboardStore {
    * @param queryId — ID from server_stats_queries
    * @param appDb — The application's Lucid database manager
    */
-  async runExplain(queryId: number, appDb: any): Promise<any> {
+  async runExplain(queryId: number, appDb: unknown): Promise<Record<string, unknown> | null> {
     if (!this.db) return { error: 'Dashboard store not initialized' }
 
     const row = await this.db('server_stats_queries').where('id', queryId).first()
@@ -912,10 +1100,12 @@ export class DashboardStore {
     }
 
     try {
-      const result = await appDb.rawQuery(`EXPLAIN ${sql}`)
+      const result = await (
+        appDb as { rawQuery: (sql: string) => Promise<{ rows?: unknown[] }> }
+      ).rawQuery(`EXPLAIN ${sql}`)
       return { plan: result.rows || result }
-    } catch (err: any) {
-      return { error: err.message || 'EXPLAIN failed' }
+    } catch (err) {
+      return { error: (err as Error).message || 'EXPLAIN failed' }
     }
   }
 
@@ -928,8 +1118,8 @@ export class DashboardStore {
     table: string,
     page: number,
     perPage: number,
-    applyFilters?: (query: any) => void
-  ): Promise<PaginatedResult<any>> {
+    applyFilters?: (query: Knex.QueryBuilder) => void
+  ): Promise<PaginatedResult<Record<string, unknown>>> {
     if (!this.db) {
       return { data: [], total: 0, page, perPage, lastPage: 0 }
     }
@@ -937,7 +1127,8 @@ export class DashboardStore {
     // Count total
     const countQuery = this.db(table)
     if (applyFilters) applyFilters(countQuery)
-    const [{ count: total }] = await countQuery.count('* as count')
+    const [{ count: totalRaw }] = await countQuery.count('* as count')
+    const total = Number(totalRaw)
 
     // Fetch page
     const offset = (page - 1) * perPage
@@ -960,30 +1151,36 @@ export class DashboardStore {
   private wireEventListeners(): void {
     if (!this.emitter || typeof this.emitter.on !== 'function') return
 
-    const buildAndPersistEmail = (data: any, status: EmailRecord['status']) => {
-      const msg = data?.message || data
+    const buildAndPersistEmail = (data: unknown, status: EmailRecord['status']) => {
+      const d = data as Record<string, unknown> | undefined
+      const msg = (d?.message || d) as Record<string, unknown> | undefined
       const record: EmailRecord = {
         id: 0,
         from: extractAddresses(msg?.from) || 'unknown',
         to: extractAddresses(msg?.to) || 'unknown',
         cc: extractAddresses(msg?.cc) || null,
         bcc: extractAddresses(msg?.bcc) || null,
-        subject: msg?.subject || '(no subject)',
-        html: msg?.html || null,
-        text: msg?.text || null,
-        mailer: data?.mailerName || data?.mailer || 'unknown',
+        subject: (msg?.subject as string) || '(no subject)',
+        html: (msg?.html as string) || null,
+        text: (msg?.text as string) || null,
+        mailer: (d?.mailerName as string) || (d?.mailer as string) || 'unknown',
         status,
-        messageId: data?.response?.messageId || data?.messageId || null,
-        attachmentCount: Array.isArray(msg?.attachments) ? msg.attachments.length : 0,
+        messageId:
+          ((d?.response as Record<string, unknown>)?.messageId as string) ||
+          (d?.messageId as string) ||
+          null,
+        attachmentCount: Array.isArray(msg?.attachments)
+          ? (msg.attachments as unknown[]).length
+          : 0,
         timestamp: Date.now(),
       }
       this.recordEmail(record)
     }
 
     this.handlers = [
-      { event: 'mail:sent', fn: (data: any) => buildAndPersistEmail(data, 'sent') },
-      { event: 'mail:queued', fn: (data: any) => buildAndPersistEmail(data, 'queued') },
-      { event: 'queued:mail:error', fn: (data: any) => buildAndPersistEmail(data, 'failed') },
+      { event: 'mail:sent', fn: (data: unknown) => buildAndPersistEmail(data, 'sent') },
+      { event: 'mail:queued', fn: (data: unknown) => buildAndPersistEmail(data, 'queued') },
+      { event: 'queued:mail:error', fn: (data: unknown) => buildAndPersistEmail(data, 'failed') },
     ]
 
     for (const h of this.handlers) {

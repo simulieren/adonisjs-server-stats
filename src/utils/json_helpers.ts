@@ -3,7 +3,7 @@
  */
 
 /** Safely parse a JSON string, returning the original value on failure. */
-export function safeParseJson(value: any): any {
+export function safeParseJson(value: unknown): unknown {
   if (value === null || value === undefined) return null
   if (typeof value !== 'string') return value
   try {
@@ -14,7 +14,7 @@ export function safeParseJson(value: any): any {
 }
 
 /** Safely parse a JSON string expected to be an array, returning [] on failure. */
-export function safeParseJsonArray(value: any): any[] {
+export function safeParseJsonArray(value: unknown): unknown[] {
   const parsed = safeParseJson(value)
   return Array.isArray(parsed) ? parsed : []
 }

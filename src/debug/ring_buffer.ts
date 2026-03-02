@@ -10,7 +10,7 @@ export class RingBuffer<T> {
   private pushCallback: ((item: T) => void) | null = null
 
   constructor(private capacity: number) {
-    this.buffer = new Array(capacity)
+    this.buffer = Array.from<T | undefined>({ length: capacity })
   }
 
   /** Register a callback that fires whenever a new item is pushed. */
@@ -56,8 +56,12 @@ export class RingBuffer<T> {
     return this.count
   }
 
+  getCapacity(): number {
+    return this.capacity
+  }
+
   clear(): void {
-    this.buffer = new Array(this.capacity)
+    this.buffer = Array.from<T | undefined>({ length: this.capacity })
     this.head = 0
     this.count = 0
   }

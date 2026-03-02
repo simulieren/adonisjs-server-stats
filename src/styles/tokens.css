@@ -1,0 +1,153 @@
+/* Shared design tokens for adonisjs-server-stats.
+ * Extracted from dashboard.css — used by the full-page dashboard.
+ * Loaded via readFileSync and prepended at runtime (not via @import).
+ */
+
+/* ── Theme: Dark (default) ─────────────────────────────────────── */
+:root {
+  --ss-bg: #0f0f0f;
+  --ss-surface: #171717;
+  --ss-surface-alt: #141414;
+  --ss-text: #e5e5e5;
+  --ss-text-secondary: #b5b5b5;
+  --ss-accent: #34d399;
+  --ss-accent-dim: #064e3b;
+  --ss-border: #333;
+  --ss-border-dim: #262626;
+  --ss-border-faint: #1f1f1f;
+  --ss-muted: #9ca3af;
+  --ss-dim: #6b7280;
+  --ss-hover: rgba(38, 38, 38, 0.4);
+  --ss-hover-accent: rgba(52, 211, 153, 0.08);
+  --ss-input-bg: #1a1a1a;
+  --ss-shadow: rgb(0 0 0 / 0.4);
+  /* Status colors */
+  --ss-green-bg: #064e3b;
+  --ss-green-fg: #34d399;
+  --ss-blue-bg: #1e3a5f;
+  --ss-blue-fg: #60a5fa;
+  --ss-amber-bg: #422006;
+  --ss-amber-fg: #fbbf24;
+  --ss-red-bg: #450a0a;
+  --ss-red-fg: #f87171;
+  --ss-purple-bg: #2e1065;
+  --ss-purple-fg: #c084fc;
+  --ss-sql-color: #93c5fd;
+  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-text-primary: var(--ss-text);
+  --ss-reqid-bg: #1e1b2e;
+  --ss-reqid-fg: #6d28d9;
+  --ss-reqid-hover-bg: #2e2644;
+  --ss-reqid-hover-fg: #a78bfa;
+}
+
+/* ── Theme: Dark (explicit toggle override) ───────────────────── */
+[data-theme='dark'] {
+  --ss-bg: #0f0f0f;
+  --ss-surface: #171717;
+  --ss-surface-alt: #141414;
+  --ss-text: #e5e5e5;
+  --ss-text-secondary: #b5b5b5;
+  --ss-accent: #34d399;
+  --ss-accent-dim: #064e3b;
+  --ss-border: #333;
+  --ss-border-dim: #262626;
+  --ss-border-faint: #1f1f1f;
+  --ss-muted: #9ca3af;
+  --ss-dim: #6b7280;
+  --ss-hover: rgba(38, 38, 38, 0.4);
+  --ss-hover-accent: rgba(52, 211, 153, 0.08);
+  --ss-input-bg: #1a1a1a;
+  --ss-shadow: rgb(0 0 0 / 0.4);
+  --ss-green-bg: #064e3b;
+  --ss-green-fg: #34d399;
+  --ss-blue-bg: #1e3a5f;
+  --ss-blue-fg: #60a5fa;
+  --ss-amber-bg: #422006;
+  --ss-amber-fg: #fbbf24;
+  --ss-red-bg: #450a0a;
+  --ss-red-fg: #f87171;
+  --ss-purple-bg: #2e1065;
+  --ss-purple-fg: #c084fc;
+  --ss-sql-color: #93c5fd;
+  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-text-primary: var(--ss-text);
+  --ss-reqid-bg: #1e1b2e;
+  --ss-reqid-fg: #6d28d9;
+  --ss-reqid-hover-bg: #2e2644;
+  --ss-reqid-hover-fg: #a78bfa;
+}
+
+/* ── Theme: Light ──────────────────────────────────────────────── */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --ss-bg: #fafafa;
+    --ss-surface: #ffffff;
+    --ss-surface-alt: #f5f5f5;
+    --ss-text: #171717;
+    --ss-text-secondary: #525252;
+    --ss-accent: #059669;
+    --ss-accent-dim: #d1fae5;
+    --ss-border: #e5e5e5;
+    --ss-border-dim: #e5e5e5;
+    --ss-border-faint: #f0f0f0;
+    --ss-muted: #6b7280;
+    --ss-dim: #9ca3af;
+    --ss-hover: rgba(0, 0, 0, 0.03);
+    --ss-hover-accent: rgba(5, 150, 105, 0.06);
+    --ss-input-bg: #ffffff;
+    --ss-shadow: rgb(0 0 0 / 0.08);
+    --ss-green-bg: #d1fae5;
+    --ss-green-fg: #059669;
+    --ss-blue-bg: #dbeafe;
+    --ss-blue-fg: #2563eb;
+    --ss-amber-bg: #fef3c7;
+    --ss-amber-fg: #b45309;
+    --ss-red-bg: #fee2e2;
+    --ss-red-fg: #dc2626;
+    --ss-purple-bg: #ede9fe;
+    --ss-purple-fg: #7c3aed;
+    --ss-sql-color: #2563eb;
+    --ss-text-primary: var(--ss-text);
+    --ss-reqid-bg: #ede9fe;
+    --ss-reqid-fg: #7c3aed;
+    --ss-reqid-hover-bg: #ddd6fe;
+    --ss-reqid-hover-fg: #6d28d9;
+  }
+}
+
+/* ── Theme: Light (explicit toggle override) ──────────────────── */
+[data-theme='light'] {
+  --ss-bg: #fafafa;
+  --ss-surface: #ffffff;
+  --ss-surface-alt: #f5f5f5;
+  --ss-text: #171717;
+  --ss-text-secondary: #525252;
+  --ss-accent: #059669;
+  --ss-accent-dim: #d1fae5;
+  --ss-border: #e5e5e5;
+  --ss-border-dim: #e5e5e5;
+  --ss-border-faint: #f0f0f0;
+  --ss-muted: #6b7280;
+  --ss-dim: #9ca3af;
+  --ss-hover: rgba(0, 0, 0, 0.03);
+  --ss-hover-accent: rgba(5, 150, 105, 0.06);
+  --ss-input-bg: #ffffff;
+  --ss-shadow: rgb(0 0 0 / 0.08);
+  --ss-green-bg: #d1fae5;
+  --ss-green-fg: #059669;
+  --ss-blue-bg: #dbeafe;
+  --ss-blue-fg: #2563eb;
+  --ss-amber-bg: #fef3c7;
+  --ss-amber-fg: #b45309;
+  --ss-red-bg: #fee2e2;
+  --ss-red-fg: #dc2626;
+  --ss-purple-bg: #ede9fe;
+  --ss-purple-fg: #7c3aed;
+  --ss-sql-color: #2563eb;
+  --ss-text-primary: var(--ss-text);
+  --ss-reqid-bg: #ede9fe;
+  --ss-reqid-fg: #7c3aed;
+  --ss-reqid-hover-bg: #ddd6fe;
+  --ss-reqid-hover-fg: #6d28d9;
+}

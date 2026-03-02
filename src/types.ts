@@ -385,6 +385,59 @@ export interface DevToolbarOptions {
    * @default '/admin/api/debug'
    */
   debugEndpoint?: string
+
+  /**
+   * Client-side rendering library for the Edge integration.
+   *
+   * - `'preact'` — lightweight Preact + React-compat components (default)
+   * - `'vue'` — Vue 3 components (ideal if your app already uses Vue / Inertia)
+   *
+   * Both renderers share the same CSS and JSON config; only the JS bundle differs.
+   *
+   * @default 'preact'
+   */
+  renderer?: 'preact' | 'vue'
+}
+
+// ---------------------------------------------------------------------------
+// Simplified config aliases (Phase 1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Toolbar settings (new simplified config).
+ * Maps to the relevant fields in DevToolbarOptions.
+ */
+export interface ToolbarConfig {
+  slowQueryThreshold?: number
+  tracing?: boolean
+  persist?: boolean
+  panes?: DebugPane[]
+  excludeFromTracing?: string[]
+}
+
+/**
+ * Dashboard settings (new simplified config).
+ * Maps to devToolbar.dashboard + devToolbar.dashboardPath + devToolbar.retentionDays.
+ */
+export interface DashboardConfig {
+  path?: string
+  retentionDays?: number
+}
+
+/**
+ * Advanced options that most users never need.
+ */
+export interface AdvancedConfig {
+  skipInTest?: boolean
+  channelName?: string
+  debugEndpoint?: string
+  renderer?: 'preact' | 'vue'
+  dbPath?: string
+  persistPath?: string
+  maxQueries?: number
+  maxEvents?: number
+  maxEmails?: number
+  maxTraces?: number
 }
 
 // ---------------------------------------------------------------------------
@@ -395,18 +448,23 @@ export interface DevToolbarOptions {
  * Top-level configuration for `adonisjs-server-stats`.
  *
  * Pass this to {@link defineConfig} in `config/server_stats.ts`.
+ * All fields are optional — `defineConfig({})` works out of the box.
  *
  * @example
  * ```ts
+ * // Minimal — zero config, auto-detects everything
  * import { defineConfig } from 'adonisjs-server-stats'
- * import { processCollector, httpCollector } from 'adonisjs-server-stats/collectors'
+ * export default defineConfig({})
+ * ```
  *
+ * @example
+ * ```ts
+ * // Common setup
+ * import { defineConfig } from 'adonisjs-server-stats'
  * export default defineConfig({
- *   intervalMs: 3000,
- *   transport: 'transmit',
- *   channelName: 'admin/server-stats',
- *   endpoint: '/admin/api/server-stats',
- *   collectors: [processCollector(), httpCollector()],
+ *   authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+ *   toolbar: true,
+ *   dashboard: true,
  * })
  * ```
  */
@@ -419,8 +477,9 @@ export interface ServerStatsConfig {
    * CPU and network overhead.
    *
    * @default 3000
+   * @deprecated Use {@link pollInterval} instead. Will be removed in the next major version.
    */
-  intervalMs: number
+  intervalMs?: number
 
   /**
    * How collected stats are pushed to connected clients.
@@ -431,8 +490,9 @@ export interface ServerStatsConfig {
    *   HTTP endpoint.
    *
    * @default 'transmit'
+   * @deprecated Use {@link realtime} instead (`true` = transmit, `false` = none). Will be removed in the next major version.
    */
-  transport: 'transmit' | 'none'
+  transport?: 'transmit' | 'none'
 
   /**
    * Transmit channel name used for SSE broadcasting.
@@ -441,8 +501,9 @@ export interface ServerStatsConfig {
    * Only relevant when `transport` is `'transmit'`.
    *
    * @default 'admin/server-stats'
+   * @deprecated Use `advanced.channelName` instead. Will be removed in the next major version.
    */
-  channelName: string
+  channelName?: string
 
   /**
    * HTTP endpoint path that returns the latest stats snapshot as JSON.
@@ -451,15 +512,20 @@ export interface ServerStatsConfig {
    * (e.g. if you provide your own controller).
    *
    * @default '/admin/api/server-stats'
+   * @deprecated Use {@link statsEndpoint} instead. Will be removed in the next major version.
    */
-  endpoint: string | false
+  endpoint?: string | false
 
   /**
-   * Array of collector instances that will be run each tick.
+   * Collector instances that will be run each tick, or `'auto'`
+   * to let the package auto-detect available collectors.
    *
-   * Order does not matter -- all collectors run in parallel via
-   * `Promise.all`. Each collector contributes a subset of fields
-   * to the merged {@link ServerStats} snapshot.
+   * When an array is provided, order does not matter -- all
+   * collectors run in parallel via `Promise.all`. Each collector
+   * contributes a subset of fields to the merged
+   * {@link ServerStats} snapshot.
+   *
+   * @default 'auto'
    *
    * @example
    * ```ts
@@ -471,7 +537,7 @@ export interface ServerStatsConfig {
    * ]
    * ```
    */
-  collectors: MetricCollector[]
+  collectors?: 'auto' | MetricCollector[]
 
   /**
    * Skip metric collection during test runs (`NODE_ENV=test`).
@@ -480,6 +546,7 @@ export interface ServerStatsConfig {
    * and speeds up the test suite.
    *
    * @default true
+   * @deprecated Use `advanced.skipInTest` instead. Will be removed in the next major version.
    */
   skipInTest?: boolean
 
@@ -508,6 +575,7 @@ export interface ServerStatsConfig {
    * table, and live logs.
    *
    * @see {@link DevToolbarOptions}
+   * @deprecated Use {@link toolbar}, {@link dashboard}, and {@link advanced} instead. Will be removed in the next major version.
    */
   devToolbar?: DevToolbarOptions
 
@@ -532,6 +600,67 @@ export interface ServerStatsConfig {
    * // Only in development
    * shouldShow: () => process.env.NODE_ENV === 'development'
    * ```
+   *
+   * @deprecated Use {@link authorize} instead. Will be removed in the next major version.
    */
-  shouldShow?: (ctx: any) => boolean
+  shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+
+  // ---------------------------------------------------------------------------
+  // New aliases (Phase 1 — non-breaking additions)
+  // ---------------------------------------------------------------------------
+
+  /** Alias for `intervalMs`. New preferred name. */
+  pollInterval?: number
+  /** Alias for `transport`. `true` = 'transmit', `false` = 'none'. */
+  realtime?: boolean
+  /** Alias for `endpoint`. New preferred name. */
+  statsEndpoint?: string | false
+  /** Alias for `shouldShow`. New preferred name. */
+  authorize?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+  /** Enable toolbar. Alias for `devToolbar`. `true` = enabled with defaults. */
+  toolbar?: boolean | ToolbarConfig
+  /** Enable dashboard. Top-level shortcut for `devToolbar.dashboard`. `true` = enabled at /__stats. */
+  dashboard?: boolean | DashboardConfig
+  /** Advanced options. */
+  advanced?: AdvancedConfig
+}
+
+// ---------------------------------------------------------------------------
+// Resolved config (all defaults applied)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fully resolved configuration with all defaults applied.
+ *
+ * This is the return type of {@link defineConfig}. Consumers that
+ * read from `app.config.get('server_stats')` receive this type,
+ * so all required fields are guaranteed to be present.
+ */
+export interface ResolvedServerStatsConfig {
+  /** Collection interval in milliseconds. Always present after `defineConfig()`. */
+  intervalMs: number
+
+  /** Transport mode. Always present after `defineConfig()`. */
+  transport: 'transmit' | 'none'
+
+  /** Transmit channel name. Always present after `defineConfig()`. */
+  channelName: string
+
+  /** HTTP endpoint path or `false` to disable. Always present after `defineConfig()`. */
+  endpoint: string | false
+
+  /** Collectors array or `'auto'`. Always present after `defineConfig()`. */
+  collectors: 'auto' | MetricCollector[]
+
+  /** Whether to skip collection in test environments. Always present after `defineConfig()`. */
+  skipInTest: boolean
+
+  /** Optional per-tick callback. */
+  onStats?: (stats: Partial<ServerStats>) => void
+
+  /** Optional dev toolbar configuration. */
+  devToolbar?: DevToolbarOptions
+
+  /** Optional access-control callback. */
+  shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
 }

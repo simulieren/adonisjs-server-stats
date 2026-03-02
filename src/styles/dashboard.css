@@ -1,0 +1,1457 @@
+/* Full-page dashboard styles for adonisjs-server-stats.
+ * All classes use the `.ss-dash-` prefix to avoid conflicts.
+ * Theme tokens are loaded from tokens.css (prepended at runtime).
+ */
+
+/* ── Reset & base ──────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+button,
+input,
+select,
+textarea,
+pre {
+  font-family: inherit;
+}
+
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Page layout ───────────────────────────────────────────────── */
+#ss-dash {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.ss-dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 42px;
+  padding: 0 16px;
+  background: var(--ss-surface);
+  border-bottom: 1px solid var(--ss-border);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.ss-dash-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ss-dash-logo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ss-accent);
+  letter-spacing: -0.02em;
+}
+
+.ss-dash-logo-sub {
+  font-size: 10px;
+  color: var(--ss-dim);
+  font-weight: 400;
+}
+
+.ss-dash-header-center {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ss-dash-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ss-dim);
+  flex-shrink: 0;
+}
+.ss-dash-live-dot.ss-dash-connected {
+  background: var(--ss-accent);
+  box-shadow: 0 0 6px var(--ss-accent);
+  animation: ss-dash-pulse 2s infinite;
+}
+@keyframes ss-dash-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.ss-dash-live-label {
+  font-size: 10px;
+  color: var(--ss-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.ss-dash-live-label.ss-dash-connected {
+  color: var(--ss-accent);
+}
+
+.ss-dash-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ss-dash-theme-btn,
+.ss-dash-back-link {
+  padding: 4px 8px;
+  font-size: 14px;
+  color: var(--ss-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-radius: 4px;
+}
+.ss-dash-theme-btn:hover,
+.ss-dash-back-link:hover {
+  color: var(--ss-text);
+  background: var(--ss-hover);
+}
+
+.ss-dash-back-link {
+  font-size: 10px;
+  text-decoration: none;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Body: sidebar + main ──────────────────────────────────────── */
+.ss-dash-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+.ss-dash-sidebar {
+  width: 220px;
+  min-width: 220px;
+  background: var(--ss-surface);
+  border-right: 1px solid var(--ss-border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition:
+    width 0.2s ease,
+    min-width 0.2s ease;
+  /* scrollbar hiding → utilities.css */
+}
+
+.ss-dash-sidebar.ss-dash-collapsed {
+  width: 56px;
+  min-width: 56px;
+}
+
+.ss-dash-nav {
+  flex: 1;
+  padding: 8px 0;
+}
+
+.ss-dash-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  cursor: pointer;
+  color: var(--ss-muted);
+  font-size: 11px;
+  font-weight: 500;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  transition:
+    color 0.15s,
+    background 0.15s;
+  position: relative;
+  white-space: nowrap;
+}
+.ss-dash-nav-item:hover {
+  color: var(--ss-text-secondary);
+  background: var(--ss-hover);
+}
+.ss-dash-nav-item.ss-dash-active {
+  color: var(--ss-accent);
+  background: var(--ss-hover-accent);
+}
+.ss-dash-nav-item.ss-dash-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  background: var(--ss-accent);
+  border-radius: 0 2px 2px 0;
+}
+
+.ss-dash-nav-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ss-dash-nav-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ss-dash-nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ss-dash-collapsed .ss-dash-nav-label {
+  display: none;
+}
+
+.ss-dash-nav-badge {
+  margin-left: auto;
+  font-size: 10px;
+  min-width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  border-radius: 9px;
+  background: var(--ss-red-fg);
+  color: #fff;
+  padding: 0 5px;
+  font-weight: 600;
+  /* tabular-nums → utilities.css */
+}
+.ss-dash-nav-badge.ss-dash-badge-accent {
+  background: var(--ss-accent-dim);
+  color: var(--ss-accent);
+}
+.ss-dash-nav-badge.ss-dash-badge-red {
+  background: var(--ss-red-bg);
+  color: var(--ss-red-fg);
+}
+.ss-dash-collapsed .ss-dash-nav-badge {
+  display: none;
+}
+
+.ss-dash-nav-sep {
+  height: 1px;
+  background: var(--ss-border-dim);
+  margin: 6px 12px;
+}
+
+.ss-dash-sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  cursor: pointer;
+  color: var(--ss-dim);
+  border: none;
+  background: none;
+  font-size: 14px;
+  border-top: 1px solid var(--ss-border-dim);
+  flex-shrink: 0;
+}
+.ss-dash-sidebar-toggle:hover {
+  color: var(--ss-text-secondary);
+  background: var(--ss-hover);
+}
+
+/* ── Main content ──────────────────────────────────────────────── */
+.ss-dash-main {
+  flex: 1;
+  overflow: auto;
+  background: var(--ss-bg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--ss-border) transparent;
+}
+
+.ss-dash-pane {
+  display: none;
+  height: 100%;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ss-border) transparent;
+}
+.ss-dash-pane.ss-dash-active {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Search bar ────────────────────────────────────────────────── */
+.ss-dash-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.ss-dash-search {
+  flex: 1;
+  min-width: 200px;
+  padding: 5px 10px;
+  padding-left: 28px;
+  padding-right: 24px;
+  font-size: 11px;
+  color: var(--ss-text);
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  outline: none;
+}
+.ss-dash-search:focus {
+  border-color: var(--ss-accent);
+}
+.ss-dash-search::placeholder {
+  color: var(--ss-dim);
+}
+
+.ss-dash-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.ss-dash-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 400px;
+}
+
+.ss-dash-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--ss-dim);
+  pointer-events: none;
+}
+
+.ss-dash-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ss-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+.ss-dash-search-clear:hover {
+  color: var(--ss-text);
+}
+
+.ss-dash-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ss-dash-summary {
+  font-size: 12px;
+  color: var(--ss-dim);
+  white-space: nowrap;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+/* Base btn / btn-group → components.css */
+/* Dashboard override: bordered style with uppercase */
+.ss-dash-btn {
+  --ss-btn-py: 4px;
+  --ss-btn-px: 10px;
+  --ss-btn-border: 1px solid var(--ss-border);
+  --ss-btn-bg: var(--ss-surface);
+  --ss-btn-case: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.ss-dash-btn:hover {
+  border-color: var(--ss-dim);
+}
+.ss-dash-btn.ss-dash-active {
+  color: var(--ss-accent);
+  border-color: var(--ss-accent);
+  background: var(--ss-accent-dim);
+}
+
+.ss-dash-filter-btn {
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 4px;
+  border: 1px solid var(--ss-border);
+  background: var(--ss-surface);
+  color: var(--ss-dim);
+  cursor: pointer;
+}
+.ss-dash-filter-btn.ss-dash-active {
+  background: var(--ss-accent);
+  color: #fff;
+  border-color: var(--ss-accent);
+}
+
+.ss-dash-level-filters {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* ── Tables ────────────────────────────────────────────────────── */
+.ss-dash-table-wrap {
+  --ss-table-cell-px: 12px;
+  --ss-table-cell-py: 7px;
+  --ss-table-td-py: 6px;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: visible;
+  margin: 0 -2px;
+  padding: 0 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ss-border) transparent;
+}
+/* Table base → components.css */
+/* Column resize → components.css */
+.ss-dash-table th {
+  z-index: 2;
+}
+.ss-dash-table td {
+  max-width: 0;
+}
+.ss-dash-table tr.ss-dash-explain-row:hover td {
+  background: var(--ss-surface-alt);
+}
+.ss-dash-table tr.ss-dash-clickable {
+  cursor: pointer;
+}
+.ss-dash-table tr.ss-dash-clickable:hover td {
+  background: var(--ss-hover-accent);
+}
+
+.ss-dash-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.ss-dash-sortable:hover {
+  color: var(--ss-accent);
+}
+
+.ss-dash-sort-arrow {
+  font-size: 10px;
+  color: var(--ss-accent);
+  margin-left: 2px;
+}
+
+.ss-dash-data-cell {
+  position: relative;
+  max-width: 300px;
+}
+
+/* ── Method badges ─────────────────────────────────────────────── */
+/* Base + GET/POST/PUT/PATCH/DELETE → components.css */
+/* Dashboard-only SQL method variants */
+.ss-dash-method-select {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-dash-method-insert {
+  background: var(--ss-blue-bg);
+  color: var(--ss-blue-fg);
+}
+.ss-dash-method-update {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-dash-method-head,
+.ss-dash-method-options,
+.ss-dash-method-raw {
+  background: var(--ss-surface);
+  color: var(--ss-dim);
+}
+
+/* Status badges → components.css */
+/* Badge generic → components.css */
+
+/* Dashboard badge-muted override (uses --ss-surface instead of --ss-border-dim) */
+.ss-dash-badge-muted {
+  background: var(--ss-surface);
+}
+
+/* Duration → components.css */
+
+/* ── SQL ───────────────────────────────────────────────────────── */
+.ss-dash-sql {
+  font-size: 11px;
+  color: var(--ss-sql-color);
+  word-break: break-all;
+  cursor: pointer;
+  max-width: 600px;
+  /* truncation → utilities.css */
+  display: inline-block;
+}
+.ss-dash-sql.ss-dash-expanded {
+  white-space: pre-wrap;
+  max-width: none;
+}
+
+.ss-dash-dup {
+  color: var(--ss-purple-fg);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ── Current route highlight ───────────────────────────────────── */
+.ss-dash-current-route td {
+  background: var(--ss-hover-accent) !important;
+}
+
+/* ── Data preview / expand ─────────────────────────────────────── */
+.ss-dash-data-preview {
+  cursor: pointer;
+  color: var(--ss-text-secondary);
+  border-bottom: 1px dashed var(--ss-dim);
+}
+.ss-dash-data-preview:hover {
+  color: var(--ss-text);
+}
+
+.ss-dash-data-full {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  color: var(--ss-text-secondary);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow: auto;
+  cursor: pointer;
+  scrollbar-width: thin;
+}
+
+/* Copy button → components.css */
+/* Dashboard copy-btn hover override (uses --ss-border instead of --ss-border-strong) */
+.ss-dash-copy-btn:hover {
+  border-color: var(--ss-border);
+}
+
+/* Empty state → components.css */
+/* Dashboard empty override (adds flex: 1) */
+.ss-dash-empty {
+  flex: 1;
+}
+
+/* ── Event name & time ─────────────────────────────────────────── */
+.ss-dash-event-name {
+  color: var(--ss-sql-color);
+}
+.ss-dash-event-data {
+  color: var(--ss-muted);
+  font-size: 10px;
+  position: relative;
+}
+.ss-dash-event-time {
+  color: var(--ss-dim);
+  font-size: 10px;
+  /* tabular-nums → utilities.css */
+}
+
+/* ── Logs ──────────────────────────────────────────────────────── */
+/* Log entry / level / time / reqid / msg → components.css */
+/* Dashboard overrides: wider padding, border-faint separator, surface bg for debug/trace */
+.ss-dash-log-filters {
+  --ss-log-px: 16px;
+  --ss-log-border: var(--ss-border-faint);
+  --ss-log-debug-bg: var(--ss-surface);
+  --ss-log-trace-bg: var(--ss-surface);
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* When log filters are inside the shared FilterBar, strip redundant chrome */
+.ss-dash-filter-controls .ss-dash-log-filters {
+  padding: 0;
+  border-bottom: none;
+  background: none;
+}
+
+.ss-dash-log-filter {
+  padding: 3px 10px;
+  font-size: 10px;
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  color: var(--ss-muted);
+  text-transform: uppercase;
+}
+.ss-dash-log-filter:hover {
+  border-color: var(--ss-dim);
+  color: var(--ss-text-secondary);
+}
+.ss-dash-log-filter.ss-dash-active {
+  border-color: var(--ss-accent);
+  color: var(--ss-accent);
+}
+
+.ss-dash-log-entries {
+  --ss-log-px: 16px;
+  --ss-log-border: var(--ss-border-faint);
+  --ss-log-debug-bg: var(--ss-surface);
+  --ss-log-trace-bg: var(--ss-surface);
+  flex: 1;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.ss-dash-log-entry:hover {
+  background: var(--ss-hover);
+}
+
+/* ── Structured log search ─────────────────────────────────────── */
+.ss-dash-structured-search {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+}
+
+.ss-dash-filter-select,
+.ss-dash-filter-input {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--ss-text);
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  outline: none;
+}
+.ss-dash-filter-select:focus,
+.ss-dash-filter-input:focus {
+  border-color: var(--ss-accent);
+}
+
+.ss-dash-filter-select {
+  min-width: 100px;
+}
+.ss-dash-filter-input {
+  min-width: 150px;
+  flex: 1;
+  max-width: 300px;
+}
+
+.ss-dash-filter-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.ss-dash-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  background: var(--ss-accent-dim);
+  color: var(--ss-accent);
+  border-radius: 4px;
+}
+.ss-dash-filter-chip-remove {
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--ss-accent);
+  background: none;
+  border: none;
+  padding: 0;
+}
+.ss-dash-filter-chip-remove:hover {
+  color: var(--ss-text);
+}
+
+/* ── Saved filters ─────────────────────────────────────────────── */
+.ss-dash-saved-filters {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.ss-dash-saved-select {
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--ss-text);
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  outline: none;
+  min-width: 120px;
+}
+
+/* ── Email preview ─────────────────────────────────────────────── */
+/* Base email preview / row / status → components.css */
+/* Dashboard override: 16px header padding */
+.ss-dash-email-preview {
+  --ss-email-px: 16px;
+}
+.ss-dash-email-preview-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--ss-dim);
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.ss-dash-email-preview-close:hover {
+  background: var(--ss-surface);
+  color: var(--ss-text);
+}
+
+/* ── Timeline / Waterfall ──────────────────────────────────────── */
+/* Base timeline → components.css */
+/* Dashboard overrides: wider dimensions, faint border, extra bar style */
+.ss-dash-tl-detail-header {
+  --ss-tl-detail-gap: 12px;
+  --ss-tl-detail-py: 8px;
+  --ss-tl-detail-px: 16px;
+}
+
+.ss-dash-tl-waterfall {
+  --ss-tl-label-w: 320px;
+  --ss-tl-row-h: 26px;
+  --ss-tl-bar-h: 14px;
+  --ss-tl-track-h: 18px;
+  --ss-tl-row-border: var(--ss-border-faint);
+  --ss-tl-dur-ml: 6px;
+  --ss-tl-legend-gap: 14px;
+  --ss-tl-legend-py: 6px;
+  --ss-tl-legend-px: 16px;
+  --ss-tl-legend-dot-size: 8px;
+  --ss-tl-warnings-px: 16px;
+  --ss-tl-bar-custom-bg: var(--ss-dim);
+  padding: 8px 16px;
+  overflow: auto;
+  flex: 1;
+  scrollbar-width: thin;
+}
+
+/* Dashboard-specific: request bar has a border */
+.ss-dash-tl-bar-request {
+  background: var(--ss-blue-bg);
+  border: 1px solid var(--ss-blue-fg);
+}
+
+.ss-dash-tl-dur {
+  min-width: 60px;
+  text-align: right;
+}
+
+.ss-dash-tl-legend {
+  flex-shrink: 0;
+}
+
+/* ── EXPLAIN panel ─────────────────────────────────────────────── */
+.ss-dash-explain-row td {
+  white-space: normal;
+  overflow: visible;
+  max-width: none;
+}
+.ss-dash-explain {
+  padding: 12px 16px;
+  background: var(--ss-surface-alt);
+  border-top: 1px solid var(--ss-border-dim);
+  font-size: 11px;
+  overflow: hidden;
+  word-break: break-word;
+}
+.ss-dash-explain-btn {
+  padding: 2px 8px;
+  font-size: 9px;
+  color: var(--ss-purple-fg);
+  background: var(--ss-purple-bg);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.ss-dash-explain-btn:hover {
+  opacity: 0.8;
+}
+.ss-dash-explain-btn-active {
+  background: var(--ss-purple-fg);
+  color: #fff;
+}
+.ss-dash-explain-result {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ss-text-secondary);
+}
+.ss-dash-explain-error {
+  color: var(--ss-red-fg);
+  padding: 8px;
+  background: var(--ss-red-bg);
+  border-radius: 4px;
+}
+.ss-dash-explain-node {
+  padding: 4px 0;
+  border-left: 2px solid var(--ss-border-dim);
+  padding-left: 10px;
+  margin-top: 2px;
+}
+.ss-dash-explain-node:first-child {
+  border-left: 2px solid var(--ss-purple-fg);
+}
+.ss-dash-explain-node-header {
+  font-weight: 600;
+  color: var(--ss-text-primary);
+  font-size: 11px;
+}
+.ss-dash-explain-node-type {
+  color: var(--ss-purple-fg);
+  font-weight: 700;
+}
+.ss-dash-explain-metrics {
+  font-size: 10px;
+  color: var(--ss-dim);
+  margin-top: 1px;
+  font-family: var(--ss-font-mono);
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+.ss-dash-explain-result table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4px;
+}
+.ss-dash-explain-result th {
+  padding: 3px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ss-muted);
+  border-bottom: 1px solid var(--ss-border);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.ss-dash-explain-result td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--ss-border-faint);
+  color: var(--ss-text-secondary);
+}
+
+/* ── Overview cards ────────────────────────────────────────────── */
+.ss-dash-overview {
+  padding: 16px;
+}
+
+.ss-dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ss-dash-card {
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ss-dash-card-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  font-weight: 600;
+}
+
+.ss-dash-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ss-text);
+  /* tabular-nums → utilities.css */
+  line-height: 1.2;
+}
+.ss-dash-card-value.ss-dash-accent {
+  color: var(--ss-accent);
+}
+.ss-dash-card-value.ss-dash-amber {
+  color: var(--ss-amber-fg);
+}
+.ss-dash-card-value.ss-dash-red {
+  color: var(--ss-red-fg);
+}
+.ss-dash-card-value.ss-dash-dim {
+  color: var(--ss-dim);
+}
+
+.ss-dash-sparkline {
+  height: 30px;
+  margin-top: 4px;
+}
+.ss-dash-sparkline svg {
+  width: 100%;
+  height: 100%;
+}
+.ss-dash-sparkline-line {
+  fill: none;
+  stroke: var(--ss-accent);
+  stroke-width: 1.5;
+}
+.ss-dash-sparkline-area {
+  fill: var(--ss-accent);
+  opacity: 0.1;
+}
+
+/* ── Chart container ───────────────────────────────────────────── */
+.ss-dash-chart-container {
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-border);
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.ss-dash-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.ss-dash-chart-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ss-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ss-dash-chart-area {
+  position: relative;
+  min-height: 160px;
+}
+
+.ss-dash-chart {
+  width: 100%;
+  height: 220px;
+  position: relative;
+}
+.ss-dash-chart svg {
+  width: 100%;
+  height: 100%;
+}
+.ss-dash-chart-svg .ss-dash-chart-dot {
+  transition:
+    r 0.15s ease,
+    opacity 0.15s ease;
+}
+.ss-dash-chart-svg .ss-dash-chart-dot-err {
+  fill: var(--ss-red-fg);
+}
+.ss-dash-chart-svg .ss-dash-chart-hover-zone {
+  cursor: crosshair;
+}
+
+.ss-dash-chart-tooltip {
+  position: absolute;
+  padding: 8px 12px;
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-border);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ss-text);
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 4px 12px var(--ss-shadow);
+  white-space: nowrap;
+}
+
+.ss-dash-chart-legend {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  padding: 8px 0 0;
+  font-size: 10px;
+  color: var(--ss-muted);
+}
+.ss-dash-chart-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.ss-dash-legend-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ── Secondary cards ───────────────────────────────────────────── */
+.ss-dash-secondary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.ss-dash-secondary-card {
+  background: var(--ss-surface);
+  border: 1px solid var(--ss-border);
+  border-radius: 6px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+
+.ss-dash-secondary-card-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ss-dash-secondary-list {
+  list-style: none;
+}
+.ss-dash-secondary-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: var(--ss-text);
+  border-bottom: 1px solid var(--ss-border-faint);
+  min-width: 0;
+}
+.ss-dash-secondary-list li:has(> a) {
+  display: block;
+  padding: 0;
+  border-bottom: none;
+}
+.ss-dash-secondary-list li > span:first-child {
+  /* truncation → utilities.css */
+  min-width: 0;
+}
+.ss-dash-secondary-list li:last-child {
+  border-bottom: none;
+}
+.ss-dash-secondary-list-value {
+  color: var(--ss-text-secondary);
+  /* tabular-nums → utilities.css */
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ── Pagination ────────────────────────────────────────────────── */
+.ss-dash-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+}
+
+.ss-dash-pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ss-dash-page-ellipsis {
+  padding: 4px 6px;
+  color: var(--ss-dim);
+  font-size: 12px;
+}
+
+.ss-dash-page-btn {
+  padding: 3px 10px;
+  font-size: 10px;
+  color: var(--ss-muted);
+  background: none;
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ss-dash-page-btn:hover {
+  color: var(--ss-text);
+  border-color: var(--ss-dim);
+}
+.ss-dash-page-btn.ss-dash-active {
+  color: var(--ss-accent);
+  border-color: var(--ss-accent);
+}
+.ss-dash-page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.ss-dash-page-info {
+  font-size: 10px;
+  color: var(--ss-dim);
+  padding: 0 8px;
+}
+
+/* ── Config viewer ─────────────────────────────────────────────── */
+/* Config section/toggle/key/val/match/redacted/copy-row/inner-table → components.css */
+/* Dashboard-specific: toolbar, tabs, env table, wider config sections */
+.ss-dash-config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+}
+.ss-dash-config-tab {
+  padding: 4px 12px;
+  font-size: 11px;
+  border: 1px solid var(--ss-border-dim);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  color: var(--ss-muted);
+  white-space: nowrap;
+}
+.ss-dash-config-tab:hover {
+  border-color: var(--ss-dim);
+  color: var(--ss-text-secondary);
+}
+.ss-dash-config-tab.ss-dash-active {
+  border-color: var(--ss-accent);
+  color: var(--ss-accent);
+}
+
+.ss-dash-config-table-wrap {
+  flex: 1;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ss-border) transparent;
+}
+
+.ss-dash-config-env-table {
+  table-layout: fixed;
+}
+.ss-dash-env-key {
+  width: 280px;
+  min-width: 280px;
+  /* truncation → utilities.css */
+}
+.ss-dash-env-val {
+  /* truncation → utilities.css */
+  max-width: 0;
+}
+
+/* Dashboard config overrides: larger header, wider padding, border-dim */
+.ss-dash-config-key {
+  font-weight: 500;
+  font-size: 11px;
+}
+.ss-dash-config-val {
+  font-size: 11px;
+}
+.ss-dash-config-sections {
+  --ss-config-section-border: var(--ss-border-dim);
+  --ss-config-header-gap: 8px;
+  --ss-config-header-py: 9px;
+  --ss-config-header-px: 16px;
+  --ss-config-header-font: 12px;
+  --ss-config-toggle-color: var(--ss-muted);
+  flex: 1;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ss-border) transparent;
+}
+.ss-dash-config-section-header {
+  user-select: none;
+  font-weight: 600;
+  transition: background 0.1s;
+}
+.ss-dash-config-section-header.ss-dash-config-leaf {
+  font-weight: 400;
+}
+.ss-dash-config-count {
+  font-weight: 400;
+}
+/* Dashboard redacted border override (uses border-dim instead of border) */
+.ss-dash-redacted-reveal,
+.ss-dash-redacted-copy {
+  border-color: var(--ss-border-dim);
+}
+.ss-dash-redacted-reveal:hover,
+.ss-dash-redacted-copy:hover {
+  color: var(--ss-text-primary);
+  border-color: var(--ss-border);
+}
+
+/* ── Cache ─────────────────────────────────────────────────────── */
+.ss-dash-cache-stats {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  flex-shrink: 0;
+}
+
+.ss-dash-cache-stat {
+  font-size: 11px;
+}
+.ss-dash-cache-stat-label {
+  font-size: 10px;
+  color: var(--ss-muted);
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.ss-dash-cache-stat-value {
+  font-weight: 600;
+  /* tabular-nums → utilities.css */
+  color: var(--ss-text);
+}
+
+.ss-dash-cache-detail {
+  padding: 12px 16px;
+  background: var(--ss-surface-alt);
+  border-top: 1px solid var(--ss-border-dim);
+}
+
+/* ── Jobs ──────────────────────────────────────────────────────── */
+.ss-dash-job-stats {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.ss-dash-job-stat {
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ss-dash-job-stat-label {
+  color: var(--ss-muted);
+  text-transform: uppercase;
+}
+.ss-dash-job-stat-value {
+  font-weight: 600;
+  /* tabular-nums → utilities.css */
+  color: var(--ss-text);
+}
+
+.ss-dash-retry-btn {
+  padding: 2px 8px;
+  font-size: 9px;
+  color: var(--ss-amber-fg);
+  background: var(--ss-amber-bg);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.ss-dash-retry-btn:hover {
+  opacity: 0.8;
+}
+
+/* ── Grouped queries toggle ────────────────────────────────────── */
+.ss-dash-grouped-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Filterable cell ───────────────────────────────────────────── */
+.ss-dash-filterable {
+  cursor: pointer;
+}
+.ss-dash-filterable:hover {
+  background: var(--ss-hover-accent);
+}
+
+/* ── Reqid input in log bar ────────────────────────────────────── */
+.ss-dash-reqid-input {
+  max-width: 200px;
+  margin-left: auto;
+}
+.ss-dash-reqid-clear {
+  margin-left: 4px;
+}
+
+/* ── Scrollable pane content ───────────────────────────────────── */
+.ss-dash-pane-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+/* ── Detail view for list/detail pattern ───────────────────────── */
+.ss-dash-list-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.ss-dash-detail-view {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+}
+.ss-dash-detail-view.ss-dash-active {
+  display: flex;
+}
+
+/* Widget deep links */
+.ss-dash-widget-link {
+  color: var(--ss-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.ss-dash-widget-link:hover {
+  color: var(--ss-accent);
+}
+
+.ss-dash-widget-row-link {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 0;
+  font-size: 11px;
+  color: var(--ss-text);
+  border-bottom: 1px solid var(--ss-border-faint);
+  text-decoration: none;
+  min-width: 0;
+  transition: color 0.15s;
+}
+.ss-dash-widget-row-link:last-child {
+  border-bottom: none;
+}
+.ss-dash-widget-row-link:hover {
+  color: var(--ss-accent);
+}
+.ss-dash-widget-row-link > span:first-child {
+  /* truncation → utilities.css */
+  min-width: 0;
+}
+
+/* ── Utility: dim text ────────────────────────────────────────── */
+.ss-dim {
+  color: var(--ss-dim);
+}
+
+.ss-dash-widget-stat {
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 11px;
+  border-bottom: 1px solid var(--ss-border-faint);
+}
+.ss-dash-widget-stat:last-child {
+  border-bottom: none;
+}
+.ss-dash-widget-stat-label {
+  color: var(--ss-muted);
+}
+.ss-dash-widget-stat-value {
+  font-weight: 600;
+  /* tabular-nums → utilities.css */
+  color: var(--ss-text);
+}
+
+/* Utility color classes → components.css */
+
+/* ── Section title (reused by internals + Vue) ────────────────── */
+.ss-dash-internals-title,
+.ss-dash-section-title {
+  margin: 20px 0 6px;
+  padding: 0 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  border-bottom: 1px solid var(--ss-border);
+}
+.ss-dash-internals-title:first-child,
+.ss-dash-section-title:first-child {
+  margin-top: 4px;
+}
+
+/* Info cards → components.css */
+/* Status indicator dot → components.css */
+/* Progress bar → components.css */
+
+/* ── Tooltip trigger ─────────────────────────────────────────── */
+.ss-tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+}

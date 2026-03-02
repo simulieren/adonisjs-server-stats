@@ -1,7 +1,7 @@
 import { isExcludedRequest } from '../middleware/request_tracking_middleware.js'
 import { RingBuffer } from './ring_buffer.js'
 
-import type { EventRecord } from './types.js'
+import type { EventRecord, Emitter } from './types.js'
 
 /**
  * Wraps the AdonisJS emitter to log all events with timestamps.
@@ -9,21 +9,20 @@ import type { EventRecord } from './types.js'
  */
 export class EventCollector {
   private buffer: RingBuffer<EventRecord>
-  private originalEmit: ((...args: any[]) => any) | null = null
-  private emitter: any = null
+  private originalEmit: Emitter['emit'] | null = null
+  private emitter: Emitter | null = null
 
   constructor(maxEvents: number = 200) {
     this.buffer = new RingBuffer<EventRecord>(maxEvents)
   }
 
-  start(emitter: any): void {
+  start(emitter: Emitter): void {
     if (!emitter || typeof emitter.emit !== 'function') return
 
     this.emitter = emitter
-    this.originalEmit = emitter.emit.bind(emitter)
+    this.originalEmit = emitter.emit.bind(emitter) as Emitter['emit']
 
-    const self = this
-    emitter.emit = function (event: string | Function, data?: any) {
+    emitter.emit = (event: string | ((...args: unknown[]) => unknown), data?: unknown) => {
       // Resolve event name: class-based events use the class name, string events are used as-is
       const eventName = typeof event === 'string' ? event : event?.name || 'unknown'
 
@@ -39,15 +38,15 @@ export class EventCollector {
         !isExcludedRequest()
       ) {
         const record: EventRecord = {
-          id: self.buffer.getNextId(),
+          id: this.buffer.getNextId(),
           event: eventName,
-          data: self.summarizeData(data),
+          data: this.summarizeData(data),
           timestamp: Date.now(),
         }
-        self.buffer.push(record)
+        this.buffer.push(record)
       }
 
-      return self.originalEmit!.call(emitter, event, data)
+      return this.originalEmit!.call(emitter, event, data)
     }
   }
 
@@ -59,7 +58,7 @@ export class EventCollector {
     this.emitter = null
   }
 
-  private summarizeData(data: any): string | null {
+  private summarizeData(data: unknown): string | null {
     if (data === undefined || data === null) return null
 
     try {
@@ -68,8 +67,9 @@ export class EventCollector {
       // Cap at 4KB per event to avoid memory bloat
       return json.length > 4096 ? json.slice(0, 4096) + '\n...' : json
     } catch {
-      if (typeof data === 'object' && data.constructor?.name) {
-        return `[${data.constructor.name}]`
+      if (typeof data === 'object' && data !== null) {
+        const ctorName = (data as { constructor?: { name?: string } }).constructor?.name
+        if (ctorName) return `[${ctorName}]`
       }
       return typeof data
     }
@@ -77,7 +77,7 @@ export class EventCollector {
 
   private safeReplacer() {
     const seen = new WeakSet()
-    return (_key: string, value: any) => {
+    return (_key: string, value: unknown) => {
       if (typeof value === 'object' && value !== null) {
         if (seen.has(value)) return '[Circular]'
         seen.add(value)
@@ -98,6 +98,10 @@ export class EventCollector {
 
   getTotalCount(): number {
     return this.buffer.size()
+  }
+
+  getBufferInfo(): { current: number; max: number } {
+    return { current: this.buffer.size(), max: this.buffer.getCapacity() }
   }
 
   clear(): void {
