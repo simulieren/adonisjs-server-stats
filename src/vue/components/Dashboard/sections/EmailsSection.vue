@@ -17,19 +17,15 @@ const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api'
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const {
-  data,
-  loading,
-  pagination,
-  goToPage,
-  setSearch,
-  fetchEmailPreview,
-} = useDashboardData(() => 'emails', {
-  baseUrl,
-  dashboardEndpoint,
-  authToken,
-  refreshKey,
-})
+const { data, loading, pagination, goToPage, setSearch, fetchEmailPreview } = useDashboardData(
+  () => 'emails',
+  {
+    baseUrl,
+    dashboardEndpoint,
+    authToken,
+    refreshKey,
+  }
+)
 
 const search = ref('')
 const previewId = ref<number | null>(null)
@@ -72,23 +68,41 @@ const { tableRef } = useResizableTable(() => emails.value)
       <div class="ss-dash-email-preview" id="ss-dash-email-preview">
         <div class="ss-dash-email-preview-header">
           <div class="ss-dash-email-preview-meta" id="ss-dash-email-preview-meta">
-            <template v-if="emails.find(e => e.id === previewId)">
-              <strong>Subject:</strong> {{ emails.find(e => e.id === previewId)?.subject }}
-              &nbsp;&nbsp;|&nbsp;&nbsp;<strong>From:</strong>
-              {{ emails.find(e => e.id === previewId)?.from_addr || emails.find(e => e.id === previewId)?.from }}
+            <template v-if="emails.find((e) => e.id === previewId)">
+              <strong>Subject:</strong>
+              {{ emails.find((e) => e.id === previewId)?.subject }} &nbsp;&nbsp;|&nbsp;&nbsp;<strong
+                >From:</strong
+              >
+              {{
+                emails.find((e) => e.id === previewId)?.from_addr ||
+                emails.find((e) => e.id === previewId)?.from
+              }}
               &nbsp;&nbsp;|&nbsp;&nbsp;<strong>To:</strong>
-              {{ emails.find(e => e.id === previewId)?.to_addr || emails.find(e => e.id === previewId)?.to }}
-              <template v-if="emails.find(e => e.id === previewId)?.cc || emails.find(e => e.id === previewId)?.cc_addr">
+              {{
+                emails.find((e) => e.id === previewId)?.to_addr ||
+                emails.find((e) => e.id === previewId)?.to
+              }}
+              <template
+                v-if="
+                  emails.find((e) => e.id === previewId)?.cc ||
+                  emails.find((e) => e.id === previewId)?.cc_addr
+                "
+              >
                 &nbsp;&nbsp;|&nbsp;&nbsp;<strong>CC:</strong>
-                {{ emails.find(e => e.id === previewId)?.cc || emails.find(e => e.id === previewId)?.cc_addr }}
+                {{
+                  emails.find((e) => e.id === previewId)?.cc ||
+                  emails.find((e) => e.id === previewId)?.cc_addr
+                }}
               </template>
               &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Status:</strong>
-              <span :class="`ss-dash-badge ss-dash-email-status-${emails.find(e => e.id === previewId)?.status}`">
-                {{ emails.find(e => e.id === previewId)?.status }}
+              <span
+                :class="`ss-dash-badge ss-dash-email-status-${emails.find((e) => e.id === previewId)?.status}`"
+              >
+                {{ emails.find((e) => e.id === previewId)?.status }}
               </span>
-              <template v-if="emails.find(e => e.id === previewId)?.mailer">
+              <template v-if="emails.find((e) => e.id === previewId)?.mailer">
                 &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Mailer:</strong>
-                {{ emails.find(e => e.id === previewId)?.mailer }}
+                {{ emails.find((e) => e.id === previewId)?.mailer }}
               </template>
             </template>
           </div>
@@ -150,31 +164,51 @@ const { tableRef } = useResizableTable(() => emails.value)
             <tbody>
               <tr
                 v-for="e in emails"
-                :key="(e.id as number)"
+                :key="e.id as number"
                 class="ss-dash-clickable ss-dash-email-row"
                 @click="handlePreview(e)"
               >
-                <td><span style="color: var(--ss-dim)">{{ e.id }}</span></td>
+                <td>
+                  <span style="color: var(--ss-dim)">{{ e.id }}</span>
+                </td>
                 <td>
                   <span
-                    :title="((e.from_addr as string) || (e.from as string) || '')"
-                    style="color: var(--ss-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                    :title="(e.from_addr as string) || (e.from as string) || ''"
+                    style="
+                      color: var(--ss-text-secondary);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      display: block;
+                    "
                   >
                     {{ (e.from_addr as string) || (e.from as string) || '' }}
                   </span>
                 </td>
                 <td>
                   <span
-                    :title="((e.to_addr as string) || (e.to as string) || '')"
-                    style="color: var(--ss-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                    :title="(e.to_addr as string) || (e.to as string) || ''"
+                    style="
+                      color: var(--ss-text-secondary);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      display: block;
+                    "
                   >
                     {{ (e.to_addr as string) || (e.to as string) || '' }}
                   </span>
                 </td>
                 <td>
                   <span
-                    :title="((e.subject as string) || '')"
-                    style="color: var(--ss-sql-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                    :title="(e.subject as string) || ''"
+                    style="
+                      color: var(--ss-sql-color);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      display: block;
+                    "
                   >
                     {{ (e.subject as string) || '' }}
                   </span>
@@ -186,17 +220,27 @@ const { tableRef } = useResizableTable(() => emails.value)
                 </td>
                 <td>
                   <span
-                    v-if="((e.attachment_count as number) || (e.attachmentCount as number) || 0) > 0"
+                    v-if="
+                      ((e.attachment_count as number) || (e.attachmentCount as number) || 0) > 0
+                    "
                     style="color: var(--ss-dim); text-align: center; display: block"
                   >
                     {{ (e.attachment_count as number) || (e.attachmentCount as number) || 0 }}
                   </span>
-                  <span v-else style="color: var(--ss-dim); text-align: center; display: block">-</span>
+                  <span v-else style="color: var(--ss-dim); text-align: center; display: block"
+                    >-</span
+                  >
                 </td>
                 <td>
                   <span
-                    :title="((e.mailer as string) || '')"
-                    style="color: var(--ss-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                    :title="(e.mailer as string) || ''"
+                    style="
+                      color: var(--ss-muted);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                      display: block;
+                    "
                   >
                     {{ (e.mailer as string) || '' }}
                   </span>
@@ -205,9 +249,21 @@ const { tableRef } = useResizableTable(() => emails.value)
                   <span
                     class="ss-dash-event-time"
                     style="white-space: nowrap"
-                    :title="formatTime(((e.createdAt as string) || (e.created_at as string) || (e.timestamp as string)) as string)"
+                    :title="
+                      formatTime(
+                        ((e.createdAt as string) ||
+                          (e.created_at as string) ||
+                          (e.timestamp as string)) as string
+                      )
+                    "
                   >
-                    {{ timeAgo(((e.createdAt as string) || (e.created_at as string) || (e.timestamp as string)) as string) }}
+                    {{
+                      timeAgo(
+                        ((e.createdAt as string) ||
+                          (e.created_at as string) ||
+                          (e.timestamp as string)) as string
+                      )
+                    }}
                   </span>
                 </td>
               </tr>

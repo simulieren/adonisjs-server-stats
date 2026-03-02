@@ -16,12 +16,12 @@ import {
 import { registerAllRoutes } from '../routes/register_routes.js'
 import { log, dim, bold } from '../utils/logger.js'
 
+import type { MetricCollector } from '../collectors/collector.js'
 import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { DevToolbarConfig } from '../debug/types.js'
-import type { MetricCollector } from '../collectors/collector.js'
 import type { ResolvedServerStatsConfig } from '../types.js'
 import type { ApplicationService } from '@adonisjs/core/types'
 
@@ -80,8 +80,9 @@ export default class ServerStatsProvider {
 
       // Derive endpoint paths for route registration
       const statsEndpoint = typeof config.endpoint === 'string' ? config.endpoint : false
-      const debugEndpoint =
-        toolbarConfig?.enabled ? (toolbarConfig.debugEndpoint ?? '/admin/api/debug') : undefined
+      const debugEndpoint = toolbarConfig?.enabled
+        ? (toolbarConfig.debugEndpoint ?? '/admin/api/debug')
+        : undefined
       const dashboardPath =
         toolbarConfig?.enabled && toolbarConfig.dashboard
           ? (toolbarConfig.dashboardPath ?? '/__stats')
@@ -334,9 +335,8 @@ export default class ServerStatsProvider {
       if (this.debugStore) {
         const logPath = this.app.makePath('logs', 'adonisjs.log')
         const dataAccess = new DataAccess(this.debugStore, this.dashboardStore, logPath)
-        const { ApiController: ApiControllerClass } = await import(
-          '../controller/api_controller.js'
-        )
+        const { ApiController: ApiControllerClass } =
+          await import('../controller/api_controller.js')
         this.apiController = new ApiControllerClass(dataAccess)
       }
     }
@@ -534,10 +534,7 @@ export default class ServerStatsProvider {
 
     // Create the controller — this makes the routes registered in boot() functional
     const DashboardControllerClass = (await import('../dashboard/dashboard_controller.js')).default
-    this.dashboardController = new DashboardControllerClass(
-      this.dashboardStore,
-      this.app
-    )
+    this.dashboardController = new DashboardControllerClass(this.dashboardStore, this.app)
 
     // ── Log piping ────────────────────────────────────────────────
     // If the log collector is already hooked into Pino (zero-config mode),

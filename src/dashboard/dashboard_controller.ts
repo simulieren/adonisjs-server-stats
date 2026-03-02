@@ -446,8 +446,7 @@ export default class DashboardController {
         const term = searchTerm.toLowerCase()
         filteredJobs = jobList.jobs.filter(
           (j) =>
-            j.name?.toLowerCase().includes(term) ||
-            j.id?.toString().toLowerCase().includes(term)
+            j.name?.toLowerCase().includes(term) || j.id?.toString().toLowerCase().includes(term)
         )
         filteredTotal = filteredJobs.length
       }

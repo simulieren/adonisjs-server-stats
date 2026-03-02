@@ -1,15 +1,12 @@
 import React, { useState, useCallback } from 'react'
 
-import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
+import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
 
-import type {
-  DashboardHookOptions,
-  DashboardCacheResponse,
-} from '../../../../core/types.js'
+import type { DashboardHookOptions, DashboardCacheResponse } from '../../../../core/types.js'
 
 interface CacheSectionProps {
   options?: DashboardHookOptions
@@ -107,7 +104,12 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
         </div>
       )}
 
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="Filter cache keys..." summary={`${(cacheData?.keys || cacheData?.data || []).length} keys`} />
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter cache keys..."
+        summary={`${(cacheData?.keys || cacheData?.data || []).length} keys`}
+      />
 
       {isLoading && !data ? (
         <div className="ss-dash-empty">Loading cache...</div>
@@ -139,9 +141,7 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
                 key: 'type',
                 label: 'Type',
                 width: '70px',
-                render: (v: string) => (
-                  <span style={{ color: 'var(--ss-muted)' }}>{v}</span>
-                ),
+                render: (v: string) => <span style={{ color: 'var(--ss-muted)' }}>{v}</span>,
               },
               {
                 key: 'size',
@@ -176,9 +176,7 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
             ]}
             data={(cacheData.keys || cacheData.data || []) as unknown as Record<string, unknown>[]}
             keyField="key"
-            onRowClick={(row: Record<string, unknown>) =>
-              handleKeyClick(row.key as string)
-            }
+            onRowClick={(row: Record<string, unknown>) => handleKeyClick(row.key as string)}
             emptyMessage="No cache keys found"
           />
         </div>

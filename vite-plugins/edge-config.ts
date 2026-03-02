@@ -1,8 +1,8 @@
 import { resolve } from 'node:path'
 
-import type { Plugin, UserConfig } from 'vite'
-
 import { discardCssPlugin } from './discard-css.js'
+
+import type { Plugin, UserConfig } from 'vite'
 
 interface EdgeConfigOptions {
   /** Framework-specific Vite plugins (e.g. preact(), vue()). */

@@ -10,8 +10,8 @@ import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 import { WaterfallChart } from '../shared/WaterfallChart.js'
 
-import type { DashboardHookOptions, TraceSpan } from '../../../../core/types.js'
 import type { TraceDetail } from '../../../../core/trace-utils.js'
+import type { DashboardHookOptions, TraceSpan } from '../../../../core/types.js'
 
 interface TimelineSectionProps {
   options?: DashboardHookOptions
@@ -186,7 +186,11 @@ export function TimelineSection({ options = {}, tracingEnabled = true }: Timelin
                   key: 'createdAt',
                   label: 'Time',
                   width: '80px',
-                  render: (v: string) => <span className="ss-dash-event-time" title={formatTime(v)}>{timeAgo(v)}</span>,
+                  render: (v: string) => (
+                    <span className="ss-dash-event-time" title={formatTime(v)}>
+                      {timeAgo(v)}
+                    </span>
+                  ),
                 },
               ]}
               data={traces}

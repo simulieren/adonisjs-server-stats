@@ -16,9 +16,7 @@ const props = withDefaults(
 const { theme, toggleTheme } = useTheme()
 
 const isDark = computed(() => theme.value === 'dark')
-const title = computed(() =>
-  isDark.value ? 'Switch to light theme' : 'Switch to dark theme'
-)
+const title = computed(() => (isDark.value ? 'Switch to light theme' : 'Switch to dark theme'))
 const baseClass = computed(() =>
   props.classPrefix === 'ss-dbg' ? 'ss-dbg-theme-toggle' : 'ss-dash-theme-btn'
 )

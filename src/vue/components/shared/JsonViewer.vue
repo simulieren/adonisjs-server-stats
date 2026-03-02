@@ -55,7 +55,9 @@ function copyToClipboard() {
 </script>
 
 <template>
-  <span v-if="value === null || value === undefined" :class="`ss-dim ${props.classPrefix}-c-dim`">-</span>
+  <span v-if="value === null || value === undefined" :class="`ss-dim ${props.classPrefix}-c-dim`"
+    >-</span
+  >
   <div v-else :class="`${props.classPrefix}-data-cell`">
     <span
       :class="`${props.classPrefix}-data-preview`"

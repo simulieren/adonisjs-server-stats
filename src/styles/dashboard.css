@@ -198,7 +198,7 @@ body {
   background: var(--ss-hover-accent);
 }
 .ss-dash-nav-item.ss-dash-active::before {
-  content: "";
+  content: '';
   position: absolute;
   left: 0;
   top: 4px;

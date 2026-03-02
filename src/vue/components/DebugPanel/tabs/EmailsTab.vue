@@ -120,7 +120,9 @@ const { tableRef } = useResizableTable(() => emails.value)
             <td class="ss-dbg-c-dim" style="text-align: center">
               {{ e.attachmentCount > 0 ? e.attachmentCount : '-' }}
             </td>
-            <td class="ss-dbg-event-time" :title="formatTime(e.timestamp)">{{ timeAgo(e.timestamp) }}</td>
+            <td class="ss-dbg-event-time" :title="formatTime(e.timestamp)">
+              {{ timeAgo(e.timestamp) }}
+            </td>
           </tr>
         </tbody>
       </table>

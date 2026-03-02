@@ -1,7 +1,16 @@
 import React, { useState, useMemo, useCallback } from 'react'
 
-import { formatTime, formatDuration, timeAgo, durationSeverity } from '../../../../core/formatters.js'
-import { filterQueries, countDuplicateQueries, computeQuerySummary } from '../../../../core/query-utils.js'
+import {
+  formatTime,
+  formatDuration,
+  timeAgo,
+  durationSeverity,
+} from '../../../../core/formatters.js'
+import {
+  filterQueries,
+  countDuplicateQueries,
+  computeQuerySummary,
+} from '../../../../core/query-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
 
@@ -19,7 +28,10 @@ export function QueriesTab({ options }: QueriesTabProps) {
   const allQueries = useMemo(() => data?.queries || [], [data])
   const queries = useMemo(() => filterQueries(allQueries, search), [allQueries, search])
   const dupCounts = useMemo(() => countDuplicateQueries(allQueries), [allQueries])
-  const summaryStats = useMemo(() => computeQuerySummary(allQueries, dupCounts), [allQueries, dupCounts])
+  const summaryStats = useMemo(
+    () => computeQuerySummary(allQueries, dupCounts),
+    [allQueries, dupCounts]
+  )
 
   const toggleExpand = useCallback((id: number) => {
     setExpandedId((prev) => (prev === id ? null : id))
@@ -78,7 +90,9 @@ export function QueriesTab({ options }: QueriesTabProps) {
           <tbody>
             {queries.map((q) => (
               <tr key={q.id}>
-                <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>{q.id}</td>
+                <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>
+                  {q.id}
+                </td>
                 <td>
                   <span
                     className={`ss-dbg-sql ${expandedId === q.id ? 'ss-dbg-expanded' : ''}`}
@@ -89,9 +103,7 @@ export function QueriesTab({ options }: QueriesTabProps) {
                   >
                     {q.sql}
                   </span>
-                  {dupCounts[q.sql] > 1 && (
-                    <span className="ss-dbg-dup"> x{dupCounts[q.sql]}</span>
-                  )}
+                  {dupCounts[q.sql] > 1 && <span className="ss-dbg-dup"> x{dupCounts[q.sql]}</span>}
                   {q.inTransaction && <span className="ss-dbg-dup"> TXN</span>}
                 </td>
                 <td

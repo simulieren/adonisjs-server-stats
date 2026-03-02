@@ -79,7 +79,11 @@ export function EventsSection({ options = {} }: EventsSectionProps) {
                   width: '80px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
                     const ts = (row.createdAt || row.created_at || row.timestamp) as string
-                    return <span className="ss-dash-event-time" title={formatTime(ts)}>{timeAgo(ts)}</span>
+                    return (
+                      <span className="ss-dash-event-time" title={formatTime(ts)}>
+                        {timeAgo(ts)}
+                      </span>
+                    )
                   },
                 },
               ]}

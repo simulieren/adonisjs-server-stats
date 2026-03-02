@@ -2,14 +2,6 @@ import { readFile, stat } from 'node:fs/promises'
 
 import { parseAndEnrich } from '../log_stream/log_stream_service.js'
 
-import type { DebugStore } from '../debug/debug_store.js'
-import type {
-  QueryRecord,
-  EventRecord,
-  EmailRecord,
-  TraceRecord,
-  RouteRecord,
-} from '../debug/types.js'
 import type {
   DashboardStore,
   QueryFilters,
@@ -18,6 +10,14 @@ import type {
   TraceFilters,
   LogFilters,
 } from '../dashboard/dashboard_store.js'
+import type { DebugStore } from '../debug/debug_store.js'
+import type {
+  QueryRecord,
+  EventRecord,
+  EmailRecord,
+  TraceRecord,
+  RouteRecord,
+} from '../debug/types.js'
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -270,9 +270,7 @@ export class DataAccess {
     }))
 
     return wrapArray(list, opts, (t, term: string) => {
-      return (
-        t.method.toLowerCase().includes(term) || t.url.toLowerCase().includes(term)
-      )
+      return t.method.toLowerCase().includes(term) || t.url.toLowerCase().includes(term)
     })
   }
 

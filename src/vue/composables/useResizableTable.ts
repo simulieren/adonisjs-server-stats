@@ -1,7 +1,8 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import type { Ref, WatchSource } from 'vue'
 
 import { initResizableColumns } from '../../core/resizable-columns.js'
+
+import type { Ref, WatchSource } from 'vue'
 
 /**
  * Vue composable that attaches resizable column handles to a table element.

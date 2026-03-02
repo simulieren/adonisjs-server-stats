@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from 'react'
 
-import { formatTime, timeAgo, formatDuration, compactPreview, durationSeverity } from '../../../../core/formatters.js'
+import {
+  formatTime,
+  timeAgo,
+  formatDuration,
+  compactPreview,
+  durationSeverity,
+} from '../../../../core/formatters.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
 
@@ -73,7 +79,11 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
           </span>
         )
       case 'timeAgo':
-        return <span className="ss-dbg-event-time" title={formatTime(value as string)}>{timeAgo(value as string)}</span>
+        return (
+          <span className="ss-dbg-event-time" title={formatTime(value as string)}>
+            {timeAgo(value as string)}
+          </span>
+        )
       case 'duration': {
         const ms = typeof value === 'number' ? value : parseFloat(String(value))
         if (isNaN(ms)) return String(value)

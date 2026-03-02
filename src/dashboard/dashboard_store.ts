@@ -425,9 +425,10 @@ export class DashboardStore {
       await this.db('server_stats_logs').insert({
         level: levelName,
         message: String(entry.msg || entry.message || ''),
-        request_id: (entry.request_id || entry.requestId || entry['x-request-id'])
-          ? String(entry.request_id || entry.requestId || entry['x-request-id'])
-          : null,
+        request_id:
+          entry.request_id || entry.requestId || entry['x-request-id']
+            ? String(entry.request_id || entry.requestId || entry['x-request-id'])
+            : null,
         data: JSON.stringify(entry),
       })
     } catch (err) {
@@ -601,7 +602,8 @@ export class DashboardStore {
       if (filters?.search) {
         const term = `%${filters.search}%`
         query.where((sub) => {
-          sub.where('from_addr', 'like', term)
+          sub
+            .where('from_addr', 'like', term)
             .orWhere('to_addr', 'like', term)
             .orWhere('subject', 'like', term)
         })

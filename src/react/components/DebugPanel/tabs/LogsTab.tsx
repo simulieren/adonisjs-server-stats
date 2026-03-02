@@ -12,23 +12,23 @@ import {
 } from '../../../../core/log-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 
-import type { DebugPanelProps } from '../../../../core/types.js'
 import type { LogEntry } from '../../../../core/log-utils.js'
+import type { DebugPanelProps } from '../../../../core/types.js'
 
 interface LogsTabProps {
   options?: DebugPanelProps
 }
 
 export function LogsTab({ options }: LogsTabProps) {
-  const { data, isLoading, error } = useDebugData<LogEntry[] | { logs?: LogEntry[]; entries?: LogEntry[] }>('logs', options)
+  const { data, isLoading, error } = useDebugData<
+    LogEntry[] | { logs?: LogEntry[]; entries?: LogEntry[] }
+  >('logs', options)
   const [levelFilter, setLevelFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [reqIdFilter, setReqIdFilter] = useState('')
 
   const logs = useMemo(() => {
-    let items: LogEntry[] = Array.isArray(data)
-      ? data
-      : (data?.logs || data?.entries || [])
+    let items: LogEntry[] = Array.isArray(data) ? data : data?.logs || data?.entries || []
     items = filterLogsByLevel(items, levelFilter)
     if (reqIdFilter) {
       const f = reqIdFilter.toLowerCase()
@@ -100,36 +100,41 @@ export function LogsTab({ options }: LogsTabProps) {
         {logs.length === 0 ? (
           <div className="ss-dbg-empty">No log entries</div>
         ) : (
-          logs.slice(-200).reverse().map((log, i) => {
-            const level = resolveLogLevel(log)
-            const msg = resolveLogMessage(log)
-            const ts = resolveLogTimestamp(log)
-            const reqId = resolveLogRequestId(log)
+          logs
+            .slice(-200)
+            .reverse()
+            .map((log, i) => {
+              const level = resolveLogLevel(log)
+              const msg = resolveLogMessage(log)
+              const ts = resolveLogTimestamp(log)
+              const reqId = resolveLogRequestId(log)
 
-            return (
-              <div key={i} className="ss-dbg-log-entry">
-                <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
-                  {level.toUpperCase()}
-                </span>
-                <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>{ts ? timeAgo(ts) : '-'}</span>
-                {reqId ? (
-                  <span
-                    className="ss-dbg-log-reqid"
-                    onClick={() => handleReqIdClick(reqId)}
-                    role="button"
-                    tabIndex={0}
-                    title={reqId}
-                    onKeyDown={(e) => e.key === 'Enter' && handleReqIdClick(reqId)}
-                  >
-                    {reqId.slice(0, 8)}
+              return (
+                <div key={i} className="ss-dbg-log-entry">
+                  <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
+                    {level.toUpperCase()}
                   </span>
-                ) : (
-                  <span className="ss-dbg-log-reqid-empty">-</span>
-                )}
-                <span className="ss-dbg-log-msg">{msg}</span>
-              </div>
-            )
-          })
+                  <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>
+                    {ts ? timeAgo(ts) : '-'}
+                  </span>
+                  {reqId ? (
+                    <span
+                      className="ss-dbg-log-reqid"
+                      onClick={() => handleReqIdClick(reqId)}
+                      role="button"
+                      tabIndex={0}
+                      title={reqId}
+                      onKeyDown={(e) => e.key === 'Enter' && handleReqIdClick(reqId)}
+                    >
+                      {reqId.slice(0, 8)}
+                    </span>
+                  ) : (
+                    <span className="ss-dbg-log-reqid-empty">-</span>
+                  )}
+                  <span className="ss-dbg-log-msg">{msg}</span>
+                </div>
+              )
+            })
         )}
       </div>
     </div>

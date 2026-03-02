@@ -1,4 +1,5 @@
 import React, { useCallback } from 'react'
+
 import { TAB_ICONS } from '../../../../core/icons.js'
 
 interface FilterBarProps {
@@ -29,7 +30,9 @@ export function FilterBar({
 
   return (
     <div className={`ss-dash-filter-bar ${className}`}>
-      {summary !== null && summary !== undefined && <span className="ss-dash-summary">{summary}</span>}
+      {summary !== null && summary !== undefined && (
+        <span className="ss-dash-summary">{summary}</span>
+      )}
       <div className="ss-dash-search-wrapper">
         <svg
           className="ss-dash-search-icon"

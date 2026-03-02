@@ -27,10 +27,7 @@ const authToken = inject<string | undefined>('ss-auth-token', undefined)
 
 const p = 'ss-dash'
 
-const {
-  data,
-  loading,
-} = useDashboardData(() => 'config', {
+const { data, loading } = useDashboardData(() => 'config', {
   baseUrl,
   dashboardEndpoint,
   authToken,
@@ -64,7 +61,10 @@ function onSearchInput(val: string) {
 // -- Data accessors ---------------------------------------------------------
 
 const config = computed(() => {
-  const d = data.value as { app?: Record<string, ConfigValue>; env?: Record<string, ConfigValue> } | null
+  const d = data.value as {
+    app?: Record<string, ConfigValue>
+    env?: Record<string, ConfigValue>
+  } | null
   return d ?? null
 })
 
@@ -80,9 +80,7 @@ const envEntries = computed(() => {
       : value === null || value === undefined
         ? ''
         : String(value)
-    return (
-      key.toLowerCase().includes(term) || valStr.toLowerCase().includes(term)
-    )
+    return key.toLowerCase().includes(term) || valStr.toLowerCase().includes(term)
   })
 })
 
@@ -98,10 +96,7 @@ const flatSearchEntries = computed(() => {
       : item.value === null || item.value === undefined
         ? ''
         : String(item.value)
-    return (
-      item.path.toLowerCase().includes(term) ||
-      valStr.toLowerCase().includes(term)
-    )
+    return item.path.toLowerCase().includes(term) || valStr.toLowerCase().includes(term)
   })
 })
 
@@ -144,14 +139,17 @@ function collapseAll() {
 function handleCopy() {
   if (!config.value) return
   const content = activeTab.value === 'app' ? config.value.app : config.value.env
-  navigator.clipboard?.writeText(JSON.stringify(content, null, 2)).then(() => {
-    copyLabel.value = 'Copied!'
-    setTimeout(() => {
-      copyLabel.value = 'Copy JSON'
-    }, 1500)
-  }).catch(() => {
-    // Silently fail
-  })
+  navigator.clipboard
+    ?.writeText(JSON.stringify(content, null, 2))
+    .then(() => {
+      copyLabel.value = 'Copied!'
+      setTimeout(() => {
+        copyLabel.value = 'Copy JSON'
+      }, 1500)
+    })
+    .catch(() => {
+      // Silently fail
+    })
 }
 
 function toggleReveal(key: string) {
@@ -174,10 +172,7 @@ function onCopyRow(text: string, key: string, event: Event) {
 
 function isObject(value: ConfigValue): boolean {
   return (
-    value !== null &&
-    typeof value === 'object' &&
-    !Array.isArray(value) &&
-    !isRedactedValue(value)
+    value !== null && typeof value === 'object' && !Array.isArray(value) && !isRedactedValue(value)
   )
 }
 
@@ -186,9 +181,7 @@ function getInnerEntries(value: ConfigValue, prefix: string): FlatEntry[] {
 }
 
 function getRelPath(fullPath: string, prefix: string): string {
-  return fullPath.indexOf(prefix + '.') === 0
-    ? fullPath.slice(prefix.length + 1)
-    : fullPath
+  return fullPath.indexOf(prefix + '.') === 0 ? fullPath.slice(prefix.length + 1) : fullPath
 }
 
 /** Get formatted value text and optional color from core utility. */
@@ -201,6 +194,13 @@ function getEnvDisplayVal(value: ConfigValue): string {
   if (isRedactedValue(value)) return value.display
   if (value === null || value === undefined) return 'null'
   return String(value)
+}
+
+/** Look up a top-level app config value by key (avoids `as Record<...>` in template). */
+function getAppVal(key: string): ConfigValue {
+  const app = config.value?.app
+  if (!app || typeof app !== 'object') return null
+  return (app as Record<string, ConfigValue>)[key] ?? null
 }
 
 /** Eye icon SVG elements as joined HTML. */
@@ -257,7 +257,10 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
             padding: '0 2px',
             lineHeight: 1,
           }"
-          @click="searchInput = ''; search = ''"
+          @click="
+            searchInput = ''
+            search = ''
+          "
         >
           &times;
         </button>
@@ -298,12 +301,21 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   :class="`${p}-config-redacted`"
                   :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                 >
-                  <span>{{ revealedKeys.has(key) ? (value as RedactedValue).value : (value as RedactedValue).display }}</span>
+                  <span>{{
+                    revealedKeys.has(key)
+                      ? (value as RedactedValue).value
+                      : (value as RedactedValue).display
+                  }}</span>
                   <button
                     type="button"
                     :class="`${p}-btn`"
                     :title="revealedKeys.has(key) ? 'Hide' : 'Reveal'"
-                    :style="{ padding: '0 4px', fontSize: '0.85em', lineHeight: 1, minWidth: 'auto' }"
+                    :style="{
+                      padding: '0 4px',
+                      fontSize: '0.85em',
+                      lineHeight: 1,
+                      minWidth: 'auto',
+                    }"
                     @click.stop="toggleReveal(key)"
                   >
                     <svg
@@ -343,7 +355,9 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   title="Copy"
                   :ref="(el: any) => setCopyBtnRef(`env-${key}`, el)"
                   @click="onCopyRow(`${key}=${getEnvDisplayVal(value)}`, `env-${key}`, $event)"
-                >&#x2398;</button>
+                >
+                  &#x2398;
+                </button>
               </td>
             </tr>
             <tr v-if="envEntries.length === 0">
@@ -381,12 +395,21 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   :class="`${p}-config-redacted`"
                   :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                 >
-                  <span>{{ revealedKeys.has(item.path) ? (item.value as RedactedValue).value : (item.value as RedactedValue).display }}</span>
+                  <span>{{
+                    revealedKeys.has(item.path)
+                      ? (item.value as RedactedValue).value
+                      : (item.value as RedactedValue).display
+                  }}</span>
                   <button
                     type="button"
                     :class="`${p}-btn`"
                     :title="revealedKeys.has(item.path) ? 'Hide' : 'Reveal'"
-                    :style="{ padding: '0 4px', fontSize: '0.85em', lineHeight: 1, minWidth: 'auto' }"
+                    :style="{
+                      padding: '0 4px',
+                      fontSize: '0.85em',
+                      lineHeight: 1,
+                      minWidth: 'auto',
+                    }"
                     @click.stop="toggleReveal(item.path)"
                   >
                     <svg
@@ -420,7 +443,8 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   v-else
                   :class="`${p}-config-val`"
                   :style="{ wordBreak: 'break-all', color: getFmt(item.value).color }"
-                >{{ getFmt(item.value).text }}</span>
+                  >{{ getFmt(item.value).text }}</span
+                >
               </td>
               <td>
                 <button
@@ -429,12 +453,16 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   :class="`${p}-copy-row-btn`"
                   title="Copy"
                   :ref="(el: any) => setCopyBtnRef(`search-${item.path}`, el)"
-                  @click="onCopyRow(
-                    `${item.path}: ${isRedactedValue(item.value) ? (item.value as RedactedValue).display : getFmt(item.value).text}`,
-                    `search-${item.path}`,
-                    $event
-                  )"
-                >&#x2398;</button>
+                  @click="
+                    onCopyRow(
+                      `${item.path}: ${isRedactedValue(item.value) ? (item.value as RedactedValue).display : getFmt(item.value).text}`,
+                      `search-${item.path}`,
+                      $event
+                    )
+                  "
+                >
+                  &#x2398;
+                </button>
               </td>
             </tr>
             <tr v-if="flatSearchEntries.length === 0">
@@ -456,7 +484,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
         <div :class="`${p}-config-sections`">
           <div v-for="key in appKeys" :key="key" :class="`${p}-config-section`">
             <!-- Object section (collapsible) -->
-            <template v-if="isObject((config!.app as Record<string, ConfigValue>)[key])">
+            <template v-if="isObject(getAppVal(key))">
               <div
                 :class="`${p}-config-section-header`"
                 :style="{ cursor: 'pointer' }"
@@ -467,7 +495,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                 </span>
                 <span :class="`${p}-config-key`">{{ key }}</span>
                 <span :class="`${p}-config-count`">
-                  {{ countLeaves((config!.app as Record<string, ConfigValue>)[key]) }} entries
+                  {{ countLeaves(getAppVal(key)) }} entries
                 </span>
               </div>
               <!-- Expanded inner table -->
@@ -481,26 +509,38 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                     </tr>
                   </thead>
                   <tbody>
-                    <tr
-                      v-for="item in getInnerEntries((config!.app as Record<string, ConfigValue>)[key], key)"
-                      :key="item.path"
-                    >
+                    <tr v-for="item in getInnerEntries(getAppVal(key), key)" :key="item.path">
                       <td :title="getRelPath(item.path, key)">
                         <span :class="`${p}-config-key`">{{ getRelPath(item.path, key) }}</span>
                       </td>
-                      <td :title="isRedactedValue(item.value) ? (item.value as RedactedValue).display : getFmt(item.value).text">
+                      <td
+                        :title="
+                          isRedactedValue(item.value)
+                            ? (item.value as RedactedValue).display
+                            : getFmt(item.value).text
+                        "
+                      >
                         <!-- Redacted toggle -->
                         <span
                           v-if="isRedactedValue(item.value)"
                           :class="`${p}-config-redacted`"
                           :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                         >
-                          <span>{{ revealedKeys.has(item.path) ? (item.value as RedactedValue).value : (item.value as RedactedValue).display }}</span>
+                          <span>{{
+                            revealedKeys.has(item.path)
+                              ? (item.value as RedactedValue).value
+                              : (item.value as RedactedValue).display
+                          }}</span>
                           <button
                             type="button"
                             :class="`${p}-btn`"
                             :title="revealedKeys.has(item.path) ? 'Hide' : 'Reveal'"
-                            :style="{ padding: '0 4px', fontSize: '0.85em', lineHeight: 1, minWidth: 'auto' }"
+                            :style="{
+                              padding: '0 4px',
+                              fontSize: '0.85em',
+                              lineHeight: 1,
+                              minWidth: 'auto',
+                            }"
                             @click.stop="toggleReveal(item.path)"
                           >
                             <svg
@@ -534,7 +574,8 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                           v-else
                           :class="`${p}-config-val`"
                           :style="{ color: getFmt(item.value).color }"
-                        >{{ getFmt(item.value).text }}</span>
+                          >{{ getFmt(item.value).text }}</span
+                        >
                       </td>
                       <td>
                         <button
@@ -543,12 +584,16 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                           :class="`${p}-copy-row-btn`"
                           title="Copy"
                           :ref="(el: any) => setCopyBtnRef(`inner-${item.path}`, el)"
-                          @click="onCopyRow(
-                            `${item.path}: ${getFmt(item.value).text}`,
-                            `inner-${item.path}`,
-                            $event
-                          )"
-                        >&#x2398;</button>
+                          @click="
+                            onCopyRow(
+                              `${item.path}: ${getFmt(item.value).text}`,
+                              `inner-${item.path}`,
+                              $event
+                            )
+                          "
+                        >
+                          &#x2398;
+                        </button>
                       </td>
                     </tr>
                   </tbody>
@@ -558,26 +603,34 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
 
             <!-- Leaf value (non-object, shown inline) -->
             <template v-else>
-              <div :class="`${p}-config-section-header ${p}-config-leaf`" :style="{ cursor: 'default' }">
+              <div
+                :class="`${p}-config-section-header ${p}-config-leaf`"
+                :style="{ cursor: 'default' }"
+              >
                 <span :class="`${p}-config-toggle`" :style="{ visibility: 'hidden' }">&bull;</span>
                 <span :class="`${p}-config-key`">{{ key }}</span>
                 <span :class="`${p}-config-val`" :style="{ marginLeft: '8px' }">
                   <!-- Redacted value -->
                   <span
-                    v-if="isRedactedValue((config!.app as Record<string, ConfigValue>)[key])"
+                    v-if="isRedactedValue(getAppVal(key))"
                     :class="`${p}-config-redacted`"
                     :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                   >
                     <span>{{
                       revealedKeys.has(key)
-                        ? ((config!.app as Record<string, ConfigValue>)[key] as RedactedValue).value
-                        : ((config!.app as Record<string, ConfigValue>)[key] as RedactedValue).display
+                        ? (getAppVal(key) as RedactedValue).value
+                        : (getAppVal(key) as RedactedValue).display
                     }}</span>
                     <button
                       type="button"
                       :class="`${p}-btn`"
                       :title="revealedKeys.has(key) ? 'Hide' : 'Reveal'"
-                      :style="{ padding: '0 4px', fontSize: '0.85em', lineHeight: 1, minWidth: 'auto' }"
+                      :style="{
+                        padding: '0 4px',
+                        fontSize: '0.85em',
+                        lineHeight: 1,
+                        minWidth: 'auto',
+                      }"
                       @click.stop="toggleReveal(key)"
                     >
                       <svg
@@ -608,41 +661,45 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   </span>
                   <!-- null / undefined -->
                   <span
-                    v-else-if="(config!.app as Record<string, ConfigValue>)[key] === null || (config!.app as Record<string, ConfigValue>)[key] === undefined"
+                    v-else-if="getAppVal(key) === null || getAppVal(key) === undefined"
                     :style="{ color: 'var(--ss-dim)' }"
-                  >null</span>
+                    >null</span
+                  >
                   <!-- boolean -->
                   <span
-                    v-else-if="typeof (config!.app as Record<string, ConfigValue>)[key] === 'boolean'"
-                    :style="{ color: (config!.app as Record<string, ConfigValue>)[key] ? 'var(--ss-green-fg)' : 'var(--ss-red-fg)' }"
-                  >{{ String((config!.app as Record<string, ConfigValue>)[key]) }}</span>
+                    v-else-if="typeof getAppVal(key) === 'boolean'"
+                    :style="{ color: getAppVal(key) ? 'var(--ss-green-fg)' : 'var(--ss-red-fg)' }"
+                    >{{ String(getAppVal(key)) }}</span
+                  >
                   <!-- number -->
                   <span
-                    v-else-if="typeof (config!.app as Record<string, ConfigValue>)[key] === 'number'"
+                    v-else-if="typeof getAppVal(key) === 'number'"
                     :style="{ color: 'var(--ss-amber-fg)' }"
-                  >{{ String((config!.app as Record<string, ConfigValue>)[key]) }}</span>
+                    >{{ String(getAppVal(key)) }}</span
+                  >
                   <!-- array -->
                   <span
-                    v-else-if="Array.isArray((config!.app as Record<string, ConfigValue>)[key])"
+                    v-else-if="Array.isArray(getAppVal(key))"
                     :style="{ color: 'var(--ss-purple-fg)' }"
-                  >{{ getFmt((config!.app as Record<string, ConfigValue>)[key]).text }}</span>
+                    >{{ getFmt(getAppVal(key)).text }}</span
+                  >
                   <!-- string / other -->
-                  <span v-else>{{ String((config!.app as Record<string, ConfigValue>)[key]) }}</span>
+                  <span v-else>{{ String(getAppVal(key)) }}</span>
                 </span>
                 <!-- Copy button for non-redacted leaf -->
                 <button
-                  v-if="!isRedactedValue((config!.app as Record<string, ConfigValue>)[key])"
+                  v-if="!isRedactedValue(getAppVal(key))"
                   type="button"
                   :class="`${p}-copy-row-btn`"
                   :style="{ marginLeft: '4px' }"
                   title="Copy"
                   :ref="(el: any) => setCopyBtnRef(`leaf-${key}`, el)"
-                  @click="onCopyRow(
-                    `${key}: ${getFmt((config!.app as Record<string, ConfigValue>)[key]).text}`,
-                    `leaf-${key}`,
-                    $event
-                  )"
-                >&#x2398;</button>
+                  @click="
+                    onCopyRow(`${key}: ${getFmt(getAppVal(key)).text}`, `leaf-${key}`, $event)
+                  "
+                >
+                  &#x2398;
+                </button>
               </div>
             </template>
           </div>

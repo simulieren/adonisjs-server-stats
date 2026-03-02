@@ -11,10 +11,7 @@
 
 import { ref, reactive, watch, onMounted, onUnmounted, type Ref, type WatchSource } from 'vue'
 
-import {
-  DashboardDataController,
-  UnauthorizedError,
-} from '../../core/index.js'
+import { DashboardDataController, UnauthorizedError } from '../../core/index.js'
 
 import type { DashboardSection, PaginationState, TimeRange } from '../../core/index.js'
 

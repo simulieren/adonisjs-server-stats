@@ -1,6 +1,8 @@
 import { render } from 'preact'
+
 import { DebugPanel } from '../../react/components/DebugPanel/DebugPanel.js'
 import { readConfig } from '../bootstrap.js'
+
 import type { EdgeDebugConfig } from '../types.js'
 
 const config = readConfig<EdgeDebugConfig>('ss-dbg-config')

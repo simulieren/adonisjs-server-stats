@@ -24,22 +24,13 @@ const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api'
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const {
-  data,
-  loading,
-  error,
-  pagination,
-  goToPage,
-  setSearch,
-  setFilter,
-  refresh,
-  mutate,
-} = useDashboardData(() => 'jobs', {
-  baseUrl,
-  dashboardEndpoint,
-  authToken,
-  refreshKey,
-})
+const { data, loading, error, pagination, goToPage, setSearch, setFilter, refresh, mutate } =
+  useDashboardData(() => 'jobs', {
+    baseUrl,
+    dashboardEndpoint,
+    authToken,
+    refreshKey,
+  })
 
 const search = ref('')
 const statusFilter = ref('all')
@@ -102,7 +93,9 @@ async function handleRetry(jobId: string) {
       </div>
       <div class="ss-dash-job-stat">
         <span class="ss-dash-job-stat-label">Failed:</span>
-        <span class="ss-dash-job-stat-value" style="color: var(--ss-red-fg)">{{ stats.failed ?? 0 }}</span>
+        <span class="ss-dash-job-stat-value" style="color: var(--ss-red-fg)">{{
+          stats.failed ?? 0
+        }}</span>
       </div>
     </div>
 
@@ -155,13 +148,17 @@ async function handleRetry(jobId: string) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="j in jobs" :key="(j.id as string)">
-              <td><span style="color: var(--ss-dim)">{{ j.id }}</span></td>
+            <tr v-for="j in jobs" :key="j.id as string">
               <td>
-                <span style="color: var(--ss-text)" :title="(j.name as string)">{{ j.name }}</span>
+                <span style="color: var(--ss-dim)">{{ j.id }}</span>
               </td>
               <td>
-                <span :class="`ss-dash-badge ss-dash-badge-${getJobStatusBadgeColor(j.status as string)}`">
+                <span style="color: var(--ss-text)" :title="j.name as string">{{ j.name }}</span>
+              </td>
+              <td>
+                <span
+                  :class="`ss-dash-badge ss-dash-badge-${getJobStatusBadgeColor(j.status as string)}`"
+                >
                   {{ j.status }}
                 </span>
               </td>
@@ -175,16 +172,34 @@ async function handleRetry(jobId: string) {
               </td>
               <td>
                 <span class="ss-dash-duration">
-                  {{ (j.duration as number) !== null && (j.duration as number) !== undefined ? formatDuration(j.duration as number) : '-' }}
+                  {{
+                    (j.duration as number) !== null && (j.duration as number) !== undefined
+                      ? formatDuration(j.duration as number)
+                      : '-'
+                  }}
                 </span>
               </td>
               <td>
                 <span
                   class="ss-dash-event-time"
                   style="white-space: nowrap"
-                  :title="formatTime(((j.timestamp as string) || (j.createdAt as string) || (j.processedAt as string) || (j.created_at as string)) as string)"
+                  :title="
+                    formatTime(
+                      ((j.timestamp as string) ||
+                        (j.createdAt as string) ||
+                        (j.processedAt as string) ||
+                        (j.created_at as string)) as string
+                    )
+                  "
                 >
-                  {{ timeAgo(((j.timestamp as string) || (j.createdAt as string) || (j.processedAt as string) || (j.created_at as string)) as string) }}
+                  {{
+                    timeAgo(
+                      ((j.timestamp as string) ||
+                        (j.createdAt as string) ||
+                        (j.processedAt as string) ||
+                        (j.created_at as string)) as string
+                    )
+                  }}
                 </span>
               </td>
               <td>
@@ -192,10 +207,19 @@ async function handleRetry(jobId: string) {
                   v-if="j.status === 'failed'"
                   type="button"
                   class="ss-dash-retry-btn"
-                  :disabled="retryStates[(j.id as string)] === 'pending' || retryStates[(j.id as string)] === 'success'"
+                  :disabled="
+                    retryStates[j.id as string] === 'pending' ||
+                    retryStates[j.id as string] === 'success'
+                  "
                   @click.stop="handleRetry(j.id as string)"
                 >
-                  {{ retryStates[(j.id as string)] === 'pending' ? '...' : retryStates[(j.id as string)] === 'success' ? 'OK' : 'Retry' }}
+                  {{
+                    retryStates[j.id as string] === 'pending'
+                      ? '...'
+                      : retryStates[j.id as string] === 'success'
+                        ? 'OK'
+                        : 'Retry'
+                  }}
                 </button>
               </td>
             </tr>

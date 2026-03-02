@@ -79,7 +79,9 @@ const { tableRef } = useResizableTable(() => events.value)
           <td class="ss-dbg-event-data">
             <JsonViewer :value="e.data" class-prefix="ss-dbg" />
           </td>
-          <td class="ss-dbg-event-time" :title="formatTime(e.timestamp)">{{ timeAgo(e.timestamp) }}</td>
+          <td class="ss-dbg-event-time" :title="formatTime(e.timestamp)">
+            {{ timeAgo(e.timestamp) }}
+          </td>
         </tr>
       </tbody>
     </table>

@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, Suspense, lazy } from 'react'
 
+import { TAB_ICONS } from '../../../core/icons.js'
 import { useFeatures } from '../../hooks/useFeatures.js'
 import { useTheme } from '../../hooks/useTheme.js'
 import { ThemeToggle } from '../shared/ThemeToggle.js'
@@ -9,7 +10,6 @@ import type {
   DebugTab,
   DebugPane,
 } from '../../../core/types.js'
-import { TAB_ICONS } from '../../../core/icons.js'
 
 // Lazy-loaded tabs
 const QueriesTab = lazy(() => import('./tabs/QueriesTab.js'))
@@ -91,7 +91,10 @@ export function DebugPanel(props: DebugPanelProps) {
   // Ensure the active tab is always visible (e.g. when a feature flag changes
   // and the currently-selected tab disappears from the bar).
   useEffect(() => {
-    const allVisibleIds = [...visibleTabs.map((t) => t.id), ...customPanes.map((p: DebugPane) => p.id)]
+    const allVisibleIds = [
+      ...visibleTabs.map((t) => t.id),
+      ...customPanes.map((p: DebugPane) => p.id),
+    ]
     if (!allVisibleIds.includes(activeTab) && allVisibleIds.length > 0) {
       setActiveTab(allVisibleIds[0] as DebugTab)
     }

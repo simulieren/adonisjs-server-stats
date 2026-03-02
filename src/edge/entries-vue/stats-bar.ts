@@ -1,6 +1,8 @@
 import { createApp, defineComponent, h, ref, watch } from 'vue'
+
 import StatsBar from '../../vue/components/StatsBar/StatsBar.vue'
 import { readConfig } from '../bootstrap.js'
+
 import type { EdgeBarConfig, EdgeDebugConfig } from '../types.js'
 
 const config = readConfig<EdgeBarConfig>('ss-bar-config')

@@ -67,15 +67,12 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                   </>
                 )}
                 &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Status:</strong>{' '}
-                <span
-                  className={`ss-dash-badge ss-dash-email-status-${email.status as string}`}
-                >
+                <span className={`ss-dash-badge ss-dash-email-status-${email.status as string}`}>
                   {email.status as string}
                 </span>
                 {(email.mailer as string) && (
                   <>
-                    &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Mailer:</strong>{' '}
-                    {email.mailer as string}
+                    &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Mailer:</strong> {email.mailer as string}
                   </>
                 )}
               </>
@@ -212,9 +209,17 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                   render: (_v: unknown, row: Record<string, unknown>) => {
                     const count = (row.attachment_count || row.attachmentCount || 0) as number
                     return count > 0 ? (
-                      <span style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}>{count}</span>
+                      <span
+                        style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}
+                      >
+                        {count}
+                      </span>
                     ) : (
-                      <span style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}>-</span>
+                      <span
+                        style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}
+                      >
+                        -
+                      </span>
                     )
                   },
                 },
@@ -247,7 +252,11 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                   render: (_v: unknown, row: Record<string, unknown>) => {
                     const ts = (row.createdAt || row.created_at || row.timestamp) as string
                     return (
-                      <span className="ss-dash-event-time" style={{ whiteSpace: 'nowrap' }} title={formatTime(ts)}>
+                      <span
+                        className="ss-dash-event-time"
+                        style={{ whiteSpace: 'nowrap' }}
+                        title={formatTime(ts)}
+                      >
                         {timeAgo(ts)}
                       </span>
                     )

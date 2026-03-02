@@ -8,15 +8,7 @@
  * - Sidebar navigation with badges and custom panes
  * - Each section fetches its own data via provide/inject
  */
-import {
-  ref,
-  computed,
-  watch,
-  provide,
-  onMounted,
-  onUnmounted,
-  defineAsyncComponent,
-} from 'vue'
+import { ref, computed, watch, provide, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 
 import { subscribeToChannel } from '../../../core/transmit-adapter.js'
 import { useFeatures } from '../../composables/useFeatures.js'
@@ -28,42 +20,18 @@ import type { DebugPane } from '../../../debug/types.js'
 import ThemeToggle from '../shared/ThemeToggle.vue'
 
 // Lazy-loaded sections
-const OverviewSection = defineAsyncComponent(
-  () => import('./sections/OverviewSection.vue'),
-)
-const RequestsSection = defineAsyncComponent(
-  () => import('./sections/RequestsSection.vue'),
-)
-const QueriesSection = defineAsyncComponent(
-  () => import('./sections/QueriesSection.vue'),
-)
-const EventsSection = defineAsyncComponent(
-  () => import('./sections/EventsSection.vue'),
-)
-const RoutesSection = defineAsyncComponent(
-  () => import('./sections/RoutesSection.vue'),
-)
-const LogsSection = defineAsyncComponent(
-  () => import('./sections/LogsSection.vue'),
-)
-const EmailsSection = defineAsyncComponent(
-  () => import('./sections/EmailsSection.vue'),
-)
-const TimelineSection = defineAsyncComponent(
-  () => import('./sections/TimelineSection.vue'),
-)
-const CacheSection = defineAsyncComponent(
-  () => import('./sections/CacheSection.vue'),
-)
-const JobsSection = defineAsyncComponent(
-  () => import('./sections/JobsSection.vue'),
-)
-const ConfigSection = defineAsyncComponent(
-  () => import('./sections/ConfigSection.vue'),
-)
-const InternalsSection = defineAsyncComponent(
-  () => import('./sections/InternalsSection.vue'),
-)
+const OverviewSection = defineAsyncComponent(() => import('./sections/OverviewSection.vue'))
+const RequestsSection = defineAsyncComponent(() => import('./sections/RequestsSection.vue'))
+const QueriesSection = defineAsyncComponent(() => import('./sections/QueriesSection.vue'))
+const EventsSection = defineAsyncComponent(() => import('./sections/EventsSection.vue'))
+const RoutesSection = defineAsyncComponent(() => import('./sections/RoutesSection.vue'))
+const LogsSection = defineAsyncComponent(() => import('./sections/LogsSection.vue'))
+const EmailsSection = defineAsyncComponent(() => import('./sections/EmailsSection.vue'))
+const TimelineSection = defineAsyncComponent(() => import('./sections/TimelineSection.vue'))
+const CacheSection = defineAsyncComponent(() => import('./sections/CacheSection.vue'))
+const JobsSection = defineAsyncComponent(() => import('./sections/JobsSection.vue'))
+const ConfigSection = defineAsyncComponent(() => import('./sections/ConfigSection.vue'))
+const InternalsSection = defineAsyncComponent(() => import('./sections/InternalsSection.vue'))
 
 /** All built-in section IDs used for hash-route validation. */
 const VALID_SECTIONS: DashboardSection[] = [
@@ -97,7 +65,7 @@ const props = withDefaults(
     authToken: undefined,
     backUrl: '/',
     channelName: 'server-stats/dashboard',
-  },
+  }
 )
 
 const { theme, toggleTheme } = useTheme()
@@ -174,10 +142,7 @@ const customPanes = computed<DebugPane[]>(() => features.value.customPanes || []
 function resolveHashSection(hash: string): DashboardSection {
   const section = hash.replace('#', '').split('?')[0]
   if (!section) return 'overview'
-  const allValid: string[] = [
-    ...VALID_SECTIONS,
-    ...customPanes.value.map((p: DebugPane) => p.id),
-  ]
+  const allValid: string[] = [...VALID_SECTIONS, ...customPanes.value.map((p: DebugPane) => p.id)]
   return allValid.includes(section) ? (section as DashboardSection) : 'overview'
 }
 
@@ -212,10 +177,7 @@ watch(activeSection, (section) => {
 
 function toggleSidebar() {
   sidebarCollapsed.value = !sidebarCollapsed.value
-  localStorage.setItem(
-    'ss-dash-sidebar',
-    sidebarCollapsed.value ? 'collapsed' : 'expanded',
-  )
+  localStorage.setItem('ss-dash-sidebar', sidebarCollapsed.value ? 'collapsed' : 'expanded')
 }
 
 function navigateTo(section: DashboardSection) {
@@ -321,12 +283,7 @@ function sectionIconKey(sectionId: string): string {
       </div>
       <div class="ss-dash-header-right">
         <ThemeToggle class-prefix="ss-dash" />
-        <a
-          v-if="backUrl"
-          :href="backUrl"
-          class="ss-dash-back-link"
-          title="Back to app"
-        >
+        <a v-if="backUrl" :href="backUrl" class="ss-dash-back-link" title="Back to app">
           &larr; App
         </a>
       </div>
@@ -359,7 +316,9 @@ function sectionIconKey(sectionId: string): string {
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                v-html="(TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).elements.join('')"
+                v-html="
+                  (TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).elements.join('')
+                "
               ></svg>
             </span>
             <span class="ss-dash-nav-label">{{ section.label }}</span>
@@ -408,23 +367,35 @@ function sectionIconKey(sectionId: string): string {
           @click="toggleSidebar"
           :title="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
         >
-          <svg v-if="sidebarCollapsed" width="16" height="16" :viewBox="TAB_ICONS['chevron-right'].viewBox" fill="none" stroke="currentColor" stroke-width="1.5" v-html="TAB_ICONS['chevron-right'].elements.join('')"></svg>
-          <svg v-else width="16" height="16" :viewBox="TAB_ICONS['chevron-left'].viewBox" fill="none" stroke="currentColor" stroke-width="1.5" v-html="TAB_ICONS['chevron-left'].elements.join('')"></svg>
+          <svg
+            v-if="sidebarCollapsed"
+            width="16"
+            height="16"
+            :viewBox="TAB_ICONS['chevron-right'].viewBox"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            v-html="TAB_ICONS['chevron-right'].elements.join('')"
+          ></svg>
+          <svg
+            v-else
+            width="16"
+            height="16"
+            :viewBox="TAB_ICONS['chevron-left'].viewBox"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+            v-html="TAB_ICONS['chevron-left'].elements.join('')"
+          ></svg>
         </button>
       </div>
 
       <!-- Main content -->
       <div class="ss-dash-main">
-        <div
-          class="ss-dash-pane ss-dash-active"
-          :id="`ss-dash-pane-${activeSection}`"
-        >
+        <div class="ss-dash-pane ss-dash-active" :id="`ss-dash-pane-${activeSection}`">
           <div class="ss-dash-pane-inner">
             <Suspense>
-              <component
-                :is="activeSectionComponent"
-                v-if="activeSectionComponent"
-              />
+              <component :is="activeSectionComponent" v-if="activeSectionComponent" />
               <div v-else class="ss-dash-empty">Unknown section</div>
               <template #fallback>
                 <div class="ss-dash-empty">Loading...</div>

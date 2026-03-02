@@ -146,19 +146,13 @@ export const TAB_ICONS: Record<string, TabIconDef> = {
    */
   'dashboard-timeline': {
     viewBox: '0 0 24 24',
-    elements: [
-      '<circle cx="12" cy="12" r="10"/>',
-      '<polyline points="12 6 12 12 16 14"/>',
-    ],
+    elements: ['<circle cx="12" cy="12" r="10"/>', '<polyline points="12 6 12 12 16 14"/>'],
   },
 
   /** Custom pane placeholder (sidebar layout). */
   'custom-pane': {
     viewBox: '0 0 24 24',
-    elements: [
-      '<rect x="3" y="3" width="18" height="18" rx="2"/>',
-      '<path d="M9 3v18"/>',
-    ],
+    elements: ['<rect x="3" y="3" width="18" height="18" rx="2"/>', '<path d="M9 3v18"/>'],
   },
 
   // ---------------------------------------------------------------------------
@@ -202,18 +196,13 @@ export const TAB_ICONS: Record<string, TabIconDef> = {
   /** Moon icon (dark theme indicator). */
   moon: {
     viewBox: '0 0 24 24',
-    elements: [
-      '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
-    ],
+    elements: ['<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>'],
   },
 
   /** Search / magnifying glass. */
   search: {
     viewBox: '0 0 24 24',
-    elements: [
-      '<circle cx="11" cy="11" r="8"/>',
-      '<line x1="21" y1="21" x2="16.65" y2="16.65"/>',
-    ],
+    elements: ['<circle cx="11" cy="11" r="8"/>', '<line x1="21" y1="21" x2="16.65" y2="16.65"/>'],
   },
 
   /** Eye icon (reveal / show). */

@@ -12,22 +12,14 @@ import { DashboardApi, formatTtl, formatCacheSize } from '../../../../core/index
 import { useApiClient } from '../../../composables/useApiClient.js'
 import JsonViewer from '../../shared/JsonViewer.vue'
 import FilterBar from '../shared/FilterBar.vue'
-import type {
-  DashboardCacheKeyEntry,
-  DashboardCacheResponse,
-} from '../../../../core/types.js'
+import type { DashboardCacheKeyEntry, DashboardCacheResponse } from '../../../../core/types.js'
 
 const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const {
-  data,
-  loading,
-  setSearch,
-  mutate,
-} = useDashboardData(() => 'cache', {
+const { data, loading, setSearch, mutate } = useDashboardData(() => 'cache', {
   baseUrl,
   dashboardEndpoint,
   authToken,
@@ -86,8 +78,7 @@ async function handleKeyClick(key: string) {
   try {
     const result = await cacheApi.fetchCacheKey(key)
     keyValue.value =
-      result.value !== undefined ? result.value :
-      result.data !== undefined ? result.data : result
+      result.value !== undefined ? result.value : result.data !== undefined ? result.data : result
     keyValueError.value = null
   } catch {
     keyValue.value = null
@@ -104,7 +95,9 @@ async function handleKeyClick(key: string) {
     <div v-if="cacheData?.available && cacheData?.stats" class="ss-dash-cache-stats">
       <div class="ss-dash-cache-stat">
         <span class="ss-dash-cache-stat-label">Hit Rate:</span>
-        <span class="ss-dash-cache-stat-value">{{ (cacheData.stats.hitRate ?? 0).toFixed(1) }}%</span>
+        <span class="ss-dash-cache-stat-value"
+          >{{ (cacheData.stats.hitRate ?? 0).toFixed(1) }}%</span
+        >
       </div>
       <div class="ss-dash-cache-stat">
         <span class="ss-dash-cache-stat-label">Hits:</span>
@@ -157,20 +150,30 @@ async function handleKeyClick(key: string) {
               <td>
                 <span
                   :title="k.key"
-                  style="color: var(--ss-sql-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                  style="
+                    color: var(--ss-sql-color);
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    display: block;
+                  "
                 >
                   {{ k.key }}
                 </span>
               </td>
-              <td><span style="color: var(--ss-muted)">{{ k.type }}</span></td>
-              <td>{{ k.size !== null && k.size !== undefined && k.size > 0 ? formatCacheSize(k.size) : '-' }}</td>
+              <td>
+                <span style="color: var(--ss-muted)">{{ k.type }}</span>
+              </td>
+              <td>
+                {{
+                  k.size !== null && k.size !== undefined && k.size > 0
+                    ? formatCacheSize(k.size)
+                    : '-'
+                }}
+              </td>
               <td>{{ k.ttl > 0 ? formatTtl(k.ttl) : '-' }}</td>
               <td>
-                <button
-                  type="button"
-                  class="ss-dash-retry-btn"
-                  @click.stop="handleDelete(k.key)"
-                >
+                <button type="button" class="ss-dash-retry-btn" @click.stop="handleDelete(k.key)">
                   Delete
                 </button>
               </td>

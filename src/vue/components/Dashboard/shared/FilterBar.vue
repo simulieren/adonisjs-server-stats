@@ -48,7 +48,9 @@ function handleClear() {
         :placeholder="placeholder || 'Search...'"
         @input="onInput"
       />
-      <button v-if="modelValue" type="button" class="ss-dash-search-clear" @click="handleClear">&times;</button>
+      <button v-if="modelValue" type="button" class="ss-dash-search-clear" @click="handleClear">
+        &times;
+      </button>
     </div>
     <div v-if="$slots.default" class="ss-dash-filter-controls">
       <slot />

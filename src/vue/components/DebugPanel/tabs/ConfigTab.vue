@@ -70,7 +70,8 @@ function formatValue(value: ConfigValue): string {
 
 function valueClass(value: ConfigValue): string {
   if (value === null || value === undefined) return 'ss-dbg-config-val-null'
-  if (typeof value === 'boolean') return value ? 'ss-dbg-config-val-true' : 'ss-dbg-config-val-false'
+  if (typeof value === 'boolean')
+    return value ? 'ss-dbg-config-val-true' : 'ss-dbg-config-val-false'
   if (typeof value === 'number') return 'ss-dbg-config-val-number'
   if (Array.isArray(value)) return 'ss-dbg-config-val-array'
   return 'ss-dbg-config-val'
@@ -257,22 +258,14 @@ watch(searchDebounced, (term) => {
         </button>
 
         <!-- Copy JSON -->
-        <button
-          class="ss-dbg-btn-clear"
-          @click="copyAllJson"
-          :title="'Copy all as JSON'"
-        >
+        <button class="ss-dbg-btn-clear" @click="copyAllJson" :title="'Copy all as JSON'">
           {{ copiedKey === '__all_json__' ? 'Copied!' : 'Copy JSON' }}
         </button>
 
         <!-- Summary -->
         <span class="ss-dbg-summary">
-          <template v-if="activeSubTab === 'app'">
-            {{ appSections.length }} sections
-          </template>
-          <template v-else>
-            {{ envEntries.length }} variables
-          </template>
+          <template v-if="activeSubTab === 'app'"> {{ appSections.length }} sections </template>
+          <template v-else> {{ envEntries.length }} variables </template>
         </span>
       </div>
 
@@ -283,11 +276,7 @@ watch(searchDebounced, (term) => {
         </div>
 
         <div v-else class="ss-dbg-config-sections">
-          <div
-            v-for="section in appSections"
-            :key="section.key"
-            class="ss-dbg-config-section"
-          >
+          <div v-for="section in appSections" :key="section.key" class="ss-dbg-config-section">
             <!-- Flat (leaf) entry -->
             <template v-if="section.isFlat">
               <div class="ss-dbg-config-section-header ss-dbg-config-leaf">
@@ -307,14 +296,20 @@ watch(searchDebounced, (term) => {
                 </template>
                 <template v-else>
                   <span :class="valueClass(section.entries[0].value)">
-                    <template v-for="(seg, i) in highlightSegments(formatValue(section.entries[0].value))" :key="i">
+                    <template
+                      v-for="(seg, i) in highlightSegments(formatValue(section.entries[0].value))"
+                      :key="i"
+                    >
                       <span v-if="seg.match" class="ss-dbg-config-match">{{ seg.text }}</span>
                       <template v-else>{{ seg.text }}</template>
                     </template>
                   </span>
                 </template>
                 <button
-                  :class="['ss-dbg-copy-row-btn', { 'ss-dbg-copy-row-ok': copiedKey === section.key }]"
+                  :class="[
+                    'ss-dbg-copy-row-btn',
+                    { 'ss-dbg-copy-row-ok': copiedKey === section.key },
+                  ]"
                   @click.stop="copyToClipboard(formatValue(section.entries[0].value), section.key)"
                   title="Copy value"
                 >
@@ -325,10 +320,7 @@ watch(searchDebounced, (term) => {
 
             <!-- Group (collapsible) -->
             <template v-else>
-              <div
-                class="ss-dbg-config-section-header"
-                @click="toggleSection(section.key)"
-              >
+              <div class="ss-dbg-config-section-header" @click="toggleSection(section.key)">
                 <span class="ss-dbg-config-toggle">
                   {{ expandedSections.has(section.key) ? '\u25BC' : '\u25B6' }}
                 </span>
@@ -342,10 +334,7 @@ watch(searchDebounced, (term) => {
               </div>
 
               <!-- Expanded table -->
-              <div
-                v-if="expandedSections.has(section.key)"
-                class="ss-dbg-config-table-wrap"
-              >
+              <div v-if="expandedSections.has(section.key)" class="ss-dbg-config-table-wrap">
                 <table class="ss-dbg-table">
                   <thead>
                     <tr>
@@ -356,13 +345,24 @@ watch(searchDebounced, (term) => {
                   </thead>
                   <tbody>
                     <tr v-for="entry in section.entries" :key="entry.fullKey">
-                      <td class="ss-dbg-config-key" style="font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace; font-size: 11px">
+                      <td
+                        class="ss-dbg-config-key"
+                        style="
+                          font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+                          font-size: 11px;
+                        "
+                      >
                         <template v-for="(seg, i) in highlightSegments(entry.key)" :key="i">
                           <span v-if="seg.match" class="ss-dbg-config-match">{{ seg.text }}</span>
                           <template v-else>{{ seg.text }}</template>
                         </template>
                       </td>
-                      <td style="font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace; font-size: 11px">
+                      <td
+                        style="
+                          font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+                          font-size: 11px;
+                        "
+                      >
                         <template v-if="isRedacted(entry.key) && !showRedacted">
                           <span class="ss-dbg-redacted-wrap">
                             &#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;
@@ -377,8 +377,13 @@ watch(searchDebounced, (term) => {
                         </template>
                         <template v-else>
                           <span :class="valueClass(entry.value)">
-                            <template v-for="(seg, i) in highlightSegments(formatValue(entry.value))" :key="i">
-                              <span v-if="seg.match" class="ss-dbg-config-match">{{ seg.text }}</span>
+                            <template
+                              v-for="(seg, i) in highlightSegments(formatValue(entry.value))"
+                              :key="i"
+                            >
+                              <span v-if="seg.match" class="ss-dbg-config-match">{{
+                                seg.text
+                              }}</span>
                               <template v-else>{{ seg.text }}</template>
                             </template>
                           </span>
@@ -386,7 +391,10 @@ watch(searchDebounced, (term) => {
                       </td>
                       <td>
                         <button
-                          :class="['ss-dbg-copy-row-btn', { 'ss-dbg-copy-row-ok': copiedKey === entry.fullKey }]"
+                          :class="[
+                            'ss-dbg-copy-row-btn',
+                            { 'ss-dbg-copy-row-ok': copiedKey === entry.fullKey },
+                          ]"
                           @click="copyToClipboard(formatValue(entry.value), entry.fullKey)"
                           title="Copy value"
                         >
@@ -419,13 +427,24 @@ watch(searchDebounced, (term) => {
             </thead>
             <tbody>
               <tr v-for="entry in envEntries" :key="entry.key">
-                <td class="ss-dbg-config-key" style="font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace; font-size: 11px">
+                <td
+                  class="ss-dbg-config-key"
+                  style="
+                    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+                    font-size: 11px;
+                  "
+                >
                   <template v-for="(seg, i) in highlightSegments(entry.key)" :key="i">
                     <span v-if="seg.match" class="ss-dbg-config-match">{{ seg.text }}</span>
                     <template v-else>{{ seg.text }}</template>
                   </template>
                 </td>
-                <td style="font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace; font-size: 11px">
+                <td
+                  style="
+                    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+                    font-size: 11px;
+                  "
+                >
                   <template v-if="isRedacted(entry.key) && !showRedacted">
                     <span class="ss-dbg-redacted-wrap">
                       &#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;
@@ -440,7 +459,10 @@ watch(searchDebounced, (term) => {
                   </template>
                   <template v-else>
                     <span :class="valueClass(entry.value)">
-                      <template v-for="(seg, i) in highlightSegments(formatValue(entry.value))" :key="i">
+                      <template
+                        v-for="(seg, i) in highlightSegments(formatValue(entry.value))"
+                        :key="i"
+                      >
                         <span v-if="seg.match" class="ss-dbg-config-match">{{ seg.text }}</span>
                         <template v-else>{{ seg.text }}</template>
                       </template>
@@ -449,7 +471,10 @@ watch(searchDebounced, (term) => {
                 </td>
                 <td>
                   <button
-                    :class="['ss-dbg-copy-row-btn', { 'ss-dbg-copy-row-ok': copiedKey === `env-${entry.key}` }]"
+                    :class="[
+                      'ss-dbg-copy-row-btn',
+                      { 'ss-dbg-copy-row-ok': copiedKey === `env-${entry.key}` },
+                    ]"
                     @click="copyToClipboard(formatValue(entry.value), `env-${entry.key}`)"
                     title="Copy value"
                   >

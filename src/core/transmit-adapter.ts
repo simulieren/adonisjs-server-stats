@@ -88,7 +88,9 @@ export function createTransmitSubscription(
       const Transmit = await resolveTransmitClass()
 
       if (!Transmit) {
-        throw new Error('Transmit client not available (neither window.Transmit nor @adonisjs/transmit-client)')
+        throw new Error(
+          'Transmit client not available (neither window.Transmit nor @adonisjs/transmit-client)'
+        )
       }
 
       if (disposed) return

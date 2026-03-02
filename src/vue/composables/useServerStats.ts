@@ -10,8 +10,8 @@ import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 
 import { ServerStatsController } from '../../core/server-stats-controller.js'
 
-import type { ConnectionMode } from '../../core/server-stats-controller.js'
 import type { ServerStats } from '../../core/index.js'
+import type { ConnectionMode } from '../../core/server-stats-controller.js'
 
 export interface UseServerStatsOptions {
   /** Base URL for API requests. */

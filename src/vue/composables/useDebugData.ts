@@ -47,10 +47,18 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
     endpoint: debugEndpoint,
     authToken,
     refreshInterval,
-    onData: (d) => { data.value = d },
-    onLoading: (l) => { loading.value = l },
-    onError: (e) => { error.value = e },
-    onUnauthorized: () => { isUnauthorized.value = true },
+    onData: (d) => {
+      data.value = d
+    },
+    onLoading: (l) => {
+      loading.value = l
+    },
+    onError: (e) => {
+      error.value = e
+    },
+    onUnauthorized: () => {
+      isUnauthorized.value = true
+    },
   })
 
   // For DASHBOARD_TABS we need a second controller that targets the
@@ -64,10 +72,18 @@ export function useDebugData(tab: () => DebugTab | string, options: UseDebugData
         endpoint: dashboardEndpoint,
         authToken,
         refreshInterval,
-        onData: (d) => { data.value = d },
-        onLoading: (l) => { loading.value = l },
-        onError: (e) => { error.value = e },
-        onUnauthorized: () => { isUnauthorized.value = true },
+        onData: (d) => {
+          data.value = d
+        },
+        onLoading: (l) => {
+          loading.value = l
+        },
+        onError: (e) => {
+          error.value = e
+        },
+        onUnauthorized: () => {
+          isUnauthorized.value = true
+        },
       })
     }
     return dashboardController!

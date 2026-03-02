@@ -2,141 +2,131 @@
 /**
  * Request waterfall / timeline tab for the debug panel.
  */
-import {
-  ref,
-  computed,
-  onBeforeUnmount,
-} from "vue";
+import { ref, computed, onBeforeUnmount } from 'vue'
 import {
   formatDuration,
   formatTime,
   statusColor,
   timeAgo,
   durationSeverity,
-} from "../../../../core/index.js";
-import { useApiClient } from "../../../composables/useApiClient.js";
-import { useResizableTable } from "../../../composables/useResizableTable.js";
-import { TAB_ICONS } from "../../../../core/icons.js";
-import type { TraceRecord, TraceSpan } from "../../../../core/index.js";
+} from '../../../../core/index.js'
+import { useApiClient } from '../../../composables/useApiClient.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
+import { TAB_ICONS } from '../../../../core/icons.js'
+import type { TraceRecord, TraceSpan } from '../../../../core/index.js'
 
 const props = defineProps<{
-  data: { traces?: TraceRecord[] } | TraceRecord[] | null;
-  dashboardPath?: string;
-  baseUrl?: string;
-  debugEndpoint?: string;
-  authToken?: string;
-}>();
+  data: { traces?: TraceRecord[] } | TraceRecord[] | null
+  dashboardPath?: string
+  baseUrl?: string
+  debugEndpoint?: string
+  authToken?: string
+}>()
 
-const search = ref("");
-const selectedTraceId = ref<number | null>(null);
-const traceDetail = ref<TraceRecord | null>(null);
-const detailLoading = ref(false);
-const detailError = ref<string | null>(null);
+const search = ref('')
+const selectedTraceId = ref<number | null>(null)
+const traceDetail = ref<TraceRecord | null>(null)
+const detailLoading = ref(false)
+const detailError = ref<string | null>(null)
 
-const getClient = useApiClient(props.baseUrl || "", props.authToken);
+const getClient = useApiClient(props.baseUrl || '', props.authToken)
 
 const traces = computed<TraceRecord[]>(() => {
-  const d = props.data;
-  if (!d) return [];
-  const items = Array.isArray(d) ? d : d.traces || [];
-  if (!search.value.trim()) return items;
-  const term = search.value.toLowerCase();
+  const d = props.data
+  if (!d) return []
+  const items = Array.isArray(d) ? d : d.traces || []
+  if (!search.value.trim()) return items
+  const term = search.value.toLowerCase()
   return items.filter(
     (t: TraceRecord) =>
       t.url.toLowerCase().includes(term) ||
       t.method.toLowerCase().includes(term) ||
-      String(t.statusCode).includes(term),
-  );
-});
+      String(t.statusCode).includes(term)
+  )
+})
 
 const CATEGORY_COLORS: Record<string, string> = {
-  request: "#1e3a5f",
-  middleware: "rgba(30, 58, 95, 0.7)",
-  db: "#6d28d9",
-  view: "#0e7490",
-  mail: "#059669",
-  event: "#b45309",
-  custom: "#525252",
-};
+  request: '#1e3a5f',
+  middleware: 'rgba(30, 58, 95, 0.7)',
+  db: '#6d28d9',
+  view: '#0e7490',
+  mail: '#059669',
+  event: '#b45309',
+  custom: '#525252',
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
-  request: "Request",
-  middleware: "Middleware",
-  db: "Database",
-  view: "View",
-  mail: "Mail",
-  event: "Event",
-  custom: "Custom",
-};
+  request: 'Request',
+  middleware: 'Middleware',
+  db: 'Database',
+  view: 'View',
+  mail: 'Mail',
+  event: 'Event',
+  custom: 'Custom',
+}
 
 function selectTrace(trace: TraceRecord) {
   if (selectedTraceId.value === trace.id) {
-    selectedTraceId.value = null;
-    traceDetail.value = null;
-    detailError.value = null;
+    selectedTraceId.value = null
+    traceDetail.value = null
+    detailError.value = null
   } else {
-    selectedTraceId.value = trace.id;
-    fetchTraceDetail(trace.id);
+    selectedTraceId.value = trace.id
+    fetchTraceDetail(trace.id)
   }
 }
 
 function goBack() {
-  selectedTraceId.value = null;
-  traceDetail.value = null;
-  detailError.value = null;
+  selectedTraceId.value = null
+  traceDetail.value = null
+  detailError.value = null
 }
 
-let fetchAbortController: AbortController | null = null;
+let fetchAbortController: AbortController | null = null
 
 async function fetchTraceDetail(id: number) {
   // Cancel any in-flight request
   if (fetchAbortController) {
-    fetchAbortController.abort();
+    fetchAbortController.abort()
   }
-  fetchAbortController = new AbortController();
+  fetchAbortController = new AbortController()
 
-  detailLoading.value = true;
-  detailError.value = null;
-  traceDetail.value = null;
+  detailLoading.value = true
+  detailError.value = null
+  traceDetail.value = null
 
-  const endpoint = props.debugEndpoint || "/admin/api/debug";
+  const endpoint = props.debugEndpoint || '/admin/api/debug'
   try {
-    const client = getClient();
-    const detail = await client.get<TraceRecord>(`${endpoint}/traces/${id}`);
-    traceDetail.value = detail;
+    const client = getClient()
+    const detail = await client.get<TraceRecord>(`${endpoint}/traces/${id}`)
+    traceDetail.value = detail
   } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") return;
-    detailError.value =
-      err instanceof Error ? err.message : "Failed to load trace";
+    if (err instanceof Error && err.name === 'AbortError') return
+    detailError.value = err instanceof Error ? err.message : 'Failed to load trace'
   } finally {
-    detailLoading.value = false;
+    detailLoading.value = false
   }
 }
 
-const detailSpans = computed<TraceSpan[]>(() => traceDetail.value?.spans || []);
-const detailWarnings = computed<string[]>(
-  () => traceDetail.value?.warnings || [],
-);
+const detailSpans = computed<TraceSpan[]>(() => traceDetail.value?.spans || [])
+const detailWarnings = computed<string[]>(() => traceDetail.value?.warnings || [])
 
-function getBarStyle(
-  span: TraceSpan,
-  totalDuration: number,
-): Record<string, string> {
-  const total = totalDuration || 1;
-  const left = total > 0 ? (span.startOffset / total) * 100 : 0;
-  const width = total > 0 ? Math.max((span.duration / total) * 100, 0.5) : 0.5;
+function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, string> {
+  const total = totalDuration || 1
+  const left = total > 0 ? (span.startOffset / total) * 100 : 0
+  const width = total > 0 ? Math.max((span.duration / total) * 100, 0.5) : 0.5
   return {
     left: `${left}%`,
     width: `${width}%`,
     background: CATEGORY_COLORS[span.category] || CATEGORY_COLORS.custom,
-  };
+  }
 }
 
-const { tableRef } = useResizableTable(() => traces.value);
+const { tableRef } = useResizableTable(() => traces.value)
 
 onBeforeUnmount(() => {
-  if (fetchAbortController) fetchAbortController.abort();
-});
+  if (fetchAbortController) fetchAbortController.abort()
+})
 
 function dbgDurationClass(ms: number): string {
   const sev = durationSeverity(ms)
@@ -151,9 +141,7 @@ function dbgDurationClass(ms: number): string {
     <!-- Trace detail view -->
     <template v-if="selectedTraceId !== null">
       <!-- Loading state -->
-      <div v-if="detailLoading" class="ss-dbg-empty">
-        Loading trace detail...
-      </div>
+      <div v-if="detailLoading" class="ss-dbg-empty">Loading trace detail...</div>
 
       <!-- Error state -->
       <template v-else-if="detailError">
@@ -167,9 +155,7 @@ function dbgDurationClass(ms: number): string {
       <template v-else-if="traceDetail">
         <div class="ss-dbg-tl-detail-header">
           <button type="button" class="ss-dbg-btn-clear" @click="goBack">&larr; Back</button>
-          <span
-            :class="`ss-dbg-method ss-dbg-method-${traceDetail.method.toLowerCase()}`"
-          >
+          <span :class="`ss-dbg-method ss-dbg-method-${traceDetail.method.toLowerCase()}`">
             {{ traceDetail.method }}
           </span>
           <span class="ss-dbg-tl-detail-url">{{ traceDetail.url }}</span>
@@ -185,15 +171,8 @@ function dbgDurationClass(ms: number): string {
         </div>
 
         <div class="ss-dbg-tl-legend">
-          <span
-            v-for="(color, cat) in CATEGORY_COLORS"
-            :key="cat"
-            class="ss-dbg-tl-legend-item"
-          >
-            <span
-              class="ss-dbg-tl-legend-dot"
-              :style="{ background: color }"
-            ></span>
+          <span v-for="(color, cat) in CATEGORY_COLORS" :key="cat" class="ss-dbg-tl-legend-item">
+            <span class="ss-dbg-tl-legend-dot" :style="{ background: color }"></span>
             {{ CATEGORY_LABELS[cat] || cat }}
           </span>
         </div>
@@ -213,19 +192,13 @@ function dbgDurationClass(ms: number): string {
                 :title="`${span.label}: ${formatDuration(span.duration)}`"
               ></span>
             </span>
-            <span class="ss-dbg-tl-dur">{{
-              formatDuration(span.duration)
-            }}</span>
+            <span class="ss-dbg-tl-dur">{{ formatDuration(span.duration) }}</span>
           </div>
         </div>
 
         <div v-if="detailWarnings.length > 0" class="ss-dbg-tl-warnings">
           <div class="ss-dbg-tl-warnings-title">Warnings</div>
-          <div
-            v-for="(w, i) in detailWarnings"
-            :key="i"
-            class="ss-dbg-tl-warning"
-          >
+          <div v-for="(w, i) in detailWarnings" :key="i" class="ss-dbg-tl-warning">
             {{ w }}
           </div>
         </div>
@@ -242,9 +215,7 @@ function dbgDurationClass(ms: number): string {
         <span class="ss-dbg-summary">{{ traces.length }} traces</span>
       </div>
 
-      <div v-if="traces.length === 0" class="ss-dbg-empty">
-        No traces captured
-      </div>
+      <div v-if="traces.length === 0" class="ss-dbg-empty">No traces captured</div>
 
       <table v-else ref="tableRef" class="ss-dbg-table">
         <thead>
@@ -259,17 +230,10 @@ function dbgDurationClass(ms: number): string {
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="t in traces"
-            :key="t.id"
-            class="ss-dbg-email-row"
-            @click="selectTrace(t)"
-          >
+          <tr v-for="t in traces" :key="t.id" class="ss-dbg-email-row" @click="selectTrace(t)">
             <td class="ss-dbg-c-dim" style="white-space: nowrap">{{ t.id }}</td>
             <td>
-              <span
-                :class="`ss-dbg-method ss-dbg-method-${t.method.toLowerCase()}`"
-              >
+              <span :class="`ss-dbg-method ss-dbg-method-${t.method.toLowerCase()}`">
                 {{ t.method }}
               </span>
             </td>
@@ -294,9 +258,7 @@ function dbgDurationClass(ms: number): string {
               </a>
             </td>
             <td>
-              <span
-                :class="`ss-dbg-status ss-dbg-status-${Math.floor(t.statusCode / 100)}xx`"
-              >
+              <span :class="`ss-dbg-status ss-dbg-status-${Math.floor(t.statusCode / 100)}xx`">
                 {{ t.statusCode }}
               </span>
             </td>
@@ -306,7 +268,9 @@ function dbgDurationClass(ms: number): string {
             <td class="ss-dbg-c-muted" style="text-align: center">
               {{ t.spanCount }}
             </td>
-            <td class="ss-dbg-event-time" :title="formatTime(t.timestamp)">{{ timeAgo(t.timestamp) }}</td>
+            <td class="ss-dbg-event-time" :title="formatTime(t.timestamp)">
+              {{ timeAgo(t.timestamp) }}
+            </td>
           </tr>
         </tbody>
       </table>

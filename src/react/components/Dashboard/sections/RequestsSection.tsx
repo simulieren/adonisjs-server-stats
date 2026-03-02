@@ -10,8 +10,8 @@ import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 import { WaterfallChart } from '../shared/WaterfallChart.js'
 
-import type { DashboardHookOptions, TraceSpan } from '../../../../core/types.js'
 import type { TraceDetail } from '../../../../core/trace-utils.js'
+import type { DashboardHookOptions, TraceSpan } from '../../../../core/types.js'
 
 interface RequestsSectionProps {
   options?: DashboardHookOptions
@@ -130,7 +130,9 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   key: 'id',
                   label: '#',
                   width: '40px',
-                  render: (v: unknown) => <span style={{ color: 'var(--ss-dim)' }}>{v as number}</span>,
+                  render: (v: unknown) => (
+                    <span style={{ color: 'var(--ss-dim)' }}>{v as number}</span>
+                  ),
                 },
                 {
                   key: 'method',
@@ -163,7 +165,10 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   width: '60px',
                   sortable: true,
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const code = (row as Record<string, unknown>).status_code || (row as Record<string, unknown>).statusCode || row.statusCode
+                    const code =
+                      (row as Record<string, unknown>).status_code ||
+                      (row as Record<string, unknown>).statusCode ||
+                      row.statusCode
                     return <StatusBadge code={code as number} />
                   },
                 },
@@ -173,7 +178,10 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   width: '80px',
                   sortable: true,
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const dur = ((row as Record<string, unknown>).total_duration || (row as Record<string, unknown>).totalDuration || (row as Record<string, unknown>).duration || 0) as number
+                    const dur = ((row as Record<string, unknown>).total_duration ||
+                      (row as Record<string, unknown>).totalDuration ||
+                      (row as Record<string, unknown>).duration ||
+                      0) as number
                     return (
                       <span
                         className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
@@ -188,7 +196,9 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   label: 'Spans',
                   width: '50px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const count = ((row as Record<string, unknown>).span_count || (row as Record<string, unknown>).spanCount || 0) as number
+                    const count = ((row as Record<string, unknown>).span_count ||
+                      (row as Record<string, unknown>).spanCount ||
+                      0) as number
                     return (
                       <span style={{ color: 'var(--ss-muted)', textAlign: 'center' }}>{count}</span>
                     )
@@ -199,11 +209,25 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   label: '\u26A0',
                   width: '40px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const count = ((row as Record<string, unknown>).warning_count || (row as Record<string, unknown>).warningCount || 0) as number
+                    const count = ((row as Record<string, unknown>).warning_count ||
+                      (row as Record<string, unknown>).warningCount ||
+                      0) as number
                     return count > 0 ? (
-                      <span style={{ color: 'var(--ss-amber-fg)', textAlign: 'center', display: 'block' }}>{count}</span>
+                      <span
+                        style={{
+                          color: 'var(--ss-amber-fg)',
+                          textAlign: 'center',
+                          display: 'block',
+                        }}
+                      >
+                        {count}
+                      </span>
                     ) : (
-                      <span style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}>-</span>
+                      <span
+                        style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}
+                      >
+                        -
+                      </span>
                     )
                   },
                 },
@@ -213,8 +237,15 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   width: '80px',
                   sortable: true,
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const val = ((row as Record<string, unknown>).createdAt || (row as Record<string, unknown>).created_at || (row as Record<string, unknown>).timestamp || '') as string
-                    return <span className="ss-dash-event-time" title={formatTime(val)}>{timeAgo(val)}</span>
+                    const val = ((row as Record<string, unknown>).createdAt ||
+                      (row as Record<string, unknown>).created_at ||
+                      (row as Record<string, unknown>).timestamp ||
+                      '') as string
+                    return (
+                      <span className="ss-dash-event-time" title={formatTime(val)}>
+                        {timeAgo(val)}
+                      </span>
+                    )
                   },
                 },
               ]}

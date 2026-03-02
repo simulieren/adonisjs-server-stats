@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 
 import { DashboardDataController } from '../../core/dashboard-data-controller.js'
 
-import type { DashboardSection, DashboardHookOptions, PaginatedResponse } from '../../core/types.js'
 import type { DashboardApi } from '../../core/dashboard-api.js'
+import type { DashboardSection, DashboardHookOptions, PaginatedResponse } from '../../core/types.js'
 
 /**
  * React hook for fetching dashboard section data.

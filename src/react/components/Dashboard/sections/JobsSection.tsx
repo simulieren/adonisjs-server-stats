@@ -24,7 +24,9 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [retryStates, setRetryStates] = useState<Record<string, 'pending' | 'success' | 'error'>>({})
+  const [retryStates, setRetryStates] = useState<Record<string, 'pending' | 'success' | 'error'>>(
+    {}
+  )
 
   const filters: Record<string, string> = {}
   if (statusFilter !== 'all') filters.status = statusFilter
@@ -87,12 +89,19 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
           </div>
           <div className="ss-dash-job-stat">
             <span className="ss-dash-job-stat-label">Failed:</span>
-            <span className="ss-dash-job-stat-value" style={{ color: 'var(--ss-red-fg)' }}>{stats.failed ?? 0}</span>
+            <span className="ss-dash-job-stat-value" style={{ color: 'var(--ss-red-fg)' }}>
+              {stats.failed ?? 0}
+            </span>
           </div>
         </div>
       )}
 
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="Filter jobs..." summary={`${meta?.total ?? jobs.length} jobs`}>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter jobs..."
+        summary={`${meta?.total ?? jobs.length} jobs`}
+      >
         <div className="ss-dash-btn-group">
           {JOB_STATUS_FILTERS.map((status) => (
             <button
@@ -170,9 +179,7 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                   label: 'Duration',
                   width: '75px',
                   render: (v: number | null) => (
-                    <span className="ss-dash-duration">
-                      {v !== null ? formatDuration(v) : '-'}
-                    </span>
+                    <span className="ss-dash-duration">{v !== null ? formatDuration(v) : '-'}</span>
                   ),
                 },
                 {
@@ -180,9 +187,16 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                   label: 'Time',
                   width: '70px',
                   render: (v: unknown, row: Record<string, unknown>) => {
-                    const ts = (v || row?.createdAt || row?.processedAt || row?.created_at) as string
+                    const ts = (v ||
+                      row?.createdAt ||
+                      row?.processedAt ||
+                      row?.created_at) as string
                     return (
-                      <span className="ss-dash-event-time" style={{ whiteSpace: 'nowrap' }} title={formatTime(ts)}>
+                      <span
+                        className="ss-dash-event-time"
+                        style={{ whiteSpace: 'nowrap' }}
+                        title={formatTime(ts)}
+                      >
                         {timeAgo(ts)}
                       </span>
                     )
@@ -206,7 +220,11 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                           handleRetry(jobId)
                         }}
                       >
-                        {retryState === 'pending' ? '...' : retryState === 'success' ? 'OK' : 'Retry'}
+                        {retryState === 'pending'
+                          ? '...'
+                          : retryState === 'success'
+                            ? 'OK'
+                            : 'Retry'}
                       </button>
                     )
                   },

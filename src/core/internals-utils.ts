@@ -100,10 +100,7 @@ export function getIntegrationLabel(name: string): string {
 /**
  * Determine the display status string for an integration entry.
  */
-export function getIntegrationStatus(info: {
-  active?: boolean
-  available?: boolean
-}): string {
+export function getIntegrationStatus(info: { active?: boolean; available?: boolean }): string {
   if ('active' in info) return info.active ? 'active' : 'inactive'
   if ('available' in info) return info.available ? 'available' : 'unavailable'
   return 'unknown'
@@ -121,9 +118,7 @@ export function getIntegrationDetails(
   if (key === 'cacheInspector')
     return info.available ? 'Redis dependency detected' : 'Redis not installed'
   if (key === 'queueInspector')
-    return info.available
-      ? 'Queue dependency detected'
-      : '@rlanz/bull-queue not installed'
+    return info.available ? 'Queue dependency detected' : '@rlanz/bull-queue not installed'
   return '-'
 }
 

@@ -4,8 +4,8 @@ import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
-import type { HttpContext } from '@adonisjs/core/http'
 import type { AdonisRouter } from './router_types.js'
+import type { HttpContext } from '@adonisjs/core/http'
 
 // ---------------------------------------------------------------------------
 // Options
@@ -180,9 +180,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
      * Wrap an ApiController method as an HTTP handler with lazy
      * initialization and 503 fallback.
      */
-    const bindApi = (
-      fn: (api: ApiController, ctx: HttpContext) => Promise<unknown> | unknown
-    ) => {
+    const bindApi = (fn: (api: ApiController, ctx: HttpContext) => Promise<unknown> | unknown) => {
       return async (ctx: HttpContext) => {
         const api = getApiController()
         if (!api) {
@@ -526,9 +524,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
 
         // ── Saved Filters (dashboard-only) ──────────────────────────
         router.get('/api/filters', bindDash('savedFilters')).as('server-stats.filters')
-        router
-          .post('/api/filters', bindDash('createSavedFilter'))
-          .as('server-stats.filters.create')
+        router.post('/api/filters', bindDash('createSavedFilter')).as('server-stats.filters.create')
         router
           .delete('/api/filters/:id', bindDash('deleteSavedFilter'))
           .as('server-stats.filters.delete')

@@ -136,22 +136,16 @@ export function EmailsTab({ options }: EmailsTabProps) {
                 className="ss-dbg-email-row"
                 onClick={() => setPreviewId(email.id)}
               >
-                <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>{email.id}</td>
-                <td
-                  className="ss-dbg-c-secondary"
-                  title={email.from}
-                >
+                <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>
+                  {email.id}
+                </td>
+                <td className="ss-dbg-c-secondary" title={email.from}>
                   {email.from}
                 </td>
-                <td
-                  className="ss-dbg-c-secondary"
-                  title={email.to}
-                >
+                <td className="ss-dbg-c-secondary" title={email.to}>
                   {email.to}
                 </td>
-                <td className="ss-dbg-c-sql">
-                  {email.subject}
-                </td>
+                <td className="ss-dbg-c-sql">{email.subject}</td>
                 <td>
                   <span className={`ss-dbg-email-status ${statusColorMap[email.status] || ''}`}>
                     {email.status}
@@ -161,11 +155,14 @@ export function EmailsTab({ options }: EmailsTabProps) {
                 <td className="ss-dbg-c-dim" style={{ textAlign: 'center' }}>
                   {email.attachmentCount > 0 ? email.attachmentCount : '-'}
                 </td>
-                <td className="ss-dbg-event-time" title={formatTime(
+                <td
+                  className="ss-dbg-event-time"
+                  title={formatTime(
                     email.timestamp ||
                       (email as unknown as Record<string, number>).created_at ||
                       (email as unknown as Record<string, number>).createdAt
-                  )}>
+                  )}
+                >
                   {timeAgo(
                     email.timestamp ||
                       (email as unknown as Record<string, number>).created_at ||

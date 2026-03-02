@@ -33,8 +33,7 @@
   --ss-purple-bg: #2e1065;
   --ss-purple-fg: #c084fc;
   --ss-sql-color: #93c5fd;
-  --ss-font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ss-text-primary: var(--ss-text);
   --ss-reqid-bg: #1e1b2e;
   --ss-reqid-fg: #6d28d9;
@@ -43,7 +42,7 @@
 }
 
 /* ── Theme: Dark (explicit toggle override) ───────────────────── */
-[data-theme="dark"] {
+[data-theme='dark'] {
   --ss-bg: #0f0f0f;
   --ss-surface: #171717;
   --ss-surface-alt: #141414;
@@ -71,8 +70,7 @@
   --ss-purple-bg: #2e1065;
   --ss-purple-fg: #c084fc;
   --ss-sql-color: #93c5fd;
-  --ss-font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --ss-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --ss-text-primary: var(--ss-text);
   --ss-reqid-bg: #1e1b2e;
   --ss-reqid-fg: #6d28d9;
@@ -82,7 +80,7 @@
 
 /* ── Theme: Light ──────────────────────────────────────────────── */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
+  :root:not([data-theme='dark']) {
     --ss-bg: #fafafa;
     --ss-surface: #ffffff;
     --ss-surface-alt: #f5f5f5;
@@ -119,7 +117,7 @@
 }
 
 /* ── Theme: Light (explicit toggle override) ──────────────────── */
-[data-theme="light"] {
+[data-theme='light'] {
   --ss-bg: #fafafa;
   --ss-surface: #ffffff;
   --ss-surface-alt: #f5f5f5;

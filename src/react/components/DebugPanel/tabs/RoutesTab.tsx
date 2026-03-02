@@ -72,10 +72,12 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
           </thead>
           <tbody>
             {routes.map((route, i) => {
-              const isCurrentRoute = currentPath && (
-                route.pattern === currentPath ||
-                new RegExp('^' + route.pattern.replace(/:[^/]+/g, '[^/]+') + '$').test(currentPath)
-              )
+              const isCurrentRoute =
+                currentPath &&
+                (route.pattern === currentPath ||
+                  new RegExp('^' + route.pattern.replace(/:[^/]+/g, '[^/]+') + '$').test(
+                    currentPath
+                  ))
               return (
                 <tr
                   key={`${route.method}-${route.pattern}-${i}`}

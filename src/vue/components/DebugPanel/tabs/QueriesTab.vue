@@ -4,7 +4,11 @@
  */
 import { ref, computed } from 'vue'
 import { formatDuration, durationSeverity, formatTime, timeAgo } from '../../../../core/index.js'
-import { filterQueries, countDuplicateQueries, computeQuerySummary } from '../../../../core/query-utils.js'
+import {
+  filterQueries,
+  countDuplicateQueries,
+  computeQuerySummary,
+} from '../../../../core/query-utils.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
 import type { QueryRecord } from '../../../../core/index.js'
 
@@ -101,7 +105,9 @@ const { tableRef } = useResizableTable(() => queries.value)
             </span>
           </td>
           <td class="ss-dbg-c-muted">{{ q.model || '-' }}</td>
-          <td class="ss-dbg-event-time" :title="formatTime(q.timestamp)">{{ timeAgo(q.timestamp) }}</td>
+          <td class="ss-dbg-event-time" :title="formatTime(q.timestamp)">
+            {{ timeAgo(q.timestamp) }}
+          </td>
         </tr>
       </tbody>
     </table>

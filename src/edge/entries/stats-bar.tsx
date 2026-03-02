@@ -1,7 +1,9 @@
 import { render } from 'preact'
 import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
+
 import { StatsBar } from '../../react/components/StatsBar/StatsBar.js'
 import { readConfig } from '../bootstrap.js'
+
 import type { EdgeBarConfig, EdgeDebugConfig } from '../types.js'
 
 const config = readConfig<EdgeBarConfig>('ss-bar-config')

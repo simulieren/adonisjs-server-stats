@@ -110,7 +110,11 @@ function filterByReqId(reqId: string) {
         <span :class="['ss-dbg-log-level', getLogLevelCssClass(resolveLogLevel(log))]">
           {{ resolveLogLevel(log).toUpperCase() }}
         </span>
-        <span class="ss-dbg-log-time" :title="resolveLogTimestamp(log) ? formatTime(resolveLogTimestamp(log)) : ''">{{ resolveLogTimestamp(log) ? timeAgo(resolveLogTimestamp(log)) : '-' }}</span>
+        <span
+          class="ss-dbg-log-time"
+          :title="resolveLogTimestamp(log) ? formatTime(resolveLogTimestamp(log)) : ''"
+          >{{ resolveLogTimestamp(log) ? timeAgo(resolveLogTimestamp(log)) : '-' }}</span
+        >
         <span
           v-if="resolveLogRequestId(log)"
           class="ss-dbg-log-reqid"

@@ -63,8 +63,9 @@ const logs = computed<Record<string, unknown>[]>(() => {
   return (d.data || d.logs || data.value || []) as Record<string, unknown>[]
 })
 
-const hasActiveFilters = computed(() =>
-  levelFilter.value !== 'all' || reqIdFilter.value !== '' || structuredFilters.value.length > 0
+const hasActiveFilters = computed(
+  () =>
+    levelFilter.value !== 'all' || reqIdFilter.value !== '' || structuredFilters.value.length > 0
 )
 
 function handleSearch(term: string) {
@@ -113,7 +114,11 @@ function syncStructuredFilters() {
   const f = filterState as Record<string, string | number | boolean>
   // Remove all existing structured filter keys
   for (const key of Object.keys(f)) {
-    if (key.startsWith('filter_field_') || key.startsWith('filter_op_') || key.startsWith('filter_value_')) {
+    if (
+      key.startsWith('filter_field_') ||
+      key.startsWith('filter_op_') ||
+      key.startsWith('filter_value_')
+    ) {
       delete f[key]
     }
   }
@@ -143,7 +148,6 @@ function removeStructuredFilter(index: number) {
   structuredFilters.value.splice(index, 1)
   syncStructuredFilters()
 }
-
 </script>
 
 <template>
@@ -213,9 +217,7 @@ function removeStructuredFilter(index: number) {
         @input="structuredValue = ($event.target as HTMLInputElement).value"
         @keydown.enter="addStructuredFilter"
       />
-      <button type="button" class="ss-dash-btn" @click="addStructuredFilter">
-        Add
-      </button>
+      <button type="button" class="ss-dash-btn" @click="addStructuredFilter">Add</button>
     </div>
 
     <!-- Active filter chips -->
@@ -234,7 +236,11 @@ function removeStructuredFilter(index: number) {
       </span>
       <span v-for="(sf, idx) in structuredFilters" :key="idx" class="ss-dash-filter-chip">
         {{ sf.field }} {{ sf.operator }} "{{ sf.value }}"
-        <button type="button" class="ss-dash-filter-chip-remove" @click="removeStructuredFilter(idx)">
+        <button
+          type="button"
+          class="ss-dash-filter-chip-remove"
+          @click="removeStructuredFilter(idx)"
+        >
           &times;
         </button>
       </span>
@@ -246,18 +252,22 @@ function removeStructuredFilter(index: number) {
 
     <template v-else-if="logs.length === 0">
       <div class="ss-dash-empty">
-        No log entries{{ reqIdFilter ? ` matching request ${reqIdFilter}` : levelFilter !== 'all' ? ` for ${levelFilter}` : '' }}
+        No log entries{{
+          reqIdFilter
+            ? ` matching request ${reqIdFilter}`
+            : levelFilter !== 'all'
+              ? ` for ${levelFilter}`
+              : ''
+        }}
       </div>
     </template>
 
     <template v-else>
       <div class="ss-dash-log-entries">
-        <div
-          v-for="(log, i) in logs"
-          :key="(log.id as string) || i"
-          class="ss-dash-log-entry"
-        >
-          <span :class="`ss-dash-log-level ${getLogLevelCssClass(resolveLogLevel(log), 'ss-dash-log-level')}`">
+        <div v-for="(log, i) in logs" :key="(log.id as string) || i" class="ss-dash-log-entry">
+          <span
+            :class="`ss-dash-log-level ${getLogLevelCssClass(resolveLogLevel(log), 'ss-dash-log-level')}`"
+          >
             {{ resolveLogLevel(log).toUpperCase() }}
           </span>
           <span

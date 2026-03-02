@@ -155,9 +155,7 @@ export async function autoDetectCollectors(): Promise<AutoDetectResult> {
 
     if (entry.enabled) {
       const mark = green('✔')
-      const detail = entry.reason
-        ? dim('— ' + entry.reason)
-        : dim('— ' + entry.description)
+      const detail = entry.reason ? dim('— ' + entry.reason) : dim('— ' + entry.description)
       return `  ${mark} ${bold(paddedName)}  ${detail}`
     }
 

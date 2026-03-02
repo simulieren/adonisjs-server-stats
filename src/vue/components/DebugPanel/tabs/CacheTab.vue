@@ -63,7 +63,9 @@ const { tableRef } = useResizableTable(() => keys.value)
 
     <!-- Key detail -->
     <div v-if="selectedKey" class="ss-dbg-cache-detail">
-      <button type="button" class="ss-dbg-btn-clear" @click="selectedKey = null">&larr; Back</button>
+      <button type="button" class="ss-dbg-btn-clear" @click="selectedKey = null">
+        &larr; Back
+      </button>
       <div style="margin-top: 8px">
         <strong>{{ selectedKey.key }}</strong>
         <span class="ss-dbg-c-muted" style="margin-left: 8px">

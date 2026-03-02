@@ -1,6 +1,8 @@
 import { createApp } from 'vue'
+
 import DashboardPage from '../../vue/components/Dashboard/DashboardPage.vue'
 import { readConfig, setupThemeSync } from '../bootstrap.js'
+
 import type { EdgeDashConfig } from '../types.js'
 
 const config = readConfig<EdgeDashConfig>('ss-dash-config')

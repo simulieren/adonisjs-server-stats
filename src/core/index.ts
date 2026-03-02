@@ -197,7 +197,10 @@ export { initResizableColumns } from './resizable-columns.js'
 
 // -- Debug data controller --------------------------------------------------
 export { DebugDataController } from './debug-data-controller.js'
-export type { DebugDataControllerConfig, DebugDataControllerCallbacks } from './debug-data-controller.js'
+export type {
+  DebugDataControllerConfig,
+  DebugDataControllerCallbacks,
+} from './debug-data-controller.js'
 
 // -- Log utilities ----------------------------------------------------------
 export {
@@ -263,9 +266,4 @@ export {
   REDACT_PATTERN,
   shouldRedact,
 } from './config-utils.js'
-export type {
-  RedactedValue,
-  ConfigValue,
-  FlatEntry,
-  FormattedValue,
-} from './config-utils.js'
+export type { RedactedValue, ConfigValue, FlatEntry, FormattedValue } from './config-utils.js'

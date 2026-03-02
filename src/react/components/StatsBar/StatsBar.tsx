@@ -4,6 +4,7 @@ import {
   getVisibleMetricGroups,
   detectMetricGroupsFromStats,
 } from '../../../core/feature-detect.js'
+import { TAB_ICONS } from '../../../core/icons.js'
 import { METRIC_DEFINITIONS } from '../../../core/metrics.js'
 import { useFeatures } from '../../hooks/useFeatures.js'
 import { useServerStats } from '../../hooks/useServerStats.js'
@@ -11,7 +12,6 @@ import { useTheme } from '../../hooks/useTheme.js'
 import { MetricCard } from './MetricCard.js'
 
 import type { StatsBarProps as StatsBarPropsBase, DebugPanelProps } from '../../../core/types.js'
-import { TAB_ICONS } from '../../../core/icons.js'
 
 interface StatsBarProps extends StatsBarPropsBase {
   /** Options for feature detection. */
@@ -160,7 +160,11 @@ export function StatsBar(props: StatsBarProps) {
             )}
           </span>
         )}
-        {visible && <span className="ss-toggle-label" style={{ color: '#737373' }}>hide stats</span>}
+        {visible && (
+          <span className="ss-toggle-label" style={{ color: '#737373' }}>
+            hide stats
+          </span>
+        )}
         <span className="ss-toggle-arrow">{visible ? '\u25BC' : '\u25B2'}</span>
       </button>
 

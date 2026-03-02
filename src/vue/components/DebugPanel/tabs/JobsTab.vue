@@ -21,7 +21,9 @@ const emit = defineEmits<{
 const activeFilter = ref('all')
 
 const jobData = computed(() => props.data || {})
-const stats = computed(() => jobData.value.stats || jobData.value.overview || ({} as Partial<JobStats>))
+const stats = computed(
+  () => jobData.value.stats || jobData.value.overview || ({} as Partial<JobStats>)
+)
 
 const jobs = computed<JobRecord[]>(() => {
   const arr = jobData.value.jobs || []

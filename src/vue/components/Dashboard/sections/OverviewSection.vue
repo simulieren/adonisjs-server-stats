@@ -4,14 +4,7 @@
  * Self-contained: fetches its own data via useDashboardData composable.
  * Matches React OverviewSection.tsx exactly.
  */
-import {
-  ref,
-  computed,
-  watch,
-  inject,
-  onUnmounted,
-  type Ref,
-} from 'vue'
+import { ref, computed, watch, inject, onUnmounted, type Ref } from 'vue'
 import {
   durationSeverity,
   formatDuration,
@@ -22,11 +15,7 @@ import { useDashboardData } from '../../../composables/useDashboardData.js'
 import Sparkline from '../../StatsBar/Sparkline.vue'
 import TimeRangeSelector from '../shared/TimeRangeSelector.vue'
 
-import type {
-  OverviewMetrics,
-  ChartDataPoint,
-  TimeRange,
-} from '../../../../core/types.js'
+import type { OverviewMetrics, ChartDataPoint, TimeRange } from '../../../../core/types.js'
 
 /* ── Injected values from parent DashboardPage ──────────────────────── */
 const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
@@ -39,25 +28,22 @@ const uid = Math.random().toString(36).slice(2, 8)
 const timeRange = ref<TimeRange>('1h')
 
 /* ── Data fetching ───────────────────────────────────────────────────── */
-const {
-  data: overviewRaw,
-  loading: isLoading,
-} = useDashboardData(() => 'overview' as const, {
+const { data: overviewRaw, loading: isLoading } = useDashboardData(() => 'overview' as const, {
   baseUrl,
   dashboardEndpoint,
   authToken,
   refreshKey,
 })
 
-const {
-  data: chartResponseRaw,
-  setTimeRange: setChartTimeRange,
-} = useDashboardData(() => 'overview/chart' as const, {
-  baseUrl,
-  dashboardEndpoint,
-  authToken,
-  refreshKey,
-})
+const { data: chartResponseRaw, setTimeRange: setChartTimeRange } = useDashboardData(
+  () => 'overview/chart' as const,
+  {
+    baseUrl,
+    dashboardEndpoint,
+    authToken,
+    refreshKey,
+  }
+)
 
 // When timeRange changes from the UI, propagate to the chart composable
 watch(timeRange, (range) => {
@@ -70,32 +56,42 @@ const overview = computed<OverviewMetrics | null>(() => {
 })
 
 const metrics = computed<OverviewMetrics>(() => {
-  return overview.value || {
-    avgResponseTime: 0,
-    p95ResponseTime: 0,
-    requestsPerMinute: 0,
-    errorRate: 0,
-    totalRequests: 0,
-    slowestEndpoints: [],
-    queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
-    recentErrors: [],
-    topEvents: [],
-    emailActivity: { sent: 0, queued: 0, failed: 0 },
-    logLevelBreakdown: { error: 0, warn: 0, info: 0, debug: 0 },
-    cacheStats: null,
-    jobQueueStatus: null,
-    statusDistribution: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 },
-    slowestQueries: [],
-  }
+  return (
+    overview.value || {
+      avgResponseTime: 0,
+      p95ResponseTime: 0,
+      requestsPerMinute: 0,
+      errorRate: 0,
+      totalRequests: 0,
+      slowestEndpoints: [],
+      queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
+      recentErrors: [],
+      topEvents: [],
+      emailActivity: { sent: 0, queued: 0, failed: 0 },
+      logLevelBreakdown: { error: 0, warn: 0, info: 0, debug: 0 },
+      cacheStats: null,
+      jobQueueStatus: null,
+      statusDistribution: { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 },
+      slowestQueries: [],
+    }
+  )
 })
 
 // Support both camelCase and snake_case API field names
 const raw = computed(() => metrics.value as unknown as Record<string, unknown>)
-const avgResponseTime = computed(() => metrics.value.avgResponseTime || Number(raw.value.avg_response_time) || 0)
-const p95ResponseTime = computed(() => metrics.value.p95ResponseTime || Number(raw.value.p95_response_time) || 0)
-const requestsPerMinute = computed(() => metrics.value.requestsPerMinute || Number(raw.value.requests_per_minute) || 0)
+const avgResponseTime = computed(
+  () => metrics.value.avgResponseTime || Number(raw.value.avg_response_time) || 0
+)
+const p95ResponseTime = computed(
+  () => metrics.value.p95ResponseTime || Number(raw.value.p95_response_time) || 0
+)
+const requestsPerMinute = computed(
+  () => metrics.value.requestsPerMinute || Number(raw.value.requests_per_minute) || 0
+)
 const errorRate = computed(() => metrics.value.errorRate || Number(raw.value.error_rate) || 0)
-const totalRequests = computed(() => metrics.value.totalRequests || Number(raw.value.total_requests) || 0)
+const totalRequests = computed(
+  () => metrics.value.totalRequests || Number(raw.value.total_requests) || 0
+)
 const hasData = computed(() => totalRequests.value > 0)
 
 // Chart data
@@ -105,17 +101,20 @@ const chartPoints = computed<ChartDataPoint[]>(() => {
 })
 
 // Sparkline data: prefer pre-computed from API, fall back to chart points
-const avgResponseTimes = computed(() =>
-  metrics.value.sparklines?.avgResponseTime ?? chartPoints.value.map((p) => p.avgDuration ?? 0)
+const avgResponseTimes = computed(
+  () =>
+    metrics.value.sparklines?.avgResponseTime ?? chartPoints.value.map((p) => p.avgDuration ?? 0)
 )
-const p95ResponseTimes = computed(() =>
-  metrics.value.sparklines?.p95ResponseTime ?? chartPoints.value.map((p) => p.p95Duration ?? 0)
+const p95ResponseTimes = computed(
+  () =>
+    metrics.value.sparklines?.p95ResponseTime ?? chartPoints.value.map((p) => p.p95Duration ?? 0)
 )
-const requestCounts = computed(() =>
-  metrics.value.sparklines?.requestsPerMinute ?? chartPoints.value.map((p) => p.requestCount ?? 0)
+const requestCounts = computed(
+  () =>
+    metrics.value.sparklines?.requestsPerMinute ?? chartPoints.value.map((p) => p.requestCount ?? 0)
 )
-const errorCounts = computed(() =>
-  metrics.value.sparklines?.errorRate ?? chartPoints.value.map((p) => p.errorCount ?? 0)
+const errorCounts = computed(
+  () => metrics.value.sparklines?.errorRate ?? chartPoints.value.map((p) => p.errorCount ?? 0)
 )
 
 /* ── Unique gradient IDs (avoid SVG collisions) ──────────────────────── */
@@ -226,7 +225,9 @@ const maxVal = computed(() => Math.ceil(maxCount.value * 1.1))
 const hasErrors = computed(() => errors.value.some((e) => e > 0))
 
 const yTicks = computed(() => niceYTicks(maxVal.value, 4))
-const yMax = computed(() => yTicks.value.length > 0 ? yTicks.value[yTicks.value.length - 1] : maxVal.value)
+const yMax = computed(() =>
+  yTicks.value.length > 0 ? yTicks.value[yTicks.value.length - 1] : maxVal.value
+)
 
 function toX(i: number): number {
   return pad.left + (i / Math.max(chartPoints.value.length - 1, 1)) * cw.value
@@ -243,7 +244,7 @@ const errorPoints = computed(() =>
 )
 
 const totalLine = computed(() => smoothPath(totalPoints.value))
-const errorLine = computed(() => hasErrors.value ? smoothPath(errorPoints.value) : '')
+const errorLine = computed(() => (hasErrors.value ? smoothPath(errorPoints.value) : ''))
 
 const totalArea = computed(() =>
   totalPoints.value.length > 1
@@ -258,7 +259,9 @@ const errorArea = computed(() =>
 
 // X-axis label interval
 const maxLabels = computed(() => Math.min(10, chartPoints.value.length))
-const labelInterval = computed(() => Math.max(1, Math.ceil(chartPoints.value.length / maxLabels.value)))
+const labelInterval = computed(() =>
+  Math.max(1, Math.ceil(chartPoints.value.length / maxLabels.value))
+)
 
 // Tooltip state
 const tooltip = ref<{ visible: boolean; x: number; idx: number }>({ visible: false, x: 0, idx: -1 })
@@ -313,11 +316,21 @@ function epUrl(ep: { url?: string; pattern?: string }): string {
   return ep.url || ep.pattern || '-'
 }
 
-function eventName(ev: { name?: string; eventName?: string; event_name?: string; event?: string }): string {
+function eventName(ev: {
+  name?: string
+  eventName?: string
+  event_name?: string
+  event?: string
+}): string {
   return ev.name || ev.eventName || ev.event_name || ev.event || ''
 }
 
-function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_normalized?: string; sql?: string }): string {
+function querySql(q: {
+  sqlNormalized?: string
+  normalizedSql?: string
+  sql_normalized?: string
+  sql?: string
+}): string {
   return q.sqlNormalized || q.normalizedSql || q.sql_normalized || q.sql || '-'
 }
 </script>
@@ -504,7 +517,7 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
               class="ss-dash-chart-tooltip"
               :style="{
                 left: clampedLeft + 'px',
-                top: (pad.top - 4) + 'px',
+                top: pad.top - 4 + 'px',
                 transform: 'translate(-50%, -100%)',
               }"
             >
@@ -521,7 +534,10 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
             <span class="ss-dash-legend-dot" style="background: var(--ss-accent)" />
             Requests
           </span>
-          <span v-if="chartPoints.some((p) => (p.errorCount ?? 0) > 0)" class="ss-dash-chart-legend-item">
+          <span
+            v-if="chartPoints.some((p) => (p.errorCount ?? 0) > 0)"
+            class="ss-dash-chart-legend-item"
+          >
             <span class="ss-dash-legend-dot" style="background: var(--ss-red-fg)" />
             Errors
           </span>
@@ -535,14 +551,27 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
           <div class="ss-dash-secondary-card-title">
             <a href="#requests" class="ss-dash-widget-link">Slowest Endpoints</a>
           </div>
-          <div v-if="metrics.slowestEndpoints.length === 0" class="ss-dash-empty" style="min-height: 60px">
+          <div
+            v-if="metrics.slowestEndpoints.length === 0"
+            class="ss-dash-empty"
+            style="min-height: 60px"
+          >
             No data yet
           </div>
           <ul v-else class="ss-dash-secondary-list">
             <li v-for="(ep, i) in metrics.slowestEndpoints.slice(0, 5)" :key="i">
-              <a :href="`#requests?url=${encodeURIComponent(epUrl(ep))}`" class="ss-dash-widget-row-link">
+              <a
+                :href="`#requests?url=${encodeURIComponent(epUrl(ep))}`"
+                class="ss-dash-widget-row-link"
+              >
                 <span :title="epUrl(ep)">{{ epUrl(ep) }}</span>
-                <span :class="['ss-dash-secondary-list-value', 'ss-dash-duration', durationClass(ep.avgDuration)]">
+                <span
+                  :class="[
+                    'ss-dash-secondary-list-value',
+                    'ss-dash-duration',
+                    durationClass(ep.avgDuration),
+                  ]"
+                >
                   {{ formatDuration(ep.avgDuration) }}
                 </span>
               </a>
@@ -580,7 +609,11 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
           <div class="ss-dash-secondary-card-title">
             <a href="#logs?level=error" class="ss-dash-widget-link">Recent Errors</a>
           </div>
-          <div v-if="metrics.recentErrors.length === 0" class="ss-dash-empty" style="min-height: 60px">
+          <div
+            v-if="metrics.recentErrors.length === 0"
+            class="ss-dash-empty"
+            style="min-height: 60px"
+          >
             No recent errors
           </div>
           <ul v-else class="ss-dash-secondary-list">
@@ -612,7 +645,10 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
           </div>
           <ul v-else class="ss-dash-secondary-list">
             <li v-for="(ev, i) in metrics.topEvents.slice(0, 5)" :key="i">
-              <a :href="`#events?event_name=${encodeURIComponent(eventName(ev))}`" class="ss-dash-widget-row-link">
+              <a
+                :href="`#events?event_name=${encodeURIComponent(eventName(ev))}`"
+                class="ss-dash-widget-row-link"
+              >
                 <span>{{ eventName(ev) }}</span>
                 <span class="ss-dash-secondary-list-value">{{ ev.count }}</span>
               </a>
@@ -643,7 +679,9 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
                 <span>Failed</span>
                 <span
                   class="ss-dash-secondary-list-value"
-                  :style="metrics.emailActivity.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined"
+                  :style="
+                    metrics.emailActivity.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined
+                  "
                 >
                   {{ metrics.emailActivity.failed }}
                 </span>
@@ -661,32 +699,43 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
             <li>
               <a href="#logs?level=error" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-red-fg)">Error</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.logLevelBreakdown.error }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.logLevelBreakdown.error
+                }}</span>
               </a>
             </li>
             <li>
               <a href="#logs?level=warn" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-amber-fg)">Warn</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.logLevelBreakdown.warn }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.logLevelBreakdown.warn
+                }}</span>
               </a>
             </li>
             <li>
               <a href="#logs?level=info" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-green-fg)">Info</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.logLevelBreakdown.info }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.logLevelBreakdown.info
+                }}</span>
               </a>
             </li>
             <li>
               <a href="#logs?level=debug" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-dim)">Debug</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.logLevelBreakdown.debug }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.logLevelBreakdown.debug
+                }}</span>
               </a>
             </li>
           </ul>
         </div>
 
         <!-- Cache -->
-        <div v-if="metrics.cacheStats && metrics.cacheStats.available" class="ss-dash-secondary-card">
+        <div
+          v-if="metrics.cacheStats && metrics.cacheStats.available"
+          class="ss-dash-secondary-card"
+        >
           <div class="ss-dash-secondary-card-title">
             <a href="#cache" class="ss-dash-widget-link">Cache</a>
           </div>
@@ -700,20 +749,27 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
             <li>
               <a href="#cache" class="ss-dash-widget-row-link">
                 <span>Hit Rate</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.cacheStats.hitRate.toFixed(1) }}%</span>
+                <span class="ss-dash-secondary-list-value"
+                  >{{ metrics.cacheStats.hitRate.toFixed(1) }}%</span
+                >
               </a>
             </li>
             <li>
               <a href="#cache" class="ss-dash-widget-row-link">
                 <span>Memory</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.cacheStats.memoryUsedHuman }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.cacheStats.memoryUsedHuman
+                }}</span>
               </a>
             </li>
           </ul>
         </div>
 
         <!-- Job Queue -->
-        <div v-if="metrics.jobQueueStatus && metrics.jobQueueStatus.available" class="ss-dash-secondary-card">
+        <div
+          v-if="metrics.jobQueueStatus && metrics.jobQueueStatus.available"
+          class="ss-dash-secondary-card"
+        >
           <div class="ss-dash-secondary-card-title">
             <a href="#jobs" class="ss-dash-widget-link">Job Queue</a>
           </div>
@@ -721,13 +777,17 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
             <li>
               <a href="#jobs?status=active" class="ss-dash-widget-row-link">
                 <span>Active</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.jobQueueStatus.active }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.jobQueueStatus.active
+                }}</span>
               </a>
             </li>
             <li>
               <a href="#jobs?status=waiting" class="ss-dash-widget-row-link">
                 <span>Waiting</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.jobQueueStatus.waiting }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.jobQueueStatus.waiting
+                }}</span>
               </a>
             </li>
             <li>
@@ -735,7 +795,9 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
                 <span>Failed</span>
                 <span
                   class="ss-dash-secondary-list-value"
-                  :style="metrics.jobQueueStatus.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined"
+                  :style="
+                    metrics.jobQueueStatus.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined
+                  "
                 >
                   {{ metrics.jobQueueStatus.failed }}
                 </span>
@@ -744,7 +806,9 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
             <li>
               <a href="#jobs?status=completed" class="ss-dash-widget-row-link">
                 <span>Completed</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.jobQueueStatus.completed }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.jobQueueStatus.completed
+                }}</span>
               </a>
             </li>
           </ul>
@@ -759,25 +823,33 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
             <li>
               <a href="#requests?status=2xx" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-green-fg)">2xx</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.statusDistribution['2xx'] }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.statusDistribution['2xx']
+                }}</span>
               </a>
             </li>
             <li>
               <a href="#requests?status=3xx" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-blue-fg)">3xx</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.statusDistribution['3xx'] }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.statusDistribution['3xx']
+                }}</span>
               </a>
             </li>
             <li>
               <a href="#requests?status=4xx" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-amber-fg)">4xx</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.statusDistribution['4xx'] }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.statusDistribution['4xx']
+                }}</span>
               </a>
             </li>
             <li>
               <a href="#requests?status=5xx" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-red-fg)">5xx</span>
-                <span class="ss-dash-secondary-list-value">{{ metrics.statusDistribution['5xx'] }}</span>
+                <span class="ss-dash-secondary-list-value">{{
+                  metrics.statusDistribution['5xx']
+                }}</span>
               </a>
             </li>
           </ul>
@@ -788,14 +860,27 @@ function querySql(q: { sqlNormalized?: string; normalizedSql?: string; sql_norma
           <div class="ss-dash-secondary-card-title">
             <a href="#queries" class="ss-dash-widget-link">Slowest Queries</a>
           </div>
-          <div v-if="metrics.slowestQueries.length === 0" class="ss-dash-empty" style="min-height: 60px">
+          <div
+            v-if="metrics.slowestQueries.length === 0"
+            class="ss-dash-empty"
+            style="min-height: 60px"
+          >
             No query data yet
           </div>
           <ul v-else class="ss-dash-secondary-list">
             <li v-for="(q, i) in metrics.slowestQueries.slice(0, 5)" :key="i">
-              <a :href="`#queries?pattern=${encodeURIComponent(querySql(q))}`" class="ss-dash-widget-row-link">
+              <a
+                :href="`#queries?pattern=${encodeURIComponent(querySql(q))}`"
+                class="ss-dash-widget-row-link"
+              >
                 <span :title="querySql(q)">{{ querySql(q) }}</span>
-                <span :class="['ss-dash-secondary-list-value', 'ss-dash-duration', durationClass(q.avgDuration)]">
+                <span
+                  :class="[
+                    'ss-dash-secondary-list-value',
+                    'ss-dash-duration',
+                    durationClass(q.avgDuration),
+                  ]"
+                >
                   {{ formatDuration(q.avgDuration) }}
                 </span>
               </a>

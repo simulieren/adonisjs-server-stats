@@ -1,5 +1,6 @@
-import type { DevToolbarOptions, ResolvedServerStatsConfig, ServerStatsConfig } from './types.js'
 import { bold, dim, yellow } from './utils/logger.js'
+
+import type { DevToolbarOptions, ResolvedServerStatsConfig, ServerStatsConfig } from './types.js'
 
 /**
  * Resolve `toolbar`, `dashboard`, and `advanced` aliases into a
@@ -22,11 +23,13 @@ function resolveToolbarAliases(
     result.enabled = true
   } else if (toolbar && typeof toolbar === 'object') {
     result.enabled = true
-    if (toolbar.slowQueryThreshold !== undefined) result.slowQueryThresholdMs = toolbar.slowQueryThreshold
+    if (toolbar.slowQueryThreshold !== undefined)
+      result.slowQueryThresholdMs = toolbar.slowQueryThreshold
     if (toolbar.tracing !== undefined) result.tracing = toolbar.tracing
     if (toolbar.persist !== undefined) result.persistDebugData = toolbar.persist
     if (toolbar.panes !== undefined) result.panes = toolbar.panes
-    if (toolbar.excludeFromTracing !== undefined) result.excludeFromTracing = toolbar.excludeFromTracing
+    if (toolbar.excludeFromTracing !== undefined)
+      result.excludeFromTracing = toolbar.excludeFromTracing
   } else if (toolbar === false) {
     result.enabled = false
   }
@@ -88,9 +91,11 @@ function buildDevToolbarMigration(dt: DevToolbarOptions): DeprecationEntry {
   if (dt.dashboard !== undefined) beforeParts.push(`  dashboard: ${dt.dashboard},`)
   if (dt.dashboardPath !== undefined) beforeParts.push(`  dashboardPath: '${dt.dashboardPath}',`)
   if (dt.retentionDays !== undefined) beforeParts.push(`  retentionDays: ${dt.retentionDays},`)
-  if (dt.slowQueryThresholdMs !== undefined) beforeParts.push(`  slowQueryThresholdMs: ${dt.slowQueryThresholdMs},`)
+  if (dt.slowQueryThresholdMs !== undefined)
+    beforeParts.push(`  slowQueryThresholdMs: ${dt.slowQueryThresholdMs},`)
   if (dt.tracing !== undefined) beforeParts.push(`  tracing: ${dt.tracing},`)
-  if (dt.persistDebugData !== undefined) beforeParts.push(`  persistDebugData: ${JSON.stringify(dt.persistDebugData)},`)
+  if (dt.persistDebugData !== undefined)
+    beforeParts.push(`  persistDebugData: ${JSON.stringify(dt.persistDebugData)},`)
   if (dt.maxQueries !== undefined) beforeParts.push(`  maxQueries: ${dt.maxQueries},`)
   if (dt.maxEvents !== undefined) beforeParts.push(`  maxEvents: ${dt.maxEvents},`)
   if (dt.maxEmails !== undefined) beforeParts.push(`  maxEmails: ${dt.maxEmails},`)
@@ -157,13 +162,14 @@ function buildDevToolbarMigration(dt: DevToolbarOptions): DeprecationEntry {
 
   return {
     old: 'devToolbar',
-    new: [
-      dt.enabled !== undefined ? 'toolbar' : '',
-      dt.dashboard ? 'dashboard' : '',
-      advancedParts.length > 0 ? 'advanced' : '',
-    ]
-      .filter(Boolean)
-      .join(' + ') || 'toolbar + dashboard + advanced',
+    new:
+      [
+        dt.enabled !== undefined ? 'toolbar' : '',
+        dt.dashboard ? 'dashboard' : '',
+        advancedParts.length > 0 ? 'advanced' : '',
+      ]
+        .filter(Boolean)
+        .join(' + ') || 'toolbar + dashboard + advanced',
     before: beforeParts,
     after: afterParts,
   }
@@ -202,8 +208,7 @@ function logDeprecationWarnings(config: ServerStatsConfig): void {
 
   // endpoint -> statsEndpoint
   if (config.endpoint !== undefined) {
-    const endpointDisplay =
-      config.endpoint === false ? 'false' : `'${config.endpoint}'`
+    const endpointDisplay = config.endpoint === false ? 'false' : `'${config.endpoint}'`
     entries.push({
       old: 'endpoint',
       new: 'statsEndpoint',
@@ -359,7 +364,11 @@ export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConf
 
   // Resolve toolbar/dashboard aliases into devToolbar
   let devToolbar = config.devToolbar
-  if (config.toolbar !== undefined || config.dashboard !== undefined || config.advanced !== undefined) {
+  if (
+    config.toolbar !== undefined ||
+    config.dashboard !== undefined ||
+    config.advanced !== undefined
+  ) {
     devToolbar = resolveToolbarAliases(config, devToolbar)
   }
 

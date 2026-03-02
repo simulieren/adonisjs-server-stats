@@ -17,26 +17,22 @@ import WaterfallChart from '../shared/WaterfallChart.vue'
 
 import type { TraceDetail } from '../../../../core/trace-utils.js'
 
-const props = withDefaults(defineProps<{
-  /** When false, show a "tracing disabled" message instead of fetching. Defaults to true. */
-  tracingEnabled?: boolean
-}>(), {
-  tracingEnabled: true,
-})
+const props = withDefaults(
+  defineProps<{
+    /** When false, show a "tracing disabled" message instead of fetching. Defaults to true. */
+    tracingEnabled?: boolean
+  }>(),
+  {
+    tracingEnabled: true,
+  }
+)
 
 const refreshKey = inject<Ref<number>>('ss-refresh-key', ref(0))
 const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api')
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const {
-  data,
-  loading,
-  error,
-  pagination,
-  goToPage,
-  setSearch,
-} = useDashboardData(() => 'traces', {
+const { data, loading, error, pagination, goToPage, setSearch } = useDashboardData(() => 'traces', {
   baseUrl,
   dashboardEndpoint,
   authToken,
@@ -89,7 +85,6 @@ function dashDurationClass(ms: number): string {
 }
 
 const { tableRef } = useResizableTable(() => traces.value)
-
 </script>
 
 <template>
@@ -102,19 +97,18 @@ const { tableRef } = useResizableTable(() => traces.value)
     <!-- Trace detail view -->
     <template v-else-if="selectedId && traceDetail">
       <div class="ss-dash-tl-detail-header">
-        <button type="button" class="ss-dash-btn" @click="handleBack">
-          &larr; Back
-        </button>
+        <button type="button" class="ss-dash-btn" @click="handleBack">&larr; Back</button>
         <span :class="`ss-dash-method ss-dash-method-${(traceDetail.method || '').toLowerCase()}`">
           {{ traceDetail.method }}
         </span>
         <span style="color: var(--ss-text)">{{ traceDetail.url }}</span>
-        <span :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.status_code || traceDetail.statusCode || 0) / 100)}xx`">
+        <span
+          :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.status_code || traceDetail.statusCode || 0) / 100)}xx`"
+        >
           {{ traceDetail.status_code || traceDetail.statusCode || 0 }}
         </span>
         <span class="ss-dash-tl-meta">
-          {{ (traceDetail.total_duration || traceDetail.totalDuration || 0).toFixed(1) }}ms
-          &middot;
+          {{ (traceDetail.total_duration || traceDetail.totalDuration || 0).toFixed(1) }}ms &middot;
           {{ traceDetail.spanCount ?? parseTraceSpans(traceDetail.spans).length }} spans
         </span>
       </div>
@@ -128,9 +122,7 @@ const { tableRef } = useResizableTable(() => traces.value)
     <!-- Loading detail -->
     <template v-else-if="selectedId && detailLoading">
       <div class="ss-dash-tl-detail-header">
-        <button type="button" class="ss-dash-btn" @click="handleBack">
-          &larr; Back
-        </button>
+        <button type="button" class="ss-dash-btn" @click="handleBack">&larr; Back</button>
       </div>
       <div class="ss-dash-empty">Loading trace detail...</div>
     </template>
@@ -174,26 +166,37 @@ const { tableRef } = useResizableTable(() => traces.value)
             <tbody>
               <tr
                 v-for="t in traces"
-                :key="(t.id as number)"
+                :key="t.id as number"
                 class="ss-dash-clickable"
                 @click="selectTrace(t.id as number)"
               >
-                <td><span style="color: var(--ss-dim)">{{ t.id }}</span></td>
                 <td>
-                  <span :class="`ss-dash-method ss-dash-method-${((t.method as string) || '').toLowerCase()}`">
+                  <span style="color: var(--ss-dim)">{{ t.id }}</span>
+                </td>
+                <td>
+                  <span
+                    :class="`ss-dash-method ss-dash-method-${((t.method as string) || '').toLowerCase()}`"
+                  >
                     {{ t.method }}
                   </span>
                 </td>
                 <td>
                   <span
-                    style="color: var(--ss-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
-                    :title="(t.url as string)"
+                    style="
+                      color: var(--ss-text);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                    "
+                    :title="t.url as string"
                   >
                     {{ t.url }}
                   </span>
                 </td>
                 <td>
-                  <span :class="`ss-dash-status ss-dash-status-${Math.floor(((t.statusCode as number) || (t.status_code as number) || 0) / 100)}xx`">
+                  <span
+                    :class="`ss-dash-status ss-dash-status-${Math.floor(((t.statusCode as number) || (t.status_code as number) || 0) / 100)}xx`"
+                  >
                     {{ (t.statusCode as number) || (t.status_code as number) || 0 }}
                   </span>
                 </td>
@@ -201,7 +204,9 @@ const { tableRef } = useResizableTable(() => traces.value)
                   <span
                     :class="`ss-dash-duration ${dashDurationClass((t.totalDuration as number) || (t.total_duration as number) || 0)}`"
                   >
-                    {{ ((t.totalDuration as number) || (t.total_duration as number) || 0).toFixed(1) }}ms
+                    {{
+                      ((t.totalDuration as number) || (t.total_duration as number) || 0).toFixed(1)
+                    }}ms
                   </span>
                 </td>
                 <td>
@@ -212,9 +217,21 @@ const { tableRef } = useResizableTable(() => traces.value)
                 <td>
                   <span
                     class="ss-dash-event-time"
-                    :title="formatTime(((t.createdAt as string) || (t.created_at as string) || (t.timestamp as string)) as string)"
+                    :title="
+                      formatTime(
+                        ((t.createdAt as string) ||
+                          (t.created_at as string) ||
+                          (t.timestamp as string)) as string
+                      )
+                    "
                   >
-                    {{ timeAgo(((t.createdAt as string) || (t.created_at as string) || (t.timestamp as string)) as string) }}
+                    {{
+                      timeAgo(
+                        ((t.createdAt as string) ||
+                          (t.created_at as string) ||
+                          (t.timestamp as string)) as string
+                      )
+                    }}
                   </span>
                 </td>
               </tr>

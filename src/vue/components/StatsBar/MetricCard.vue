@@ -237,11 +237,7 @@ onBeforeUnmount(() => {
 
   <!-- Tooltip teleported to .ss-bar so it is not clipped by .ss-bar-scroll overflow -->
   <Teleport v-if="showTooltip && teleportTarget" :to="teleportTarget">
-    <div
-      ref="tooltipRef"
-      :class="['ss-tooltip', { 'ss-pinned': pinned }]"
-      :style="tooltipStyle"
-    >
+    <div ref="tooltipRef" :class="['ss-tooltip', { 'ss-pinned': pinned }]" :style="tooltipStyle">
       <div class="ss-tooltip-inner" style="position: relative">
         <button v-if="pinned" class="ss-tooltip-close" @click.stop="closeTooltip">&times;</button>
         <div class="ss-tooltip-header">

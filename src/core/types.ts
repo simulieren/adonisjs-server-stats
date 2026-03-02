@@ -517,13 +517,37 @@ export interface OverviewMetrics {
   slowestEndpoints: { url?: string; pattern?: string; avgDuration: number; count: number }[]
   queryStats: { total: number; avgDuration: number; perRequest: number }
   recentErrors: { id?: number; level: string; message: string; timestamp?: number | string }[]
-  topEvents: { eventName?: string; name?: string; event_name?: string; event?: string; count: number }[]
+  topEvents: {
+    eventName?: string
+    name?: string
+    event_name?: string
+    event?: string
+    count: number
+  }[]
   emailActivity: { sent: number; queued: number; failed: number }
   logLevelBreakdown: { error: number; warn: number; info: number; debug: number }
-  cacheStats: { available: boolean; totalKeys: number; hitRate: number; memoryUsedHuman: string } | null
-  jobQueueStatus: { available: boolean; active: number; waiting: number; failed: number; completed: number } | null
+  cacheStats: {
+    available: boolean
+    totalKeys: number
+    hitRate: number
+    memoryUsedHuman: string
+  } | null
+  jobQueueStatus: {
+    available: boolean
+    active: number
+    waiting: number
+    failed: number
+    completed: number
+  } | null
   statusDistribution: { '2xx': number; '3xx': number; '4xx': number; '5xx': number }
-  slowestQueries: { sqlNormalized?: string; normalizedSql?: string; sql_normalized?: string; sql?: string; avgDuration: number; count: number }[]
+  slowestQueries: {
+    sqlNormalized?: string
+    normalizedSql?: string
+    sql_normalized?: string
+    sql?: string
+    avgDuration: number
+    count: number
+  }[]
   sparklines?: {
     avgResponseTime?: number[]
     p95ResponseTime?: number[]

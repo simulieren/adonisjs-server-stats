@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react'
-import { TAB_ICONS } from '../../../core/icons.js'
+
 import { formatUptime, timeAgo, formatDuration } from '../../../core/formatters.js'
+import { TAB_ICONS } from '../../../core/icons.js'
 import {
   isSecretKey,
   formatConfigVal,
@@ -30,11 +31,33 @@ function StatusDot({ status, prefix }: { status: string; prefix: string }) {
 // ---------------------------------------------------------------------------
 
 const EyeIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox={TAB_ICONS.eye.viewBox} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: TAB_ICONS.eye.elements.join('') }} />
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="12"
+    height="12"
+    viewBox={TAB_ICONS.eye.viewBox}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    dangerouslySetInnerHTML={{ __html: TAB_ICONS.eye.elements.join('') }}
+  />
 )
 
 const EyeOffIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox={TAB_ICONS['eye-off'].viewBox} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" dangerouslySetInnerHTML={{ __html: TAB_ICONS['eye-off'].elements.join('') }} />
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="12"
+    height="12"
+    viewBox={TAB_ICONS['eye-off'].viewBox}
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    dangerouslySetInnerHTML={{ __html: TAB_ICONS['eye-off'].elements.join('') }}
+  />
 )
 
 function RedactedValue({ value }: { value: string }) {
@@ -151,11 +174,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
     (key: string, value: unknown): React.ReactNode => {
       if (value === null || value === undefined) return <span className={`${p}-c-dim`}>null</span>
       if (typeof value === 'boolean')
-        return (
-          <span className={value ? `${p}-c-green` : `${p}-c-red`}>
-            {String(value)}
-          </span>
-        )
+        return <span className={value ? `${p}-c-green` : `${p}-c-red`}>{String(value)}</span>
       if (Array.isArray(value)) return <span>{value.join(', ') || '-'}</span>
       const strVal = formatConfigVal(value)
       if (isSecretKey(key)) {
@@ -217,7 +236,9 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
                 <tr key={c.name}>
                   <td>
                     <code>{c.name}</code>
-                    {c.label && c.label !== c.name && <span className={`${p}-c-dim`}>{' '}{c.label}</span>}
+                    {c.label && c.label !== c.name && (
+                      <span className={`${p}-c-dim`}> {c.label}</span>
+                    )}
                   </td>
                   <td>
                     <StatusDot status={c.status} prefix={p} />
@@ -387,7 +408,9 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
               </tr>
               <tr>
                 <td>DB Path</td>
-                <td><code>{data.storage.dbPath}</code></td>
+                <td>
+                  <code>{data.storage.dbPath}</code>
+                </td>
               </tr>
               <tr>
                 <td>File Size</td>
@@ -403,11 +426,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
               </tr>
               <tr>
                 <td>Last Cleanup</td>
-                <td>
-                  {data.storage.lastCleanupAt
-                    ? timeAgo(data.storage.lastCleanupAt)
-                    : '-'}
-                </td>
+                <td>{data.storage.lastCleanupAt ? timeAgo(data.storage.lastCleanupAt) : '-'}</td>
               </tr>
             </tbody>
           </table>
@@ -423,7 +442,9 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
               <tbody>
                 {data.storage.tables.map((t) => (
                   <tr key={t.name}>
-                    <td><code>{t.name}</code></td>
+                    <td>
+                      <code>{t.name}</code>
+                    </td>
                     <td>{t.rowCount.toLocaleString()}</td>
                   </tr>
                 ))}

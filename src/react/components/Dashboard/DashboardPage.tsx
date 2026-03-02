@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef, Suspense, lazy } from 'react'
 
+import { TAB_ICONS } from '../../../core/icons.js'
 import { subscribeToChannel } from '../../../core/transmit-adapter.js'
 import { useDashboardData } from '../../hooks/useDashboardData.js'
 import { useFeatures } from '../../hooks/useFeatures.js'
@@ -12,7 +13,6 @@ import type {
   DebugPane,
   OverviewMetrics,
 } from '../../../core/types.js'
-import { TAB_ICONS } from '../../../core/icons.js'
 
 /** All built-in section IDs used for hash-route validation. */
 const VALID_SECTIONS: DashboardSection[] = [
@@ -114,10 +114,7 @@ export function DashboardPage(props: DashboardPageProps) {
     (hash: string): DashboardSection => {
       const section = hash.replace('#', '').split('?')[0]
       if (!section) return 'overview'
-      const allValid: string[] = [
-        ...VALID_SECTIONS,
-        ...customPanes.map((p: DebugPane) => p.id),
-      ]
+      const allValid: string[] = [...VALID_SECTIONS, ...customPanes.map((p: DebugPane) => p.id)]
       return allValid.includes(section) ? (section as DashboardSection) : 'overview'
     },
     [customPanes]
@@ -229,10 +226,7 @@ export function DashboardPage(props: DashboardPageProps) {
     }
 
     return (
-      <div
-        className="ss-dash-pane ss-dash-active"
-        id={`ss-dash-pane-${activeSection}`}
-      >
+      <div className="ss-dash-pane ss-dash-active" id={`ss-dash-pane-${activeSection}`}>
         <div className="ss-dash-pane-inner">
           <Suspense fallback={<div className="ss-dash-empty">Loading...</div>}>
             {sectionMap[activeSection] || <div className="ss-dash-empty">Unknown section</div>}
@@ -288,7 +282,9 @@ export function DashboardPage(props: DashboardPageProps) {
                   type="button"
                   className={`ss-dash-nav-item ${activeSection === section.id ? 'ss-dash-active' : ''}`}
                   data-ss-section={section.id}
-                  onClick={() => { if (section.id !== activeSection) setActiveSection(section.id) }}
+                  onClick={() => {
+                    if (section.id !== activeSection) setActiveSection(section.id)
+                  }}
                   title={sidebarCollapsed ? section.label : undefined}
                 >
                   <span className="ss-dash-nav-icon">
@@ -301,7 +297,11 @@ export function DashboardPage(props: DashboardPageProps) {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      dangerouslySetInnerHTML={{ __html: (TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).elements.join('') }}
+                      dangerouslySetInnerHTML={{
+                        __html: (
+                          TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config
+                        ).elements.join(''),
+                      }}
                     />
                   </span>
                   <span className="ss-dash-nav-label">{section.label}</span>
@@ -355,9 +355,25 @@ export function DashboardPage(props: DashboardPageProps) {
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {sidebarCollapsed ? (
-              <svg width="16" height="16" viewBox={TAB_ICONS['chevron-right'].viewBox} fill="none" stroke="currentColor" strokeWidth="1.5" dangerouslySetInnerHTML={{ __html: TAB_ICONS['chevron-right'].elements.join('') }} />
+              <svg
+                width="16"
+                height="16"
+                viewBox={TAB_ICONS['chevron-right'].viewBox}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                dangerouslySetInnerHTML={{ __html: TAB_ICONS['chevron-right'].elements.join('') }}
+              />
             ) : (
-              <svg width="16" height="16" viewBox={TAB_ICONS['chevron-left'].viewBox} fill="none" stroke="currentColor" strokeWidth="1.5" dangerouslySetInnerHTML={{ __html: TAB_ICONS['chevron-left'].elements.join('') }} />
+              <svg
+                width="16"
+                height="16"
+                viewBox={TAB_ICONS['chevron-left'].viewBox}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                dangerouslySetInnerHTML={{ __html: TAB_ICONS['chevron-left'].elements.join('') }}
+              />
             )}
           </button>
         </div>

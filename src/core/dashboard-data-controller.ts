@@ -305,7 +305,8 @@ export class DashboardDataController {
   async mutate(path: string, method: 'post' | 'delete' = 'post', body?: unknown): Promise<unknown> {
     const url = `${this.endpoint}/${path}`
     try {
-      const result = method === 'post' ? await this.client.post(url, body) : await this.client.delete(url)
+      const result =
+        method === 'post' ? await this.client.post(url, body) : await this.client.delete(url)
       // Refresh after mutation
       await this.fetch(true)
       return result

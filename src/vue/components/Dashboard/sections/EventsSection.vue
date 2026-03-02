@@ -18,13 +18,7 @@ const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api'
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const {
-  data,
-  loading,
-  pagination,
-  goToPage,
-  setSearch,
-} = useDashboardData(() => 'events', {
+const { data, loading, pagination, goToPage, setSearch } = useDashboardData(() => 'events', {
   baseUrl,
   dashboardEndpoint,
   authToken,
@@ -76,15 +70,29 @@ const { tableRef } = useResizableTable(() => events.value)
             </tr>
           </thead>
           <tbody>
-            <tr v-for="e in events" :key="(e.id as string)">
-              <td><span style="color: var(--ss-dim)">{{ e.id }}</span></td>
+            <tr v-for="e in events" :key="e.id as string">
+              <td>
+                <span style="color: var(--ss-dim)">{{ e.id }}</span>
+              </td>
               <td>
                 <span
                   class="ss-dash-event-name"
-                  :title="((e.event_name as string) || (e.eventName as string) || (e.event as string) || '') as string"
-                  style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block"
+                  :title="
+                    ((e.event_name as string) ||
+                      (e.eventName as string) ||
+                      (e.event as string) ||
+                      '') as string
+                  "
+                  style="
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    display: block;
+                  "
                 >
-                  {{ (e.event_name as string) || (e.eventName as string) || (e.event as string) || '' }}
+                  {{
+                    (e.event_name as string) || (e.eventName as string) || (e.event as string) || ''
+                  }}
                 </span>
               </td>
               <td>
@@ -93,9 +101,21 @@ const { tableRef } = useResizableTable(() => events.value)
               <td>
                 <span
                   class="ss-dash-event-time"
-                  :title="formatTime(((e.createdAt as string) || (e.created_at as string) || (e.timestamp as string)) as string)"
+                  :title="
+                    formatTime(
+                      ((e.createdAt as string) ||
+                        (e.created_at as string) ||
+                        (e.timestamp as string)) as string
+                    )
+                  "
                 >
-                  {{ timeAgo(((e.createdAt as string) || (e.created_at as string) || (e.timestamp as string)) as string) }}
+                  {{
+                    timeAgo(
+                      ((e.createdAt as string) ||
+                        (e.created_at as string) ||
+                        (e.timestamp as string)) as string
+                    )
+                  }}
                 </span>
               </td>
             </tr>

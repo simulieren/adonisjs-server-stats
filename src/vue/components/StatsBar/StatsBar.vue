@@ -190,8 +190,12 @@ const themeAttr = computed(() => theme.value)
     <span v-if="!visible && stats" class="ss-toggle-summary" style="display: flex">
       <span
         v-if="visibleGroups.has('process')"
-        :class="['ss-value', stats.cpuPercent > 80 ? 'ss-red' : stats.cpuPercent > 50 ? 'ss-amber' : 'ss-green']"
-      >{{ cpuSummary }}</span>
+        :class="[
+          'ss-value',
+          stats.cpuPercent > 80 ? 'ss-red' : stats.cpuPercent > 50 ? 'ss-amber' : 'ss-green',
+        ]"
+        >{{ cpuSummary }}</span
+      >
       <span v-if="visibleGroups.has('process')" class="ss-value ss-green">{{ memSummary }}</span>
       <span
         v-if="visibleGroups.has('redis') && stats?.redisOk !== undefined"

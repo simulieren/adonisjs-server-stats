@@ -48,9 +48,7 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 async function fetchDiagnostics() {
   try {
-    const result = await getClient().fetch<DiagnosticsResponse>(
-      `${debugEndpoint}/diagnostics`
-    )
+    const result = await getClient().fetch<DiagnosticsResponse>(`${debugEndpoint}/diagnostics`)
     diagnostics.value = result
     error.value = null
     isLoading.value = false
@@ -169,9 +167,7 @@ const integrationEntries = computed(() => {
     <div v-if="isLoading && !diagnostics" class="ss-dash-empty">Loading diagnostics...</div>
 
     <!-- Error -->
-    <div v-else-if="error && !diagnostics" class="ss-dash-empty">
-      Error: {{ error.message }}
-    </div>
+    <div v-else-if="error && !diagnostics" class="ss-dash-empty">Error: {{ error.message }}</div>
 
     <!-- No data -->
     <div v-else-if="!diagnostics" class="ss-dash-empty">Diagnostics not available</div>
@@ -185,7 +181,10 @@ const integrationEntries = computed(() => {
             { label: 'Version', value: diagnostics.package?.version || '-' },
             { label: 'Node.js', value: diagnostics.package?.nodeVersion || '-' },
             { label: 'AdonisJS', value: diagnostics.package?.adonisVersion || '-' },
-            { label: 'Uptime', value: formatUptime(diagnostics.uptime || diagnostics.package?.uptime) },
+            {
+              label: 'Uptime',
+              value: formatUptime(diagnostics.uptime || diagnostics.package?.uptime),
+            },
             { label: 'Renderer', value: diagnostics.devToolbar?.renderer || 'preact' },
           ]"
           :key="card.label"
@@ -215,7 +214,8 @@ const integrationEntries = computed(() => {
               <span
                 v-if="c.label && c.label !== c.name"
                 style="margin-left: 6px; font-size: 11px; color: var(--ss-dim)"
-              >{{ c.label }}</span>
+                >{{ c.label }}</span
+              >
             </td>
             <td>
               <span :class="['ss-dash-dot', dotClass(c.status)]"></span>
@@ -224,7 +224,9 @@ const integrationEntries = computed(() => {
             <td :style="c.lastError ? { color: 'var(--ss-red-fg)' } : {}">
               <template v-if="c.lastError">
                 {{ c.lastError }}
-                <span style="color: var(--ss-dim); margin-left: 4px">{{ timeAgo(c.lastErrorAt ?? 0) }}</span>
+                <span style="color: var(--ss-dim); margin-left: 4px">{{
+                  timeAgo(c.lastErrorAt ?? 0)
+                }}</span>
               </template>
               <template v-else>-</template>
             </td>
@@ -235,18 +237,31 @@ const integrationEntries = computed(() => {
                   :key="item.key"
                   style="margin-right: 8px"
                 >
-                  {{ item.key }}=<template v-if="item.secret && !revealedKeys.has(`collector-${c.name}-${item.key}`)">
+                  {{ item.key }}=<template
+                    v-if="item.secret && !revealedKeys.has(`collector-${c.name}-${item.key}`)"
+                  >
                     <span
                       style="color: var(--ss-muted); cursor: pointer"
                       @click="toggleReveal(`collector-${c.name}-${item.key}`)"
-                    >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span>
-                  </template><template v-else>
+                      >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
+                    > </template
+                  ><template v-else>
                     <span>{{ item.value }}</span>
                     <button
                       v-if="item.secret"
-                      style="background: none; border: none; color: var(--ss-link-color, #3b82f6); cursor: pointer; font-size: 10px; margin-left: 4px; padding: 0"
+                      style="
+                        background: none;
+                        border: none;
+                        color: var(--ss-link-color, #3b82f6);
+                        cursor: pointer;
+                        font-size: 10px;
+                        margin-left: 4px;
+                        padding: 0;
+                      "
                       @click="toggleReveal(`collector-${c.name}-${item.key}`)"
-                    >Hide</button>
+                    >
+                      Hide
+                    </button>
                   </template>
                 </span>
               </template>
@@ -261,7 +276,11 @@ const integrationEntries = computed(() => {
       <div v-if="!bufferEntries.length" class="ss-dash-empty">No buffer data</div>
       <table v-else class="ss-dash-table">
         <thead>
-          <tr><th>Buffer</th><th>Usage</th><th>Fill %</th></tr>
+          <tr>
+            <th>Buffer</th>
+            <th>Usage</th>
+            <th>Fill %</th>
+          </tr>
         </thead>
         <tbody>
           <tr v-for="b in bufferEntries" :key="b.name">
@@ -275,7 +294,9 @@ const integrationEntries = computed(() => {
                     :style="{ width: b.percent + '%' }"
                   ></div>
                 </div>
-                <span :class="['ss-dash-bar-pct', b.percent >= 100 ? 'ss-dash-bar-pct-warn' : '']">{{ b.percent }}%</span>
+                <span :class="['ss-dash-bar-pct', b.percent >= 100 ? 'ss-dash-bar-pct-warn' : '']"
+                  >{{ b.percent }}%</span
+                >
               </div>
             </td>
           </tr>
@@ -287,7 +308,11 @@ const integrationEntries = computed(() => {
       <div v-if="!timerEntries.length" class="ss-dash-empty">No timer data</div>
       <table v-else class="ss-dash-table">
         <thead>
-          <tr><th>Timer</th><th>Status</th><th>Interval</th></tr>
+          <tr>
+            <th>Timer</th>
+            <th>Status</th>
+            <th>Interval</th>
+          </tr>
         </thead>
         <tbody>
           <tr v-for="t in timerEntries" :key="t.key">
@@ -306,7 +331,11 @@ const integrationEntries = computed(() => {
       <div v-if="!integrationEntries.length" class="ss-dash-empty">No integration data</div>
       <table v-else class="ss-dash-table">
         <thead>
-          <tr><th>Integration</th><th>Status</th><th>Details</th></tr>
+          <tr>
+            <th>Integration</th>
+            <th>Status</th>
+            <th>Details</th>
+          </tr>
         </thead>
         <tbody>
           <tr v-for="i in integrationEntries" :key="i.key">
@@ -324,28 +353,61 @@ const integrationEntries = computed(() => {
       <template v-if="diagnostics.storage">
         <h3 class="ss-dash-section-title">Storage</h3>
         <table class="ss-dash-table">
-          <thead><tr><th>Metric</th><th>Value</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
           <tbody>
             <tr>
               <td>Status</td>
               <td>
-                <span :class="['ss-dash-dot', dotClass(diagnostics.storage!.ready ? 'ready' : 'unavailable')]"></span>
+                <span
+                  :class="[
+                    'ss-dash-dot',
+                    dotClass(diagnostics.storage!.ready ? 'ready' : 'unavailable'),
+                  ]"
+                ></span>
                 {{ diagnostics.storage!.ready ? 'ready' : 'not ready' }}
               </td>
             </tr>
             <tr>
               <td>DB Path</td>
-              <td style="font-family: monospace; font-size: 11px">{{ diagnostics.storage!.dbPath }}</td>
+              <td style="font-family: monospace; font-size: 11px">
+                {{ diagnostics.storage!.dbPath }}
+              </td>
             </tr>
-            <tr><td>File Size</td><td>{{ diagnostics.storage!.fileSizeMb.toFixed(1) }} MB</td></tr>
-            <tr><td>WAL Size</td><td>{{ diagnostics.storage!.walSizeMb.toFixed(1) }} MB</td></tr>
-            <tr><td>Retention</td><td>{{ diagnostics.storage!.retentionDays }} days</td></tr>
-            <tr><td>Last Cleanup</td><td>{{ timeAgo(diagnostics.storage!.lastCleanupAt ?? 0) }}</td></tr>
+            <tr>
+              <td>File Size</td>
+              <td>{{ diagnostics.storage!.fileSizeMb.toFixed(1) }} MB</td>
+            </tr>
+            <tr>
+              <td>WAL Size</td>
+              <td>{{ diagnostics.storage!.walSizeMb.toFixed(1) }} MB</td>
+            </tr>
+            <tr>
+              <td>Retention</td>
+              <td>{{ diagnostics.storage!.retentionDays }} days</td>
+            </tr>
+            <tr>
+              <td>Last Cleanup</td>
+              <td>{{ timeAgo(diagnostics.storage!.lastCleanupAt ?? 0) }}</td>
+            </tr>
           </tbody>
         </table>
 
-        <table v-if="diagnostics.storage!.tables?.length" class="ss-dash-table" style="margin-top: 8px">
-          <thead><tr><th>Table</th><th>Rows</th></tr></thead>
+        <table
+          v-if="diagnostics.storage!.tables?.length"
+          class="ss-dash-table"
+          style="margin-top: 8px"
+        >
+          <thead>
+            <tr>
+              <th>Table</th>
+              <th>Rows</th>
+            </tr>
+          </thead>
           <tbody>
             <tr v-for="t in diagnostics.storage!.tables" :key="t.name">
               <td style="font-family: monospace; font-size: 11px">{{ t.name }}</td>
@@ -358,71 +420,169 @@ const integrationEntries = computed(() => {
       <!-- 7. Resolved Config -->
       <h3 class="ss-dash-section-title">Resolved Config</h3>
       <table class="ss-dash-table">
-        <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td>intervalMs</td><td>{{ diagnostics.config?.intervalMs }}</td></tr>
-          <tr><td>transport</td><td>{{ diagnostics.config?.transport }}</td></tr>
-          <tr><td>channelName</td><td>{{ diagnostics.config?.channelName }}</td></tr>
-          <tr><td>endpoint</td><td>{{ diagnostics.config?.endpoint === false ? 'false' : diagnostics.config?.endpoint }}</td></tr>
-          <tr><td>skipInTest</td><td>{{ diagnostics.config?.skipInTest }}</td></tr>
-          <tr><td>onStats callback</td><td>{{ diagnostics.config?.hasOnStatsCallback ? 'defined' : 'not defined' }}</td></tr>
-          <tr><td>shouldShow callback</td><td>{{ diagnostics.config?.hasShouldShowCallback ? 'defined' : 'not defined' }}</td></tr>
+          <tr>
+            <td>intervalMs</td>
+            <td>{{ diagnostics.config?.intervalMs }}</td>
+          </tr>
+          <tr>
+            <td>transport</td>
+            <td>{{ diagnostics.config?.transport }}</td>
+          </tr>
+          <tr>
+            <td>channelName</td>
+            <td>{{ diagnostics.config?.channelName }}</td>
+          </tr>
+          <tr>
+            <td>endpoint</td>
+            <td>
+              {{ diagnostics.config?.endpoint === false ? 'false' : diagnostics.config?.endpoint }}
+            </td>
+          </tr>
+          <tr>
+            <td>skipInTest</td>
+            <td>{{ diagnostics.config?.skipInTest }}</td>
+          </tr>
+          <tr>
+            <td>onStats callback</td>
+            <td>{{ diagnostics.config?.hasOnStatsCallback ? 'defined' : 'not defined' }}</td>
+          </tr>
+          <tr>
+            <td>shouldShow callback</td>
+            <td>{{ diagnostics.config?.hasShouldShowCallback ? 'defined' : 'not defined' }}</td>
+          </tr>
         </tbody>
       </table>
 
       <h4 class="ss-dash-section-title">DevToolbar</h4>
       <table class="ss-dash-table">
-        <thead><tr><th>Setting</th><th>Value</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+          </tr>
+        </thead>
         <tbody>
-          <tr><td>enabled</td><td>{{ diagnostics.devToolbar?.enabled }}</td></tr>
-          <tr><td>tracing</td><td>{{ diagnostics.devToolbar?.tracing }}</td></tr>
-          <tr><td>dashboard</td><td>{{ diagnostics.devToolbar?.dashboard }}</td></tr>
+          <tr>
+            <td>enabled</td>
+            <td>{{ diagnostics.devToolbar?.enabled }}</td>
+          </tr>
+          <tr>
+            <td>tracing</td>
+            <td>{{ diagnostics.devToolbar?.tracing }}</td>
+          </tr>
+          <tr>
+            <td>dashboard</td>
+            <td>{{ diagnostics.devToolbar?.dashboard }}</td>
+          </tr>
           <tr>
             <td>dashboardPath</td>
-            <td style="font-family: monospace; font-size: 11px">{{ diagnostics.devToolbar?.dashboardPath }}</td>
+            <td style="font-family: monospace; font-size: 11px">
+              {{ diagnostics.devToolbar?.dashboardPath }}
+            </td>
           </tr>
           <tr>
             <td>debugEndpoint</td>
             <td style="font-family: monospace; font-size: 11px">
               <template v-if="!revealedKeys.has('cfg-debugEndpoint')">
-                <span style="color: var(--ss-muted); cursor: pointer" @click="toggleReveal('cfg-debugEndpoint')">&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span>
+                <span
+                  style="color: var(--ss-muted); cursor: pointer"
+                  @click="toggleReveal('cfg-debugEndpoint')"
+                  >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
+                >
               </template>
               <template v-else>
                 {{ diagnostics.devToolbar?.debugEndpoint }}
                 <button
-                  style="background: none; border: none; color: var(--ss-link-color, #3b82f6); cursor: pointer; font-size: 10px; margin-left: 4px; padding: 0"
+                  style="
+                    background: none;
+                    border: none;
+                    color: var(--ss-link-color, #3b82f6);
+                    cursor: pointer;
+                    font-size: 10px;
+                    margin-left: 4px;
+                    padding: 0;
+                  "
                   @click="toggleReveal('cfg-debugEndpoint')"
-                >Hide</button>
+                >
+                  Hide
+                </button>
               </template>
             </td>
           </tr>
-          <tr><td>maxQueries</td><td>{{ diagnostics.devToolbar?.maxQueries }}</td></tr>
-          <tr><td>maxEvents</td><td>{{ diagnostics.devToolbar?.maxEvents }}</td></tr>
-          <tr><td>maxEmails</td><td>{{ diagnostics.devToolbar?.maxEmails }}</td></tr>
-          <tr><td>maxTraces</td><td>{{ diagnostics.devToolbar?.maxTraces }}</td></tr>
-          <tr><td>slowQueryThresholdMs</td><td>{{ diagnostics.devToolbar?.slowQueryThresholdMs }}</td></tr>
-          <tr><td>retentionDays</td><td>{{ diagnostics.devToolbar?.retentionDays }}</td></tr>
+          <tr>
+            <td>maxQueries</td>
+            <td>{{ diagnostics.devToolbar?.maxQueries }}</td>
+          </tr>
+          <tr>
+            <td>maxEvents</td>
+            <td>{{ diagnostics.devToolbar?.maxEvents }}</td>
+          </tr>
+          <tr>
+            <td>maxEmails</td>
+            <td>{{ diagnostics.devToolbar?.maxEmails }}</td>
+          </tr>
+          <tr>
+            <td>maxTraces</td>
+            <td>{{ diagnostics.devToolbar?.maxTraces }}</td>
+          </tr>
+          <tr>
+            <td>slowQueryThresholdMs</td>
+            <td>{{ diagnostics.devToolbar?.slowQueryThresholdMs }}</td>
+          </tr>
+          <tr>
+            <td>retentionDays</td>
+            <td>{{ diagnostics.devToolbar?.retentionDays }}</td>
+          </tr>
           <tr>
             <td>dbPath</td>
             <td style="font-family: monospace; font-size: 11px">
               <template v-if="!revealedKeys.has('cfg-dbPath')">
-                <span style="color: var(--ss-muted); cursor: pointer" @click="toggleReveal('cfg-dbPath')">&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span>
+                <span
+                  style="color: var(--ss-muted); cursor: pointer"
+                  @click="toggleReveal('cfg-dbPath')"
+                  >&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;</span
+                >
               </template>
               <template v-else>
                 {{ diagnostics.devToolbar?.dbPath }}
                 <button
-                  style="background: none; border: none; color: var(--ss-link-color, #3b82f6); cursor: pointer; font-size: 10px; margin-left: 4px; padding: 0"
+                  style="
+                    background: none;
+                    border: none;
+                    color: var(--ss-link-color, #3b82f6);
+                    cursor: pointer;
+                    font-size: 10px;
+                    margin-left: 4px;
+                    padding: 0;
+                  "
                   @click="toggleReveal('cfg-dbPath')"
-                >Hide</button>
+                >
+                  Hide
+                </button>
               </template>
             </td>
           </tr>
-          <tr><td>persistDebugData</td><td>{{ diagnostics.devToolbar?.persistDebugData }}</td></tr>
+          <tr>
+            <td>persistDebugData</td>
+            <td>{{ diagnostics.devToolbar?.persistDebugData }}</td>
+          </tr>
           <tr>
             <td>excludeFromTracing</td>
-            <td style="font-size: 11px">{{ diagnostics.devToolbar?.excludeFromTracing?.join(', ') || '-' }}</td>
+            <td style="font-size: 11px">
+              {{ diagnostics.devToolbar?.excludeFromTracing?.join(', ') || '-' }}
+            </td>
           </tr>
-          <tr><td>customPanes</td><td>{{ diagnostics.devToolbar?.customPaneCount ?? 0 }} registered</td></tr>
+          <tr>
+            <td>customPanes</td>
+            <td>{{ diagnostics.devToolbar?.customPaneCount ?? 0 }} registered</td>
+          </tr>
         </tbody>
       </table>
     </template>

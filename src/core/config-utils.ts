@@ -79,12 +79,7 @@ export function flattenConfig(obj: ConfigValue, prefix: string = ''): FlatEntry[
   for (const key of Object.keys(obj)) {
     const fullPath = prefix ? `${prefix}.${key}` : key
     const val = (obj as Record<string, ConfigValue>)[key]
-    if (
-      typeof val === 'object' &&
-      val !== null &&
-      !Array.isArray(val) &&
-      !isRedactedValue(val)
-    ) {
+    if (typeof val === 'object' && val !== null && !Array.isArray(val) && !isRedactedValue(val)) {
       results.push(...flattenConfig(val, fullPath))
     } else {
       results.push({ path: fullPath, value: val })
@@ -109,15 +104,13 @@ export function flattenConfig(obj: ConfigValue, prefix: string = ''): FlatEntry[
  * - `string` -> as-is (no color)
  */
 export function formatFlatValue(value: ConfigValue): FormattedValue {
-  if (value === null || value === undefined)
-    return { text: 'null', color: 'var(--ss-dim)' }
+  if (value === null || value === undefined) return { text: 'null', color: 'var(--ss-dim)' }
   if (typeof value === 'boolean')
     return {
       text: String(value),
       color: value ? 'var(--ss-green-fg)' : 'var(--ss-red-fg)',
     }
-  if (typeof value === 'number')
-    return { text: String(value), color: 'var(--ss-amber-fg)' }
+  if (typeof value === 'number') return { text: String(value), color: 'var(--ss-amber-fg)' }
   if (Array.isArray(value)) {
     const items = value.map((item) => {
       if (item === null || item === undefined) return 'null'
@@ -126,8 +119,7 @@ export function formatFlatValue(value: ConfigValue): FormattedValue {
     })
     return { text: `[${items.join(', ')}]`, color: 'var(--ss-purple-fg)' }
   }
-  if (typeof value === 'object')
-    return { text: JSON.stringify(value), color: 'var(--ss-dim)' }
+  if (typeof value === 'object') return { text: JSON.stringify(value), color: 'var(--ss-dim)' }
   return { text: String(value) }
 }
 
@@ -206,11 +198,7 @@ export function collectTopLevelObjectKeys(obj: ConfigValue): string[] {
  * @param value      - The config value.
  * @param searchTerm - Lowercased search term.
  */
-export function matchesConfigSearch(
-  key: string,
-  value: ConfigValue,
-  searchTerm: string
-): boolean {
+export function matchesConfigSearch(key: string, value: ConfigValue, searchTerm: string): boolean {
   if (!searchTerm) return true
   if (key.toLowerCase().includes(searchTerm)) return true
   const strVal = isRedactedValue(value)

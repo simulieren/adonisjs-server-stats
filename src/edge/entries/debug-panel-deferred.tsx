@@ -1,4 +1,5 @@
 import { render } from 'preact'
+
 import { DebugPanel } from '../../react/components/DebugPanel/DebugPanel.js'
 
 import type { EdgeDebugConfig } from '../types.js'

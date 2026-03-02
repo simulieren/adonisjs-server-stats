@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { durationSeverity, formatDuration, formatTime, timeAgo } from '../../../../core/formatters.js'
+import {
+  durationSeverity,
+  formatDuration,
+  formatTime,
+  timeAgo,
+} from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Sparkline } from '../../StatsBar/Sparkline.js'
 import { TimeRangeSelector } from '../shared/TimeRangeSelector.js'
@@ -167,10 +172,9 @@ function OverviewChart({ chartPoints }: OverviewChartProps) {
 
   // Clamp tooltip pixel position within container
   const tooltipWidth = 120
-  const clampedLeft =
-    tooltip.visible
-      ? Math.max(tooltipWidth / 2, Math.min(tooltip.x, w - tooltipWidth / 2))
-      : 0
+  const clampedLeft = tooltip.visible
+    ? Math.max(tooltipWidth / 2, Math.min(tooltip.x, w - tooltipWidth / 2))
+    : 0
 
   return (
     <div ref={containerRef} style={{ position: 'relative' }}>
@@ -383,9 +387,12 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
 
   // Extract sparkline data: prefer pre-computed sparklines from API, fall back to chart points
   const chartPoints = chartResponse?.buckets || []
-  const avgResponseTimes = metrics.sparklines?.avgResponseTime ?? chartPoints.map((p) => p.avgDuration ?? 0)
-  const p95ResponseTimes = metrics.sparklines?.p95ResponseTime ?? chartPoints.map((p) => p.p95Duration ?? 0)
-  const requestCounts = metrics.sparklines?.requestsPerMinute ?? chartPoints.map((p) => p.requestCount ?? 0)
+  const avgResponseTimes =
+    metrics.sparklines?.avgResponseTime ?? chartPoints.map((p) => p.avgDuration ?? 0)
+  const p95ResponseTimes =
+    metrics.sparklines?.p95ResponseTime ?? chartPoints.map((p) => p.p95Duration ?? 0)
+  const requestCounts =
+    metrics.sparklines?.requestsPerMinute ?? chartPoints.map((p) => p.requestCount ?? 0)
   const errorCounts = metrics.sparklines?.errorRate ?? chartPoints.map((p) => p.errorCount ?? 0)
 
   return (
@@ -453,18 +460,12 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         </div>
         <div className="ss-dash-chart-legend" id="ss-dash-chart-legend">
           <span className="ss-dash-chart-legend-item">
-            <span
-              className="ss-dash-legend-dot"
-              style={{ background: 'var(--ss-accent)' }}
-            />
+            <span className="ss-dash-legend-dot" style={{ background: 'var(--ss-accent)' }} />
             Requests
           </span>
           {chartPoints.some((p) => (p.errorCount ?? 0) > 0) && (
             <span className="ss-dash-chart-legend-item">
-              <span
-                className="ss-dash-legend-dot"
-                style={{ background: 'var(--ss-red-fg)' }}
-              />
+              <span className="ss-dash-legend-dot" style={{ background: 'var(--ss-red-fg)' }} />
               Errors
             </span>
           )}
@@ -476,19 +477,28 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Slowest Endpoints */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#requests" className="ss-dash-widget-link">Slowest Endpoints</a>
+            <a href="#requests" className="ss-dash-widget-link">
+              Slowest Endpoints
+            </a>
           </div>
           {metrics.slowestEndpoints.length === 0 ? (
-            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>No data yet</div>
+            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>
+              No data yet
+            </div>
           ) : (
             <ul className="ss-dash-secondary-list">
               {metrics.slowestEndpoints.slice(0, 5).map((ep, i) => {
                 const epUrl = ep.url || ep.pattern || '-'
                 return (
                   <li key={i}>
-                    <a href={`#requests?url=${encodeURIComponent(epUrl)}`} className="ss-dash-widget-row-link">
+                    <a
+                      href={`#requests?url=${encodeURIComponent(epUrl)}`}
+                      className="ss-dash-widget-row-link"
+                    >
                       <span title={epUrl}>{epUrl}</span>
-                      <span className={`ss-dash-secondary-list-value ss-dash-duration ${durationClass(ep.avgDuration)}`}>
+                      <span
+                        className={`ss-dash-secondary-list-value ss-dash-duration ${durationClass(ep.avgDuration)}`}
+                      >
                         {formatDuration(ep.avgDuration)}
                       </span>
                     </a>
@@ -502,7 +512,9 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Query Stats */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#queries" className="ss-dash-widget-link">Query Stats</a>
+            <a href="#queries" className="ss-dash-widget-link">
+              Query Stats
+            </a>
           </div>
           <ul className="ss-dash-secondary-list">
             <li>
@@ -527,10 +539,14 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Recent Errors */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#logs?level=error" className="ss-dash-widget-link">Recent Errors</a>
+            <a href="#logs?level=error" className="ss-dash-widget-link">
+              Recent Errors
+            </a>
           </div>
           {metrics.recentErrors.length === 0 ? (
-            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>No recent errors</div>
+            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>
+              No recent errors
+            </div>
           ) : (
             <ul className="ss-dash-secondary-list">
               {metrics.recentErrors.map((err, i) => (
@@ -540,7 +556,11 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
                       {err.message}
                     </span>
                     {err.timestamp && (
-                      <span className="ss-dash-secondary-list-value" style={{ color: 'var(--ss-dim)' }} title={formatTime(err.timestamp)}>
+                      <span
+                        className="ss-dash-secondary-list-value"
+                        style={{ color: 'var(--ss-dim)' }}
+                        title={formatTime(err.timestamp)}
+                      >
                         {timeAgo(err.timestamp)}
                       </span>
                     )}
@@ -554,17 +574,24 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Top Events */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#events" className="ss-dash-widget-link">Top Events</a>
+            <a href="#events" className="ss-dash-widget-link">
+              Top Events
+            </a>
           </div>
           {metrics.topEvents.length === 0 ? (
-            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>No events yet</div>
+            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>
+              No events yet
+            </div>
           ) : (
             <ul className="ss-dash-secondary-list">
               {metrics.topEvents.slice(0, 5).map((ev, i) => {
                 const evName = ev.name || ev.eventName || ev.event_name || ev.event || ''
                 return (
                   <li key={i}>
-                    <a href={`#events?event_name=${encodeURIComponent(evName)}`} className="ss-dash-widget-row-link">
+                    <a
+                      href={`#events?event_name=${encodeURIComponent(evName)}`}
+                      className="ss-dash-widget-row-link"
+                    >
                       <span>{evName}</span>
                       <span className="ss-dash-secondary-list-value">{ev.count}</span>
                     </a>
@@ -578,7 +605,9 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Email Activity */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#emails" className="ss-dash-widget-link">Email Activity</a>
+            <a href="#emails" className="ss-dash-widget-link">
+              Email Activity
+            </a>
           </div>
           <ul className="ss-dash-secondary-list">
             <li>
@@ -596,7 +625,12 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
             <li>
               <a href="#emails?status=failed" className="ss-dash-widget-row-link">
                 <span>Failed</span>
-                <span className="ss-dash-secondary-list-value" style={metrics.emailActivity.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined}>
+                <span
+                  className="ss-dash-secondary-list-value"
+                  style={
+                    metrics.emailActivity.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined
+                  }
+                >
                   {metrics.emailActivity.failed}
                 </span>
               </a>
@@ -607,7 +641,9 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Log Levels */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#logs" className="ss-dash-widget-link">Log Levels</a>
+            <a href="#logs" className="ss-dash-widget-link">
+              Log Levels
+            </a>
           </div>
           <ul className="ss-dash-secondary-list">
             <li>
@@ -629,13 +665,17 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
             <li>
               <a href="#logs?level=info" className="ss-dash-widget-row-link">
                 <span style={{ color: 'var(--ss-green-fg)' }}>Info</span>
-                <span className="ss-dash-secondary-list-value">{metrics.logLevelBreakdown.info}</span>
+                <span className="ss-dash-secondary-list-value">
+                  {metrics.logLevelBreakdown.info}
+                </span>
               </a>
             </li>
             <li>
               <a href="#logs?level=debug" className="ss-dash-widget-row-link">
                 <span style={{ color: 'var(--ss-dim)' }}>Debug</span>
-                <span className="ss-dash-secondary-list-value">{metrics.logLevelBreakdown.debug}</span>
+                <span className="ss-dash-secondary-list-value">
+                  {metrics.logLevelBreakdown.debug}
+                </span>
               </a>
             </li>
           </ul>
@@ -645,25 +685,33 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {metrics.cacheStats && metrics.cacheStats.available && (
           <div className="ss-dash-secondary-card">
             <div className="ss-dash-secondary-card-title">
-              <a href="#cache" className="ss-dash-widget-link">Cache</a>
+              <a href="#cache" className="ss-dash-widget-link">
+                Cache
+              </a>
             </div>
             <ul className="ss-dash-secondary-list">
               <li>
                 <a href="#cache" className="ss-dash-widget-row-link">
                   <span>Keys</span>
-                  <span className="ss-dash-secondary-list-value">{metrics.cacheStats.totalKeys}</span>
+                  <span className="ss-dash-secondary-list-value">
+                    {metrics.cacheStats.totalKeys}
+                  </span>
                 </a>
               </li>
               <li>
                 <a href="#cache" className="ss-dash-widget-row-link">
                   <span>Hit Rate</span>
-                  <span className="ss-dash-secondary-list-value">{metrics.cacheStats.hitRate.toFixed(1)}%</span>
+                  <span className="ss-dash-secondary-list-value">
+                    {metrics.cacheStats.hitRate.toFixed(1)}%
+                  </span>
                 </a>
               </li>
               <li>
                 <a href="#cache" className="ss-dash-widget-row-link">
                   <span>Memory</span>
-                  <span className="ss-dash-secondary-list-value">{metrics.cacheStats.memoryUsedHuman}</span>
+                  <span className="ss-dash-secondary-list-value">
+                    {metrics.cacheStats.memoryUsedHuman}
+                  </span>
                 </a>
               </li>
             </ul>
@@ -674,25 +722,36 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {metrics.jobQueueStatus && metrics.jobQueueStatus.available && (
           <div className="ss-dash-secondary-card">
             <div className="ss-dash-secondary-card-title">
-              <a href="#jobs" className="ss-dash-widget-link">Job Queue</a>
+              <a href="#jobs" className="ss-dash-widget-link">
+                Job Queue
+              </a>
             </div>
             <ul className="ss-dash-secondary-list">
               <li>
                 <a href="#jobs?status=active" className="ss-dash-widget-row-link">
                   <span>Active</span>
-                  <span className="ss-dash-secondary-list-value">{metrics.jobQueueStatus.active}</span>
+                  <span className="ss-dash-secondary-list-value">
+                    {metrics.jobQueueStatus.active}
+                  </span>
                 </a>
               </li>
               <li>
                 <a href="#jobs?status=waiting" className="ss-dash-widget-row-link">
                   <span>Waiting</span>
-                  <span className="ss-dash-secondary-list-value">{metrics.jobQueueStatus.waiting}</span>
+                  <span className="ss-dash-secondary-list-value">
+                    {metrics.jobQueueStatus.waiting}
+                  </span>
                 </a>
               </li>
               <li>
                 <a href="#jobs?status=failed" className="ss-dash-widget-row-link">
                   <span>Failed</span>
-                  <span className="ss-dash-secondary-list-value" style={metrics.jobQueueStatus.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined}>
+                  <span
+                    className="ss-dash-secondary-list-value"
+                    style={
+                      metrics.jobQueueStatus.failed > 0 ? { color: 'var(--ss-red-fg)' } : undefined
+                    }
+                  >
                     {metrics.jobQueueStatus.failed}
                   </span>
                 </a>
@@ -700,7 +759,9 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
               <li>
                 <a href="#jobs?status=completed" className="ss-dash-widget-row-link">
                   <span>Completed</span>
-                  <span className="ss-dash-secondary-list-value">{metrics.jobQueueStatus.completed}</span>
+                  <span className="ss-dash-secondary-list-value">
+                    {metrics.jobQueueStatus.completed}
+                  </span>
                 </a>
               </li>
             </ul>
@@ -710,7 +771,9 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Response Status */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#requests" className="ss-dash-widget-link">Response Status</a>
+            <a href="#requests" className="ss-dash-widget-link">
+              Response Status
+            </a>
           </div>
           <ul className="ss-dash-secondary-list">
             <li>
@@ -751,19 +814,28 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
         {/* Slowest Queries */}
         <div className="ss-dash-secondary-card">
           <div className="ss-dash-secondary-card-title">
-            <a href="#queries" className="ss-dash-widget-link">Slowest Queries</a>
+            <a href="#queries" className="ss-dash-widget-link">
+              Slowest Queries
+            </a>
           </div>
           {metrics.slowestQueries.length === 0 ? (
-            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>No query data yet</div>
+            <div className="ss-dash-empty" style={{ minHeight: '60px' }}>
+              No query data yet
+            </div>
           ) : (
             <ul className="ss-dash-secondary-list">
               {metrics.slowestQueries.slice(0, 5).map((q, i) => {
                 const qSql = q.sqlNormalized || q.normalizedSql || q.sql_normalized || q.sql || '-'
                 return (
                   <li key={i}>
-                    <a href={`#queries?pattern=${encodeURIComponent(qSql)}`} className="ss-dash-widget-row-link">
+                    <a
+                      href={`#queries?pattern=${encodeURIComponent(qSql)}`}
+                      className="ss-dash-widget-row-link"
+                    >
                       <span title={qSql}>{qSql}</span>
-                      <span className={`ss-dash-secondary-list-value ss-dash-duration ${durationClass(q.avgDuration)}`}>
+                      <span
+                        className={`ss-dash-secondary-list-value ss-dash-duration ${durationClass(q.avgDuration)}`}
+                      >
                         {formatDuration(q.avgDuration)}
                       </span>
                     </a>

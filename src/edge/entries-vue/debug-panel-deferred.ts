@@ -1,4 +1,5 @@
 import { createApp, h } from 'vue'
+
 import DebugPanel from '../../vue/components/DebugPanel/DebugPanel.vue'
 
 import type { EdgeDebugConfig } from '../types.js'

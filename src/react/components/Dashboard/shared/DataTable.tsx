@@ -88,19 +88,21 @@ export function DataTable<T extends Record<string, unknown>>({
             : ''
           const clickClass = onRowClick ? 'ss-dash-clickable' : ''
           return (
-          <React.Fragment key={(row[keyField] as React.Key) ?? i}>
-          <tr
-            onClick={onRowClick ? () => onRowClick(row) : undefined}
-            className={`${clickClass} ${extraClass}`.trim()}
-          >
-            {columns.map((col) => (
-              <td key={col.key}>
-                {col.render ? col.render(row[col.key], row) : (row[col.key] as React.ReactNode) ?? '-'}
-              </td>
-            ))}
-          </tr>
-          {renderAfterRow ? renderAfterRow(row, i) : null}
-          </React.Fragment>
+            <React.Fragment key={(row[keyField] as React.Key) ?? i}>
+              <tr
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                className={`${clickClass} ${extraClass}`.trim()}
+              >
+                {columns.map((col) => (
+                  <td key={col.key}>
+                    {col.render
+                      ? col.render(row[col.key], row)
+                      : ((row[col.key] as React.ReactNode) ?? '-')}
+                  </td>
+                ))}
+              </tr>
+              {renderAfterRow ? renderAfterRow(row, i) : null}
+            </React.Fragment>
           )
         })}
       </tbody>

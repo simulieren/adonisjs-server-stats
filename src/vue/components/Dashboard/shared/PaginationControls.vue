@@ -27,9 +27,7 @@ const pages = computed(() => getPageNumbers(props.page, props.lastPage))
 
 <template>
   <div v-if="lastPage > 1" class="ss-dash-pagination">
-    <span class="ss-dash-page-info">
-      Page {{ page }} of {{ lastPage }} ({{ total }} total)
-    </span>
+    <span class="ss-dash-page-info"> Page {{ page }} of {{ lastPage }} ({{ total }} total) </span>
     <div class="ss-dash-pagination-controls">
       <button
         type="button"

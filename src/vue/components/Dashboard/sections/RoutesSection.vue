@@ -15,12 +15,7 @@ const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api'
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const {
-  data,
-  loading,
-  error,
-  setSearch,
-} = useDashboardData(() => 'routes', {
+const { data, loading, error, setSearch } = useDashboardData(() => 'routes', {
   baseUrl,
   dashboardEndpoint,
   authToken,
@@ -81,21 +76,33 @@ const { tableRef } = useResizableTable(() => routes.value)
           <tbody>
             <tr v-for="(r, i) in routes" :key="(r.pattern as string) || i">
               <td>
-                <span :class="`ss-dash-method ss-dash-method-${((r.method as string) || '').toLowerCase()}`">
+                <span
+                  :class="`ss-dash-method ss-dash-method-${((r.method as string) || '').toLowerCase()}`"
+                >
                   {{ r.method }}
                 </span>
               </td>
               <td>
                 <span
-                  style="color: var(--ss-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
-                  :title="(r.pattern as string)"
+                  style="
+                    color: var(--ss-text);
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
+                  :title="r.pattern as string"
                 >
                   {{ r.pattern }}
                 </span>
               </td>
               <td>
                 <span
-                  style="color: var(--ss-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
+                  style="
+                    color: var(--ss-muted);
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
                   :title="(r.name as string) || '-'"
                 >
                   {{ (r.name as string) || '-' }}
@@ -103,18 +110,33 @@ const { tableRef } = useResizableTable(() => routes.value)
               </td>
               <td>
                 <span
-                  style="color: var(--ss-sql-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
-                  :title="(r.handler as string)"
+                  style="
+                    color: var(--ss-sql-color);
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
+                  :title="r.handler as string"
                 >
                   {{ r.handler }}
                 </span>
               </td>
               <td>
                 <span
-                  style="color: var(--ss-dim); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
-                  :title="(r.middleware as string[])?.length ? (r.middleware as string[]).join(', ') : '-'"
+                  style="
+                    color: var(--ss-dim);
+                    font-size: 10px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                  "
+                  :title="
+                    (r.middleware as string[])?.length ? (r.middleware as string[]).join(', ') : '-'
+                  "
                 >
-                  {{ (r.middleware as string[])?.length ? (r.middleware as string[]).join(', ') : '-' }}
+                  {{
+                    (r.middleware as string[])?.length ? (r.middleware as string[]).join(', ') : '-'
+                  }}
                 </span>
               </td>
             </tr>

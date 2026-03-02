@@ -3,8 +3,8 @@ import React from 'react'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { ConfigContent } from '../../shared/ConfigContent.js'
 
-import type { ConfigValue } from '../../shared/ConfigContent.js'
 import type { DashboardHookOptions } from '../../../../core/types.js'
+import type { ConfigValue } from '../../shared/ConfigContent.js'
 
 interface ConfigSectionProps {
   options?: DashboardHookOptions

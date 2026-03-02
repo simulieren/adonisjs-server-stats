@@ -96,7 +96,12 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
 
   return (
     <div>
-      <FilterBar search={search} onSearchChange={setSearch} placeholder="Search logs..." summary={`${meta?.total ?? 0} logs`}>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Search logs..."
+        summary={`${meta?.total ?? 0} logs`}
+      >
         <div className="ss-dash-log-filters">
           {LOG_LEVELS.map((level) => (
             <button
@@ -231,10 +236,14 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
 
             return (
               <div key={(log.id as string) || i} className="ss-dash-log-entry">
-                <span className={`ss-dash-log-level ${getLogLevelCssClass(level, 'ss-dash-log-level')}`}>
+                <span
+                  className={`ss-dash-log-level ${getLogLevelCssClass(level, 'ss-dash-log-level')}`}
+                >
                   {level.toUpperCase()}
                 </span>
-                <span className="ss-dash-log-time" title={ts ? formatTime(ts) : ''}>{ts ? timeAgo(ts) : '-'}</span>
+                <span className="ss-dash-log-time" title={ts ? formatTime(ts) : ''}>
+                  {ts ? timeAgo(ts) : '-'}
+                </span>
                 {reqId ? (
                   <span
                     className="ss-dash-log-reqid"

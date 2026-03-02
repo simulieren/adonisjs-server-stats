@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 
-import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
 import { SLOW_DURATION_MS } from '../../../../core/constants.js'
+import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
@@ -54,16 +54,16 @@ function ExplainPlanNode({ node, depth = 0 }: { node: PlanNode; depth?: number }
   const metrics: string[] = []
   if (node['Startup Cost'] !== null && node['Startup Cost'] !== undefined)
     metrics.push(`cost=${node['Startup Cost']}..${node['Total Cost']}`)
-  if (node['Plan Rows'] !== null && node['Plan Rows'] !== undefined) metrics.push(`rows=${node['Plan Rows']}`)
-  if (node['Plan Width'] !== null && node['Plan Width'] !== undefined) metrics.push(`width=${node['Plan Width']}`)
+  if (node['Plan Rows'] !== null && node['Plan Rows'] !== undefined)
+    metrics.push(`rows=${node['Plan Rows']}`)
+  if (node['Plan Width'] !== null && node['Plan Width'] !== undefined)
+    metrics.push(`width=${node['Plan Width']}`)
   if (node['Filter']) metrics.push(`filter: ${node['Filter']}`)
   if (node['Index Cond']) metrics.push(`cond: ${node['Index Cond']}`)
   if (node['Hash Cond']) metrics.push(`hash: ${node['Hash Cond']}`)
   if (node['Join Type']) metrics.push(`join: ${node['Join Type']}`)
   if (node['Sort Key']) {
-    const sortKey = Array.isArray(node['Sort Key'])
-      ? node['Sort Key'].join(', ')
-      : node['Sort Key']
+    const sortKey = Array.isArray(node['Sort Key']) ? node['Sort Key'].join(', ') : node['Sort Key']
     metrics.push(`sort: ${sortKey}`)
   }
 
@@ -315,24 +315,48 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
       }
 
       // Numeric aggregation fields
-      if ((normalized.count === null || normalized.count === undefined) && g.total_count !== null && g.total_count !== undefined) {
+      if (
+        (normalized.count === null || normalized.count === undefined) &&
+        g.total_count !== null &&
+        g.total_count !== undefined
+      ) {
         normalized.count = g.total_count
       }
-      if ((normalized.avgDuration === null || normalized.avgDuration === undefined) && g.avg_duration !== null && g.avg_duration !== undefined) {
+      if (
+        (normalized.avgDuration === null || normalized.avgDuration === undefined) &&
+        g.avg_duration !== null &&
+        g.avg_duration !== undefined
+      ) {
         normalized.avgDuration = g.avg_duration
       }
-      if ((normalized.maxDuration === null || normalized.maxDuration === undefined) && g.max_duration !== null && g.max_duration !== undefined) {
+      if (
+        (normalized.maxDuration === null || normalized.maxDuration === undefined) &&
+        g.max_duration !== null &&
+        g.max_duration !== undefined
+      ) {
         normalized.maxDuration = g.max_duration
       }
-      if ((normalized.minDuration === null || normalized.minDuration === undefined) && g.min_duration !== null && g.min_duration !== undefined) {
+      if (
+        (normalized.minDuration === null || normalized.minDuration === undefined) &&
+        g.min_duration !== null &&
+        g.min_duration !== undefined
+      ) {
         normalized.minDuration = g.min_duration
       }
-      if ((normalized.totalDuration === null || normalized.totalDuration === undefined) && g.total_duration !== null && g.total_duration !== undefined) {
+      if (
+        (normalized.totalDuration === null || normalized.totalDuration === undefined) &&
+        g.total_duration !== null &&
+        g.total_duration !== undefined
+      ) {
         normalized.totalDuration = g.total_duration
       }
 
       // Percent of total time: API may return percentOfTotal or pct_time
-      if ((normalized.percentOfTotal === null || normalized.percentOfTotal === undefined) && g.pct_time !== null && g.pct_time !== undefined) {
+      if (
+        (normalized.percentOfTotal === null || normalized.percentOfTotal === undefined) &&
+        g.pct_time !== null &&
+        g.pct_time !== undefined
+      ) {
         normalized.percentOfTotal = g.pct_time
       }
 
@@ -435,23 +459,22 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                           title="Click to expand"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setExpandedSql(
-                              expandedSql === sqlText ? null : sqlText
-                            )
+                            setExpandedSql(expandedSql === sqlText ? null : sqlText)
                           }}
                           role="button"
                           tabIndex={0}
                           onKeyDown={(e) =>
                             e.key === 'Enter' &&
-                            setExpandedSql(
-                              expandedSql === sqlText ? null : sqlText
-                            )
+                            setExpandedSql(expandedSql === sqlText ? null : sqlText)
                           }
                         >
                           {sqlText}
                         </span>
                         {isDup && (
-                          <> <span className="ss-dash-dup">DUP</span></>
+                          <>
+                            {' '}
+                            <span className="ss-dash-dup">DUP</span>
+                          </>
                         )}
                       </>
                     )
@@ -463,7 +486,11 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   width: '60px',
                   sortable: true,
                   render: (v: unknown) => (
-                    <span style={{ color: 'var(--ss-muted)', textAlign: 'center', display: 'block' }}>{(v as number) || 0}</span>
+                    <span
+                      style={{ color: 'var(--ss-muted)', textAlign: 'center', display: 'block' }}
+                    >
+                      {(v as number) || 0}
+                    </span>
                   ),
                 },
                 {
@@ -474,7 +501,9 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   render: (v: unknown) => {
                     const dur = (v as number) || 0
                     return (
-                      <span className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}>
+                      <span
+                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
+                      >
                         {dur.toFixed(2) + 'ms'}
                       </span>
                     )
@@ -497,7 +526,9 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   render: (v: unknown) => {
                     const dur = (v as number) || 0
                     return (
-                      <span className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}>
+                      <span
+                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
+                      >
                         {dur.toFixed(2) + 'ms'}
                       </span>
                     )
@@ -519,7 +550,11 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   label: '% Time',
                   width: '60px',
                   render: (v: unknown) => (
-                    <span style={{ color: 'var(--ss-muted)', textAlign: 'center', display: 'block' }}>{((v as number) || 0).toFixed(1) + '%'}</span>
+                    <span
+                      style={{ color: 'var(--ss-muted)', textAlign: 'center', display: 'block' }}
+                    >
+                      {((v as number) || 0).toFixed(1) + '%'}
+                    </span>
                   ),
                 },
               ]}
@@ -536,127 +571,173 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
         <>
           <div className="ss-dash-table-wrap">
             <DataTable
-            columns={[
-              {
-                key: 'id',
-                label: '#',
-                width: '40px',
-                render: (v) => <span style={{ color: 'var(--ss-dim)' }}>{v as React.ReactNode}</span>,
-              },
-              {
-                key: 'sql',
-                label: 'SQL',
-                render: (_v: unknown, row: Record<string, unknown>) => {
-                  const sqlText = (row.sql as string) || (row.sql_text as string) || ''
-                  return (
-                  <div>
-                    <span
-                      className={`ss-dash-sql ${expandedSql === (row.id as number) ? 'ss-dash-expanded' : ''}`}
-                      title="Click to expand"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setExpandedSql(
-                          expandedSql === (row.id as number) ? null : (row.id as number)
-                        )
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) =>
-                        e.key === 'Enter' &&
-                        setExpandedSql(
-                          expandedSql === (row.id as number) ? null : (row.id as number)
-                        )
-                      }
-                    >
-                      {sqlText}
-                    </span>
-                    {(sqlCounts.get(((row.sqlNormalized as string) || (row.sql as string) || (row.sql_text as string)) ?? '') ?? 0) > 1 && (
-                      <span className="ss-dash-dup">
-                        &times;{sqlCounts.get(((row.sqlNormalized as string) || (row.sql as string) || (row.sql_text as string)) ?? '')}
+              columns={[
+                {
+                  key: 'id',
+                  label: '#',
+                  width: '40px',
+                  render: (v) => (
+                    <span style={{ color: 'var(--ss-dim)' }}>{v as React.ReactNode}</span>
+                  ),
+                },
+                {
+                  key: 'sql',
+                  label: 'SQL',
+                  render: (_v: unknown, row: Record<string, unknown>) => {
+                    const sqlText = (row.sql as string) || (row.sql_text as string) || ''
+                    return (
+                      <div>
+                        <span
+                          className={`ss-dash-sql ${expandedSql === (row.id as number) ? 'ss-dash-expanded' : ''}`}
+                          title="Click to expand"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setExpandedSql(
+                              expandedSql === (row.id as number) ? null : (row.id as number)
+                            )
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) =>
+                            e.key === 'Enter' &&
+                            setExpandedSql(
+                              expandedSql === (row.id as number) ? null : (row.id as number)
+                            )
+                          }
+                        >
+                          {sqlText}
+                        </span>
+                        {(sqlCounts.get(
+                          ((row.sqlNormalized as string) ||
+                            (row.sql as string) ||
+                            (row.sql_text as string)) ??
+                            ''
+                        ) ?? 0) > 1 && (
+                          <span className="ss-dash-dup">
+                            &times;
+                            {sqlCounts.get(
+                              ((row.sqlNormalized as string) ||
+                                (row.sql as string) ||
+                                (row.sql_text as string)) ??
+                                ''
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  },
+                },
+                {
+                  key: 'duration',
+                  label: 'Duration',
+                  width: '70px',
+                  sortable: true,
+                  render: (v: unknown) => {
+                    const dur = (v as number) || 0
+                    return (
+                      <span
+                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
+                      >
+                        {dur.toFixed(2) + 'ms'}
                       </span>
-                    )}
-                  </div>
-                  )
+                    )
+                  },
                 },
-              },
-              {
-                key: 'duration',
-                label: 'Duration',
-                width: '70px',
-                sortable: true,
-                render: (v: unknown) => {
-                  const dur = (v as number) || 0
-                  return (
-                  <span
-                    className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
-                  >
-                    {dur.toFixed(2) + 'ms'}
-                  </span>
-                  )
+                {
+                  key: 'method',
+                  label: 'Method',
+                  width: '60px',
+                  render: (_v: unknown, row: Record<string, unknown>) => {
+                    const method = (row.method as string) || (row.sql_method as string) || ''
+                    return (
+                      <span className={`ss-dash-method ss-dash-method-${method.toLowerCase()}`}>
+                        {method}
+                      </span>
+                    )
+                  },
                 },
-              },
-              {
-                key: 'method',
-                label: 'Method',
-                width: '60px',
-                render: (_v: unknown, row: Record<string, unknown>) => {
-                  const method = (row.method as string) || (row.sql_method as string) || ''
-                  return <span className={`ss-dash-method ss-dash-method-${method.toLowerCase()}`}>{method}</span>
-                },
-              },
-              {
-                key: 'model',
-                label: 'Model',
-                width: '90px',
-                render: (v: unknown) => <span style={{ color: 'var(--ss-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={v as string}>{(v as string) || '-'}</span>,
-              },
-              {
-                key: 'connection',
-                label: 'Connection',
-                width: '80px',
-                render: (v: unknown) => <span style={{ color: 'var(--ss-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(v as string) || '-'}</span>,
-              },
-              {
-                key: 'createdAt',
-                label: 'Time',
-                width: '90px',
-                sortable: true,
-                render: (v: unknown, row: Record<string, unknown>) => {
-                  const ts = (v as string) || (row.created_at as string) || (row.timestamp as string) || ''
-                  return <span className="ss-dash-event-time" title={formatTime(ts)}>{timeAgo(ts)}</span>
-                },
-              },
-              {
-                key: 'id',
-                label: '',
-                width: '70px',
-                render: (_v: unknown, row: Record<string, unknown>) => {
-                  const method = (row.method as string) || (row.sql_method as string) || ''
-                  if (method !== 'select') return null
-                  const isActive = explainData?.queryId === (row.id as number) && !explainData?.error
-                  return (
-                    <button
-                      type="button"
-                      className={`ss-dash-explain-btn${isActive ? ' ss-dash-explain-btn-active' : ''}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleExplain(row.id as number)
+                {
+                  key: 'model',
+                  label: 'Model',
+                  width: '90px',
+                  render: (v: unknown) => (
+                    <span
+                      style={{
+                        color: 'var(--ss-muted)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
-                      disabled={explainLoading === (row.id as number)}
+                      title={v as string}
                     >
-                      {explainLoading === (row.id as number) ? '...' : 'EXPLAIN'}
-                    </button>
-                  )
+                      {(v as string) || '-'}
+                    </span>
+                  ),
                 },
-              },
-            ]}
-            data={queries}
-            sort={sort}
-            sortDir={sortDir}
-            onSort={handleSort}
-            emptyMessage="No queries recorded"
-            renderAfterRow={renderExplainRow}
-          />
+                {
+                  key: 'connection',
+                  label: 'Connection',
+                  width: '80px',
+                  render: (v: unknown) => (
+                    <span
+                      style={{
+                        color: 'var(--ss-dim)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {(v as string) || '-'}
+                    </span>
+                  ),
+                },
+                {
+                  key: 'createdAt',
+                  label: 'Time',
+                  width: '90px',
+                  sortable: true,
+                  render: (v: unknown, row: Record<string, unknown>) => {
+                    const ts =
+                      (v as string) || (row.created_at as string) || (row.timestamp as string) || ''
+                    return (
+                      <span className="ss-dash-event-time" title={formatTime(ts)}>
+                        {timeAgo(ts)}
+                      </span>
+                    )
+                  },
+                },
+                {
+                  key: 'id',
+                  label: '',
+                  width: '70px',
+                  render: (_v: unknown, row: Record<string, unknown>) => {
+                    const method = (row.method as string) || (row.sql_method as string) || ''
+                    if (method !== 'select') return null
+                    const isActive =
+                      explainData?.queryId === (row.id as number) && !explainData?.error
+                    return (
+                      <button
+                        type="button"
+                        className={`ss-dash-explain-btn${isActive ? ' ss-dash-explain-btn-active' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleExplain(row.id as number)
+                        }}
+                        disabled={explainLoading === (row.id as number)}
+                      >
+                        {explainLoading === (row.id as number) ? '...' : 'EXPLAIN'}
+                      </button>
+                    )
+                  },
+                },
+              ]}
+              data={queries}
+              sort={sort}
+              sortDir={sortDir}
+              onSort={handleSort}
+              emptyMessage="No queries recorded"
+              renderAfterRow={renderExplainRow}
+            />
           </div>
           {meta && (
             <Pagination

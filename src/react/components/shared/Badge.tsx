@@ -12,8 +12,17 @@ interface BadgeProps {
 /**
  * Colored pill badge for status indicators.
  */
-export function Badge({ color = 'muted', children, className = '', classPrefix = 'ss-dash' }: BadgeProps) {
-  return <span className={`${classPrefix}-badge ${classPrefix}-badge-${color} ${className}`}>{children}</span>
+export function Badge({
+  color = 'muted',
+  children,
+  className = '',
+  classPrefix = 'ss-dash',
+}: BadgeProps) {
+  return (
+    <span className={`${classPrefix}-badge ${classPrefix}-badge-${color} ${className}`}>
+      {children}
+    </span>
+  )
 }
 
 interface MethodBadgeProps {
@@ -27,7 +36,11 @@ interface MethodBadgeProps {
  */
 export function MethodBadge({ method, className = '', classPrefix = 'ss-dash' }: MethodBadgeProps) {
   return (
-    <span className={`${classPrefix}-method ${classPrefix}-method-${method.toLowerCase()} ${className}`}>{method}</span>
+    <span
+      className={`${classPrefix}-method ${classPrefix}-method-${method.toLowerCase()} ${className}`}
+    >
+      {method}
+    </span>
   )
 }
 

@@ -1,7 +1,8 @@
 import React from 'react'
 
-import type { Theme } from '../../../core/types.js'
 import { TAB_ICONS } from '../../../core/icons.js'
+
+import type { Theme } from '../../../core/types.js'
 
 interface ThemeToggleProps {
   theme: Theme
@@ -13,7 +14,12 @@ interface ThemeToggleProps {
 /**
  * Sun/moon toggle button for switching between light and dark themes.
  */
-export function ThemeToggle({ theme, onToggle, className = '', classPrefix = 'ss-dash' }: ThemeToggleProps) {
+export function ThemeToggle({
+  theme,
+  onToggle,
+  className = '',
+  classPrefix = 'ss-dash',
+}: ThemeToggleProps) {
   const isDark = theme === 'dark'
   const baseClass = classPrefix === 'ss-dbg' ? 'ss-dbg-theme-toggle' : 'ss-dash-theme-btn'
 

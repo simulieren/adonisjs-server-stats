@@ -9,8 +9,8 @@
 // ---------------------------------------------------------------------------
 
 import { ApiClient, UnauthorizedError } from './api-client.js'
-import { getDebugTabPath } from './routes.js'
 import { DEBUG_REFRESH_MS } from './constants.js'
+import { getDebugTabPath } from './routes.js'
 
 /**
  * Callback configuration for {@link DebugDataController}.

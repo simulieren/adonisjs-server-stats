@@ -89,7 +89,7 @@ export function resolveTraceField(
   camelKey: string,
   fallback: number = 0
 ): number {
-  return ((trace[snakeKey] as number) || (trace[camelKey] as number) || fallback)
+  return (trace[snakeKey] as number) || (trace[camelKey] as number) || fallback
 }
 
 /**
@@ -104,9 +104,10 @@ export function normalizeTraceFields(trace: Record<string, unknown>): Normalized
     method: (trace.method as string) || '',
     url: (trace.url as string) || '',
     statusCode: resolveTraceField(trace, 'status_code', 'statusCode'),
-    totalDuration: resolveTraceField(trace, 'total_duration', 'totalDuration')
-      || (trace.duration as number)
-      || 0,
+    totalDuration:
+      resolveTraceField(trace, 'total_duration', 'totalDuration') ||
+      (trace.duration as number) ||
+      0,
     spanCount: resolveTraceField(trace, 'span_count', 'spanCount'),
     spans: parseTraceSpans(trace.spans),
     warnings: parseTraceWarnings(trace.warnings),

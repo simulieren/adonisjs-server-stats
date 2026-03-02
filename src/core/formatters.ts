@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { SLOW_DURATION_MS, VERY_SLOW_DURATION_MS } from './constants.js'
+
 import type { ThresholdColor } from './types.js'
 
 // ---------------------------------------------------------------------------

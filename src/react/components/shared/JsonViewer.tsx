@@ -12,7 +12,12 @@ interface JsonViewerProps {
 /**
  * Compact JSON preview with click-to-expand functionality.
  */
-export function JsonViewer({ data, maxPreviewLength = 100, className = '', classPrefix = 'ss-dash' }: JsonViewerProps) {
+export function JsonViewer({
+  data,
+  maxPreviewLength = 100,
+  className = '',
+  classPrefix = 'ss-dash',
+}: JsonViewerProps) {
   const [expanded, setExpanded] = useState(false)
 
   const parsed = useMemo(() => {

@@ -1,11 +1,11 @@
 import React from 'react'
 
-import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useDashboardApiBase } from '../../../hooks/useDashboardApiBase.js'
+import { useDebugData } from '../../../hooks/useDebugData.js'
 import { ConfigContent } from '../../shared/ConfigContent.js'
 
-import type { ConfigValue } from '../../shared/ConfigContent.js'
 import type { DebugPanelProps } from '../../../../core/types.js'
+import type { ConfigValue } from '../../shared/ConfigContent.js'
 
 interface ConfigTabProps {
   options?: DebugPanelProps

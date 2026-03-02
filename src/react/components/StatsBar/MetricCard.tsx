@@ -178,59 +178,60 @@ export function MetricCard({ metric, stats, history, className = '' }: MetricCar
   // Resolve the portal target: the closest .ss-bar ancestor
   const portalTarget = cardRef.current?.closest('.ss-bar') as HTMLElement | null
 
-  const tooltip = showTooltip && portalTarget
-    ? createPortal(
-        <div
-          ref={tooltipRef}
-          className={`ss-tooltip ${pinned ? 'ss-pinned' : ''}`}
-          style={tooltipStyle}
-        >
-          <div className="ss-tooltip-inner" style={{ position: 'relative' }}>
-            {pinned && (
-              <button
-                className="ss-tooltip-close"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setPinned(false)
-                }}
-                type="button"
-              >
-                {'\u00D7'}
-              </button>
-            )}
-            <div className="ss-tooltip-header">
-              <span className="ss-tooltip-title">{metric.title}</span>
-              {metric.unit && <span className="ss-tooltip-unit">{metric.unit}</span>}
-            </div>
-            <div className="ss-tooltip-current">
-              <span className="ss-tooltip-current-label">Current: </span>
-              <span className="ss-tooltip-current-value">{value}</span>
-            </div>
-            {statsInfo && (
-              <div className="ss-tooltip-stats">
-                <span>Min: {formatStatNum(statsInfo.min, metric.unit)}</span>
-                <span>Max: {formatStatNum(statsInfo.max, metric.unit)}</span>
-                <span>Avg: {formatStatNum(statsInfo.avg, metric.unit)}</span>
+  const tooltip =
+    showTooltip && portalTarget
+      ? createPortal(
+          <div
+            ref={tooltipRef}
+            className={`ss-tooltip ${pinned ? 'ss-pinned' : ''}`}
+            style={tooltipStyle}
+          >
+            <div className="ss-tooltip-inner" style={{ position: 'relative' }}>
+              {pinned && (
+                <button
+                  className="ss-tooltip-close"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setPinned(false)
+                  }}
+                  type="button"
+                >
+                  {'\u00D7'}
+                </button>
+              )}
+              <div className="ss-tooltip-header">
+                <span className="ss-tooltip-title">{metric.title}</span>
+                {metric.unit && <span className="ss-tooltip-unit">{metric.unit}</span>}
               </div>
-            )}
-            {detail && <div className="ss-tooltip-details">{detail}</div>}
-            {history.length > 0 && (
-              <>
-                <div className="ss-tooltip-sparkline">
-                  <Sparkline data={history} color={hexColor} />
+              <div className="ss-tooltip-current">
+                <span className="ss-tooltip-current-label">Current: </span>
+                <span className="ss-tooltip-current-value">{value}</span>
+              </div>
+              {statsInfo && (
+                <div className="ss-tooltip-stats">
+                  <span>Min: {formatStatNum(statsInfo.min, metric.unit)}</span>
+                  <span>Max: {formatStatNum(statsInfo.max, metric.unit)}</span>
+                  <span>Avg: {formatStatNum(statsInfo.avg, metric.unit)}</span>
                 </div>
-                <div className="ss-tooltip-samples">
-                  Last {Math.min(history.length, 60)} samples (~
-                  {Math.round((Math.min(history.length, 60) * 3) / 60)} min)
-                </div>
-              </>
-            )}
-          </div>
-          <div className="ss-tooltip-arrow" />
-        </div>,
-        portalTarget
-      )
-    : null
+              )}
+              {detail && <div className="ss-tooltip-details">{detail}</div>}
+              {history.length > 0 && (
+                <>
+                  <div className="ss-tooltip-sparkline">
+                    <Sparkline data={history} color={hexColor} />
+                  </div>
+                  <div className="ss-tooltip-samples">
+                    Last {Math.min(history.length, 60)} samples (~
+                    {Math.round((Math.min(history.length, 60) * 3) / 60)} min)
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="ss-tooltip-arrow" />
+          </div>,
+          portalTarget
+        )
+      : null
 
   return (
     <>

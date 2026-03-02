@@ -75,14 +75,16 @@ export function EventsTab({ options }: EventsTabProps) {
                 (evt as unknown as Record<string, number>).createdAt
               return (
                 <tr key={evt.id}>
-                  <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>{evt.id}</td>
-                  <td className="ss-dbg-event-name">
-                    {evt.event}
+                  <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>
+                    {evt.id}
                   </td>
+                  <td className="ss-dbg-event-name">{evt.event}</td>
                   <td className="ss-dbg-event-data">
                     <JsonViewer data={evt.data} maxPreviewLength={80} classPrefix="ss-dbg" />
                   </td>
-                  <td className="ss-dbg-event-time" title={formatTime(ts)}>{timeAgo(ts)}</td>
+                  <td className="ss-dbg-event-time" title={formatTime(ts)}>
+                    {timeAgo(ts)}
+                  </td>
                 </tr>
               )
             })}

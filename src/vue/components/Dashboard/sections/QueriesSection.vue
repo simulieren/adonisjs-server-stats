@@ -26,9 +26,7 @@ function renderPlanNode(node: PlanNode, depth: number): VNode | null {
   const nodeType = node['Node Type'] || 'Unknown'
   const relation = node['Relation Name'] || ''
   const alias =
-    node['Alias'] && node['Alias'] !== node['Relation Name']
-      ? ` (${node['Alias']})`
-      : ''
+    node['Alias'] && node['Alias'] !== node['Relation Name'] ? ` (${node['Alias']})` : ''
   const indexName = node['Index Name'] || ''
 
   const metrics: string[] = []
@@ -41,32 +39,24 @@ function renderPlanNode(node: PlanNode, depth: number): VNode | null {
   if (node['Hash Cond']) metrics.push(`hash: ${node['Hash Cond']}`)
   if (node['Join Type']) metrics.push(`join: ${node['Join Type']}`)
   if (node['Sort Key']) {
-    const sortKey = Array.isArray(node['Sort Key'])
-      ? node['Sort Key'].join(', ')
-      : node['Sort Key']
+    const sortKey = Array.isArray(node['Sort Key']) ? node['Sort Key'].join(', ') : node['Sort Key']
     metrics.push(`sort: ${sortKey}`)
   }
 
   const childPlans = node['Plans'] || []
 
-  return h(
-    'div',
-    { class: 'ss-dash-explain-node', style: { marginLeft: `${indent}px` } },
-    [
-      h('div', { class: 'ss-dash-explain-node-header' }, [
-        h('span', { class: 'ss-dash-explain-node-type' }, nodeType),
-        relation ? [' on ', h('strong', null, relation)] : null,
-        alias || null,
-        indexName ? [' using ', h('em', null, indexName)] : null,
-      ]),
-      metrics.length > 0
-        ? h('div', { class: 'ss-dash-explain-metrics' }, metrics.join(' \u00B7 '))
-        : null,
-      ...childPlans.map((child: PlanNode, i: number) =>
-        renderPlanNode(child, depth + 1)
-      ),
-    ]
-  )
+  return h('div', { class: 'ss-dash-explain-node', style: { marginLeft: `${indent}px` } }, [
+    h('div', { class: 'ss-dash-explain-node-header' }, [
+      h('span', { class: 'ss-dash-explain-node-type' }, nodeType),
+      relation ? [' on ', h('strong', null, relation)] : null,
+      alias || null,
+      indexName ? [' using ', h('em', null, indexName)] : null,
+    ]),
+    metrics.length > 0
+      ? h('div', { class: 'ss-dash-explain-metrics' }, metrics.join(' \u00B7 '))
+      : null,
+    ...childPlans.map((child: PlanNode, i: number) => renderPlanNode(child, depth + 1)),
+  ])
 }
 
 /**
@@ -122,23 +112,15 @@ const explainData = ref<ExplainData | null>(null)
 const explainLoading = ref<number | null>(null)
 
 // Use different endpoints for list/grouped views
-const endpoint = computed(() => viewMode.value === 'grouped' ? 'queries/grouped' : 'queries')
+const endpoint = computed(() => (viewMode.value === 'grouped' ? 'queries/grouped' : 'queries'))
 
-const {
-  data,
-  loading,
-  pagination,
-  sort,
-  goToPage,
-  setSearch,
-  setSort,
-  explainQuery,
-} = useDashboardData(() => endpoint.value, {
-  baseUrl,
-  dashboardEndpoint,
-  authToken,
-  refreshKey,
-})
+const { data, loading, pagination, sort, goToPage, setSearch, setSort, explainQuery } =
+  useDashboardData(() => endpoint.value, {
+    baseUrl,
+    dashboardEndpoint,
+    authToken,
+    refreshKey,
+  })
 
 const search = ref('')
 
@@ -162,11 +144,16 @@ const queries = computed<Record<string, unknown>[]>(() => {
       normalized.sqlNormalized = (g.sql_normalized as string) || (g.pattern as string) || ''
     }
     if (normalized.count == null && g.total_count != null) normalized.count = g.total_count
-    if (normalized.avgDuration == null && g.avg_duration != null) normalized.avgDuration = g.avg_duration
-    if (normalized.maxDuration == null && g.max_duration != null) normalized.maxDuration = g.max_duration
-    if (normalized.minDuration == null && g.min_duration != null) normalized.minDuration = g.min_duration
-    if (normalized.totalDuration == null && g.total_duration != null) normalized.totalDuration = g.total_duration
-    if (normalized.percentOfTotal == null && g.pct_time != null) normalized.percentOfTotal = g.pct_time
+    if (normalized.avgDuration == null && g.avg_duration != null)
+      normalized.avgDuration = g.avg_duration
+    if (normalized.maxDuration == null && g.max_duration != null)
+      normalized.maxDuration = g.max_duration
+    if (normalized.minDuration == null && g.min_duration != null)
+      normalized.minDuration = g.min_duration
+    if (normalized.totalDuration == null && g.total_duration != null)
+      normalized.totalDuration = g.total_duration
+    if (normalized.percentOfTotal == null && g.pct_time != null)
+      normalized.percentOfTotal = g.pct_time
     return normalized
   })
 })
@@ -261,6 +248,34 @@ function dashDurationClass(ms: number): string {
   return ''
 }
 
+/** Get column keys from the first explain plan row (avoids `as Record<...>` in template). */
+function explainPlanCols(): string[] {
+  const plan = explainData.value?.plan
+  if (!plan || plan.length === 0 || typeof plan[0] !== 'object' || !plan[0]) return []
+  return Object.keys(plan[0] as Record<string, unknown>)
+}
+
+/** Get a cell value from an explain plan row (avoids `as Record<...>` in template). */
+function planCellValue(row: unknown, col: string): string {
+  if (!row || typeof row !== 'object') return '-'
+  const val = (row as Record<string, unknown>)[col]
+  return val != null ? String(val) : '-'
+}
+
+/** Check if explain plan has nested Plan node. */
+function explainHasNestedPlan(): boolean {
+  const plan = explainData.value?.plan
+  if (!plan || plan.length === 0 || typeof plan[0] !== 'object' || !plan[0]) return false
+  return 'Plan' in (plan[0] as Record<string, unknown>)
+}
+
+/** Get nested Plan node for tree rendering. */
+function explainNestedPlan(): Record<string, unknown> {
+  const plan = explainData.value?.plan
+  if (!plan || plan.length === 0 || typeof plan[0] !== 'object' || !plan[0]) return {}
+  return (plan[0] as Record<string, unknown>)['Plan'] as Record<string, unknown>
+}
+
 const { tableRef } = useResizableTable(() => queries.value)
 </script>
 
@@ -301,17 +316,23 @@ const { tableRef } = useResizableTable(() => queries.value)
               <th>Pattern</th>
               <th class="ss-dash-sortable" @click="handleSort('count')">
                 Count
-                <span v-if="sort.column === 'count'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                <span v-if="sort.column === 'count'" class="ss-dash-sort-arrow">{{
+                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                }}</span>
               </th>
               <th class="ss-dash-sortable" @click="handleSort('avgDuration')">
                 Avg
-                <span v-if="sort.column === 'avgDuration'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                <span v-if="sort.column === 'avgDuration'" class="ss-dash-sort-arrow">{{
+                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                }}</span>
               </th>
               <th>Min</th>
               <th>Max</th>
               <th class="ss-dash-sortable" @click="handleSort('totalDuration')">
                 Total
-                <span v-if="sort.column === 'totalDuration'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                <span v-if="sort.column === 'totalDuration'" class="ss-dash-sort-arrow">{{
+                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                }}</span>
               </th>
               <th>% Time</th>
             </tr>
@@ -324,27 +345,57 @@ const { tableRef } = useResizableTable(() => queries.value)
                   title="Click to expand"
                   role="button"
                   tabindex="0"
-                  @click.stop="expandedSql = expandedSql === (g.sqlNormalized as string) ? null : (g.sqlNormalized as string)"
-                  @keydown.enter="expandedSql = expandedSql === (g.sqlNormalized as string) ? null : (g.sqlNormalized as string)"
+                  @click.stop="
+                    expandedSql =
+                      expandedSql === (g.sqlNormalized as string)
+                        ? null
+                        : (g.sqlNormalized as string)
+                  "
+                  @keydown.enter="
+                    expandedSql =
+                      expandedSql === (g.sqlNormalized as string)
+                        ? null
+                        : (g.sqlNormalized as string)
+                  "
                 >
                   {{ g.sqlNormalized }}
                 </span>
                 <span v-if="((g.count as number) || 0) >= 3" class="ss-dash-dup">DUP</span>
               </td>
-              <td><span style="color: var(--ss-muted); text-align: center; display: block">{{ (g.count as number) || 0 }}</span></td>
               <td>
-                <span :class="`ss-dash-duration ${dashDurationClass((g.avgDuration as number) || 0)}`">
+                <span style="color: var(--ss-muted); text-align: center; display: block">{{
+                  (g.count as number) || 0
+                }}</span>
+              </td>
+              <td>
+                <span
+                  :class="`ss-dash-duration ${dashDurationClass((g.avgDuration as number) || 0)}`"
+                >
                   {{ ((g.avgDuration as number) || 0).toFixed(2) }}ms
                 </span>
               </td>
-              <td><span class="ss-dash-duration">{{ ((g.minDuration as number) || 0).toFixed(2) }}ms</span></td>
               <td>
-                <span :class="`ss-dash-duration ${dashDurationClass((g.maxDuration as number) || 0)}`">
+                <span class="ss-dash-duration"
+                  >{{ ((g.minDuration as number) || 0).toFixed(2) }}ms</span
+                >
+              </td>
+              <td>
+                <span
+                  :class="`ss-dash-duration ${dashDurationClass((g.maxDuration as number) || 0)}`"
+                >
                   {{ ((g.maxDuration as number) || 0).toFixed(2) }}ms
                 </span>
               </td>
-              <td><span class="ss-dash-duration">{{ ((g.totalDuration as number) || 0).toFixed(1) }}ms</span></td>
-              <td><span style="color: var(--ss-muted); text-align: center; display: block">{{ ((g.percentOfTotal as number) || 0).toFixed(1) }}%</span></td>
+              <td>
+                <span class="ss-dash-duration"
+                  >{{ ((g.totalDuration as number) || 0).toFixed(1) }}ms</span
+                >
+              </td>
+              <td>
+                <span style="color: var(--ss-muted); text-align: center; display: block"
+                  >{{ ((g.percentOfTotal as number) || 0).toFixed(1) }}%</span
+                >
+              </td>
             </tr>
           </tbody>
         </table>
@@ -372,22 +423,28 @@ const { tableRef } = useResizableTable(() => queries.value)
               <th>SQL</th>
               <th class="ss-dash-sortable" @click="handleSort('duration')">
                 Duration
-                <span v-if="sort.column === 'duration'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                <span v-if="sort.column === 'duration'" class="ss-dash-sort-arrow">{{
+                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                }}</span>
               </th>
               <th>Method</th>
               <th>Model</th>
               <th>Connection</th>
               <th class="ss-dash-sortable" @click="handleSort('createdAt')">
                 Time
-                <span v-if="sort.column === 'createdAt'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                <span v-if="sort.column === 'createdAt'" class="ss-dash-sort-arrow">{{
+                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                }}</span>
               </th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            <template v-for="q in queries" :key="(q.id as number)">
+            <template v-for="q in queries" :key="q.id as number">
               <tr>
-                <td><span style="color: var(--ss-dim)">{{ q.id }}</span></td>
+                <td>
+                  <span style="color: var(--ss-dim)">{{ q.id }}</span>
+                </td>
                 <td>
                   <div>
                     <span
@@ -395,48 +452,96 @@ const { tableRef } = useResizableTable(() => queries.value)
                       title="Click to expand"
                       role="button"
                       tabindex="0"
-                      @click.stop="expandedSql = expandedSql === (q.id as number) ? null : (q.id as number)"
-                      @keydown.enter="expandedSql = expandedSql === (q.id as number) ? null : (q.id as number)"
+                      @click.stop="
+                        expandedSql = expandedSql === (q.id as number) ? null : (q.id as number)
+                      "
+                      @keydown.enter="
+                        expandedSql = expandedSql === (q.id as number) ? null : (q.id as number)
+                      "
                     >
                       {{ (q.sql as string) || (q.sql_text as string) || '' }}
                     </span>
                     <span
-                      v-if="(sqlCounts.get(((q.sqlNormalized as string) || (q.sql as string) || (q.sql_text as string)) ?? '') ?? 0) > 1"
+                      v-if="
+                        (sqlCounts.get(
+                          ((q.sqlNormalized as string) ||
+                            (q.sql as string) ||
+                            (q.sql_text as string)) ??
+                            ''
+                        ) ?? 0) > 1
+                      "
                       class="ss-dash-dup"
                     >
-                      &times;{{ sqlCounts.get(((q.sqlNormalized as string) || (q.sql as string) || (q.sql_text as string)) ?? '') }}
+                      &times;{{
+                        sqlCounts.get(
+                          ((q.sqlNormalized as string) ||
+                            (q.sql as string) ||
+                            (q.sql_text as string)) ??
+                            ''
+                        )
+                      }}
                     </span>
                   </div>
                 </td>
                 <td>
-                  <span :class="`ss-dash-duration ${dashDurationClass((q.duration as number) || 0)}`">
+                  <span
+                    :class="`ss-dash-duration ${dashDurationClass((q.duration as number) || 0)}`"
+                  >
                     {{ ((q.duration as number) || 0).toFixed(2) }}ms
                   </span>
                 </td>
                 <td>
-                  <span :class="`ss-dash-method ss-dash-method-${((q.method as string) || (q.sql_method as string) || '').toLowerCase()}`">
+                  <span
+                    :class="`ss-dash-method ss-dash-method-${((q.method as string) || (q.sql_method as string) || '').toLowerCase()}`"
+                  >
                     {{ (q.method as string) || (q.sql_method as string) || '' }}
                   </span>
                 </td>
                 <td>
                   <span
-                    style="color: var(--ss-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
-                    :title="(q.model as string)"
+                    style="
+                      color: var(--ss-muted);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                    "
+                    :title="q.model as string"
                   >
                     {{ (q.model as string) || '-' }}
                   </span>
                 </td>
                 <td>
-                  <span style="color: var(--ss-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap">
+                  <span
+                    style="
+                      color: var(--ss-dim);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                    "
+                  >
                     {{ (q.connection as string) || '-' }}
                   </span>
                 </td>
                 <td>
                   <span
                     class="ss-dash-event-time"
-                    :title="formatTime(((q.createdAt as string) || (q.created_at as string) || (q.timestamp as string) || '') as string)"
+                    :title="
+                      formatTime(
+                        ((q.createdAt as string) ||
+                          (q.created_at as string) ||
+                          (q.timestamp as string) ||
+                          '') as string
+                      )
+                    "
                   >
-                    {{ timeAgo(((q.createdAt as string) || (q.created_at as string) || (q.timestamp as string) || '') as string) }}
+                    {{
+                      timeAgo(
+                        ((q.createdAt as string) ||
+                          (q.created_at as string) ||
+                          (q.timestamp as string) ||
+                          '') as string
+                      )
+                    }}
                   </span>
                 </td>
                 <td>
@@ -459,25 +564,35 @@ const { tableRef } = useResizableTable(() => queries.value)
                 <td colspan="8" class="ss-dash-explain">
                   <div style="display: flex; justify-content: space-between; align-items: start">
                     <div style="flex: 1">
-                      <div v-if="explainData.error" class="ss-dash-explain-result ss-dash-explain-error">
+                      <div
+                        v-if="explainData.error"
+                        class="ss-dash-explain-result ss-dash-explain-error"
+                      >
                         <strong>Error:</strong> {{ explainData.error }}
                         <br v-if="explainData.message" />
                         {{ explainData.message }}
                       </div>
-                      <div v-else-if="explainData.plan && explainData.plan.length > 0 && (explainData.plan[0] as Record<string, unknown>)?.['Plan']" class="ss-dash-explain-result">
-                        <ExplainPlanNode :node="((explainData.plan[0] as Record<string, unknown>)['Plan'] as Record<string, unknown>)" :depth="0" />
+                      <div v-else-if="explainHasNestedPlan()" class="ss-dash-explain-result">
+                        <ExplainPlanNode :node="explainNestedPlan()" :depth="0" />
                       </div>
-                      <div v-else-if="explainData.plan && explainData.plan.length > 0 && typeof explainData.plan[0] === 'object'" class="ss-dash-explain-result">
+                      <div
+                        v-else-if="
+                          explainData.plan &&
+                          explainData.plan.length > 0 &&
+                          typeof explainData.plan[0] === 'object'
+                        "
+                        class="ss-dash-explain-result"
+                      >
                         <table>
                           <thead>
                             <tr>
-                              <th v-for="col in Object.keys(explainData.plan[0] as Record<string, unknown>)" :key="col">{{ col }}</th>
+                              <th v-for="col in explainPlanCols()" :key="col">{{ col }}</th>
                             </tr>
                           </thead>
                           <tbody>
                             <tr v-for="(row, ri) in explainData.plan" :key="ri">
-                              <td v-for="col in Object.keys(explainData.plan[0] as Record<string, unknown>)" :key="col">
-                                {{ (row as Record<string, unknown>)[col] != null ? String((row as Record<string, unknown>)[col]) : '-' }}
+                              <td v-for="col in explainPlanCols()" :key="col">
+                                {{ planCellValue(row, col) }}
                               </td>
                             </tr>
                           </tbody>

@@ -101,11 +101,7 @@ function getTooltip(span: TraceSpan): string {
   <div v-else :class="`ss-dash-tl-waterfall ${className || ''}`">
     <!-- Legend -->
     <div class="ss-dash-tl-legend">
-      <div
-        v-for="(label, cat) in CATEGORY_LABELS"
-        :key="cat"
-        class="ss-dash-tl-legend-item"
-      >
+      <div v-for="(label, cat) in CATEGORY_LABELS" :key="cat" class="ss-dash-tl-legend-item">
         <span
           class="ss-dash-tl-legend-dot"
           :style="{ background: CATEGORY_COLORS[cat] || CATEGORY_COLORS.custom }"
@@ -115,11 +111,7 @@ function getTooltip(span: TraceSpan): string {
     </div>
 
     <!-- Rows -->
-    <div
-      v-for="span in sortedSpans"
-      :key="span.id"
-      class="ss-dash-tl-row"
-    >
+    <div v-for="span in sortedSpans" :key="span.id" class="ss-dash-tl-row">
       <div
         class="ss-dash-tl-label"
         :title="getTooltip(span)"

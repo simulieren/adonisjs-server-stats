@@ -22,21 +22,15 @@ const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api'
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const {
-  data,
-  loading,
-  error,
-  pagination,
-  sort,
-  goToPage,
-  setSearch,
-  setSort,
-} = useDashboardData(() => 'requests', {
-  baseUrl,
-  dashboardEndpoint,
-  authToken,
-  refreshKey,
-})
+const { data, loading, error, pagination, sort, goToPage, setSearch, setSort } = useDashboardData(
+  () => 'requests',
+  {
+    baseUrl,
+    dashboardEndpoint,
+    authToken,
+    refreshKey,
+  }
+)
 
 const search = ref('')
 const selectedTrace = ref<Record<string, unknown> | null>(null)
@@ -89,7 +83,6 @@ function dashDurationClass(ms: number): string {
 }
 
 const { tableRef } = useResizableTable(() => requests.value)
-
 </script>
 
 <template>
@@ -104,13 +97,13 @@ const { tableRef } = useResizableTable(() => requests.value)
           {{ traceDetail.method }}
         </span>
         <span style="color: var(--ss-text)">{{ traceDetail.url }}</span>
-        <span :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.statusCode || 200) / 100)}xx`">
+        <span
+          :class="`ss-dash-status ss-dash-status-${Math.floor((traceDetail.statusCode || 200) / 100)}xx`"
+        >
           {{ traceDetail.statusCode }}
         </span>
         <span class="ss-dash-tl-meta">
-          {{ traceDetail.totalDuration.toFixed(1) }}ms
-          &middot;
-          {{ traceDetail.spanCount }} spans
+          {{ traceDetail.totalDuration.toFixed(1) }}ms &middot; {{ traceDetail.spanCount }} spans
         </span>
       </div>
       <WaterfallChart
@@ -161,51 +154,72 @@ const { tableRef } = useResizableTable(() => requests.value)
                 <th>#</th>
                 <th class="ss-dash-sortable" @click="handleSort('method')">
                   Method
-                  <span v-if="sort.column === 'method'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                  <span v-if="sort.column === 'method'" class="ss-dash-sort-arrow">{{
+                    sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                  }}</span>
                 </th>
                 <th class="ss-dash-sortable" @click="handleSort('url')">
                   URL
-                  <span v-if="sort.column === 'url'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                  <span v-if="sort.column === 'url'" class="ss-dash-sort-arrow">{{
+                    sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                  }}</span>
                 </th>
                 <th class="ss-dash-sortable" @click="handleSort('statusCode')">
                   Status
-                  <span v-if="sort.column === 'statusCode'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                  <span v-if="sort.column === 'statusCode'" class="ss-dash-sort-arrow">{{
+                    sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                  }}</span>
                 </th>
                 <th class="ss-dash-sortable" @click="handleSort('duration')">
                   Duration
-                  <span v-if="sort.column === 'duration'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                  <span v-if="sort.column === 'duration'" class="ss-dash-sort-arrow">{{
+                    sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                  }}</span>
                 </th>
                 <th>Spans</th>
                 <th>&#x26A0;</th>
                 <th class="ss-dash-sortable" @click="handleSort('createdAt')">
                   Time
-                  <span v-if="sort.column === 'createdAt'" class="ss-dash-sort-arrow">{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                  <span v-if="sort.column === 'createdAt'" class="ss-dash-sort-arrow">{{
+                    sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
+                  }}</span>
                 </th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="r in requests"
-                :key="(r.id as number)"
+                :key="r.id as number"
                 class="ss-dash-clickable"
                 @click="handleRowClick(r)"
               >
-                <td><span style="color: var(--ss-dim)">{{ r.id }}</span></td>
                 <td>
-                  <span :class="`ss-dash-method ss-dash-method-${((r.method as string) || '').toLowerCase()}`">
+                  <span style="color: var(--ss-dim)">{{ r.id }}</span>
+                </td>
+                <td>
+                  <span
+                    :class="`ss-dash-method ss-dash-method-${((r.method as string) || '').toLowerCase()}`"
+                  >
                     {{ r.method }}
                   </span>
                 </td>
                 <td>
                   <span
-                    style="color: var(--ss-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap"
-                    :title="(r.url as string)"
+                    style="
+                      color: var(--ss-text);
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      white-space: nowrap;
+                    "
+                    :title="r.url as string"
                   >
                     {{ r.url }}
                   </span>
                 </td>
                 <td>
-                  <span :class="`ss-dash-status ss-dash-status-${Math.floor(((r.status_code as number) || (r.statusCode as number) || 200) / 100)}xx`">
+                  <span
+                    :class="`ss-dash-status ss-dash-status-${Math.floor(((r.status_code as number) || (r.statusCode as number) || 200) / 100)}xx`"
+                  >
                     {{ r.status_code || r.statusCode }}
                   </span>
                 </td>
@@ -213,7 +227,14 @@ const { tableRef } = useResizableTable(() => requests.value)
                   <span
                     :class="`ss-dash-duration ${dashDurationClass((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0)}`"
                   >
-                    {{ ((r.total_duration as number) || (r.totalDuration as number) || (r.duration as number) || 0).toFixed(1) }}ms
+                    {{
+                      (
+                        (r.total_duration as number) ||
+                        (r.totalDuration as number) ||
+                        (r.duration as number) ||
+                        0
+                      ).toFixed(1)
+                    }}ms
                   </span>
                 </td>
                 <td>
@@ -228,14 +249,30 @@ const { tableRef } = useResizableTable(() => requests.value)
                   >
                     {{ (r.warning_count as number) || (r.warningCount as number) || 0 }}
                   </span>
-                  <span v-else style="color: var(--ss-dim); text-align: center; display: block">-</span>
+                  <span v-else style="color: var(--ss-dim); text-align: center; display: block"
+                    >-</span
+                  >
                 </td>
                 <td>
                   <span
                     class="ss-dash-event-time"
-                    :title="formatTime(((r.createdAt as string) || (r.created_at as string) || (r.timestamp as string) || '') as string)"
+                    :title="
+                      formatTime(
+                        ((r.createdAt as string) ||
+                          (r.created_at as string) ||
+                          (r.timestamp as string) ||
+                          '') as string
+                      )
+                    "
                   >
-                    {{ timeAgo(((r.createdAt as string) || (r.created_at as string) || (r.timestamp as string) || '') as string) }}
+                    {{
+                      timeAgo(
+                        ((r.createdAt as string) ||
+                          (r.created_at as string) ||
+                          (r.timestamp as string) ||
+                          '') as string
+                      )
+                    }}
                   </span>
                 </td>
               </tr>
