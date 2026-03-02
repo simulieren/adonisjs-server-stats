@@ -85,14 +85,26 @@ server.use([() => import('adonisjs-server-stats/middleware')])
 ```ts
 // config/server_stats.ts
 import { defineConfig } from 'adonisjs-server-stats'
-import { processCollector, systemCollector, httpCollector } from 'adonisjs-server-stats/collectors'
+
+export default defineConfig({})
+```
+
+That's it -- zero config required. Collectors are auto-detected from your installed packages (Lucid, Redis, BullMQ, etc.) and enabled automatically. All other options have sensible defaults.
+
+**Common setup** -- add access control and enable the toolbar/dashboard:
+
+```ts
+// config/server_stats.ts
+import { defineConfig } from 'adonisjs-server-stats'
 
 export default defineConfig({
-  collectors: [processCollector(), systemCollector(), httpCollector()],
+  authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+  toolbar: true,
+  dashboard: true,
 })
 ```
 
-That's it -- this gives you CPU, memory, event loop lag, and HTTP throughput out of the box. All other options have sensible defaults. Add more collectors as needed:
+**Full control** -- override auto-detection with explicit collectors:
 
 ```ts
 // config/server_stats.ts
@@ -110,39 +122,13 @@ import {
 } from 'adonisjs-server-stats/collectors'
 
 export default defineConfig({
-  // How often to collect and broadcast stats (in milliseconds)
-  intervalMs: 3000,
-
-  // Real-time transport: 'transmit' for SSE via @adonisjs/transmit, 'none' for polling only
-  transport: 'transmit',
-
-  // Transmit channel name clients subscribe to
-  channelName: 'admin/server-stats',
-
-  // HTTP endpoint that serves the latest stats snapshot (set to false to disable)
-  endpoint: '/admin/api/server-stats',
-
+  pollInterval: 3000,
   collectors: [
-    // CPU usage, event loop lag, heap/RSS memory, uptime, Node.js version
     processCollector(),
-
-    // OS load averages, total/free system memory, system uptime
     systemCollector(),
-
-    // Requests/sec, avg response time, error rate, active connections
-    // maxRecords: size of the circular buffer for request tracking
     httpCollector({ maxRecords: 10_000 }),
-
-    // Lucid connection pool: used/free/pending/max connections
-    // Requires @adonisjs/lucid
     dbPoolCollector({ connectionName: 'postgres' }),
-
-    // Redis server stats: memory, connected clients, keys, hit rate
-    // Requires @adonisjs/redis
     redisCollector(),
-
-    // BullMQ queue stats: active/waiting/delayed/failed jobs
-    // Requires bullmq -- connects directly to Redis (not via @adonisjs/redis)
     queueCollector({
       queueName: 'default',
       connection: {
@@ -151,14 +137,7 @@ export default defineConfig({
         password: env.get('QUEUE_REDIS_PASSWORD'),
       },
     }),
-
-    // Log stats: errors/warnings in a 5-minute window, entries/minute
-    // Zero-config: auto-hooks into AdonisJS Pino logger, no file path needed
     logCollector(),
-    // Or file-based fallback: logCollector({ logPath: 'logs/adonisjs.log' }),
-
-    // App-level metrics: online users, pending webhooks, pending emails
-    // Requires @adonisjs/lucid
     appCollector(),
   ],
 })
@@ -172,7 +151,7 @@ That's it for setup -- **all API routes are auto-registered by the package**. No
 [server-stats] auto-registered routes: /admin/api/server-stats, /admin/api/debug/*, /__stats/*
 ```
 
-All routes are gated by the `shouldShow` callback if configured (see [Visibility Control](#visibility-control-shouldshow)).
+All routes are gated by the `authorize` callback if configured (see [Visibility Control](#visibility-control-authorize)).
 
 **Edge** (add before `</body>`):
 
@@ -184,21 +163,71 @@ All routes are gated by the `shouldShow` callback if configured (see [Visibility
 
 ## Config Reference
 
-### `ServerStatsConfig`
+### `ServerStatsConfig` (recommended)
 
-| Option        | Type                   | Default                     | Description                          |
-| ------------- | ---------------------- | --------------------------- | ------------------------------------ |
-| `intervalMs`  | `number`               | `3000`                      | Collection + broadcast interval (ms) |
-| `transport`   | `'transmit' \| 'none'` | `'transmit'`                | SSE transport. `'none'` = poll-only. |
-| `channelName` | `string`               | `'admin/server-stats'`      | Transmit channel name                |
-| `endpoint`    | `string \| false`      | `'/admin/api/server-stats'` | HTTP endpoint. `false` to disable.   |
-| `collectors`  | `MetricCollector[]`    | `[]`                        | Array of collector instances         |
-| `skipInTest`  | `boolean`              | `true`                      | Skip collection during tests         |
-| `onStats`     | `(stats) => void`      | --                          | Callback after each collection tick  |
-| `shouldShow`  | `(ctx) => boolean`     | --                          | Per-request visibility guard         |
-| `devToolbar`  | `DevToolbarOptions`    | --                          | Dev toolbar configuration            |
+All fields are optional. `defineConfig({})` works with zero configuration.
 
-### `DevToolbarOptions`
+| Option          | Type                              | Default                     | Description                                                      |
+| --------------- | --------------------------------- | --------------------------- | ---------------------------------------------------------------- |
+| `pollInterval`  | `number`                          | `3000`                      | Collection + broadcast interval (ms)                             |
+| `collectors`    | `'auto' \| MetricCollector[]`     | `'auto'`                    | `'auto'` probes installed packages; or pass an explicit array    |
+| `realtime`      | `boolean`                         | `true`                      | `true` = SSE via Transmit, `false` = poll-only                   |
+| `statsEndpoint` | `string \| false`                 | `'/admin/api/server-stats'` | HTTP endpoint. `false` to disable.                               |
+| `authorize`     | `(ctx) => boolean`                | --                          | Per-request visibility guard                                     |
+| `onStats`       | `(stats) => void`                 | --                          | Callback after each collection tick                              |
+| `toolbar`       | `boolean \| ToolbarConfig`        | --                          | `true` to enable with defaults, or pass a `ToolbarConfig` object |
+| `dashboard`     | `boolean \| DashboardConfig`      | --                          | `true` to enable at `/__stats`, or pass a `DashboardConfig`      |
+| `advanced`      | `AdvancedConfig`                  | --                          | Rarely-needed options (channel name, db path, buffer sizes, etc) |
+
+### `ToolbarConfig`
+
+| Option               | Type       | Default                                           | Description                                     |
+| -------------------- | ---------- | ------------------------------------------------- | ----------------------------------------------- |
+| `slowQueryThreshold` | `number`   | `100`                                             | Slow query threshold (ms)                        |
+| `tracing`            | `boolean`  | `false`                                           | Enable per-request tracing with timeline         |
+| `persist`            | `boolean`  | `false`                                           | Persist debug data to disk across restarts       |
+| `panes`              | `DebugPane[]` | --                                             | Custom debug panel tabs                          |
+| `excludeFromTracing` | `string[]` | `['/admin/api/debug', '/admin/api/server-stats']` | URL prefixes to exclude from tracing/persistence |
+
+### `DashboardConfig`
+
+| Option          | Type     | Default      | Description                            |
+| --------------- | -------- | ------------ | -------------------------------------- |
+| `path`          | `string` | `'/__stats'` | URL path for the dashboard page        |
+| `retentionDays` | `number` | `7`          | Days to keep historical data in SQLite |
+
+### `AdvancedConfig`
+
+| Option          | Type                | Default                                      | Description                                     |
+| --------------- | ------------------- | -------------------------------------------- | ----------------------------------------------- |
+| `skipInTest`    | `boolean`           | `true`                                       | Skip collection during tests                    |
+| `channelName`   | `string`            | `'admin/server-stats'`                       | Transmit channel name                           |
+| `debugEndpoint` | `string`            | `'/admin/api/debug'`                         | Base path for debug toolbar API endpoints       |
+| `renderer`      | `'preact' \| 'vue'` | `'preact'`                                   | Client-side rendering library for Edge          |
+| `dbPath`        | `string`            | `'.adonisjs/server-stats/dashboard.sqlite3'` | Path to the SQLite database file                |
+| `persistPath`   | `string`            | `'.adonisjs/server-stats/debug-data.json'`   | Path for persisted debug data                   |
+| `maxQueries`    | `number`            | `500`                                        | Max SQL queries to buffer                       |
+| `maxEvents`     | `number`            | `200`                                        | Max events to buffer                            |
+| `maxEmails`     | `number`            | `100`                                        | Max emails to buffer                            |
+| `maxTraces`     | `number`            | `200`                                        | Max request traces to buffer                    |
+
+### Legacy config (deprecated)
+
+The following field names still work but will show deprecation warnings at boot. They will be removed in the next major version.
+
+| Legacy Name   | Replacement                     | Notes                                        |
+| ------------- | ------------------------------- | -------------------------------------------- |
+| `intervalMs`  | `pollInterval`                  | Same type and default                        |
+| `transport`   | `realtime`                      | `'transmit'` = `true`, `'none'` = `false`    |
+| `channelName` | `advanced.channelName`          | Same type and default                        |
+| `endpoint`    | `statsEndpoint`                 | Same type and default                        |
+| `shouldShow`  | `authorize`                     | Same type and default                        |
+| `skipInTest`  | `advanced.skipInTest`           | Same type and default                        |
+| `devToolbar`  | `toolbar` + `dashboard` + `advanced` | Split into focused config objects       |
+
+### `DevToolbarOptions` (internal)
+
+> **Note:** This is the internal, fully-expanded format. Most users should prefer the new `toolbar`, `dashboard`, and `advanced` options above -- they map to these fields automatically.
 
 | Option                 | Type                | Default                                           | Description                                                                                                                                                                                                  |
 | ---------------------- | ------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -221,6 +250,8 @@ All routes are gated by the `shouldShow` callback if configured (see [Visibility
 ---
 
 ## Collectors
+
+> When `collectors` is `'auto'` (the default), the package probes installed packages at boot and enables matching collectors automatically. On startup you'll see a log showing all 8 collectors with a checkmark or cross and which packages were found or missing. You only need to specify collectors explicitly if you want to customize their options.
 
 Each collector is a factory function that returns a `MetricCollector`. All collectors run in parallel each tick; missing peer dependencies are handled gracefully (the collector returns defaults instead of crashing).
 
@@ -308,51 +339,53 @@ interface MetricCollector {
 
 ---
 
-## Visibility Control (`shouldShow`)
+## Visibility Control (`authorize`)
 
-Use `shouldShow` to control who can see the stats bar and access all auto-registered API routes (stats, debug, dashboard). The callback receives the AdonisJS `HttpContext` and should return `true` to allow access, `false` to deny (403).
+Use `authorize` to control who can see the stats bar and access all auto-registered API routes (stats, debug, dashboard). The callback receives the AdonisJS `HttpContext` and should return `true` to allow access, `false` to deny (403).
 
-Because `shouldShow` runs **after** middleware (including auth), you have full access to `ctx.auth`.
+Because `authorize` runs **after** middleware (including auth), you have full access to `ctx.auth`.
 
 ```ts
 export default defineConfig({
   // Only show in development
-  shouldShow: () => env.get('NODE_ENV'),
+  authorize: () => env.get('NODE_ENV'),
 })
 ```
 
 ```ts
 export default defineConfig({
   // Only show for logged-in admin users
-  shouldShow: (ctx) => ctx.auth?.user?.isAdmin === true,
+  authorize: (ctx) => ctx.auth?.user?.isAdmin === true,
 })
 ```
 
 ```ts
 export default defineConfig({
   // Only show for specific roles
-  shouldShow: (ctx) => {
+  authorize: (ctx) => {
     const role = ctx.auth?.user?.role
     return role === 'admin' || role === 'superadmin'
   },
 })
 ```
 
-> **Tip:** When `shouldShow` is not set, the bar and all routes are accessible to everyone. In production you almost always want to set this.
+> **Tip:** When `authorize` is not set, the bar and all routes are accessible to everyone. In production you almost always want to set this.
+>
+> **Migration note:** `shouldShow` still works as a deprecated alias for `authorize`. Both have the same signature and behavior.
 
 ---
 
 ## Auto-Registered Routes
 
-All API routes are registered automatically by the package during `boot()` -- no manual controllers or route definitions needed. Each route group is gated by the `shouldShow` callback if configured.
+All API routes are registered automatically by the package during `boot()` -- no manual controllers or route definitions needed. Each route group is gated by the `authorize` callback if configured.
 
 ### Stats bar endpoint
 
-Registered when `endpoint` is a string (default: `/admin/api/server-stats`). Returns the latest stats snapshot as JSON.
+Registered when `statsEndpoint` is a string (default: `/admin/api/server-stats`). Returns the latest stats snapshot as JSON.
 
 ### Debug toolbar routes
 
-Registered when `devToolbar.enabled: true`. Base path configurable via `devToolbar.debugEndpoint` (default: `/admin/api/debug`).
+Registered when `toolbar` is enabled. Base path configurable via `advanced.debugEndpoint` (default: `/admin/api/debug`).
 
 | Method | Path                  | Description                     |
 | ------ | --------------------- | ------------------------------- |
@@ -367,7 +400,7 @@ Registered when `devToolbar.enabled: true`. Base path configurable via `devToolb
 
 ### Dashboard routes
 
-Registered when `devToolbar.dashboard: true`. Base path configurable via `devToolbar.dashboardPath` (default: `/__stats`).
+Registered when `dashboard` is enabled. Base path configurable via `dashboard.path` (default: `/__stats`).
 
 | Method | Path                       | Description                       |
 | ------ | -------------------------- | --------------------------------- |
@@ -403,7 +436,7 @@ Auto-registered routes bypass route-level middleware but are still subject to gl
 To avoid this, either:
 
 - Move auth middleware to a named route group instead of global middleware
-- Use the `shouldShow` callback for access control (recommended)
+- Use the `authorize` callback for access control (recommended)
 
 ---
 
@@ -540,7 +573,7 @@ The components auto-detect your auth setup:
 - **Cookie auth** (default Inertia setup) — requests use `credentials: 'include'` automatically
 - **Bearer token** — pass `authToken` as a prop to any component
 
-The same `shouldShow` callback you configure on the server gates all API routes. If a user isn't authorized, the components detect the 403 and hide themselves.
+The same `authorize` callback you configure on the server gates all API routes. If a user isn't authorized, the components detect the 403 and hide themselves.
 
 ### Real-time updates
 
@@ -567,19 +600,34 @@ Adds a debug panel with SQL query inspection, event tracking, email capture with
 
 ```ts
 export default defineConfig({
+  toolbar: {
+    slowQueryThreshold: 100,
+    tracing: true,
+    persist: true,
+  },
+})
+```
+
+Debug routes are auto-registered by the package at `/admin/api/debug/*` (configurable via `advanced.debugEndpoint`).
+
+<details>
+<summary>Legacy format (deprecated)</summary>
+
+```ts
+export default defineConfig({
   devToolbar: {
     enabled: true,
     maxQueries: 500,
     maxEvents: 200,
     maxEmails: 100,
     slowQueryThresholdMs: 100,
-    persistDebugData: true, // or a custom path: 'custom/debug.json'
-    tracing: true, // enable per-request timeline
+    persistDebugData: true,
+    tracing: true,
   },
 })
 ```
 
-Debug routes are auto-registered by the package at `/admin/api/debug/*` (configurable via `debugEndpoint`).
+</details>
 
 ### Built-in Emails Tab
 
@@ -597,7 +645,7 @@ The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `m
 
 ### Persistent Debug Data
 
-Enable `persistDebugData: true` to save queries, events, and emails to `.adonisjs/server-stats/debug-data.json`. You can also pass a custom path (relative to app root) like `persistDebugData: 'custom/debug.json'`. Data is:
+Enable `toolbar.persist: true` (or the legacy `devToolbar.persistDebugData: true`) to save queries, events, and emails to `.adonisjs/server-stats/debug-data.json`. You can customize the path via `advanced.persistPath`. Data is:
 
 - **Loaded** on server startup (before collectors start)
 - **Flushed** every 30 seconds (handles crashes)
@@ -668,37 +716,28 @@ If `better-sqlite3` is not installed, the dashboard will log a helpful message a
 ```ts
 // config/server_stats.ts
 export default defineConfig({
-  devToolbar: {
-    enabled: true,
-    dashboard: true,
-  },
+  dashboard: true,
 })
 ```
 
-Restart your dev server and visit **`/__stats`** (or your configured `dashboardPath`).
+Restart your dev server and visit **`/__stats`** (or your configured `dashboard.path`).
 
 #### Configuration
 
 ```ts
-devToolbar: {
-  enabled: true,
-  dashboard: true,
-
-  // URL path for the dashboard (default: '/__stats')
-  dashboardPath: '/__stats',
-
-  // Days to retain historical data (default: 7)
-  retentionDays: 7,
-
-  // SQLite database file path, relative to app root (default: '.adonisjs/server-stats/dashboard.sqlite3')
-  dbPath: '.adonisjs/server-stats/dashboard.sqlite3',
-
-  // URL prefixes to exclude from tracing and dashboard persistence (default: [])
-  excludeFromTracing: ['/admin/api/debug'],
-
-  // Enable tracing for per-request timeline in the dashboard (recommended)
-  tracing: true,
-}
+export default defineConfig({
+  dashboard: {
+    path: '/__stats',
+    retentionDays: 7,
+  },
+  toolbar: {
+    tracing: true,
+    excludeFromTracing: ['/admin/api/debug'],
+  },
+  advanced: {
+    dbPath: '.adonisjs/server-stats/dashboard.sqlite3',
+  },
+})
 ```
 
 #### Dashboard Sections
@@ -719,15 +758,12 @@ devToolbar: {
 
 #### Access Control
 
-The dashboard reuses the `shouldShow` callback from the main config. If set, all dashboard routes are gated by it -- unauthorized requests receive a 403.
+The dashboard reuses the `authorize` callback from the main config. If set, all dashboard routes are gated by it -- unauthorized requests receive a 403.
 
 ```ts
 export default defineConfig({
-  shouldShow: (ctx) => ctx.auth?.user?.role === 'admin',
-  devToolbar: {
-    enabled: true,
-    dashboard: true,
-  },
+  authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+  dashboard: true,
 })
 ```
 
@@ -751,7 +787,7 @@ The dashboard uses a dedicated SQLite database (separate from your app's databas
 - **Self-cleaning** -- old data is automatically purged based on `retentionDays`
 - **WAL mode** -- concurrent reads don't block writes
 
-The SQLite file is created at the configured `dbPath` (default: `.adonisjs/server-stats/dashboard.sqlite3`). Add it to your `.gitignore`:
+The SQLite file is created at the configured `advanced.dbPath` (default: `.adonisjs/server-stats/dashboard.sqlite3`). Add it to your `.gitignore`:
 
 ```
 .adonisjs/server-stats/
@@ -799,8 +835,7 @@ const webhooksPane: DebugPane = {
 }
 
 export default defineConfig({
-  devToolbar: {
-    enabled: true,
+  toolbar: {
     panes: [webhooksPane],
   },
 })
@@ -911,10 +946,14 @@ All types are exported for consumer use:
 import type {
   ServerStats,
   ServerStatsConfig,
+  ResolvedServerStatsConfig,
   MetricCollector,
   MetricValue,
   LogStats,
   DevToolbarOptions,
+  ToolbarConfig,
+  DashboardConfig,
+  AdvancedConfig,
 } from 'adonisjs-server-stats'
 
 // Debug types
