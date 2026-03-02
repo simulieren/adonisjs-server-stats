@@ -30,10 +30,12 @@ function renderPlanNode(node: PlanNode, depth: number): VNode | null {
   const indexName = node['Index Name'] || ''
 
   const metrics: string[] = []
-  if (node['Startup Cost'] != null)
+  if (node['Startup Cost'] !== null && node['Startup Cost'] !== undefined)
     metrics.push(`cost=${node['Startup Cost']}..${node['Total Cost']}`)
-  if (node['Plan Rows'] != null) metrics.push(`rows=${node['Plan Rows']}`)
-  if (node['Plan Width'] != null) metrics.push(`width=${node['Plan Width']}`)
+  if (node['Plan Rows'] !== null && node['Plan Rows'] !== undefined)
+    metrics.push(`rows=${node['Plan Rows']}`)
+  if (node['Plan Width'] !== null && node['Plan Width'] !== undefined)
+    metrics.push(`width=${node['Plan Width']}`)
   if (node['Filter']) metrics.push(`filter: ${node['Filter']}`)
   if (node['Index Cond']) metrics.push(`cond: ${node['Index Cond']}`)
   if (node['Hash Cond']) metrics.push(`hash: ${node['Hash Cond']}`)
@@ -140,19 +142,47 @@ const queries = computed<Record<string, unknown>[]>(() => {
 
   return rawQueries.value.map((g) => {
     const normalized = { ...g }
-    if (normalized.sqlNormalized == null && (g.sql_normalized || g.pattern)) {
+    if (
+      normalized.sqlNormalized === null ||
+      (normalized.sqlNormalized === undefined && (g.sql_normalized || g.pattern))
+    ) {
       normalized.sqlNormalized = (g.sql_normalized as string) || (g.pattern as string) || ''
     }
-    if (normalized.count == null && g.total_count != null) normalized.count = g.total_count
-    if (normalized.avgDuration == null && g.avg_duration != null)
+    if (
+      (normalized.count === null || normalized.count === undefined) &&
+      g.total_count !== null &&
+      g.total_count !== undefined
+    )
+      normalized.count = g.total_count
+    if (
+      (normalized.avgDuration === null || normalized.avgDuration === undefined) &&
+      g.avg_duration !== null &&
+      g.avg_duration !== undefined
+    )
       normalized.avgDuration = g.avg_duration
-    if (normalized.maxDuration == null && g.max_duration != null)
+    if (
+      (normalized.maxDuration === null || normalized.maxDuration === undefined) &&
+      g.max_duration !== null &&
+      g.max_duration !== undefined
+    )
       normalized.maxDuration = g.max_duration
-    if (normalized.minDuration == null && g.min_duration != null)
+    if (
+      (normalized.minDuration === null || normalized.minDuration === undefined) &&
+      g.min_duration !== null &&
+      g.min_duration !== undefined
+    )
       normalized.minDuration = g.min_duration
-    if (normalized.totalDuration == null && g.total_duration != null)
+    if (
+      (normalized.totalDuration === null || normalized.totalDuration === undefined) &&
+      g.total_duration !== null &&
+      g.total_duration !== undefined
+    )
       normalized.totalDuration = g.total_duration
-    if (normalized.percentOfTotal == null && g.pct_time != null)
+    if (
+      (normalized.percentOfTotal === null || normalized.percentOfTotal === undefined) &&
+      g.pct_time !== null &&
+      g.pct_time !== undefined
+    )
       normalized.percentOfTotal = g.pct_time
     return normalized
   })
@@ -259,7 +289,7 @@ function explainPlanCols(): string[] {
 function planCellValue(row: unknown, col: string): string {
   if (!row || typeof row !== 'object') return '-'
   const val = (row as Record<string, unknown>)[col]
-  return val != null ? String(val) : '-'
+  return val !== null && val !== undefined ? String(val) : '-'
 }
 
 /** Check if explain plan has nested Plan node. */
