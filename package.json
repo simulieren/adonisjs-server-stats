@@ -115,10 +115,10 @@
     "build:edge-vue": "bash scripts/build-edge.sh vite.config.edge-vue.ts",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
+    "lint": "oxlint src/ configure.ts vite.config.*.ts vite-plugins/ --ignore-pattern 'src/edge/client/**' --ignore-pattern 'src/edge/client-vue/**'",
+    "lint:fix": "oxlint --fix src/ configure.ts vite.config.*.ts vite-plugins/ --ignore-pattern 'src/edge/client/**' --ignore-pattern 'src/edge/client-vue/**'",
+    "format": "oxfmt src/ configure.ts vite.config.*.ts vite-plugins/",
+    "format:check": "oxfmt --check src/ configure.ts vite.config.*.ts vite-plugins/",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
