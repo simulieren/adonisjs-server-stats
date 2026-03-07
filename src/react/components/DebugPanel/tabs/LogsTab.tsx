@@ -8,9 +8,11 @@ import {
   resolveLogTimestamp,
   resolveLogRequestId,
   getLogLevelCssClass,
+  getStructuredData,
   filterLogsByLevel,
 } from '../../../../core/log-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { JsonViewer } from '../../shared/JsonViewer.js'
 
 import type { LogEntry } from '../../../../core/log-utils.js'
 import type { DebugPanelProps } from '../../../../core/types.js'
@@ -26,6 +28,7 @@ export function LogsTab({ options }: LogsTabProps) {
   const [levelFilter, setLevelFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [reqIdFilter, setReqIdFilter] = useState('')
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
   const logs = useMemo(() => {
     let items: LogEntry[] = Array.isArray(data) ? data : data?.logs || data?.entries || []
@@ -108,31 +111,47 @@ export function LogsTab({ options }: LogsTabProps) {
               const msg = resolveLogMessage(log)
               const ts = resolveLogTimestamp(log)
               const reqId = resolveLogRequestId(log)
+              const structured = getStructuredData(log)
 
               return (
-                <div key={i} className="ss-dbg-log-entry">
-                  <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
-                    {level.toUpperCase()}
-                  </span>
-                  <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>
-                    {ts ? timeAgo(ts) : '-'}
-                  </span>
-                  {reqId ? (
-                    <span
-                      className="ss-dbg-log-reqid"
-                      onClick={() => handleReqIdClick(reqId)}
-                      role="button"
-                      tabIndex={0}
-                      title={reqId}
-                      onKeyDown={(e) => e.key === 'Enter' && handleReqIdClick(reqId)}
-                    >
-                      {reqId.slice(0, 8)}
+                <React.Fragment key={i}>
+                  <div
+                    className={`ss-dbg-log-entry${structured ? ' ss-dbg-log-entry-expandable' : ''}`}
+                    onClick={() => structured && setExpandedIndex(expandedIndex === i ? null : i)}
+                  >
+                    <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
+                      {level.toUpperCase()}
                     </span>
-                  ) : (
-                    <span className="ss-dbg-log-reqid-empty">-</span>
+                    <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>
+                      {ts ? timeAgo(ts) : '-'}
+                    </span>
+                    {reqId ? (
+                      <span
+                        className="ss-dbg-log-reqid"
+                        onClick={(e) => { e.stopPropagation(); handleReqIdClick(reqId) }}
+                        role="button"
+                        tabIndex={0}
+                        title={reqId}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleReqIdClick(reqId) } }}
+                      >
+                        {reqId.slice(0, 8)}
+                      </span>
+                    ) : (
+                      <span className="ss-dbg-log-reqid-empty">-</span>
+                    )}
+                    {structured ? (
+                      <span className={`ss-dbg-log-expand-icon${expandedIndex === i ? ' ss-dbg-log-expand-icon-open' : ''}`}>▶</span>
+                    ) : (
+                      <span style={{ width: 14 }} />
+                    )}
+                    <span className="ss-dbg-log-msg">{msg}</span>
+                  </div>
+                  {expandedIndex === i && structured && (
+                    <div className="ss-dbg-log-detail">
+                      <JsonViewer data={structured} classPrefix="ss-dbg" defaultExpanded />
+                    </div>
                   )}
-                  <span className="ss-dbg-log-msg">{msg}</span>
-                </div>
+                </React.Fragment>
               )
             })
         )}

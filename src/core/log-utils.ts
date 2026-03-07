@@ -109,3 +109,70 @@ export function filterLogsByLevel(logs: LogEntry[], level: string): LogEntry[] {
     return resolved === level
   })
 }
+
+// ---------------------------------------------------------------------------
+// Structured data extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Standard Pino / framework keys that should NOT be surfaced as "structured data".
+ */
+export const STANDARD_LOG_KEYS = new Set([
+  'level',
+  'time',
+  'pid',
+  'hostname',
+  'msg',
+  'message',
+  'v',
+  'name',
+  'levelName',
+  'level_name',
+  'timestamp',
+  'createdAt',
+  'created_at',
+  'requestId',
+  'request_id',
+  'x-request-id',
+  'id',
+  'data',
+])
+
+/**
+ * Extract non-standard structured data from a log entry.
+ *
+ * Handles two data shapes:
+ * - **Debug panel** (raw Pino): extra fields live at the top level
+ * - **Dashboard** (SQLite): extra fields live inside the `data` JSON blob
+ *
+ * Returns `null` when there is no structured data to show.
+ */
+export function getStructuredData(entry: LogEntry): Record<string, unknown> | null {
+  // Try the `data` blob first (dashboard / SQLite shape)
+  if (entry.data) {
+    let blob: Record<string, unknown> | null = null
+    if (typeof entry.data === 'string') {
+      try {
+        blob = JSON.parse(entry.data)
+      } catch {
+        // not valid JSON – ignore
+      }
+    } else if (typeof entry.data === 'object' && !Array.isArray(entry.data)) {
+      blob = entry.data as Record<string, unknown>
+    }
+    if (blob) {
+      const extra: Record<string, unknown> = {}
+      for (const [k, v] of Object.entries(blob)) {
+        if (!STANDARD_LOG_KEYS.has(k)) extra[k] = v
+      }
+      if (Object.keys(extra).length > 0) return extra
+    }
+  }
+
+  // Fall back to top-level fields (debug panel / raw Pino shape)
+  const extra: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(entry)) {
+    if (!STANDARD_LOG_KEYS.has(k)) extra[k] = v
+  }
+  return Object.keys(extra).length > 0 ? extra : null
+}

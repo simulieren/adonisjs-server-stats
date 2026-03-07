@@ -522,6 +522,87 @@
   word-break: break-word;
 }
 
+/* Expandable log row */
+.ss-log-entry-expandable,
+.ss-dash-log-entry-expandable,
+.ss-dbg-log-entry-expandable {
+  cursor: pointer;
+}
+.ss-log-entry-expandable:hover,
+.ss-dash-log-entry-expandable:hover,
+.ss-dbg-log-entry-expandable:hover {
+  background: var(--ss-surface-alt);
+}
+.ss-log-expand-icon,
+.ss-dash-log-expand-icon,
+.ss-dbg-log-expand-icon {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--ss-dim);
+  width: 14px;
+  text-align: center;
+  transition: transform 0.15s ease;
+  user-select: none;
+}
+.ss-log-expand-icon-open,
+.ss-dash-log-expand-icon-open,
+.ss-dbg-log-expand-icon-open {
+  transform: rotate(90deg);
+}
+.ss-log-detail,
+.ss-dash-log-detail,
+.ss-dbg-log-detail {
+  padding: 6px var(--ss-log-px, 12px) 10px var(--ss-log-px, 12px);
+  border-bottom: 1px solid var(--ss-log-border, var(--ss-input-bg));
+  background: var(--ss-surface-alt);
+  font-size: 11px;
+}
+.ss-log-detail .ss-dash-data-cell,
+.ss-log-detail .ss-dbg-data-cell,
+.ss-dash-log-detail .ss-dash-data-cell,
+.ss-dbg-log-detail .ss-dbg-data-cell {
+  width: 100%;
+  max-width: none;
+}
+.ss-log-detail .ss-dash-data-full,
+.ss-log-detail .ss-dbg-data-full,
+.ss-dash-log-detail .ss-dash-data-full,
+.ss-dbg-log-detail .ss-dbg-data-full {
+  position: relative;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: var(--ss-bg);
+  border: 1px solid var(--ss-border-dim);
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+.ss-log-detail .ss-dash-data-full pre,
+.ss-log-detail .ss-dbg-data-full pre,
+.ss-dash-log-detail .ss-dash-data-full pre,
+.ss-dbg-log-detail .ss-dbg-data-full pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ss-text-secondary);
+}
+.ss-log-detail .ss-dash-copy-btn,
+.ss-log-detail .ss-dbg-copy-btn,
+.ss-dash-log-detail .ss-dash-copy-btn,
+.ss-dbg-log-detail .ss-dbg-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  border: 1px solid var(--ss-border-dim);
+  border-radius: 3px;
+  background: var(--ss-surface-alt);
+}
+
 /* ── 4. Email preview ────────────────────────────────────────── */
 /* Dashboard uses 16px padding, debug uses 12px — override via
  * --ss-email-px on a wrapper. */

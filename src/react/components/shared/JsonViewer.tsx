@@ -7,6 +7,7 @@ interface JsonViewerProps {
   maxPreviewLength?: number
   className?: string
   classPrefix?: 'ss-dash' | 'ss-dbg'
+  defaultExpanded?: boolean
 }
 
 /**
@@ -17,8 +18,9 @@ export function JsonViewer({
   maxPreviewLength = 100,
   className = '',
   classPrefix = 'ss-dash',
+  defaultExpanded = false,
 }: JsonViewerProps) {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(defaultExpanded)
 
   const parsed = useMemo(() => {
     if (typeof data === 'string') {
@@ -63,15 +65,17 @@ export function JsonViewer({
 
   return (
     <div className={`${classPrefix}-data-cell ${className}`}>
-      <span
-        className={`${classPrefix}-data-preview`}
-        onClick={handleToggle}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && handleToggle()}
-      >
-        {preview}
-      </span>
+      {!expanded && (
+        <span
+          className={`${classPrefix}-data-preview`}
+          onClick={handleToggle}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === 'Enter' && handleToggle()}
+        >
+          {preview}
+        </span>
+      )}
       {expanded && (
         <div className={`${classPrefix}-data-full`} onClick={handleToggle}>
           <button

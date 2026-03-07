@@ -8,8 +8,10 @@ import {
   resolveLogTimestamp,
   resolveLogRequestId,
   getLogLevelCssClass,
+  getStructuredData,
 } from '../../../../core/log-utils.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
+import { JsonViewer } from '../../shared/JsonViewer.js'
 import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 
@@ -35,6 +37,7 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
   const [structuredField, setStructuredField] = useState('level')
   const [structuredOp, setStructuredOp] = useState('equals')
   const [structuredValue, setStructuredValue] = useState('')
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
   const filters: Record<string, string> = {}
   if (levelFilter !== 'all') filters.level = levelFilter
@@ -233,33 +236,49 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
             const message = resolveLogMessage(log)
             const reqId = resolveLogRequestId(log)
             const ts = resolveLogTimestamp(log)
+            const structured = getStructuredData(log)
 
             return (
-              <div key={(log.id as string) || i} className="ss-dash-log-entry">
-                <span
-                  className={`ss-dash-log-level ${getLogLevelCssClass(level, 'ss-dash-log-level')}`}
+              <React.Fragment key={(log.id as string) || i}>
+                <div
+                  className={`ss-dash-log-entry${structured ? ' ss-dash-log-entry-expandable' : ''}`}
+                  onClick={() => structured && setExpandedIndex(expandedIndex === i ? null : i)}
                 >
-                  {level.toUpperCase()}
-                </span>
-                <span className="ss-dash-log-time" title={ts ? formatTime(ts) : ''}>
-                  {ts ? timeAgo(ts) : '-'}
-                </span>
-                {reqId ? (
                   <span
-                    className="ss-dash-log-reqid"
-                    title={reqId}
-                    onClick={() => handleReqIdClick(reqId)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(e) => e.key === 'Enter' && handleReqIdClick(reqId)}
+                    className={`ss-dash-log-level ${getLogLevelCssClass(level, 'ss-dash-log-level')}`}
                   >
-                    {reqId.slice(0, 8)}
+                    {level.toUpperCase()}
                   </span>
-                ) : (
-                  <span className="ss-dash-log-reqid-empty">--</span>
+                  <span className="ss-dash-log-time" title={ts ? formatTime(ts) : ''}>
+                    {ts ? timeAgo(ts) : '-'}
+                  </span>
+                  {reqId ? (
+                    <span
+                      className="ss-dash-log-reqid"
+                      title={reqId}
+                      onClick={(e) => { e.stopPropagation(); handleReqIdClick(reqId) }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleReqIdClick(reqId) } }}
+                    >
+                      {reqId.slice(0, 8)}
+                    </span>
+                  ) : (
+                    <span className="ss-dash-log-reqid-empty">--</span>
+                  )}
+                  {structured ? (
+                    <span className={`ss-dash-log-expand-icon${expandedIndex === i ? ' ss-dash-log-expand-icon-open' : ''}`}>▶</span>
+                  ) : (
+                    <span style={{ width: 14 }} />
+                  )}
+                  <span className="ss-dash-log-msg">{message}</span>
+                </div>
+                {expandedIndex === i && structured && (
+                  <div className="ss-dash-log-detail">
+                    <JsonViewer data={structured} classPrefix="ss-dash" defaultExpanded />
+                  </div>
                 )}
-                <span className="ss-dash-log-msg">{message}</span>
-              </div>
+              </React.Fragment>
             )
           })}
         </div>

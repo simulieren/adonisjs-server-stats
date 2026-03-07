@@ -13,13 +13,16 @@ const props = withDefaults(
     maxLen?: number
     /** CSS class prefix: 'ss-dash' for dashboard, 'ss-dbg' for debug panel. */
     classPrefix?: 'ss-dash' | 'ss-dbg'
+    /** Start in expanded state. */
+    defaultExpanded?: boolean
   }>(),
   {
     classPrefix: 'ss-dash',
+    defaultExpanded: false,
   }
 )
 
-const expanded = ref(false)
+const expanded = ref(props.defaultExpanded)
 
 const preview = computed(() => {
   if (props.value === null || props.value === undefined) return '-'
@@ -60,6 +63,7 @@ function copyToClipboard() {
   >
   <div v-else :class="`${props.classPrefix}-data-cell`">
     <span
+      v-if="!expanded"
       :class="`${props.classPrefix}-data-preview`"
       role="button"
       :tabindex="0"

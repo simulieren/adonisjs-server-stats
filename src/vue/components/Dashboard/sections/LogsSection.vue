@@ -14,7 +14,9 @@ import {
   resolveLogTimestamp,
   resolveLogRequestId,
   getLogLevelCssClass,
+  getStructuredData,
 } from '../../../../core/log-utils.js'
+import JsonViewer from '../../shared/JsonViewer.vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
@@ -45,6 +47,7 @@ const search = ref('')
 const levelFilter = ref('all')
 const reqIdFilter = ref('')
 const reqIdInput = ref('')
+const expandedIndex = ref<number | null>(null)
 
 interface StructuredFilter {
   field: string
@@ -67,6 +70,11 @@ const hasActiveFilters = computed(
   () =>
     levelFilter.value !== 'all' || reqIdFilter.value !== '' || structuredFilters.value.length > 0
 )
+
+function toggleExpand(i: number, hasData: boolean) {
+  if (!hasData) return
+  expandedIndex.value = expandedIndex.value === i ? null : i
+}
 
 function handleSearch(term: string) {
   search.value = term
@@ -274,32 +282,45 @@ function selectValue(e: Event): string {
 
     <template v-else>
       <div class="ss-dash-log-entries">
-        <div v-for="(log, i) in logs" :key="String(log.id || i)" class="ss-dash-log-entry">
-          <span
-            :class="`ss-dash-log-level ${getLogLevelCssClass(resolveLogLevel(log), 'ss-dash-log-level')}`"
+        <template v-for="(log, i) in logs" :key="String(log.id || i)">
+          <div
+            :class="['ss-dash-log-entry', { 'ss-dash-log-entry-expandable': !!getStructuredData(log) }]"
+            @click="toggleExpand(i, !!getStructuredData(log))"
           >
-            {{ resolveLogLevel(log).toUpperCase() }}
-          </span>
-          <span
-            class="ss-dash-log-time"
-            :title="resolveLogTimestamp(log) ? formatTime(resolveLogTimestamp(log)) : ''"
-          >
-            {{ resolveLogTimestamp(log) ? timeAgo(resolveLogTimestamp(log)) : '-' }}
-          </span>
-          <span
-            v-if="resolveLogRequestId(log)"
-            class="ss-dash-log-reqid"
-            :title="resolveLogRequestId(log)"
-            role="button"
-            tabindex="0"
-            @click="handleReqIdClick(resolveLogRequestId(log))"
-            @keydown.enter="handleReqIdClick(resolveLogRequestId(log))"
-          >
-            {{ resolveLogRequestId(log).slice(0, 8) }}
-          </span>
-          <span v-else class="ss-dash-log-reqid-empty">--</span>
-          <span class="ss-dash-log-msg">{{ resolveLogMessage(log) }}</span>
-        </div>
+            <span
+              :class="`ss-dash-log-level ${getLogLevelCssClass(resolveLogLevel(log), 'ss-dash-log-level')}`"
+            >
+              {{ resolveLogLevel(log).toUpperCase() }}
+            </span>
+            <span
+              class="ss-dash-log-time"
+              :title="resolveLogTimestamp(log) ? formatTime(resolveLogTimestamp(log)) : ''"
+            >
+              {{ resolveLogTimestamp(log) ? timeAgo(resolveLogTimestamp(log)) : '-' }}
+            </span>
+            <span
+              v-if="resolveLogRequestId(log)"
+              class="ss-dash-log-reqid"
+              :title="resolveLogRequestId(log)"
+              role="button"
+              tabindex="0"
+              @click.stop="handleReqIdClick(resolveLogRequestId(log))"
+              @keydown.enter.stop="handleReqIdClick(resolveLogRequestId(log))"
+            >
+              {{ resolveLogRequestId(log).slice(0, 8) }}
+            </span>
+            <span v-else class="ss-dash-log-reqid-empty">--</span>
+            <span
+              v-if="getStructuredData(log)"
+              :class="['ss-dash-log-expand-icon', { 'ss-dash-log-expand-icon-open': expandedIndex === i }]"
+            >&#x25B6;</span>
+            <span v-else style="width: 14px" />
+            <span class="ss-dash-log-msg">{{ resolveLogMessage(log) }}</span>
+          </div>
+          <div v-if="expandedIndex === i && getStructuredData(log)" class="ss-dash-log-detail">
+            <JsonViewer :value="getStructuredData(log)" class-prefix="ss-dash" default-expanded />
+          </div>
+        </template>
       </div>
     </template>
 
