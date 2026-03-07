@@ -183,7 +183,7 @@ function dbgDurationClass(ms: number): string {
       </template>
 
       <!-- Detail content -->
-      <template v-else-if="traceDetail">
+      <div v-else-if="traceDetail" class="ss-dbg-tl-detail-wrapper">
         <div class="ss-dbg-tl-detail-header">
           <button type="button" class="ss-dbg-btn-clear" @click="goBack">&larr; Back</button>
           <span :class="`ss-dbg-method ss-dbg-method-${traceDetail.method.toLowerCase()}`">
@@ -280,7 +280,7 @@ function dbgDurationClass(ms: number): string {
             </div>
           </div>
         </template>
-      </template>
+      </div>
 
       <!-- Fallback loading -->
       <div v-else class="ss-dbg-empty">Loading trace detail...</div>

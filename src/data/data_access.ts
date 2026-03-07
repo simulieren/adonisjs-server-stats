@@ -338,7 +338,44 @@ export class DataAccess {
     }
 
     if (!this.debugStore.traces) return null
-    return this.debugStore.traces.getTrace(id) ?? null
+    const trace = this.debugStore.traces.getTrace(id) ?? null
+    if (!trace) return null
+
+    // Enrich with related logs by httpRequestId
+    if (trace.httpRequestId) {
+      const logs = await this.getRelatedLogsByRequestId(trace.httpRequestId)
+      if (logs.length > 0) {
+        return { ...trace, logs }
+      }
+    }
+
+    return trace
+  }
+
+  /**
+   * Find log entries matching a specific request ID.
+   *
+   * Checks SQLite first (if available), then falls back to scanning
+   * the log file for entries with a matching `request_id` field.
+   */
+  private async getRelatedLogsByRequestId(
+    requestId: string
+  ): Promise<Record<string, unknown>[]> {
+    // Try SQLite first
+    if (this.hasPersistence) {
+      try {
+        const result = await this.dashboardStore!.getLogs(1, 50, { requestId })
+        return result.data
+      } catch {
+        // Fall through to log file
+      }
+    }
+
+    // Fallback: scan log file
+    const entries = await this.readLogFile()
+    return entries.filter(
+      (e) => e.request_id === requestId || e.requestId === requestId
+    )
   }
 
   // =========================================================================

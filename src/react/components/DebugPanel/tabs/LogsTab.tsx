@@ -104,8 +104,7 @@ export function LogsTab({ options }: LogsTabProps) {
           <div className="ss-dbg-empty">No log entries</div>
         ) : (
           logs
-            .slice(-200)
-            .reverse()
+            .slice(0, 200)
             .map((log, i) => {
               const level = resolveLogLevel(log)
               const msg = resolveLogMessage(log)

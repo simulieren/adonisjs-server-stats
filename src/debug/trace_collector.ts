@@ -75,7 +75,12 @@ export class TraceCollector {
   }
 
   /** Finish the current trace and save it to the ring buffer. Returns the record, or null if no context. */
-  finishTrace(method: string, url: string, statusCode: number): TraceRecord | null {
+  finishTrace(
+    method: string,
+    url: string,
+    statusCode: number,
+    httpRequestId?: string
+  ): TraceRecord | null {
     const ctx = this.als.getStore()
     if (!ctx) return null
 
@@ -91,6 +96,7 @@ export class TraceCollector {
       spans: ctx.spans,
       warnings: ctx.warnings,
       timestamp: Date.now(),
+      httpRequestId: httpRequestId ?? undefined,
     }
 
     this.buffer.push(record)

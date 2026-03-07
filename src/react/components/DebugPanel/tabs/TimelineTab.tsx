@@ -245,7 +245,7 @@ export function TimelineTab({ options }: TimelineTabProps) {
     )
 
     return (
-      <div>
+      <div className="ss-dbg-tl-detail-wrapper">
         <div className="ss-dbg-tl-detail-header">
           <button
             type="button"
