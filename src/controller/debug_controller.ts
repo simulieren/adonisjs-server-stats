@@ -1,20 +1,25 @@
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
+import { ConfigInspector } from '../dashboard/integrations/config_inspector.js'
+
 import type { DashboardStore } from '../dashboard/dashboard_store.js'
 import type { DebugStore } from '../debug/debug_store.js'
 import type { StatsEngine } from '../engine/stats_engine.js'
 import type { ResolvedServerStatsConfig } from '../types.js'
+import type { ApplicationService } from '@adonisjs/core/types'
 import type { HttpContext } from '@adonisjs/core/http'
 
 interface DiagnosticsDeps {
   getEngine?: () => StatsEngine | null
   getDashboardStore?: () => DashboardStore | null
   getProviderDiagnostics?: () => Record<string, unknown>
+  getApp?: () => ApplicationService
 }
 
 export default class DebugController {
   private diagnosticsDeps: DiagnosticsDeps
+  private configInspector: ConfigInspector | null = null
 
   constructor(
     private store: DebugStore,
@@ -71,7 +76,28 @@ export default class DebugController {
       channelName: cfg?.channelName ?? 'admin/server-stats',
     }
 
-    return response.json({ features, customPanes, endpoints, transmit })
+    // App config + env vars (for the Config tab's APP CONFIG / ENV view)
+    const inspector = this.getConfigInspector()
+    const appConfig = inspector ? inspector.getConfig().config : {}
+    const envVars = inspector ? inspector.getEnvVars().env : {}
+
+    return response.json({
+      features,
+      customPanes,
+      endpoints,
+      transmit,
+      app: appConfig,
+      env: envVars,
+    })
+  }
+
+  /** Lazily create a ConfigInspector from the app reference. */
+  private getConfigInspector(): ConfigInspector | null {
+    if (this.configInspector) return this.configInspector
+    const app = this.diagnosticsDeps.getApp?.()
+    if (!app) return null
+    this.configInspector = new ConfigInspector(app)
+    return this.configInspector
   }
 
   async diagnostics({ response }: HttpContext) {

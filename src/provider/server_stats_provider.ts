@@ -537,6 +537,7 @@ export default class ServerStatsProvider {
       getEngine: () => this.engine,
       getDashboardStore: () => this.dashboardStore,
       getProviderDiagnostics: () => this.getDiagnostics(),
+      getApp: () => this.app,
     })
 
     // Wire trace collector into the request tracking middleware
