@@ -67,6 +67,24 @@ export class RingBuffer<T> {
   }
 
   /**
+   * Find a single item by predicate, searching from newest to oldest.
+   * Returns immediately on first match without copying the buffer.
+   */
+  findFromEnd(predicate: (item: T) => boolean): T | undefined {
+    if (this.count === 0) return undefined
+
+    const start = this.count < this.capacity ? 0 : this.head
+
+    for (let i = this.count - 1; i >= 0; i--) {
+      const idx = (start + i) % this.capacity
+      const item = this.buffer[idx] as T
+      if (predicate(item)) return item
+    }
+
+    return undefined
+  }
+
+  /**
    * Collect items from the end of the buffer while the predicate holds.
    * Iterates from newest to oldest and stops at the first non-match.
    * Returns items in insertion order (oldest first).

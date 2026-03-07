@@ -132,6 +132,10 @@ export class DashboardStore {
   private dbFilePath: string = ''
   private lastCleanupAt: number | null = null
 
+  // Cached storage stats (polled every 3s by Internals tab — cache for 10s)
+  private cachedStorageStats: { data: unknown; cachedAt: number } | null = null
+  private static readonly STORAGE_STATS_TTL_MS = 10_000
+
   // Write queue — buffers pending writes and flushes them in batch
   // transactions to avoid overwhelming the single-connection pool.
   private writeQueue: PersistRequestInput[] = []
@@ -212,7 +216,7 @@ export class DashboardStore {
         max: 1,
         // Fast-fail: if the connection can't be acquired within 5s,
         // throw instead of silently queueing for tarn's default 30s.
-        acquireTimeoutMillis: 5_000,
+        acquireTimeoutMillis: 2_000,
         // Set PRAGMAs on every new connection (not just the first one)
         afterCreate(conn: unknown, done: (err: Error | null, conn: unknown) => void) {
           const raw = conn as { pragma: (stmt: string) => void }
@@ -311,7 +315,11 @@ export class DashboardStore {
     return this.db !== null
   }
 
-  /** Get SQLite storage statistics for the diagnostics endpoint. */
+  /**
+   * Get SQLite storage statistics for the diagnostics endpoint.
+   * Cached for 10s since the Internals tab polls every 3s.
+   * Wrapped in a single transaction — 1 pool acquire instead of 8.
+   */
   async getStorageStats(): Promise<{
     ready: boolean
     dbPath: string
@@ -331,6 +339,14 @@ export class DashboardStore {
         tables: [],
         lastCleanupAt: null,
       }
+    }
+
+    // Serve cached stats if still fresh (avoids 8 COUNT queries per 3s poll)
+    if (
+      this.cachedStorageStats &&
+      Date.now() - this.cachedStorageStats.cachedAt < DashboardStore.STORAGE_STATS_TTL_MS
+    ) {
+      return this.cachedStorageStats.data as Awaited<ReturnType<DashboardStore['getStorageStats']>>
     }
 
     let fileSizeMb = 0
@@ -359,18 +375,24 @@ export class DashboardStore {
       'server_stats_saved_filters',
     ]
 
-    const tables: Array<{ name: string; rowCount: number }> = []
-    for (const name of tableNames) {
-      try {
-        const [row] = await this.db(name).count('* as count')
-        tables.push({ name, rowCount: Number(row.count) })
-      } catch {
-        tables.push({ name, rowCount: 0 })
+    // Single transaction for all 8 COUNT queries — 1 pool acquire instead of 8
+    const tables: Array<{ name: string; rowCount: number }> = await this.db.transaction(
+      async (trx) => {
+        const result: Array<{ name: string; rowCount: number }> = []
+        for (const name of tableNames) {
+          try {
+            const [row] = await trx(name).count('* as count')
+            result.push({ name, rowCount: Number(row.count) })
+          } catch {
+            result.push({ name, rowCount: 0 })
+          }
+        }
+        return result
       }
-    }
+    )
 
-    return {
-      ready: true,
+    const stats = {
+      ready: true as const,
       dbPath: this.config.dbPath,
       fileSizeMb,
       walSizeMb,
@@ -378,6 +400,9 @@ export class DashboardStore {
       tables,
       lastCleanupAt: this.lastCleanupAt,
     }
+
+    this.cachedStorageStats = { data: stats, cachedAt: Date.now() }
+    return stats
   }
 
   // =========================================================================
@@ -860,31 +885,34 @@ export class DashboardStore {
     }
   }
 
-  /** Single request with associated queries, events, and trace. */
+  /**
+   * Single request with associated queries, events, and trace.
+   * Wrapped in a transaction — 1 pool acquire instead of 4.
+   */
   async getRequestDetail(id: number): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
-    const request = await this.db('server_stats_requests').where('id', id).first()
-    if (!request) return null
+    return this.db.transaction(async (trx) => {
+      const request = await trx('server_stats_requests').where('id', id).first()
+      if (!request) return null
 
-    // Sequential awaits — with max:1 pool, Promise.all creates concurrent
-    // pendingAcquires that thrash tarn's scheduler and cause pool exhaustion.
-    const queries = await this.db('server_stats_queries').where('request_id', id).orderBy('created_at', 'asc')
-    const events = await this.db('server_stats_events').where('request_id', id).orderBy('created_at', 'asc')
-    const trace = await this.db('server_stats_traces').where('request_id', id).first()
+      const queries = await trx('server_stats_queries').where('request_id', id).orderBy('created_at', 'asc')
+      const events = await trx('server_stats_events').where('request_id', id).orderBy('created_at', 'asc')
+      const trace = await trx('server_stats_traces').where('request_id', id).first()
 
-    return {
-      ...request,
-      queries,
-      events,
-      trace: trace
-        ? {
-            ...trace,
-            spans: safeParseJson(trace.spans) ?? [],
-            warnings: safeParseJsonArray(trace.warnings),
-          }
-        : null,
-    }
+      return {
+        ...request,
+        queries,
+        events,
+        trace: trace
+          ? {
+              ...trace,
+              spans: safeParseJson(trace.spans) ?? [],
+              warnings: safeParseJsonArray(trace.warnings),
+            }
+          : null,
+      }
+    })
   }
 
   // =========================================================================
@@ -896,104 +924,101 @@ export class DashboardStore {
    *
    * @param range — '1h' | '6h' | '24h' | '7d'
    */
+  /**
+   * Wrapped in a single transaction — 1 pool acquire instead of 5.
+   */
   async getOverviewMetrics(range: string = '1h'): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
     const cutoff = rangeToCutoff(range)
 
-    // Aggregate counts and averages in SQL — never loads all rows into JS.
-    // Previous implementation fetched every row and computed stats in JS,
-    // which caused O(N) memory + CPU per call and froze the event loop
-    // on busy servers.
-    const stats: Record<string, unknown> | undefined = await this.db('server_stats_requests')
-      .where('created_at', '>=', cutoff)
-      .select(
-        this.db.raw('COUNT(*) as total'),
-        this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
-        this.db.raw('SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as error_count')
-      )
-      .first()
+    return this.db.transaction(async (trx) => {
+      const stats: Record<string, unknown> | undefined = await trx('server_stats_requests')
+        .where('created_at', '>=', cutoff)
+        .select(
+          trx.raw('COUNT(*) as total'),
+          trx.raw('ROUND(AVG(duration), 2) as avg_duration'),
+          trx.raw('SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as error_count')
+        )
+        .first()
 
-    const total = Number(stats?.total ?? 0)
-    if (total === 0) {
-      return {
-        avgResponseTime: 0,
-        p95ResponseTime: 0,
-        requestsPerMinute: 0,
-        errorRate: 0,
-        totalRequests: 0,
-        slowestEndpoints: [],
-        queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
-        recentErrors: [],
+      const total = Number(stats?.total ?? 0)
+      if (total === 0) {
+        return {
+          avgResponseTime: 0,
+          p95ResponseTime: 0,
+          requestsPerMinute: 0,
+          errorRate: 0,
+          totalRequests: 0,
+          slowestEndpoints: [],
+          queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
+          recentErrors: [],
+        }
       }
-    }
 
-    const avgResponseTime = stats?.avg_duration as number
-    const errorCount = Number(stats?.error_count ?? 0)
-    const rangeMinutes = rangeToMinutes(range)
-    const requestsPerMin = total / rangeMinutes
+      const avgResponseTime = stats?.avg_duration as number
+      const errorCount = Number(stats?.error_count ?? 0)
+      const rangeMinutes = rangeToMinutes(range)
+      const requestsPerMin = total / rangeMinutes
 
-    // p95 via ORDER BY + OFFSET — avoids loading all rows into JS
-    const p95Offset = Math.floor(total * 0.95)
-    const p95Row = await this.db('server_stats_requests')
-      .where('created_at', '>=', cutoff)
-      .orderBy('duration', 'asc')
-      .offset(Math.min(p95Offset, total - 1))
-      .limit(1)
-      .select('duration')
-      .first()
-    const p95ResponseTime = (p95Row?.duration as number) ?? 0
+      const p95Offset = Math.floor(total * 0.95)
+      const p95Row = await trx('server_stats_requests')
+        .where('created_at', '>=', cutoff)
+        .orderBy('duration', 'asc')
+        .offset(Math.min(p95Offset, total - 1))
+        .limit(1)
+        .select('duration')
+        .first()
+      const p95ResponseTime = (p95Row?.duration as number) ?? 0
 
-    // Slowest endpoints (top 5 by average duration)
-    const slowestEndpoints = await this.db('server_stats_requests')
-      .where('created_at', '>=', cutoff)
-      .select(
-        'url',
-        this.db.raw('COUNT(*) as count'),
-        this.db.raw('ROUND(AVG(duration), 2) as avg_duration')
-      )
-      .groupBy('url')
-      .orderBy('avg_duration', 'desc')
-      .limit(5)
+      const slowestEndpoints = await trx('server_stats_requests')
+        .where('created_at', '>=', cutoff)
+        .select(
+          'url',
+          trx.raw('COUNT(*) as count'),
+          trx.raw('ROUND(AVG(duration), 2) as avg_duration')
+        )
+        .groupBy('url')
+        .orderBy('avg_duration', 'desc')
+        .limit(5)
 
-    // Query stats
-    const queryStats: Record<string, unknown> | undefined = await this.db('server_stats_queries')
-      .where('created_at', '>=', cutoff)
-      .select(
-        this.db.raw('COUNT(*) as total'),
-        this.db.raw('ROUND(AVG(duration), 2) as avg_duration')
-      )
-      .first()
+      const queryStats: Record<string, unknown> | undefined = await trx('server_stats_queries')
+        .where('created_at', '>=', cutoff)
+        .select(
+          trx.raw('COUNT(*) as total'),
+          trx.raw('ROUND(AVG(duration), 2) as avg_duration')
+        )
+        .first()
 
-    // Recent errors (last 5 log entries with level error/fatal)
-    const recentErrors = await this.db('server_stats_logs')
-      .where('created_at', '>=', cutoff)
-      .whereIn('level', ['error', 'fatal'])
-      .orderBy('created_at', 'desc')
-      .limit(5)
+      const recentErrors = await trx('server_stats_logs')
+        .where('created_at', '>=', cutoff)
+        .whereIn('level', ['error', 'fatal'])
+        .orderBy('created_at', 'desc')
+        .limit(5)
 
-    return {
-      avgResponseTime: round(avgResponseTime),
-      p95ResponseTime: round(p95ResponseTime),
-      requestsPerMinute: round(requestsPerMin),
-      errorRate: round((errorCount / total) * 100),
-      totalRequests: total,
-      slowestEndpoints: slowestEndpoints.map((s: Record<string, unknown>) => ({
-        url: s.url,
-        count: s.count,
-        avgDuration: s.avg_duration,
-      })),
-      queryStats: {
-        total: (queryStats?.total as number) ?? 0,
-        avgDuration: (queryStats?.avg_duration as number) ?? 0,
-        perRequest: total > 0 ? round(((queryStats?.total as number) ?? 0) / total) : 0,
-      },
-      recentErrors: recentErrors.map((e: Record<string, unknown>) => ({
-        id: e.id,
-        message: e.message,
-        createdAt: e.created_at,
-      })),
-    }
+      return {
+        avgResponseTime: round(avgResponseTime),
+        p95ResponseTime: round(p95ResponseTime),
+        requestsPerMinute: round(requestsPerMin),
+        errorRate: round((errorCount / total) * 100),
+        totalRequests: total,
+        slowestEndpoints: slowestEndpoints.map((s: Record<string, unknown>) => ({
+          url: s.url,
+          count: s.count,
+          avgDuration: s.avg_duration,
+        })),
+        queryStats: {
+          total: (queryStats?.total as number) ?? 0,
+          avgDuration: (queryStats?.avg_duration as number) ?? 0,
+          perRequest: total > 0 ? round(((queryStats?.total as number) ?? 0) / total) : 0,
+        },
+        recentErrors: recentErrors.map((e: Record<string, unknown>) => ({
+          id: e.id,
+          message: e.message,
+          createdAt: e.created_at,
+        })),
+      }
+    })
   }
 
   /**
@@ -1090,53 +1115,55 @@ export class DashboardStore {
     const cutoff = rangeToCutoff(range)
 
     try {
-      // Sequential awaits — with max:1 pool, Promise.all creates 5
-      // concurrent pendingAcquires that overwhelm tarn's scheduler.
-      const topEventsRaw = await this.db('server_stats_events')
-        .select('event_name', this.db.raw('COUNT(*) as count'))
-        .where('created_at', '>=', cutoff)
-        .groupBy('event_name')
-        .orderBy('count', 'desc')
-        .limit(5)
+      // Single transaction — 1 pool acquire instead of 5.
+      const { topEventsRaw, emailStatusRaw, logLevelsRaw, statusRaw, slowQueriesRaw } =
+        await this.db.transaction(async (trx) => ({
+          topEventsRaw: await trx('server_stats_events')
+            .select('event_name', trx.raw('COUNT(*) as count'))
+            .where('created_at', '>=', cutoff)
+            .groupBy('event_name')
+            .orderBy('count', 'desc')
+            .limit(5),
 
-      const emailStatusRaw = await this.db('server_stats_emails')
-        .select('status', this.db.raw('COUNT(*) as count'))
-        .where('created_at', '>=', cutoff)
-        .groupBy('status')
+          emailStatusRaw: await trx('server_stats_emails')
+            .select('status', trx.raw('COUNT(*) as count'))
+            .where('created_at', '>=', cutoff)
+            .groupBy('status'),
 
-      const logLevelsRaw = await this.db('server_stats_logs')
-        .select('level', this.db.raw('COUNT(*) as count'))
-        .where('created_at', '>=', cutoff)
-        .groupBy('level')
+          logLevelsRaw: await trx('server_stats_logs')
+            .select('level', trx.raw('COUNT(*) as count'))
+            .where('created_at', '>=', cutoff)
+            .groupBy('level'),
 
-      const statusRaw = await this.db('server_stats_requests')
-        .select(
-          this.db.raw(
-            `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
-          ),
-          this.db.raw(
-            `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
-          ),
-          this.db.raw(
-            `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
-          ),
-          this.db.raw(
-            `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
-          )
-        )
-        .where('created_at', '>=', cutoff)
-        .first()
+          statusRaw: await trx('server_stats_requests')
+            .select(
+              trx.raw(
+                `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
+              ),
+              trx.raw(
+                `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
+              ),
+              trx.raw(
+                `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
+              ),
+              trx.raw(
+                `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
+              )
+            )
+            .where('created_at', '>=', cutoff)
+            .first(),
 
-      const slowQueriesRaw = await this.db('server_stats_queries')
-        .select(
-          'sql_normalized',
-          this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
-          this.db.raw('COUNT(*) as count')
-        )
-        .where('created_at', '>=', cutoff)
-        .groupBy('sql_normalized')
-        .orderBy('avg_duration', 'desc')
-        .limit(5)
+          slowQueriesRaw: await trx('server_stats_queries')
+            .select(
+              'sql_normalized',
+              trx.raw('ROUND(AVG(duration), 2) as avg_duration'),
+              trx.raw('COUNT(*) as count')
+            )
+            .where('created_at', '>=', cutoff)
+            .groupBy('sql_normalized')
+            .orderBy('avg_duration', 'desc')
+            .limit(5),
+        }))
 
       // Map top events
       const topEvents = (topEventsRaw || []).map((r: Record<string, unknown>) => ({
@@ -1271,7 +1298,13 @@ export class DashboardStore {
   // Private helpers
   // =========================================================================
 
-  /** Generic paginated query with filter callback. */
+  /**
+   * Generic paginated query with filter callback.
+   *
+   * Wrapped in a single transaction so COUNT + SELECT acquire the pool
+   * connection only once instead of two separate acquire/release cycles.
+   * With max:1 pool, this halves pool pressure per paginated endpoint.
+   */
   private async paginate(
     table: string,
     page: number,
@@ -1282,25 +1315,19 @@ export class DashboardStore {
       return { data: [], total: 0, page, perPage, lastPage: 0 }
     }
 
-    // Count total
-    const countQuery = this.db(table)
-    if (applyFilters) applyFilters(countQuery)
-    const [{ count: totalRaw }] = await countQuery.count('* as count')
-    const total = Number(totalRaw)
+    return this.db.transaction(async (trx) => {
+      const countQuery = trx(table)
+      if (applyFilters) applyFilters(countQuery)
+      const [{ count: totalRaw }] = await countQuery.count('* as count')
+      const total = Number(totalRaw)
 
-    // Fetch page
-    const offset = (page - 1) * perPage
-    const dataQuery = this.db(table).orderBy('created_at', 'desc').limit(perPage).offset(offset)
-    if (applyFilters) applyFilters(dataQuery)
-    const data = await dataQuery
+      const offset = (page - 1) * perPage
+      const dataQuery = trx(table).orderBy('created_at', 'desc').limit(perPage).offset(offset)
+      if (applyFilters) applyFilters(dataQuery)
+      const data = await dataQuery
 
-    return {
-      data,
-      total,
-      page,
-      perPage,
-      lastPage: Math.ceil(total / perPage),
-    }
+      return { data, total, page, perPage, lastPage: Math.ceil(total / perPage) }
+    })
   }
 
   /**

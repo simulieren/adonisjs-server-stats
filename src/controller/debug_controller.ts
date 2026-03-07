@@ -20,6 +20,8 @@ interface DiagnosticsDeps {
 export default class DebugController {
   private diagnosticsDeps: DiagnosticsDeps
   private configInspector: ConfigInspector | null = null
+  private cachedPackageVersion: string | null = null
+  private cachedAdonisVersion: string | null = null
 
   constructor(
     private store: DebugStore,
@@ -105,27 +107,29 @@ export default class DebugController {
     const dashboardStore = this.diagnosticsDeps.getDashboardStore?.()
     const providerDiag = this.diagnosticsDeps.getProviderDiagnostics?.() ?? {}
 
-    // Package version — read from disk since createRequire resolves from
-    // the compiled output directory where ../../package.json doesn't exist.
-    let packageVersion = 'unknown'
-    try {
-      const pkgPath = fileURLToPath(new URL('../../../package.json', import.meta.url))
-      const pkgJson = JSON.parse(await readFile(pkgPath, 'utf-8'))
-      packageVersion = pkgJson.version
-    } catch {
-      // Fallback
+    // Cache package versions on first call — avoids readFile + JSON.parse
+    // and createRequire + require on every 3s poll from the Internals tab.
+    if (!this.cachedPackageVersion) {
+      try {
+        const pkgPath = fileURLToPath(new URL('../../../package.json', import.meta.url))
+        const pkgJson = JSON.parse(await readFile(pkgPath, 'utf-8'))
+        this.cachedPackageVersion = pkgJson.version
+      } catch {
+        this.cachedPackageVersion = 'unknown'
+      }
     }
-
-    // AdonisJS version
-    let adonisVersion = 'unknown'
-    try {
-      const { createRequire } = await import('node:module')
-      const require = createRequire(import.meta.url)
-      const adonisPkg = require('@adonisjs/core/package.json')
-      adonisVersion = adonisPkg.version
-    } catch {
-      // Not installed or not resolvable
+    if (!this.cachedAdonisVersion) {
+      try {
+        const { createRequire } = await import('node:module')
+        const require = createRequire(import.meta.url)
+        const adonisPkg = require('@adonisjs/core/package.json')
+        this.cachedAdonisVersion = adonisPkg.version
+      } catch {
+        this.cachedAdonisVersion = 'unknown'
+      }
     }
+    const packageVersion = this.cachedPackageVersion
+    const adonisVersion = this.cachedAdonisVersion
 
     // Collector health + configs
     const healthList = engine?.getCollectorHealth() ?? []

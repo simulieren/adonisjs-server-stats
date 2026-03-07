@@ -207,7 +207,7 @@ export class TraceCollector {
   }
 
   getTrace(id: number): TraceRecord | undefined {
-    return this.buffer.toArray().find((t) => t.id === id)
+    return this.buffer.findFromEnd((t) => t.id === id)
   }
 
   getTotalCount(): number {

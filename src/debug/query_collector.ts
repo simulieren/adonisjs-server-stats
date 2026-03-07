@@ -15,6 +15,8 @@ export class QueryCollector {
   private slowThresholdMs: number
   private emitter: Emitter | null = null
   private handler: ((data: DbQueryEvent) => void) | null = null
+  private cachedSummary: { total: number; slow: number; duplicates: number; avgDuration: number } | null = null
+  private summaryComputedAt: number = 0
 
   constructor(maxQueries: number = 500, slowThresholdMs: number = 100) {
     this.buffer = new RingBuffer<QueryRecord>(maxQueries)
@@ -82,7 +84,16 @@ export class QueryCollector {
     return this.buffer.latest(n)
   }
 
+  /**
+   * Cached for 1s to avoid 4 full O(N) passes over the 500-item buffer
+   * on every 3-second auto-refresh from the debug panel.
+   */
   getSummary() {
+    const now = Date.now()
+    if (this.cachedSummary && now - this.summaryComputedAt < 1000) {
+      return this.cachedSummary
+    }
+
     const queries = this.buffer.toArray()
     const total = queries.length
     const slow = queries.filter((q) => q.duration > this.slowThresholdMs).length
@@ -95,12 +106,14 @@ export class QueryCollector {
 
     const avgDuration = total > 0 ? queries.reduce((sum, q) => sum + q.duration, 0) / total : 0
 
-    return {
+    this.cachedSummary = {
       total,
       slow,
       duplicates,
       avgDuration: round(avgDuration),
     }
+    this.summaryComputedAt = now
+    return this.cachedSummary
   }
 
   getTotalCount(): number {
