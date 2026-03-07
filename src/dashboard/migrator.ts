@@ -181,27 +181,26 @@ export async function autoMigrate(db: Knex): Promise<void> {
  * Yields between each DELETE so the event loop stays responsive.
  */
 export async function runRetentionCleanup(db: Knex, retentionDays: number): Promise<void> {
-  const modifier = `-${retentionDays} days`
+  // Use string interpolation instead of parameterized bindings.
+  // Knex + better-sqlite3 can hang on parameterized db.raw() calls,
+  // while non-parameterized queries (used in migrations) work fine.
+  // Safe here — retentionDays is always a controlled integer.
+  const days = Math.max(1, Math.floor(retentionDays))
+  const cutoff = `datetime('now', '-${days} days')`
 
   try {
     // Cascade deletes queries, events, traces via FK ON DELETE CASCADE
-    await db.raw(`DELETE FROM server_stats_requests WHERE created_at < datetime('now', ?)`, [
-      modifier,
-    ])
+    await db.raw(`DELETE FROM server_stats_requests WHERE created_at < ${cutoff}`)
     await yieldToEventLoop()
 
     // Standalone tables
-    await db.raw(`DELETE FROM server_stats_logs WHERE created_at < datetime('now', ?)`, [modifier])
+    await db.raw(`DELETE FROM server_stats_logs WHERE created_at < ${cutoff}`)
     await yieldToEventLoop()
 
-    await db.raw(`DELETE FROM server_stats_emails WHERE created_at < datetime('now', ?)`, [
-      modifier,
-    ])
+    await db.raw(`DELETE FROM server_stats_emails WHERE created_at < ${cutoff}`)
     await yieldToEventLoop()
 
-    await db.raw(`DELETE FROM server_stats_metrics WHERE created_at < datetime('now', ?)`, [
-      modifier,
-    ])
+    await db.raw(`DELETE FROM server_stats_metrics WHERE created_at < ${cutoff}`)
   } catch (err) {
     // Log but don't throw — retention cleanup failure shouldn't block init
     const { log } = await import('../utils/logger.js')

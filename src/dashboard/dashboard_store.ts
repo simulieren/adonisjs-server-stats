@@ -205,25 +205,21 @@ export class DashboardStore {
     await autoMigrate(db)
     log.info('dashboard: migrations complete')
 
-    log.info('dashboard: running retention cleanup...')
-    await runRetentionCleanup(db, this.config.retentionDays)
-    log.info('dashboard: retention cleanup complete')
-    this.lastCleanupAt = Date.now()
-
-    // Hourly retention cleanup
-    this.retentionTimer = setInterval(
-      async () => {
-        try {
-          if (this.db) {
-            await runRetentionCleanup(this.db, this.config.retentionDays)
-            this.lastCleanupAt = Date.now()
-          }
-        } catch (err) {
-          log.warn('dashboard: retention cleanup failed — ' + (err as Error)?.message)
+    // Defer retention cleanup — not critical during startup.
+    // Run first cleanup after 30s, then hourly.
+    const runCleanup = async () => {
+      try {
+        if (this.db) {
+          await runRetentionCleanup(this.db, this.config.retentionDays)
+          this.lastCleanupAt = Date.now()
+          log.info('dashboard: retention cleanup complete')
         }
-      },
-      60 * 60 * 1000
-    )
+      } catch (err) {
+        log.warn('dashboard: retention cleanup failed — ' + (err as Error)?.message)
+      }
+    }
+    setTimeout(() => runCleanup(), 30_000)
+    this.retentionTimer = setInterval(() => runCleanup(), 60 * 60 * 1000)
 
     // Start chart aggregation (every 60s)
     this.chartAggregator = new ChartAggregator(db)
