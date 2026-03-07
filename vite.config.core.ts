@@ -21,6 +21,8 @@ export default defineConfig({
     outDir: 'dist/core',
     emptyOutDir: true,
 
+    minify: 'esbuild',
+
     rollupOptions: {
       external: ['@adonisjs/transmit-client'],
     },

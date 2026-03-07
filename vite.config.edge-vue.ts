@@ -10,7 +10,6 @@ export default defineConfig(
     plugins: [vue()],
     entries: {
       'stats-bar': resolve(__dirname, 'src/edge/entries-vue/stats-bar.ts'),
-      'debug-panel': resolve(__dirname, 'src/edge/entries-vue/debug-panel.ts'),
       'debug-panel-deferred': resolve(__dirname, 'src/edge/entries-vue/debug-panel-deferred.ts'),
       dashboard: resolve(__dirname, 'src/edge/entries-vue/dashboard.ts'),
     },
