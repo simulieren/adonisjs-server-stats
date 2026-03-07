@@ -193,12 +193,33 @@ export class DashboardStore {
       client: 'better-sqlite3',
       connection: { filename: dbFilePath },
       useNullAsDefault: true,
+      // SQLite only supports one writer. Using a single-connection pool
+      // prevents SQLITE_BUSY deadlocks under load and ensures PRAGMAs
+      // are set consistently on the one connection that's reused.
+      pool: {
+        min: 1,
+        max: 1,
+        // Set PRAGMAs on every new connection (not just the first one)
+        afterCreate(conn: unknown, done: (err: Error | null, conn: unknown) => void) {
+          const raw = conn as { pragma: (stmt: string) => void }
+          try {
+            raw.pragma('journal_mode = WAL')
+            raw.pragma('foreign_keys = ON')
+            raw.pragma('busy_timeout = 5000')
+          } catch {
+            // Fallback: PRAGMAs will be set via db.raw() below
+          }
+          done(null, conn)
+        },
+      },
     })
     this.db = db
 
+    // Ensure PRAGMAs are set (fallback if afterCreate didn't work)
     log.info('dashboard: setting PRAGMA...')
     await db.raw('PRAGMA journal_mode=WAL')
     await db.raw('PRAGMA foreign_keys=ON')
+    await db.raw('PRAGMA busy_timeout=5000')
     log.info('dashboard: PRAGMA set')
 
     log.info('dashboard: running migrations...')
