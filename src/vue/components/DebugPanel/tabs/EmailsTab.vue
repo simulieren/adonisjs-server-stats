@@ -10,10 +10,14 @@ import type { EmailRecord } from '../../../../core/index.js'
 const props = defineProps<{
   data: { emails?: EmailRecord[] } | EmailRecord[] | null
   dashboardPath?: string
+  debugEndpoint?: string
+  authToken?: string
 }>()
 
 const search = ref('')
 const previewEmail = ref<EmailRecord | null>(null)
+const previewHtml = ref<string | null>(null)
+const loadingPreview = ref(false)
 
 const emails = computed<EmailRecord[]>(() => {
   const d = props.data
@@ -46,12 +50,36 @@ function statusClass(status: string): string {
   return map[status] || ''
 }
 
-function openPreview(email: EmailRecord) {
+async function openPreview(email: EmailRecord) {
   previewEmail.value = email
+  previewHtml.value = email.html || null
+
+  // If no HTML in row data (SQLite path strips bodies), fetch from preview endpoint
+  if (!previewHtml.value && email.id) {
+    loadingPreview.value = true
+    try {
+      const endpoint = props.debugEndpoint || '/admin/api/debug'
+      const headers: Record<string, string> = {}
+      if (props.authToken) headers['Authorization'] = `Bearer ${props.authToken}`
+      const res = await fetch(`${endpoint}/emails/${email.id}/preview`, {
+        headers,
+        credentials: props.authToken ? 'omit' : 'include',
+      })
+      if (res.ok) {
+        previewHtml.value = await res.text()
+      }
+    } catch {
+      // Preview fetch failed — show fallback
+    } finally {
+      loadingPreview.value = false
+    }
+  }
 }
 
 function closePreview() {
   previewEmail.value = null
+  previewHtml.value = null
+  loadingPreview.value = false
 }
 
 const { tableRef } = useResizableTable(() => emails.value)
@@ -76,10 +104,11 @@ const { tableRef } = useResizableTable(() => emails.value)
         </div>
         <button type="button" class="ss-dbg-btn-clear" @click="closePreview">&times;</button>
       </div>
+      <div v-if="loadingPreview" class="ss-dbg-empty">Loading preview...</div>
       <iframe
-        v-if="previewEmail.html"
+        v-else-if="previewHtml"
         class="ss-dbg-email-iframe"
-        :srcdoc="previewEmail.html"
+        :srcdoc="previewHtml"
       ></iframe>
       <div v-else class="ss-dbg-empty">No HTML content</div>
     </div>

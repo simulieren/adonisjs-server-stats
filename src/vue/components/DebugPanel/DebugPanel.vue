@@ -239,6 +239,8 @@ defineExpose({ toggle, open, close })
           v-else-if="activeTab === 'emails'"
           :data="data as any"
           :dashboard-path="dashboardPath"
+          :debug-endpoint="debugEndpoint"
+          :auth-token="authToken"
         />
         <RoutesTab v-else-if="activeTab === 'routes'" :data="data as any" />
         <LogsTab

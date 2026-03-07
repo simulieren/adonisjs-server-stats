@@ -226,7 +226,18 @@ export class DataAccess {
         ...(opts.filters as Partial<EmailFilters>),
       }
       const result = await this.dashboardStore!.getEmails(page, perPage, filters, true)
-      return fromDashboardResult(result)
+      const normalized = fromDashboardResult(result)
+      // Normalize SQLite column names to match the EmailRecord shape
+      // so both memory and SQLite paths return consistent field names
+      normalized.data = (normalized.data as Record<string, unknown>[]).map((row) => ({
+        ...row,
+        from: row.from_addr ?? row.from ?? '',
+        to: row.to_addr ?? row.to ?? '',
+        messageId: row.message_id ?? row.messageId ?? null,
+        attachmentCount: row.attachment_count ?? row.attachmentCount ?? 0,
+        timestamp: row.created_at ?? row.timestamp ?? null,
+      }))
+      return normalized
     }
 
     const emails = this.debugStore.emails.getEmails()

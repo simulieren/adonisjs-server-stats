@@ -14,6 +14,8 @@ export function EmailsTab({ options }: EmailsTabProps) {
   const { data, isLoading, error } = useDebugData<{ emails: EmailRecord[] }>('emails', options)
   const [search, setSearch] = useState('')
   const [previewId, setPreviewId] = useState<number | null>(null)
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const [loadingPreview, setLoadingPreview] = useState(false)
 
   const emails = useMemo(() => {
     const items = data?.emails || []
@@ -30,7 +32,39 @@ export function EmailsTab({ options }: EmailsTabProps) {
 
   const previewEmail = useMemo(() => emails.find((e) => e.id === previewId), [emails, previewId])
 
-  const closePreview = useCallback(() => setPreviewId(null), [])
+  const openPreview = useCallback(
+    async (email: EmailRecord) => {
+      setPreviewId(email.id)
+      setPreviewHtml(email.html || null)
+
+      if (!email.html && email.id) {
+        setLoadingPreview(true)
+        try {
+          const endpoint = options?.debugEndpoint || '/admin/api/debug'
+          const headers: Record<string, string> = {}
+          if (options?.authToken) headers['Authorization'] = `Bearer ${options.authToken}`
+          const res = await fetch(`${endpoint}/emails/${email.id}/preview`, {
+            headers,
+            credentials: options?.authToken ? 'omit' : 'include',
+          })
+          if (res.ok) {
+            setPreviewHtml(await res.text())
+          }
+        } catch {
+          // Preview fetch failed
+        } finally {
+          setLoadingPreview(false)
+        }
+      }
+    },
+    [options]
+  )
+
+  const closePreview = useCallback(() => {
+    setPreviewId(null)
+    setPreviewHtml(null)
+    setLoadingPreview(false)
+  }, [])
 
   const statusColorMap: Record<string, string> = {
     sent: 'ss-dbg-email-status-sent',
@@ -75,10 +109,12 @@ export function EmailsTab({ options }: EmailsTabProps) {
             {'\u00D7'}
           </button>
         </div>
-        {previewEmail.html ? (
+        {loadingPreview ? (
+          <div className="ss-dbg-empty">Loading preview...</div>
+        ) : previewHtml ? (
           <iframe
             className="ss-dbg-email-iframe"
-            srcDoc={previewEmail.html}
+            srcDoc={previewHtml}
             title="Email preview"
             sandbox=""
           />
@@ -135,7 +171,7 @@ export function EmailsTab({ options }: EmailsTabProps) {
               <tr
                 key={email.id}
                 className="ss-dbg-email-row"
-                onClick={() => setPreviewId(email.id)}
+                onClick={() => openPreview(email)}
               >
                 <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>
                   {email.id}
