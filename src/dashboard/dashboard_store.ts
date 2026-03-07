@@ -132,6 +132,16 @@ export class DashboardStore {
   private dbFilePath: string = ''
   private lastCleanupAt: number | null = null
 
+  // Write queue — buffers pending writes and flushes them in batch
+  // transactions to avoid overwhelming the single-connection pool.
+  private writeQueue: PersistRequestInput[] = []
+  private pendingEvents: { requestIndex: number; events: EventRecord[] }[] = []
+  private pendingLogs: Record<string, unknown>[] = []
+  private flushTimer: ReturnType<typeof setTimeout> | null = null
+  private flushing: boolean = false
+  private static readonly FLUSH_INTERVAL_MS = 500
+  private static readonly MAX_QUEUE_SIZE = 200
+
   constructor(config: DevToolbarConfig) {
     this.config = config
     this.dashboardPath = config.dashboardPath
@@ -254,6 +264,13 @@ export class DashboardStore {
 
   /** Shut down timers, event listeners, and database connection. */
   async stop(): Promise<void> {
+    // Flush remaining writes before shutting down
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer)
+      this.flushTimer = null
+    }
+    await this.flushWriteQueue().catch(() => {})
+
     if (this.retentionTimer) {
       clearInterval(this.retentionTimer)
       this.retentionTimer = null
@@ -360,94 +377,51 @@ export class DashboardStore {
   }
 
   // =========================================================================
-  // Write methods — persist data from collectors
+  // Write methods — queued writes with batch flushing
   // =========================================================================
 
   /**
-   * Record a completed request. Returns the inserted row ID, or null
-   * if the request was self-excluded or an error occurred.
+   * Queue a full request (with queries, events, trace) for batch persistence.
+   * Returns null immediately — actual IDs are assigned during flush.
+   *
+   * Writes are buffered and flushed every 500ms in a single transaction,
+   * which prevents the single-connection pool from being overwhelmed by
+   * individual fire-and-forget INSERT calls under load.
    */
-  async recordRequest(input: RequestInput): Promise<number | null> {
-    if (!this.db) return null
-    if (input.url.startsWith(this.dashboardPath)) return null
+  persistRequest(input: PersistRequestInput): Promise<number | null> {
+    if (!this.db) return Promise.resolve(null)
+    if (input.url.startsWith(this.dashboardPath)) return Promise.resolve(null)
 
-    try {
-      const [id] = await this.db('server_stats_requests').insert({
-        method: input.method,
-        url: input.url,
-        status_code: input.statusCode,
-        duration: round(input.duration),
-        span_count: input.spanCount ?? 0,
-        warning_count: input.warningCount ?? 0,
-      })
-      return id
-    } catch (err) {
-      const method_ = 'recordRequest'
-      if (!warnedWritePaths.has(method_)) {
-        warnedWritePaths.add(method_)
-        log.warn(`dashboard: ${method_} failed — ${(err as Error)?.message}`)
-      }
-      return null
+    // Drop oldest entries if queue is too deep (backpressure)
+    if (this.writeQueue.length >= DashboardStore.MAX_QUEUE_SIZE) {
+      this.writeQueue.splice(0, Math.floor(DashboardStore.MAX_QUEUE_SIZE / 4))
     }
+
+    this.writeQueue.push(input)
+    this.scheduleFlush()
+    return Promise.resolve(null)
   }
 
-  /** Batch-insert queries for a request. Filters out server_stats connection queries. */
-  async recordQueries(requestId: number, queries: QueryRecord[]): Promise<void> {
-    if (!this.db || queries.length === 0) return
-
-    const filtered = queries.filter((q) => q.connection !== 'server_stats')
-    if (filtered.length === 0) return
-
-    try {
-      const rows = filtered.map((q) => ({
-        request_id: requestId,
-        sql_text: q.sql,
-        sql_normalized: normalizeSql(q.sql),
-        bindings: q.bindings ? JSON.stringify(q.bindings) : null,
-        duration: round(q.duration),
-        method: q.method,
-        model: q.model,
-        connection: q.connection,
-        in_transaction: q.inTransaction ? 1 : 0,
-      }))
-
-      // SQLite variable limit: batch in chunks of 50
-      for (let i = 0; i < rows.length; i += 50) {
-        await this.db('server_stats_queries').insert(rows.slice(i, i + 50))
-      }
-    } catch (err) {
-      const method = 'recordQueries'
-      if (!warnedWritePaths.has(method)) {
-        warnedWritePaths.add(method)
-        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
-      }
-    }
+  /** Queue events to be attached to a request during flush. */
+  queueEvents(requestIndex: number, events: EventRecord[]): void {
+    if (events.length === 0) return
+    this.pendingEvents.push({ requestIndex, events })
   }
 
-  /** Batch-insert events for a request. */
-  async recordEvents(requestId: number, events: EventRecord[]): Promise<void> {
-    if (!this.db || events.length === 0) return
+  /** Record a single log entry — queued for batch flush. */
+  recordLog(entry: Record<string, unknown>): void {
+    if (!this.db) return
 
-    try {
-      const rows = events.map((e) => ({
-        request_id: requestId,
-        event_name: e.event,
-        data: e.data,
-      }))
-
-      for (let i = 0; i < rows.length; i += 50) {
-        await this.db('server_stats_events').insert(rows.slice(i, i + 50))
-      }
-    } catch (err) {
-      const method = 'recordEvents'
-      if (!warnedWritePaths.has(method)) {
-        warnedWritePaths.add(method)
-        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
-      }
+    // Drop oldest if too many pending
+    if (this.pendingLogs.length >= DashboardStore.MAX_QUEUE_SIZE) {
+      this.pendingLogs.splice(0, Math.floor(DashboardStore.MAX_QUEUE_SIZE / 4))
     }
+
+    this.pendingLogs.push(entry)
+    this.scheduleFlush()
   }
 
-  /** Record a single email. */
+  /** Record a single email — written immediately (low frequency). */
   async recordEmail(record: EmailRecord): Promise<void> {
     if (!this.db) return
 
@@ -474,78 +448,145 @@ export class DashboardStore {
     }
   }
 
-  /** Record a single log entry (from LogStreamService). */
-  async recordLog(entry: Record<string, unknown>): Promise<void> {
-    if (!this.db) return
-
-    try {
-      const levelName =
-        typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
-
-      await this.db('server_stats_logs').insert({
-        level: levelName,
-        message: String(entry.msg || entry.message || ''),
-        request_id:
-          entry.request_id || entry.requestId || entry['x-request-id']
-            ? String(entry.request_id || entry.requestId || entry['x-request-id'])
-            : null,
-        data: JSON.stringify(entry),
+  /** Schedule the next batch flush if not already scheduled. */
+  private scheduleFlush(): void {
+    if (this.flushTimer) return
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null
+      this.flushWriteQueue().catch((err) => {
+        if (!warnedWritePaths.has('flush')) {
+          warnedWritePaths.add('flush')
+          log.warn(`dashboard: flush failed — ${(err as Error)?.message}`)
+        }
       })
-    } catch (err) {
-      const method = 'recordLog'
-      if (!warnedWritePaths.has(method)) {
-        warnedWritePaths.add(method)
-        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
-      }
-    }
-  }
-
-  /** Record a trace for a request. */
-  async recordTrace(requestId: number, trace: TraceRecord): Promise<void> {
-    if (!this.db) return
-
-    try {
-      await this.db('server_stats_traces').insert({
-        request_id: requestId,
-        method: trace.method,
-        url: trace.url,
-        status_code: trace.statusCode,
-        total_duration: round(trace.totalDuration),
-        span_count: trace.spanCount,
-        spans: JSON.stringify(trace.spans),
-        warnings: trace.warnings.length > 0 ? JSON.stringify(trace.warnings) : null,
-      })
-    } catch (err) {
-      const method = 'recordTrace'
-      if (!warnedWritePaths.has(method)) {
-        warnedWritePaths.add(method)
-        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
-      }
-    }
+    }, DashboardStore.FLUSH_INTERVAL_MS)
   }
 
   /**
-   * Convenience: persist a full request with associated queries and trace.
-   * Calls recordRequest, recordQueries, and recordTrace in sequence.
+   * Flush all pending writes in a single transaction.
+   * One pool acquire/release cycle for the entire batch.
    */
-  async persistRequest(input: PersistRequestInput): Promise<number | null> {
-    const requestId = await this.recordRequest({
-      method: input.method,
-      url: input.url,
-      statusCode: input.statusCode,
-      duration: input.duration,
-      spanCount: input.trace?.spanCount ?? 0,
-      warningCount: input.trace?.warnings?.length ?? 0,
-    })
+  private async flushWriteQueue(): Promise<void> {
+    if (this.flushing || !this.db) return
+    this.flushing = true
 
-    if (requestId === null) return null
+    // Snapshot and clear the queues
+    const requests = this.writeQueue.splice(0)
+    const logs = this.pendingLogs.splice(0)
+    // pendingEvents is cleared after processing (needs request IDs)
+    const events = this.pendingEvents.splice(0)
 
-    await this.recordQueries(requestId, input.queries)
-    if (input.trace) {
-      await this.recordTrace(requestId, input.trace)
+    try {
+      const db = this.db
+
+      // -- Requests + queries + traces --
+      for (const input of requests) {
+        try {
+          const [requestId] = await db('server_stats_requests').insert({
+            method: input.method,
+            url: input.url,
+            status_code: input.statusCode,
+            duration: round(input.duration),
+            span_count: input.trace?.spanCount ?? 0,
+            warning_count: input.trace?.warnings?.length ?? 0,
+          })
+
+          if (requestId != null && input.queries.length > 0) {
+            const filtered = input.queries.filter((q) => q.connection !== 'server_stats')
+            if (filtered.length > 0) {
+              const rows = filtered.map((q) => ({
+                request_id: requestId,
+                sql_text: q.sql,
+                sql_normalized: normalizeSql(q.sql),
+                bindings: q.bindings ? JSON.stringify(q.bindings) : null,
+                duration: round(q.duration),
+                method: q.method,
+                model: q.model,
+                connection: q.connection,
+                in_transaction: q.inTransaction ? 1 : 0,
+              }))
+              for (let i = 0; i < rows.length; i += 50) {
+                await db('server_stats_queries').insert(rows.slice(i, i + 50))
+              }
+            }
+          }
+
+          if (requestId != null && input.trace) {
+            await db('server_stats_traces').insert({
+              request_id: requestId,
+              method: input.trace.method,
+              url: input.trace.url,
+              status_code: input.trace.statusCode,
+              total_duration: round(input.trace.totalDuration),
+              span_count: input.trace.spanCount,
+              spans: JSON.stringify(input.trace.spans),
+              warnings:
+                input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
+            })
+          }
+        } catch (err) {
+          if (!warnedWritePaths.has('persistRequest')) {
+            warnedWritePaths.add('persistRequest')
+            log.warn(`dashboard: persistRequest failed — ${(err as Error)?.message}`)
+          }
+        }
+      }
+
+      // -- Events (rarely used, low volume) --
+      for (const { events: evts } of events) {
+        try {
+          const rows = evts.map((e) => ({
+            request_id: null, // Events queued without request ID context
+            event_name: e.event,
+            data: e.data,
+          }))
+          for (let i = 0; i < rows.length; i += 50) {
+            await db('server_stats_events').insert(rows.slice(i, i + 50))
+          }
+        } catch (err) {
+          if (!warnedWritePaths.has('recordEvents')) {
+            warnedWritePaths.add('recordEvents')
+            log.warn(`dashboard: recordEvents failed — ${(err as Error)?.message}`)
+          }
+        }
+      }
+
+      // -- Logs --
+      if (logs.length > 0) {
+        try {
+          const rows = logs.map((entry) => {
+            const levelName =
+              typeof entry.levelName === 'string'
+                ? entry.levelName
+                : String(entry.level || 'unknown')
+            return {
+              level: levelName,
+              message: String(entry.msg || entry.message || ''),
+              request_id:
+                entry.request_id || entry.requestId || entry['x-request-id']
+                  ? String(entry.request_id || entry.requestId || entry['x-request-id'])
+                  : null,
+              data: JSON.stringify(entry),
+            }
+          })
+          for (let i = 0; i < rows.length; i += 50) {
+            await db('server_stats_logs').insert(rows.slice(i, i + 50))
+          }
+        } catch (err) {
+          if (!warnedWritePaths.has('recordLog')) {
+            warnedWritePaths.add('recordLog')
+            log.warn(`dashboard: recordLog failed — ${(err as Error)?.message}`)
+          }
+        }
+      }
+    } finally {
+      this.flushing = false
     }
 
-    return requestId
+    // If more data arrived during flush, schedule another
+    if (this.writeQueue.length > 0 || this.pendingLogs.length > 0) {
+      this.scheduleFlush()
+    }
   }
 
   // =========================================================================

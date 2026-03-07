@@ -724,8 +724,6 @@ export default class ServerStatsProvider {
     const dashStore = this.dashboardStore
 
     let lastQueryId = 0
-    let lastEventId = 0
-    let warnedPersistOnce = false
 
     setOnRequestComplete(({ method, url, statusCode, duration, trace }) => {
       if (!dashStore.isReady()) return
@@ -737,34 +735,15 @@ export default class ServerStatsProvider {
         lastQueryId = allQueries[allQueries.length - 1].id
       }
 
-      // Gather new events since last request
-      const allEvents = debugStore.events.getEvents()
-      const newEvents = allEvents.filter((e) => e.id > lastEventId)
-      if (allEvents.length > 0) {
-        lastEventId = allEvents[allEvents.length - 1].id
-      }
-
-      // Persist asynchronously (fire-and-forget)
-      dashStore
-        .persistRequest({
-          method,
-          url,
-          statusCode,
-          duration,
-          queries: newQueries,
-          trace: trace ?? null,
-        })
-        .then((requestId) => {
-          if (requestId !== null && newEvents.length > 0) {
-            return dashStore.recordEvents(requestId, newEvents)
-          }
-        })
-        .catch((err) => {
-          if (!warnedPersistOnce) {
-            warnedPersistOnce = true
-            log.warn('failed to persist request data — ' + (err?.message || 'unknown error'))
-          }
-        })
+      // Queue for batch persistence (flushed every 500ms)
+      dashStore.persistRequest({
+        method,
+        url,
+        statusCode,
+        duration,
+        queries: newQueries,
+        trace: trace ?? null,
+      })
     })
 
     // ── Transmit streaming for real-time dashboard updates ────────
