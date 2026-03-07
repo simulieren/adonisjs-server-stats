@@ -66,6 +66,30 @@ export class RingBuffer<T> {
     this.count = 0
   }
 
+  /**
+   * Collect items from the end of the buffer while the predicate holds.
+   * Iterates from newest to oldest and stops at the first non-match.
+   * Returns items in insertion order (oldest first).
+   *
+   * Useful for efficiently getting "items since ID X" without copying the
+   * entire buffer, since IDs are monotonically increasing.
+   */
+  collectFromEnd(predicate: (item: T) => boolean): T[] {
+    if (this.count === 0) return []
+
+    const result: T[] = []
+    const start = this.count < this.capacity ? 0 : this.head
+
+    for (let i = this.count - 1; i >= 0; i--) {
+      const idx = (start + i) % this.capacity
+      const item = this.buffer[idx] as T
+      if (!predicate(item)) break
+      result.push(item)
+    }
+
+    return result.reverse()
+  }
+
   /** Bulk-load items (e.g. from disk). Pushes each in order, respecting capacity. */
   load(items: T[]): void {
     for (const item of items) {

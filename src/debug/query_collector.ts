@@ -68,6 +68,16 @@ export class QueryCollector {
     return this.buffer.toArray()
   }
 
+  /**
+   * Get only queries with id > lastId.
+   * Uses collectFromEnd for O(K) performance where K = number of new items,
+   * instead of O(N) full buffer copy + filter.
+   */
+  getQueriesSince(lastId: number): QueryRecord[] {
+    if (lastId <= 0) return this.buffer.toArray()
+    return this.buffer.collectFromEnd((q) => q.id > lastId)
+  }
+
   getLatest(n: number = 100): QueryRecord[] {
     return this.buffer.latest(n)
   }

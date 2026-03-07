@@ -728,11 +728,11 @@ export default class ServerStatsProvider {
     setOnRequestComplete(({ method, url, statusCode, duration, trace }) => {
       if (!dashStore.isReady()) return
 
-      // Gather new queries since last request
-      const allQueries = debugStore.queries.getQueries()
-      const newQueries = allQueries.filter((q) => q.id > lastQueryId)
-      if (allQueries.length > 0) {
-        lastQueryId = allQueries[allQueries.length - 1].id
+      // O(K) collection of new queries since last seen ID — avoids
+      // copying the entire 500-item ring buffer on every request.
+      const newQueries = debugStore.queries.getQueriesSince(lastQueryId)
+      if (newQueries.length > 0) {
+        lastQueryId = newQueries[newQueries.length - 1].id
       }
 
       // Queue for batch persistence (flushed every 500ms)
@@ -760,6 +760,9 @@ export default class ServerStatsProvider {
       if (!this.transmitChannels.includes(dashChannel)) {
         this.transmitChannels.push(dashChannel)
       }
+      // Broadcast overview metrics every 30s (not 5s) to reduce SQLite
+      // pool pressure. Each broadcast runs 5+ sequential queries on the
+      // single-connection pool, blocking all dashboard API reads.
       this.dashboardBroadcastTimer = setInterval(async () => {
         try {
           if (!dashStore.isReady()) return
@@ -775,7 +778,7 @@ export default class ServerStatsProvider {
         } catch {
           // Silently ignore
         }
-      }, 5_000)
+      }, 30_000)
     }
   }
 
@@ -792,7 +795,7 @@ export default class ServerStatsProvider {
         },
         dashboardBroadcast: {
           active: this.dashboardBroadcastTimer !== null,
-          intervalMs: 5000,
+          intervalMs: 30_000,
         },
         debugBroadcast: {
           active: this.debugBroadcastTimer !== null,

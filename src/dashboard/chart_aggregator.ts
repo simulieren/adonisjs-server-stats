@@ -46,16 +46,20 @@ export class ChartAggregator {
 
     if (existing) return
 
-    // Get requests from the last 60 seconds
+    // Aggregate request stats in SQL — avoids loading all rows into JS
     const cutoff = toSqliteTimestamp(new Date(Date.now() - 60_000))
 
-    const requests: { duration: number; status_code: number }[] = await this.db(
-      'server_stats_requests'
-    )
+    const stats: Record<string, unknown> | undefined = await this.db('server_stats_requests')
       .where('created_at', '>=', cutoff)
-      .select('duration', 'status_code')
+      .select(
+        this.db.raw('COUNT(*) as request_count'),
+        this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
+        this.db.raw('SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as error_count')
+      )
+      .first()
 
-    const requestCount = requests.length
+    const requestCount = Number(stats?.request_count ?? 0)
+
     if (requestCount === 0) {
       // Still insert a zero-row so the chart shows continuous data
       await this.db('server_stats_metrics').insert({
@@ -70,14 +74,15 @@ export class ChartAggregator {
       return
     }
 
-    // Calculate avg and p95 duration
-    const durations = requests.map((r) => r.duration).sort((a: number, b: number) => a - b)
-    const avgDuration = durations.reduce((sum: number, d: number) => sum + d, 0) / requestCount
-    const p95Index = Math.floor(requestCount * 0.95)
-    const p95Duration = durations[Math.min(p95Index, requestCount - 1)]
-
-    // Count errors (status >= 400)
-    const errorCount = requests.filter((r) => r.status_code >= 400).length
+    // p95 via ORDER BY + OFFSET — avoids loading all rows
+    const p95Offset = Math.floor(requestCount * 0.95)
+    const p95Row = await this.db('server_stats_requests')
+      .where('created_at', '>=', cutoff)
+      .orderBy('duration', 'asc')
+      .offset(Math.min(p95Offset, requestCount - 1))
+      .limit(1)
+      .select('duration')
+      .first()
 
     // Get query stats for the same window
     const queryStats: { query_count: number; avg_query_duration: number } | undefined =
@@ -92,9 +97,9 @@ export class ChartAggregator {
     await this.db('server_stats_metrics').insert({
       bucket,
       request_count: requestCount,
-      avg_duration: round(avgDuration),
-      p95_duration: round(p95Duration),
-      error_count: errorCount,
+      avg_duration: round(stats?.avg_duration as number),
+      p95_duration: round((p95Row?.duration as number) ?? 0),
+      error_count: Number(stats?.error_count ?? 0),
       query_count: queryStats?.query_count ?? 0,
       avg_query_duration: round(queryStats?.avg_query_duration ?? 0),
     })

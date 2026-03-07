@@ -137,6 +137,7 @@ export class DashboardStore {
   private writeQueue: PersistRequestInput[] = []
   private pendingEvents: { requestIndex: number; events: EventRecord[] }[] = []
   private pendingLogs: Record<string, unknown>[] = []
+  private pendingEmails: EmailRecord[] = []
   private flushTimer: ReturnType<typeof setTimeout> | null = null
   private flushing: boolean = false
   private static readonly FLUSH_INTERVAL_MS = 500
@@ -209,13 +210,17 @@ export class DashboardStore {
       pool: {
         min: 1,
         max: 1,
+        // Fast-fail: if the connection can't be acquired within 5s,
+        // throw instead of silently queueing for tarn's default 30s.
+        acquireTimeoutMillis: 5_000,
         // Set PRAGMAs on every new connection (not just the first one)
         afterCreate(conn: unknown, done: (err: Error | null, conn: unknown) => void) {
           const raw = conn as { pragma: (stmt: string) => void }
           try {
             raw.pragma('journal_mode = WAL')
             raw.pragma('foreign_keys = ON')
-            raw.pragma('busy_timeout = 5000')
+            // Note: busy_timeout is a no-op via PRAGMA in better-sqlite3.
+            // Use the `timeout` constructor option in better-sqlite3 if needed.
           } catch {
             // Fallback: PRAGMAs will be set via db.raw() below
           }
@@ -229,7 +234,6 @@ export class DashboardStore {
     log.info('dashboard: setting PRAGMA...')
     await db.raw('PRAGMA journal_mode=WAL')
     await db.raw('PRAGMA foreign_keys=ON')
-    await db.raw('PRAGMA busy_timeout=5000')
     log.info('dashboard: PRAGMA set')
 
     log.info('dashboard: running migrations...')
@@ -421,31 +425,16 @@ export class DashboardStore {
     this.scheduleFlush()
   }
 
-  /** Record a single email — written immediately (low frequency). */
-  async recordEmail(record: EmailRecord): Promise<void> {
+  /** Record a single email — queued for batch flush (avoids bypassing the write queue). */
+  recordEmail(record: EmailRecord): void {
     if (!this.db) return
 
-    try {
-      await this.db('server_stats_emails').insert({
-        from_addr: record.from,
-        to_addr: record.to,
-        cc: record.cc,
-        bcc: record.bcc,
-        subject: record.subject,
-        html: record.html,
-        text_body: record.text,
-        mailer: record.mailer,
-        status: record.status,
-        message_id: record.messageId,
-        attachment_count: record.attachmentCount,
-      })
-    } catch (err) {
-      const method = 'recordEmail'
-      if (!warnedWritePaths.has(method)) {
-        warnedWritePaths.add(method)
-        log.warn(`dashboard: ${method} failed — ${(err as Error)?.message}`)
-      }
+    if (this.pendingEmails.length >= DashboardStore.MAX_QUEUE_SIZE) {
+      this.pendingEmails.splice(0, Math.floor(DashboardStore.MAX_QUEUE_SIZE / 4))
     }
+
+    this.pendingEmails.push(record)
+    this.scheduleFlush()
   }
 
   /** Schedule the next batch flush if not already scheduled. */
@@ -479,16 +468,63 @@ export class DashboardStore {
     const requests = this.writeQueue.splice(0)
     const logs = this.pendingLogs.splice(0)
     const events = this.pendingEvents.splice(0)
+    const emails = this.pendingEmails.splice(0)
 
-    if (requests.length === 0 && logs.length === 0 && events.length === 0) {
+    if (requests.length === 0 && logs.length === 0 && events.length === 0 && emails.length === 0) {
       this.flushing = false
       return
     }
 
+    // Pre-stringify JSON OUTSIDE the transaction so the synchronous
+    // better-sqlite3 execution doesn't block the event loop on large spans.
+    const preparedRequests = requests.map((input) => ({
+      input,
+      filteredQueries: input.queries
+        .filter((q) => q.connection !== 'server_stats')
+        .map((q) => ({
+          sql_text: q.sql,
+          sql_normalized: normalizeSql(q.sql),
+          bindings: q.bindings ? JSON.stringify(q.bindings) : null,
+          duration: round(q.duration),
+          method: q.method,
+          model: q.model,
+          connection: q.connection,
+          in_transaction: q.inTransaction ? 1 : 0,
+        })),
+      traceRow: input.trace
+        ? {
+            method: input.trace.method,
+            url: input.trace.url,
+            status_code: input.trace.statusCode,
+            total_duration: round(input.trace.totalDuration),
+            span_count: input.trace.spanCount,
+            spans: JSON.stringify(input.trace.spans),
+            warnings:
+              input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
+          }
+        : null,
+    }))
+
+    const preparedLogs = logs.map((entry) => {
+      const levelName =
+        typeof entry.levelName === 'string'
+          ? entry.levelName
+          : String(entry.level || 'unknown')
+      return {
+        level: levelName,
+        message: String(entry.msg || entry.message || ''),
+        request_id:
+          entry.request_id || entry.requestId || entry['x-request-id']
+            ? String(entry.request_id || entry.requestId || entry['x-request-id'])
+            : null,
+        data: JSON.stringify(entry),
+      }
+    })
+
     try {
       await this.db.transaction(async (trx) => {
         // -- Requests + queries + traces --
-        for (const input of requests) {
+        for (const { input, filteredQueries, traceRow } of preparedRequests) {
           try {
             const [requestId] = await trx('server_stats_requests').insert({
               method: input.method,
@@ -499,38 +535,15 @@ export class DashboardStore {
               warning_count: input.trace?.warnings?.length ?? 0,
             })
 
-            if (requestId != null && input.queries.length > 0) {
-              const filtered = input.queries.filter((q) => q.connection !== 'server_stats')
-              if (filtered.length > 0) {
-                const rows = filtered.map((q) => ({
-                  request_id: requestId,
-                  sql_text: q.sql,
-                  sql_normalized: normalizeSql(q.sql),
-                  bindings: q.bindings ? JSON.stringify(q.bindings) : null,
-                  duration: round(q.duration),
-                  method: q.method,
-                  model: q.model,
-                  connection: q.connection,
-                  in_transaction: q.inTransaction ? 1 : 0,
-                }))
-                for (let i = 0; i < rows.length; i += 50) {
-                  await trx('server_stats_queries').insert(rows.slice(i, i + 50))
-                }
+            if (requestId !== null && requestId !== undefined && filteredQueries.length > 0) {
+              const rows = filteredQueries.map((q) => ({ ...q, request_id: requestId }))
+              for (let i = 0; i < rows.length; i += 50) {
+                await trx('server_stats_queries').insert(rows.slice(i, i + 50))
               }
             }
 
-            if (requestId != null && input.trace) {
-              await trx('server_stats_traces').insert({
-                request_id: requestId,
-                method: input.trace.method,
-                url: input.trace.url,
-                status_code: input.trace.statusCode,
-                total_duration: round(input.trace.totalDuration),
-                span_count: input.trace.spanCount,
-                spans: JSON.stringify(input.trace.spans),
-                warnings:
-                  input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
-              })
+            if (requestId !== null && requestId !== undefined && traceRow) {
+              await trx('server_stats_traces').insert({ ...traceRow, request_id: requestId })
             }
           } catch (err) {
             if (!warnedWritePaths.has('persistRequest')) {
@@ -559,26 +572,38 @@ export class DashboardStore {
           }
         }
 
-        // -- Logs --
-        if (logs.length > 0) {
+        // -- Emails --
+        if (emails.length > 0) {
           try {
-            const rows = logs.map((entry) => {
-              const levelName =
-                typeof entry.levelName === 'string'
-                  ? entry.levelName
-                  : String(entry.level || 'unknown')
-              return {
-                level: levelName,
-                message: String(entry.msg || entry.message || ''),
-                request_id:
-                  entry.request_id || entry.requestId || entry['x-request-id']
-                    ? String(entry.request_id || entry.requestId || entry['x-request-id'])
-                    : null,
-                data: JSON.stringify(entry),
-              }
-            })
+            const rows = emails.map((record) => ({
+              from_addr: record.from,
+              to_addr: record.to,
+              cc: record.cc,
+              bcc: record.bcc,
+              subject: record.subject,
+              html: record.html,
+              text_body: record.text,
+              mailer: record.mailer,
+              status: record.status,
+              message_id: record.messageId,
+              attachment_count: record.attachmentCount,
+            }))
             for (let i = 0; i < rows.length; i += 50) {
-              await trx('server_stats_logs').insert(rows.slice(i, i + 50))
+              await trx('server_stats_emails').insert(rows.slice(i, i + 50))
+            }
+          } catch (err) {
+            if (!warnedWritePaths.has('recordEmail')) {
+              warnedWritePaths.add('recordEmail')
+              log.warn(`dashboard: recordEmail failed — ${(err as Error)?.message}`)
+            }
+          }
+        }
+
+        // -- Logs --
+        if (preparedLogs.length > 0) {
+          try {
+            for (let i = 0; i < preparedLogs.length; i += 50) {
+              await trx('server_stats_logs').insert(preparedLogs.slice(i, i + 50))
             }
           } catch (err) {
             if (!warnedWritePaths.has('recordLog')) {
@@ -597,8 +622,16 @@ export class DashboardStore {
       this.flushing = false
     }
 
+    // Yield to the event loop after the transaction so HTTP requests
+    // and timers get a chance to run between flush cycles.
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
     // If more data arrived during flush, schedule another
-    if (this.writeQueue.length > 0 || this.pendingLogs.length > 0) {
+    if (
+      this.writeQueue.length > 0 ||
+      this.pendingLogs.length > 0 ||
+      this.pendingEmails.length > 0
+    ) {
       this.scheduleFlush()
     }
   }
@@ -834,11 +867,11 @@ export class DashboardStore {
     const request = await this.db('server_stats_requests').where('id', id).first()
     if (!request) return null
 
-    const [queries, events, trace] = await Promise.all([
-      this.db('server_stats_queries').where('request_id', id).orderBy('created_at', 'asc'),
-      this.db('server_stats_events').where('request_id', id).orderBy('created_at', 'asc'),
-      this.db('server_stats_traces').where('request_id', id).first(),
-    ])
+    // Sequential awaits — with max:1 pool, Promise.all creates concurrent
+    // pendingAcquires that thrash tarn's scheduler and cause pool exhaustion.
+    const queries = await this.db('server_stats_queries').where('request_id', id).orderBy('created_at', 'asc')
+    const events = await this.db('server_stats_events').where('request_id', id).orderBy('created_at', 'asc')
+    const trace = await this.db('server_stats_traces').where('request_id', id).first()
 
     return {
       ...request,
@@ -868,12 +901,20 @@ export class DashboardStore {
 
     const cutoff = rangeToCutoff(range)
 
-    // Recent requests for calculations
-    const requests: Record<string, unknown>[] = await this.db('server_stats_requests')
+    // Aggregate counts and averages in SQL — never loads all rows into JS.
+    // Previous implementation fetched every row and computed stats in JS,
+    // which caused O(N) memory + CPU per call and froze the event loop
+    // on busy servers.
+    const stats: Record<string, unknown> | undefined = await this.db('server_stats_requests')
       .where('created_at', '>=', cutoff)
-      .select('duration', 'status_code', 'url', 'created_at')
+      .select(
+        this.db.raw('COUNT(*) as total'),
+        this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
+        this.db.raw('SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as error_count')
+      )
+      .first()
 
-    const total = requests.length
+    const total = Number(stats?.total ?? 0)
     if (total === 0) {
       return {
         avgResponseTime: 0,
@@ -887,13 +928,21 @@ export class DashboardStore {
       }
     }
 
-    const durations = requests.map((r) => r.duration as number).sort((a, b) => a - b)
-    const avgResponseTime = durations.reduce((s, d) => s + d, 0) / total
-    const p95Index = Math.floor(total * 0.95)
-    const p95ResponseTime = durations[Math.min(p95Index, total - 1)]
-    const errorCount = requests.filter((r) => (r.status_code as number) >= 400).length
+    const avgResponseTime = stats?.avg_duration as number
+    const errorCount = Number(stats?.error_count ?? 0)
     const rangeMinutes = rangeToMinutes(range)
     const requestsPerMin = total / rangeMinutes
+
+    // p95 via ORDER BY + OFFSET — avoids loading all rows into JS
+    const p95Offset = Math.floor(total * 0.95)
+    const p95Row = await this.db('server_stats_requests')
+      .where('created_at', '>=', cutoff)
+      .orderBy('duration', 'asc')
+      .offset(Math.min(p95Offset, total - 1))
+      .limit(1)
+      .select('duration')
+      .first()
+    const p95ResponseTime = (p95Row?.duration as number) ?? 0
 
     // Slowest endpoints (top 5 by average duration)
     const slowestEndpoints = await this.db('server_stats_requests')
@@ -1041,59 +1090,53 @@ export class DashboardStore {
     const cutoff = rangeToCutoff(range)
 
     try {
-      const [topEventsRaw, emailStatusRaw, logLevelsRaw, statusRaw, slowQueriesRaw] =
-        await Promise.all([
-          // Top 5 events by count
-          this.db('server_stats_events')
-            .select('event_name', this.db.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('event_name')
-            .orderBy('count', 'desc')
-            .limit(5),
+      // Sequential awaits — with max:1 pool, Promise.all creates 5
+      // concurrent pendingAcquires that overwhelm tarn's scheduler.
+      const topEventsRaw = await this.db('server_stats_events')
+        .select('event_name', this.db.raw('COUNT(*) as count'))
+        .where('created_at', '>=', cutoff)
+        .groupBy('event_name')
+        .orderBy('count', 'desc')
+        .limit(5)
 
-          // Email activity by status
-          this.db('server_stats_emails')
-            .select('status', this.db.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('status'),
+      const emailStatusRaw = await this.db('server_stats_emails')
+        .select('status', this.db.raw('COUNT(*) as count'))
+        .where('created_at', '>=', cutoff)
+        .groupBy('status')
 
-          // Log level breakdown
-          this.db('server_stats_logs')
-            .select('level', this.db.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('level'),
+      const logLevelsRaw = await this.db('server_stats_logs')
+        .select('level', this.db.raw('COUNT(*) as count'))
+        .where('created_at', '>=', cutoff)
+        .groupBy('level')
 
-          // Status code distribution bucketed into 2xx/3xx/4xx/5xx
-          this.db('server_stats_requests')
-            .select(
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
-              ),
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
-              ),
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
-              ),
-              this.db.raw(
-                `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
-              )
-            )
-            .where('created_at', '>=', cutoff)
-            .first(),
+      const statusRaw = await this.db('server_stats_requests')
+        .select(
+          this.db.raw(
+            `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
+          ),
+          this.db.raw(
+            `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
+          ),
+          this.db.raw(
+            `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
+          ),
+          this.db.raw(
+            `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
+          )
+        )
+        .where('created_at', '>=', cutoff)
+        .first()
 
-          // Slowest queries by avg duration (top 5)
-          this.db('server_stats_queries')
-            .select(
-              'sql_normalized',
-              this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
-              this.db.raw('COUNT(*) as count')
-            )
-            .where('created_at', '>=', cutoff)
-            .groupBy('sql_normalized')
-            .orderBy('avg_duration', 'desc')
-            .limit(5),
-        ])
+      const slowQueriesRaw = await this.db('server_stats_queries')
+        .select(
+          'sql_normalized',
+          this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
+          this.db.raw('COUNT(*) as count')
+        )
+        .where('created_at', '>=', cutoff)
+        .groupBy('sql_normalized')
+        .orderBy('avg_duration', 'desc')
+        .limit(5)
 
       // Map top events
       const topEvents = (topEventsRaw || []).map((r: Record<string, unknown>) => ({

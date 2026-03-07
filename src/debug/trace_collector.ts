@@ -50,6 +50,7 @@ export async function trace<T>(label: string, fn: () => Promise<T>): Promise<T> 
  * the request context. Users can add custom spans via {@link trace}.
  */
 export class TraceCollector {
+  private static readonly MAX_SPANS_PER_TRACE = 200
   private buffer: RingBuffer<TraceRecord>
   private als = new AsyncLocalStorage<TraceContext>()
   private emitter: Emitter | null = null
@@ -106,6 +107,7 @@ export class TraceCollector {
   ): void {
     const ctx = this.als.getStore()
     if (!ctx) return
+    if (ctx.spans.length >= TraceCollector.MAX_SPANS_PER_TRACE) return
 
     ctx.spans.push({
       id: String(ctx.nextSpanId++),

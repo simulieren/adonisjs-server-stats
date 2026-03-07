@@ -147,13 +147,15 @@ export default class DashboardController {
     return this.withDb(response, 'overview', emptyOverview(), async () => {
       const range = request.qs().range || '1h'
 
-      const [overview, widgets, sparklineData] = await Promise.all([
-        this.dashboardStore.getOverviewMetrics(range),
-        this.dashboardStore.getOverviewWidgets(range),
-        this.dashboardStore.getSparklineData(range),
-      ])
+      // Sequential awaits — with a single-connection SQLite pool, Promise.all
+      // creates concurrent pendingAcquires that thrash tarn's scheduler.
+      const overview = await this.dashboardStore.getOverviewMetrics(range)
       if (!overview) return emptyOverview()
+      const widgets = await this.dashboardStore.getOverviewWidgets(range)
+      const sparklineData = await this.dashboardStore.getSparklineData(range)
 
+      // Cache and queue inspectors use Redis/BullMQ (not SQLite), so
+      // Promise.all is fine here — different connection pools.
       const [cacheStats, jobQueueStatus] = await Promise.all([
         this.fetchCacheOverview(),
         this.fetchQueueOverview(),
