@@ -1,6 +1,6 @@
 {
   "name": "adonisjs-server-stats",
-  "version": "1.6.4",
+  "version": "1.6.5",
   "description": "Real-time server monitoring for AdonisJS v6 applications",
   "keywords": [
     "adonisjs",
