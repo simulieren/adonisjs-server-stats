@@ -11,8 +11,9 @@ import type { Gauge } from 'prom-client'
  *
  * At runtime the shape is identical to `configProvider.create(...)`.
  */
-export function serverStatsCollector(): { resolver: (app: any) => Promise<any> } {
+export function serverStatsCollector(): { type: 'provider'; resolver: (app: any) => Promise<any> } {
   return {
+    type: 'provider',
     resolver: async (app: any) => {
       const { Collector } = await import('@julr/adonisjs-prometheus/collectors/collector')
       const config = app.config.get('prometheus', {})
