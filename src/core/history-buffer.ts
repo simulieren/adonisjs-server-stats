@@ -41,7 +41,7 @@ export function createHistoryBuffer(maxLength: number = MAX_HISTORY): HistoryBuf
 
   function toArray(ring: { data: number[]; head: number; count: number }): number[] {
     if (ring.count === 0) return []
-    const result = new Array(ring.count)
+    const result: number[] = Array.from({ length: ring.count })
     const start = ring.count < maxLength ? 0 : ring.head
     for (let i = 0; i < ring.count; i++) {
       result[i] = ring.data[(start + i) % maxLength]
@@ -59,7 +59,7 @@ export function createHistoryBuffer(maxLength: number = MAX_HISTORY): HistoryBuf
         const value = metric.extract(stats)
         if (typeof value !== 'number') continue
 
-        if (!rings[key]) rings[key] = { data: new Array(maxLength), head: 0, count: 0 }
+        if (!rings[key]) rings[key] = { data: Array.from({ length: maxLength }), head: 0, count: 0 }
         const ring = rings[key]
         ring.data[ring.head] = value
         ring.head = (ring.head + 1) % maxLength

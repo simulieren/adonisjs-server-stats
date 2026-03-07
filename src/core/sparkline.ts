@@ -217,7 +217,7 @@ export function buildSparklineData(
   const len = values.length
 
   // Build point strings (shared between polyline points and area path)
-  const pts = new Array<string>(len)
+  const pts: string[] = Array.from({ length: len })
   for (let i = 0; i < len; i++) {
     const x = pad + (i / (len - 1)) * iw
     const y = pad + ih - ((values[i] - stats.min) / range) * ih

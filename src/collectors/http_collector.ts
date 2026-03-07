@@ -68,6 +68,12 @@ export function getRequestMetrics(): RequestMetrics | null {
  * ```
  */
 export function httpCollector(opts?: HttpCollectorOptions): MetricCollector {
+  if (sharedInstance) {
+    console.warn(
+      '[server-stats] httpCollector() called again — replacing previous RequestMetrics instance'
+    )
+  }
+
   const metrics = new RequestMetrics(opts)
   sharedInstance = metrics
 

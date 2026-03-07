@@ -11,12 +11,18 @@ import type { Gauge } from 'prom-client'
  *
  * At runtime the shape is identical to `configProvider.create(...)`.
  */
-export function serverStatsCollector(): { type: 'provider'; resolver: (app: any) => Promise<any> } {
+export function serverStatsCollector(): {
+  type: 'provider'
+  resolver: (app: unknown) => Promise<unknown>
+} {
   return {
     type: 'provider',
-    resolver: async (app: any) => {
+    resolver: async (app: unknown) => {
       const { Collector } = await import('@julr/adonisjs-prometheus/collectors/collector')
-      const config = app.config.get('prometheus', {})
+      const config = (app as { config: { get: (key: string, fallback: Record<string, unknown>) => unknown } }).config.get(
+        'prometheus',
+        {}
+      )
 
       class ServerStatsCollectorImpl extends Collector {
         static instance: ServerStatsCollectorImpl | null = null
@@ -218,7 +224,7 @@ export function serverStatsCollector(): { type: 'provider'; resolver: (app: any)
         }
       }
 
-      return new ServerStatsCollectorImpl(config)
+      return new ServerStatsCollectorImpl(config as ConstructorParameters<typeof Collector>[0])
     },
   }
 }

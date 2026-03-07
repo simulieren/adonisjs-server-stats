@@ -81,7 +81,7 @@ export function parseTraceWarnings(raw: unknown): string[] {
 /**
  * Resolve a numeric field that may appear under a snake_case or camelCase key.
  *
- * Returns the first truthy value found, or the provided fallback (default `0`).
+ * Returns the first non-nullish value found, or the provided fallback (default `0`).
  */
 export function resolveTraceField(
   trace: Record<string, unknown>,
@@ -89,7 +89,7 @@ export function resolveTraceField(
   camelKey: string,
   fallback: number = 0
 ): number {
-  return (trace[snakeKey] as number) || (trace[camelKey] as number) || fallback
+  return (trace[snakeKey] as number) ?? (trace[camelKey] as number) ?? fallback
 }
 
 /**

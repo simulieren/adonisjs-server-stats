@@ -63,6 +63,13 @@ export function getLogStreamService(): LogStreamService | null {
  * ```
  */
 export function logCollector(opts?: LogCollectorOptions): MetricCollector {
+  if (sharedLogStream) {
+    console.warn(
+      '[server-stats] logCollector() called again — stopping previous LogStreamService instance'
+    )
+    sharedLogStream.stop()
+  }
+
   const service = new LogStreamService(opts?.logPath)
   sharedLogStream = service
 

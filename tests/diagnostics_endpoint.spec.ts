@@ -220,23 +220,34 @@ test.group('Diagnostics | getStorageStats under rapid polling', () => {
 
   test('error in getStorageStats does not poison the inflight map', async ({ assert }) => {
     const store = new StorageStatsCache()
+
+    // Monkey-patch the coalesced inner logic to force a rejection
+    const originalGetStorageStats = store.getStorageStats.bind(store)
     let shouldFail = true
+    store.getStorageStats = function (queryDelayMs?: number) {
+      if (shouldFail) {
+        // Access private coalesce via the prototype to ensure inflight cleanup is tested
+        return (store as any).coalesce('storageStats', async () => {
+          throw new Error('Simulated DB failure')
+        })
+      }
+      return originalGetStorageStats(queryDelayMs)
+    } as typeof store.getStorageStats
 
-    // Override getStorageStats to fail on first call
-    const originalMethod = store.getStorageStats.bind(store)
-    let callCount = 0
-
-    // We test the coalesce error cleanup by creating a custom scenario
-    const failingStore = new StorageStatsCache()
-
-    // Manually simulate a query that errors
+    // Fire 10 concurrent calls that should all fail
     const errorPromises = Array.from({ length: 10 }, () =>
-      failingStore.getStorageStats(5).catch(() => null)
+      store.getStorageStats(5).catch(() => null)
     )
-
-    // Even if calls fail, inflight should clean up
     await Promise.allSettled(errorPromises)
-    assert.equal(failingStore.inflightSize, 0, 'Inflight map should be clean after errors')
+
+    // Inflight map must be clean even after errors
+    assert.equal(store.inflightSize, 0, 'Inflight map should be clean after errors')
+
+    // Subsequent calls after the failure should still work
+    shouldFail = false
+    const result = await store.getStorageStats(5)
+    assert.isTrue(result.ready, 'Store should recover after transient errors')
+    assert.equal(store.inflightSize, 0, 'Inflight map should be clean after recovery')
   })
 })
 

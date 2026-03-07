@@ -55,7 +55,13 @@ export class StatsEngine {
    */
   async start(): Promise<void> {
     for (const collector of this.collectors) {
-      await collector.start?.()
+      try {
+        await collector.start?.()
+      } catch (err) {
+        console.warn(
+          `[server-stats] collector "${collector.name}" threw during start() — ${(err as Error).message}`
+        )
+      }
     }
 
     if (this.collectors.length > 0) {
@@ -74,7 +80,13 @@ export class StatsEngine {
    */
   async stop(): Promise<void> {
     for (const collector of this.collectors) {
-      await collector.stop?.()
+      try {
+        await collector.stop?.()
+      } catch (err) {
+        console.warn(
+          `[server-stats] collector "${collector.name}" threw during stop() — ${(err as Error).message}`
+        )
+      }
     }
 
     for (const health of this.collectorHealth.values()) {

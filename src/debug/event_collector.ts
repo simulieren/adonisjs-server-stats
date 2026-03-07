@@ -98,7 +98,7 @@ export class EventCollector {
 
     if (Array.isArray(value)) {
       const take = Math.min(value.length, 20)
-      const arr = new Array(take)
+      const arr: unknown[] = Array.from({ length: take })
       for (let i = 0; i < take; i++) {
         arr[i] = this.limitDepth(value[i], maxDepth - 1, seen)
       }

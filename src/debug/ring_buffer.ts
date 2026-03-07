@@ -46,7 +46,7 @@ export class RingBuffer<T> {
   latest(n: number): T[] {
     if (this.count === 0) return []
     const take = Math.min(n, this.count)
-    const result: T[] = new Array(take)
+    const result: T[] = Array.from({ length: take })
 
     // Walk backwards from the most recently inserted item
     for (let i = 0; i < take; i++) {

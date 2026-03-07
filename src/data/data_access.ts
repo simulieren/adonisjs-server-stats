@@ -11,13 +11,7 @@ import type {
   LogFilters,
 } from '../dashboard/dashboard_store.js'
 import type { DebugStore } from '../debug/debug_store.js'
-import type {
-  QueryRecord,
-  EventRecord,
-  EmailRecord,
-  TraceRecord,
-  RouteRecord,
-} from '../debug/types.js'
+import type { QueryRecord, EventRecord, TraceRecord, RouteRecord } from '../debug/types.js'
 
 // ---------------------------------------------------------------------------
 // Public types

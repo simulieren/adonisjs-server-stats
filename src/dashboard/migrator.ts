@@ -211,21 +211,18 @@ export async function runRetentionCleanup(db: Knex, retentionDays: number): Prom
     // Batch deletes to avoid blocking the event loop for large tables.
     // Each batch deletes up to 1000 rows, yielding between batches.
     const batchDelete = async (table: string) => {
-      let deleted: number
-      do {
-        const result = await db.raw(
+      let hasMore = true
+      while (hasMore) {
+        await db.raw(
           `DELETE FROM ${table} WHERE rowid IN (SELECT rowid FROM ${table} WHERE created_at < ${cutoff} LIMIT 1000)`
         )
-        deleted = (result as unknown as number) ?? 0
-        // SQLite returns the number of changes via better-sqlite3's .run().changes
-        // but through Knex.raw() the exact shape varies — loop until no matches
         const remaining = await db.raw(
           `SELECT COUNT(*) as cnt FROM ${table} WHERE created_at < ${cutoff} LIMIT 1`
         )
         const cnt = (remaining as unknown as Array<{ cnt: number }>)?.[0]?.cnt ?? 0
-        if (cnt === 0) break
-        await yieldToEventLoop()
-      } while (true)
+        hasMore = cnt > 0
+        if (hasMore) await yieldToEventLoop()
+      }
     }
 
     // Cascade deletes queries, events, traces via FK ON DELETE CASCADE
