@@ -112,6 +112,17 @@ function fromDashboardResult<T>(result: {
   }
 }
 
+function mapTraceListRow<T extends Record<string, unknown>>(row: T) {
+  return {
+    ...row,
+    requestId: row.request_id ?? row.requestId,
+    statusCode: row.status_code ?? row.statusCode,
+    totalDuration: row.total_duration ?? row.totalDuration,
+    spanCount: row.span_count ?? row.spanCount,
+    createdAt: row.created_at ?? row.createdAt,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // DataAccess
 // ---------------------------------------------------------------------------
@@ -269,7 +280,10 @@ export class DataAccess {
         ...(opts.filters as Partial<TraceFilters>),
       }
       const result = await this.dashboardStore!.getTraces(page, perPage, filters)
-      return fromDashboardResult(result)
+      return {
+        ...fromDashboardResult(result),
+        data: result.data.map(mapTraceListRow),
+      }
     }
 
     if (!this.debugStore.traces) {
