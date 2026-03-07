@@ -247,7 +247,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
           .get(
             '/emails',
             bindApi(async (api, ctx) => {
-              const result = await api.getEmails({ source: 'memory' })
+              const result = await api.getEmails({})
               return ctx.response.json({ emails: result.data, total: result.meta.total })
             })
           )
@@ -258,7 +258,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
             '/emails/:id/preview',
             bindApi(async (api, ctx) => {
               const id = Number(ctx.params.id)
-              const html = await api.getEmailPreview(id, 'memory')
+              const html = await api.getEmailPreview(id)
               if (!html) {
                 return ctx.response.notFound({ error: 'Email not found' })
               }
