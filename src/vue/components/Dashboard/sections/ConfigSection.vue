@@ -58,6 +58,11 @@ function onSearchInput(val: string) {
   }, 200)
 }
 
+/** Extract input value from a DOM event (avoids `as` cast in template). */
+function inputValue(e: Event): string {
+  return (e.target as HTMLInputElement).value
+}
+
 // -- Data accessors ---------------------------------------------------------
 
 const config = computed(() => {
@@ -203,6 +208,23 @@ function getAppVal(key: string): ConfigValue {
   return (app as Record<string, ConfigValue>)[key] ?? null
 }
 
+/** Get the revealed or display text for a redacted value (avoids `as RedactedValue` in template). */
+function redactedText(value: ConfigValue, revealed: boolean): string {
+  if (!isRedactedValue(value)) return ''
+  return revealed ? (value as RedactedValue).value : (value as RedactedValue).display
+}
+
+function clearSearch() {
+  searchInput.value = ''
+  search.value = ''
+}
+
+/** Get the display string for a redacted value (avoids `as RedactedValue` in template). */
+function redactedLabel(value: ConfigValue): string {
+  if (!isRedactedValue(value)) return ''
+  return (value as RedactedValue).display
+}
+
 /** Eye icon SVG elements as joined HTML. */
 const eyeIconHtml = computed(() => TAB_ICONS.eye.elements.join(''))
 const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
@@ -239,7 +261,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
           placeholder="Search keys and values..."
           :value="searchInput"
           style="width: 100%"
-          @input="onSearchInput(($event.target as HTMLInputElement).value)"
+          @input="onSearchInput(inputValue($event))"
         />
         <button
           v-if="searchInput"
@@ -257,10 +279,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
             padding: '0 2px',
             lineHeight: 1,
           }"
-          @click="
-            searchInput = ''
-            search = ''
-          "
+          @click="clearSearch"
         >
           &times;
         </button>
@@ -301,11 +320,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   :class="`${p}-config-redacted`"
                   :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                 >
-                  <span>{{
-                    revealedKeys.has(key)
-                      ? (value as RedactedValue).value
-                      : (value as RedactedValue).display
-                  }}</span>
+                  <span>{{ redactedText(value, revealedKeys.has(key)) }}</span>
                   <button
                     type="button"
                     :class="`${p}-btn`"
@@ -395,11 +410,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   :class="`${p}-config-redacted`"
                   :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                 >
-                  <span>{{
-                    revealedKeys.has(item.path)
-                      ? (item.value as RedactedValue).value
-                      : (item.value as RedactedValue).display
-                  }}</span>
+                  <span>{{ redactedText(item.value, revealedKeys.has(item.path)) }}</span>
                   <button
                     type="button"
                     :class="`${p}-btn`"
@@ -455,7 +466,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                   :ref="(el: any) => setCopyBtnRef(`search-${item.path}`, el)"
                   @click="
                     onCopyRow(
-                      `${item.path}: ${isRedactedValue(item.value) ? (item.value as RedactedValue).display : getFmt(item.value).text}`,
+                      `${item.path}: ${isRedactedValue(item.value) ? redactedLabel(item.value) : getFmt(item.value).text}`,
                       `search-${item.path}`,
                       $event
                     )
@@ -516,7 +527,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                       <td
                         :title="
                           isRedactedValue(item.value)
-                            ? (item.value as RedactedValue).display
+                            ? redactedLabel(item.value)
                             : getFmt(item.value).text
                         "
                       >
@@ -526,11 +537,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                           :class="`${p}-config-redacted`"
                           :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                         >
-                          <span>{{
-                            revealedKeys.has(item.path)
-                              ? (item.value as RedactedValue).value
-                              : (item.value as RedactedValue).display
-                          }}</span>
+                          <span>{{ redactedText(item.value, revealedKeys.has(item.path)) }}</span>
                           <button
                             type="button"
                             :class="`${p}-btn`"
@@ -616,11 +623,7 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                     :class="`${p}-config-redacted`"
                     :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                   >
-                    <span>{{
-                      revealedKeys.has(key)
-                        ? (getAppVal(key) as RedactedValue).value
-                        : (getAppVal(key) as RedactedValue).display
-                    }}</span>
+                    <span>{{ redactedText(getAppVal(key), revealedKeys.has(key)) }}</span>
                     <button
                       type="button"
                       :class="`${p}-btn`"

@@ -148,6 +148,16 @@ function removeStructuredFilter(index: number) {
   structuredFilters.value.splice(index, 1)
   syncStructuredFilters()
 }
+
+/** Extract input value from a DOM event (avoids `as` cast in template). */
+function inputValue(e: Event): string {
+  return (e.target as HTMLInputElement).value
+}
+
+/** Extract select value from a DOM event (avoids `as` cast in template). */
+function selectValue(e: Event): string {
+  return (e.target as HTMLSelectElement).value
+}
 </script>
 
 <template>
@@ -173,7 +183,7 @@ function removeStructuredFilter(index: number) {
           class="ss-dash-filter-input ss-dash-reqid-input"
           placeholder="Filter by request ID..."
           :value="reqIdInput"
-          @input="reqIdInput = ($event.target as HTMLInputElement).value"
+          @input="reqIdInput = inputValue($event)"
           @keydown.enter="handleReqIdInputSubmit"
         />
         <button
@@ -192,7 +202,7 @@ function removeStructuredFilter(index: number) {
       <select
         class="ss-dash-filter-select"
         :value="structuredField"
-        @change="structuredField = ($event.target as HTMLSelectElement).value"
+        @change="structuredField = selectValue($event)"
       >
         <option value="level">level</option>
         <option value="message">message</option>
@@ -204,7 +214,7 @@ function removeStructuredFilter(index: number) {
       <select
         class="ss-dash-filter-select"
         :value="structuredOp"
-        @change="structuredOp = ($event.target as HTMLSelectElement).value"
+        @change="structuredOp = selectValue($event)"
       >
         <option value="equals">equals</option>
         <option value="contains">contains</option>
@@ -214,7 +224,7 @@ function removeStructuredFilter(index: number) {
         class="ss-dash-filter-input"
         placeholder="Value..."
         :value="structuredValue"
-        @input="structuredValue = ($event.target as HTMLInputElement).value"
+        @input="structuredValue = inputValue($event)"
         @keydown.enter="addStructuredFilter"
       />
       <button type="button" class="ss-dash-btn" @click="addStructuredFilter">Add</button>
@@ -264,7 +274,7 @@ function removeStructuredFilter(index: number) {
 
     <template v-else>
       <div class="ss-dash-log-entries">
-        <div v-for="(log, i) in logs" :key="(log.id as string) || i" class="ss-dash-log-entry">
+        <div v-for="(log, i) in logs" :key="log.id || i" class="ss-dash-log-entry">
           <span
             :class="`ss-dash-log-level ${getLogLevelCssClass(resolveLogLevel(log), 'ss-dash-log-level')}`"
           >

@@ -38,6 +38,11 @@ function handleSort(col: Column) {
   }
 }
 
+/** Compute a stable key for a row (avoids `as` cast in template). */
+function rowKey(row: Record<string, unknown>, index: number): string | number {
+  return (row[props.keyField || 'id'] as PropertyKey) ?? index
+}
+
 const { tableRef } = useResizableTable(() => props.rows)
 </script>
 
@@ -72,7 +77,7 @@ const { tableRef } = useResizableTable(() => props.rows)
     <tbody>
       <tr
         v-for="(row, index) in rows"
-        :key="(row[keyField || 'id'] as PropertyKey) ?? index"
+        :key="rowKey(row, index)"
         :class="
           [clickable ? 'ss-dash-clickable' : '', rowClassName || ''].filter(Boolean).join(' ')
         "
