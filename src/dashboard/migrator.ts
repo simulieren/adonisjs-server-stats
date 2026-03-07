@@ -183,18 +183,28 @@ export async function autoMigrate(db: Knex): Promise<void> {
 export async function runRetentionCleanup(db: Knex, retentionDays: number): Promise<void> {
   const modifier = `-${retentionDays} days`
 
-  // Cascade deletes queries, events, traces via FK ON DELETE CASCADE
-  await db.raw(`DELETE FROM server_stats_requests WHERE created_at < datetime('now', ?)`, [
-    modifier,
-  ])
-  await yieldToEventLoop()
+  try {
+    // Cascade deletes queries, events, traces via FK ON DELETE CASCADE
+    await db.raw(`DELETE FROM server_stats_requests WHERE created_at < datetime('now', ?)`, [
+      modifier,
+    ])
+    await yieldToEventLoop()
 
-  // Standalone tables
-  await db.raw(`DELETE FROM server_stats_logs WHERE created_at < datetime('now', ?)`, [modifier])
-  await yieldToEventLoop()
+    // Standalone tables
+    await db.raw(`DELETE FROM server_stats_logs WHERE created_at < datetime('now', ?)`, [modifier])
+    await yieldToEventLoop()
 
-  await db.raw(`DELETE FROM server_stats_emails WHERE created_at < datetime('now', ?)`, [modifier])
-  await yieldToEventLoop()
+    await db.raw(`DELETE FROM server_stats_emails WHERE created_at < datetime('now', ?)`, [
+      modifier,
+    ])
+    await yieldToEventLoop()
 
-  await db.raw(`DELETE FROM server_stats_metrics WHERE created_at < datetime('now', ?)`, [modifier])
+    await db.raw(`DELETE FROM server_stats_metrics WHERE created_at < datetime('now', ?)`, [
+      modifier,
+    ])
+  } catch (err) {
+    // Log but don't throw — retention cleanup failure shouldn't block init
+    const { log } = await import('../utils/logger.js')
+    log.warn(`dashboard: retention cleanup error — ${(err as Error)?.message}`)
+  }
 }

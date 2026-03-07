@@ -159,10 +159,13 @@ export class DashboardStore {
     // devDep copy when symlinked (file: dependency), which may have
     // different native bindings or conflict with the app's copies.
     log.info('dashboard: loading knex...')
-    const { appImport } = await import('../utils/app_import.js')
+    const { appImportWithPath } = await import('../utils/app_import.js')
     let knexModule: unknown
+    let knexPath: string
     try {
-      knexModule = await appImport('knex')
+      const result = await appImportWithPath('knex')
+      knexModule = result.module
+      knexPath = result.resolvedPath
     } catch (err) {
       throw new Error(
         `Could not load knex: ${(err as Error)?.message}. ` +
@@ -170,21 +173,22 @@ export class DashboardStore {
       )
     }
 
-    let betterSqlite3Available = true
+    let sqlite3Path: string
     try {
-      await appImport('better-sqlite3')
-    } catch {
-      betterSqlite3Available = false
-    }
-    if (!betterSqlite3Available) {
+      const result = await appImportWithPath('better-sqlite3')
+      sqlite3Path = result.resolvedPath
+    } catch (err) {
       throw new Error(
-        'Could not load better-sqlite3. ' +
+        `Could not load better-sqlite3: ${(err as Error)?.message}. ` +
           'Install it with: npm install better-sqlite3'
       )
     }
 
+    log.info(`dashboard: knex resolved from ${knexPath}`)
+    log.info(`dashboard: better-sqlite3 resolved from ${sqlite3Path}`)
+
     const knexFactory = (knexModule as Record<string, unknown>).default ?? knexModule
-    log.info('dashboard: opening SQLite database...')
+    log.info(`dashboard: opening SQLite database at ${dbFilePath}`)
     const db: Knex = (knexFactory as Function)({
       client: 'better-sqlite3',
       connection: { filename: dbFilePath },
@@ -195,11 +199,15 @@ export class DashboardStore {
     log.info('dashboard: setting PRAGMA...')
     await db.raw('PRAGMA journal_mode=WAL')
     await db.raw('PRAGMA foreign_keys=ON')
+    log.info('dashboard: PRAGMA set')
 
     log.info('dashboard: running migrations...')
     await autoMigrate(db)
+    log.info('dashboard: migrations complete')
+
     log.info('dashboard: running retention cleanup...')
     await runRetentionCleanup(db, this.config.retentionDays)
+    log.info('dashboard: retention cleanup complete')
     this.lastCleanupAt = Date.now()
 
     // Hourly retention cleanup

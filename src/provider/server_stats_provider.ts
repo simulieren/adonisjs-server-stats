@@ -682,6 +682,8 @@ export default class ServerStatsProvider {
       return
     }
 
+    log.info('dashboard: binding to container...')
+
     // Bind to container
     ;(this.app.container as unknown as ContainerWithSingleton).singleton(
       'dashboard.store',
@@ -692,12 +694,14 @@ export default class ServerStatsProvider {
     setDashboardPath(toolbarConfig.dashboardPath)
 
     // Create the controller — this makes the routes registered in boot() functional
+    log.info('dashboard: creating controller...')
     const DashboardControllerClass = (await import('../dashboard/dashboard_controller.js')).default
     this.dashboardController = new DashboardControllerClass(this.dashboardStore, this.app)
 
     // ── Log piping ────────────────────────────────────────────────
     // If the log collector is already hooked into Pino (zero-config mode),
     // piggyback on it instead of creating a separate file poller.
+    log.info('dashboard: setting up log piping...')
     const existingLogStream = getLogStreamService()
     if (existingLogStream && !existingLogStream['logPath']) {
       // Stream mode — add a listener for dashboard persistence

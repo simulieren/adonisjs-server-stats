@@ -25,3 +25,22 @@ export async function appImport<T = unknown>(specifier: string): Promise<T> {
     return await import(specifier)
   }
 }
+
+/**
+ * Same as {@link appImport} but also returns the resolved file path.
+ * Useful for diagnostic logging.
+ */
+export async function appImportWithPath<T = unknown>(
+  specifier: string
+): Promise<{ module: T; resolvedPath: string }> {
+  try {
+    const appRequire = createRequire(join(process.cwd(), 'package.json'))
+    const resolved = appRequire.resolve(specifier)
+    const module = await import(pathToFileURL(resolved).href)
+    return { module: module as T, resolvedPath: resolved }
+  } catch {
+    // Fallback: normal import (works when not symlinked)
+    const module = await import(specifier)
+    return { module: module as T, resolvedPath: `(bare import: ${specifier})` }
+  }
+}
