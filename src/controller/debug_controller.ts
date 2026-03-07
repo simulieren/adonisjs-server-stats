@@ -37,6 +37,7 @@ export default class DebugController {
 
     // Derive feature flags from the actual config
     const rawCollectors = cfg?.collectors
+    const isAuto = rawCollectors === 'auto'
     const collectorNames = new Set(
       Array.isArray(rawCollectors) ? rawCollectors.map((c) => c.name) : []
     )
@@ -46,15 +47,15 @@ export default class DebugController {
       debugPanel: !!toolbarConfig?.enabled,
       dashboard: !!toolbarConfig?.dashboard,
       tracing: !!toolbarConfig?.tracing,
-      process: collectorNames.has('process'),
-      system: collectorNames.has('system'),
-      http: collectorNames.has('http'),
-      db: collectorNames.has('db_pool'),
-      redis: collectorNames.has('redis'),
-      queues: collectorNames.has('queue'),
-      cache: collectorNames.has('redis'),
-      app: collectorNames.has('app'),
-      log: collectorNames.has('log'),
+      process: isAuto || collectorNames.has('process'),
+      system: isAuto || collectorNames.has('system'),
+      http: isAuto || collectorNames.has('http'),
+      db: isAuto || collectorNames.has('db_pool'),
+      redis: isAuto || collectorNames.has('redis'),
+      queues: isAuto || collectorNames.has('queue'),
+      cache: isAuto || collectorNames.has('redis'),
+      app: isAuto || collectorNames.has('app'),
+      log: isAuto || collectorNames.has('log'),
       emails: !!toolbarConfig?.enabled,
     }
 

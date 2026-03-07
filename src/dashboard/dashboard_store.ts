@@ -1462,13 +1462,15 @@ export class DashboardStore {
    * Wire email event listeners to persist emails as they arrive.
    */
   private wireEventListeners(): void {
-    if (!this.emitter || typeof this.emitter.on !== 'function') return
+    if (!this.emitter || typeof this.emitter.on !== 'function') {
+      log.warn('dashboard: emitter not available — email collection disabled')
+      return
+    }
 
     const buildAndPersistEmail = (data: unknown, status: EmailRecord['status']) => {
       const d = data as Record<string, unknown> | undefined
       const msg = (d?.message || d) as Record<string, unknown> | undefined
-      const record: EmailRecord = {
-        id: 0,
+      const record = {
         from: extractAddresses(msg?.from) || 'unknown',
         to: extractAddresses(msg?.to) || 'unknown',
         cc: extractAddresses(msg?.cc) || null,
@@ -1486,11 +1488,12 @@ export class DashboardStore {
           ? (msg.attachments as unknown[]).length
           : 0,
         timestamp: Date.now(),
-      }
+      } as EmailRecord
       this.recordEmail(record)
     }
 
     this.handlers = [
+      { event: 'mail:sending', fn: (data: unknown) => buildAndPersistEmail(data, 'sending') },
       { event: 'mail:sent', fn: (data: unknown) => buildAndPersistEmail(data, 'sent') },
       { event: 'mail:queued', fn: (data: unknown) => buildAndPersistEmail(data, 'queued') },
       { event: 'queued:mail:error', fn: (data: unknown) => buildAndPersistEmail(data, 'failed') },
