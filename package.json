@@ -1,6 +1,6 @@
 {
   "name": "adonisjs-server-stats",
-  "version": "1.6.14",
+  "version": "1.7.0",
   "description": "Real-time server monitoring for AdonisJS v6 applications",
   "keywords": [
     "adonisjs",
@@ -73,6 +73,10 @@
     "./log-stream/provider": {
       "types": "./dist/src/log_stream/log_stream_provider.d.ts",
       "import": "./dist/src/log_stream/log_stream_provider.js"
+    },
+    "./email-bridge/provider": {
+      "types": "./dist/src/provider/email_bridge_provider.d.ts",
+      "import": "./dist/src/provider/email_bridge_provider.js"
     },
     "./edge": {
       "types": "./dist/src/edge/plugin.d.ts",
