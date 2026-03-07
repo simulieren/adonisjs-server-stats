@@ -105,16 +105,19 @@ export default class ServerStatsProvider {
         ? (toolbarConfig.debugEndpoint ?? '/admin/api/debug')
         : undefined
 
-      // Check dashboard dependencies before registering dashboard routes
+      // Check dashboard dependencies before registering dashboard routes.
+      // Must use appImport — bare import() resolves to this package's
+      // devDeps when symlinked, not the app's actual dependencies.
       if (toolbarConfig?.enabled && toolbarConfig.dashboard) {
+        const { appImport } = await import('../utils/app_import.js')
         const missing: string[] = []
         try {
-          await import('knex')
+          await appImport('knex')
         } catch {
           missing.push('knex')
         }
         try {
-          await import('better-sqlite3')
+          await appImport('better-sqlite3')
         } catch {
           missing.push('better-sqlite3')
         }
@@ -618,11 +621,21 @@ export default class ServerStatsProvider {
     this.dashboardStore = new DashboardStoreClass(toolbarConfig)
     const appRoot = this.app.makePath('')
     try {
-      await this.dashboardStore.start(
+      // Timeout safety net: if SQLite init hangs (e.g. wrong native binary
+      // loaded via symlink), abort after 15s instead of freezing forever.
+      const TIMEOUT_MS = 15_000
+      const startPromise = this.dashboardStore.start(
         null,
         emitter as Parameters<DashboardStore['start']>[1],
         appRoot
       )
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error(`Dashboard SQLite initialization timed out after ${TIMEOUT_MS / 1000}s`)),
+          TIMEOUT_MS
+        )
+      })
+      await Promise.race([startPromise, timeoutPromise])
       log.info('dashboard: SQLite store ready')
     } catch (err) {
       const msg = (err as Error)?.message || ''
@@ -634,6 +647,7 @@ export default class ServerStatsProvider {
         msg.includes('Cannot find package') ||
         code === 'ERR_MODULE_NOT_FOUND' ||
         code === 'MODULE_NOT_FOUND'
+      const isTimeout = msg.includes('timed out')
 
       if (isMissingDep) {
         log.block('Dashboard could not start — missing dependencies. Install with:', [
@@ -643,11 +657,26 @@ export default class ServerStatsProvider {
           dim('Dashboard has been disabled for this session.'),
           dim('Everything else (stats bar, debug panel) works without it.'),
         ])
+      } else if (isTimeout) {
+        log.block('Dashboard initialization timed out', [
+          dim('SQLite setup took too long — this usually means a wrong native'),
+          dim('binary was loaded (common with symlinked/file: dependencies).'),
+          '',
+          dim('Try running:'),
+          `  ${bold('npm install knex better-sqlite3')}`,
+          dim('in your app directory to ensure the correct copies are used.'),
+          '',
+          dim('Dashboard has been disabled for this session.'),
+          dim('Everything else (stats bar, debug panel) works without it.'),
+        ])
       } else {
         log.warn(
           `Dashboard could not start: ${msg}\n` +
             `  ${dim('Dashboard has been disabled for this session.')}`
         )
+        if ((err as Error)?.stack) {
+          console.error((err as Error).stack)
+        }
       }
       this.dashboardStore = null
       return

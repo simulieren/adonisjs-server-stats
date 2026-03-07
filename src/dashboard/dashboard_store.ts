@@ -154,10 +154,15 @@ export class DashboardStore {
 
     // Create a standalone Knex connection to SQLite — bypasses Lucid's
     // connection manager entirely so we never pollute the app's pool.
+    //
+    // Must use appImport — bare import('knex') resolves to this package's
+    // devDep copy when symlinked (file: dependency), which may have
+    // different native bindings or conflict with the app's copies.
     log.info('dashboard: loading knex...')
+    const { appImport } = await import('../utils/app_import.js')
     let knexModule: unknown
     try {
-      knexModule = await import('knex')
+      knexModule = await appImport('knex')
     } catch (err) {
       throw new Error(
         `Could not load knex: ${(err as Error)?.message}. ` +
@@ -167,7 +172,7 @@ export class DashboardStore {
 
     let betterSqlite3Available = true
     try {
-      await import('better-sqlite3')
+      await appImport('better-sqlite3')
     } catch {
       betterSqlite3Available = false
     }
