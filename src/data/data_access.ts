@@ -236,9 +236,22 @@ export class DataAccess {
     }
 
     const emails = this.debugStore.emails.getEmails()
-    // Strip html/text from list response
-    const stripped = emails.map(({ html: _html, text: _text, ...rest }) => rest)
-    return wrapArray(stripped, opts, (e: Omit<EmailRecord, 'html' | 'text'>, term: string) => {
+    // Strip html/text from list response — build lightweight objects
+    // without object-spread to avoid copying large HTML bodies
+    const stripped = emails.map((e) => ({
+      id: e.id,
+      from: e.from,
+      to: e.to,
+      cc: e.cc,
+      bcc: e.bcc,
+      subject: e.subject,
+      mailer: e.mailer,
+      status: e.status,
+      messageId: e.messageId,
+      attachmentCount: e.attachmentCount,
+      timestamp: e.timestamp,
+    }))
+    return wrapArray(stripped, opts, (e, term: string) => {
       return (
         e.from.toLowerCase().includes(term) ||
         e.to.toLowerCase().includes(term) ||
@@ -291,10 +304,17 @@ export class DataAccess {
     }
 
     const traces = this.debugStore.traces.getTraces()
-    // Strip spans from list view, add warningCount
-    const list = traces.map(({ spans: _spans, warnings, ...rest }) => ({
-      ...rest,
-      warningCount: warnings.length,
+    // Strip spans from list view, add warningCount — build lightweight
+    // objects without spread to avoid copying large span arrays
+    const list = traces.map((t) => ({
+      id: t.id,
+      method: t.method,
+      url: t.url,
+      statusCode: t.statusCode,
+      totalDuration: t.totalDuration,
+      spanCount: t.spanCount,
+      warningCount: t.warnings.length,
+      timestamp: t.timestamp,
     }))
 
     return wrapArray(list, opts, (t, term: string) => {

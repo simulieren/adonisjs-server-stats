@@ -13,6 +13,7 @@ import type { EmailRecord, Emitter, MailEventData, MailMessage } from './types.j
  * - `queued:mail:error` — queued email failed
  */
 export class EmailCollector {
+  private static readonly MAX_HTML_SIZE = 50_000 // 50 KB cap per email body
   private buffer: RingBuffer<EmailRecord>
   private emitter: Emitter | null = null
   private handlers: { event: string; fn: (data: MailEventData) => void }[] = []
@@ -36,15 +37,14 @@ export class EmailCollector {
       const to = extractAddresses(msg?.to)
       const subject = msg?.subject || ''
 
-      // Try to find the matching 'sending' record and update it
-      const all = this.buffer.toArray()
-      for (let i = all.length - 1; i >= 0; i--) {
-        const rec = all[i]
-        if (rec.status === 'sending' && rec.to === to && rec.subject === subject) {
-          rec.status = 'sent'
-          rec.messageId = data?.response?.messageId || data?.messageId || null
-          return
-        }
+      // Try to find the matching 'sending' record and update it (no buffer copy)
+      const match = this.buffer.findFromEnd(
+        (rec) => rec.status === 'sending' && rec.to === to && rec.subject === subject
+      )
+      if (match) {
+        match.status = 'sent'
+        match.messageId = data?.response?.messageId || data?.messageId || null
+        return
       }
 
       // No matching 'sending' record — insert a new 'sent' record
@@ -96,8 +96,7 @@ export class EmailCollector {
   }
 
   getEmailHtml(id: number): string | null {
-    const all = this.buffer.toArray()
-    const record = all.find((r) => r.id === id)
+    const record = this.buffer.findFromEnd((r) => r.id === id)
     return record?.html ?? null
   }
 
@@ -125,14 +124,20 @@ export class EmailCollector {
       cc: extractAddresses(msg?.cc) || null,
       bcc: extractAddresses(msg?.bcc) || null,
       subject: msg?.subject || '(no subject)',
-      html: msg?.html || null,
-      text: msg?.text || null,
+      html: this.capSize(msg?.html),
+      text: this.capSize(msg?.text),
       mailer: data?.mailerName || data?.mailer || 'unknown',
       status,
       messageId: null,
       attachmentCount: Array.isArray(msg?.attachments) ? msg.attachments.length : 0,
       timestamp: Date.now(),
     }
+  }
+
+  private capSize(value: string | null | undefined): string | null {
+    if (!value) return null
+    if (value.length <= EmailCollector.MAX_HTML_SIZE) return value
+    return value.slice(0, EmailCollector.MAX_HTML_SIZE) + '\n<!-- truncated -->'
   }
 
   /** Register a callback that fires whenever a new email is recorded. */

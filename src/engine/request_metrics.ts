@@ -50,9 +50,38 @@ export class RequestMetrics {
     let errorCount = 0
     let validCount = 0
 
-    for (let i = 0; i < this.count; i++) {
-      const r = this.records[i]
-      if (r.timestamp >= cutoff) {
+    // When the buffer is full (ring buffer mode), scan from the oldest
+    // entry (writeIndex) forward. Records are in chronological order
+    // within each wrap, so once we find one >= cutoff, all subsequent
+    // records in that direction are also valid — but since they wrap,
+    // we still need to check all slots. The key optimization is that
+    // we can skip already-overwritten (stale) slots efficiently.
+    if (this.count === this.maxRecords) {
+      // Full ring buffer — scan from writeIndex (oldest) to writeIndex-1 (newest)
+      for (let j = 0; j < this.maxRecords; j++) {
+        const idx = (this.writeIndex + j) % this.maxRecords
+        const r = this.records[idx]
+        if (r.timestamp >= cutoff) {
+          validCount++
+          totalDuration += r.durationMs
+          if (r.statusCode >= 500) {
+            errorCount++
+          }
+        }
+      }
+    } else {
+      // Buffer not yet full — records are in order 0..count-1
+      // Scan backwards from newest to find the cutoff point, then
+      // aggregate only the valid tail.
+      let startIdx = 0
+      for (let i = this.count - 1; i >= 0; i--) {
+        if (this.records[i].timestamp < cutoff) {
+          startIdx = i + 1
+          break
+        }
+      }
+      for (let i = startIdx; i < this.count; i++) {
+        const r = this.records[i]
         validCount++
         totalDuration += r.durationMs
         if (r.statusCode >= 500) {

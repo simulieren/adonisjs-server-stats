@@ -159,11 +159,17 @@ export interface SparklineStats {
 export function computeStats(values: number[]): SparklineStats | null {
   if (values.length === 0) return null
 
-  const min = Math.min(...values)
-  const max = Math.max(...values)
-  const avg = values.reduce((sum, v) => sum + v, 0) / values.length
+  let min = values[0]
+  let max = values[0]
+  let sum = values[0]
+  for (let i = 1; i < values.length; i++) {
+    const v = values[i]
+    if (v < min) min = v
+    if (v > max) max = v
+    sum += v
+  }
 
-  return { min, max, avg }
+  return { min, max, avg: sum / values.length }
 }
 
 // ---------------------------------------------------------------------------
@@ -197,17 +203,44 @@ export function buildSparklineData(
   values: number[],
   options?: SparklineOptions
 ): SparklineData | null {
-  const opts = resolveOptions(options)
-  const points = generateSparklinePoints(values, opts.width, opts.height, opts.padding)
-  const areaPath = generateSparklinePath(values, opts.width, opts.height, opts.padding)
+  if (values.length < 2) return null
 
-  if (!points || !areaPath) return null
+  const opts = resolveOptions(options)
+
+  // Compute min/max/avg once (avoids 3 separate passes in points/path/stats)
+  const stats = computeStats(values)!
+  const range = stats.max - stats.min || 1
+
+  const iw = opts.width - opts.padding * 2
+  const ih = opts.height - opts.padding * 2
+  const pad = opts.padding
+  const len = values.length
+
+  // Build point strings (shared between polyline points and area path)
+  const pts = new Array<string>(len)
+  for (let i = 0; i < len; i++) {
+    const x = pad + (i / (len - 1)) * iw
+    const y = pad + ih - ((values[i] - stats.min) / range) * ih
+    pts[i] = `${x.toFixed(1)},${y.toFixed(1)}`
+  }
+
+  const points = pts.join(' ')
+  const lastX = (pad + iw).toFixed(1)
+  const bottomY = (pad + ih).toFixed(1)
+  const firstX = pad.toFixed(1)
+  const areaPath =
+    `M${pts[0]} ` +
+    pts
+      .slice(1)
+      .map((p) => `L${p}`)
+      .join(' ') +
+    ` L${lastX},${bottomY} L${firstX},${bottomY} Z`
 
   return {
     points,
     areaPath,
     gradientId: generateGradientId(),
     options: opts,
-    stats: computeStats(values),
+    stats,
   }
 }

@@ -30,11 +30,12 @@ export class DashboardApi {
    *
    * @param section     - Section identifier (e.g. `'overview'`, `'queries'`).
    * @param queryString - Optional query string (without leading `?`).
+   * @param init        - Optional `RequestInit` overrides (e.g. `{ signal }`).
    */
-  async fetchSection(section: string, queryString?: string) {
+  async fetchSection(section: string, queryString?: string, init?: RequestInit) {
     const path = getDashboardSectionPath(section)
     const url = queryString ? `${this.basePath}${path}?${queryString}` : `${this.basePath}${path}`
-    return this.client.fetch<Record<string, unknown>>(url)
+    return this.client.fetch<Record<string, unknown>>(url, init)
   }
 
   /**

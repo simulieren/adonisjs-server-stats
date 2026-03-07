@@ -1,5 +1,5 @@
 import { render } from 'preact'
-import { useState, useCallback, useEffect, useRef } from 'preact/hooks'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'preact/hooks'
 
 import { StatsBar } from '../../react/components/StatsBar/StatsBar.js'
 import { readConfig } from '../bootstrap.js'
@@ -71,17 +71,25 @@ function StatsBarApp() {
   const [isLive, setIsLive] = useState(false)
   const debugLoadedRef = useRef(false)
 
-  const debugConfig: EdgeDebugConfig | undefined = config.showDebug
-    ? {
-        debugEndpoint: config.debugEndpoint,
-        authToken: config.authToken,
-        dashboardPath: config.dashboardPath,
-      }
-    : undefined
+  const debugConfig = useMemo<EdgeDebugConfig | undefined>(
+    () =>
+      config.showDebug
+        ? {
+            debugEndpoint: config.debugEndpoint,
+            authToken: config.authToken,
+            dashboardPath: config.dashboardPath,
+          }
+        : undefined,
+    [config.showDebug, config.debugEndpoint, config.authToken, config.dashboardPath]
+  )
 
-  const debugOptions = config.showDebug
-    ? { debugEndpoint: config.debugEndpoint, authToken: config.authToken }
-    : undefined
+  const debugOptions = useMemo(
+    () =>
+      config.showDebug
+        ? { debugEndpoint: config.debugEndpoint, authToken: config.authToken }
+        : undefined,
+    [config.showDebug, config.debugEndpoint, config.authToken]
+  )
 
   const handleToggleDebug = useCallback(() => {
     setDebugOpen((prev) => !prev)
@@ -129,7 +137,8 @@ function StatsBarApp() {
         }
       }
     }
-  }, [debugOpen, isLive, debugConfig])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debugOpen, debugConfig])
 
   return (
     <>

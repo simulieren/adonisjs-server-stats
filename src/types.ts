@@ -623,6 +623,17 @@ export interface ServerStatsConfig {
   dashboard?: boolean | DashboardConfig
   /** Advanced options. */
   advanced?: AdvancedConfig
+
+  /**
+   * Enable verbose logging during initialization.
+   *
+   * When `true`, the package logs detailed info messages about each
+   * boot step (SQLite init, migrations, route registration, etc.).
+   * When `false` (the default), only warnings are logged.
+   *
+   * @default false
+   */
+  verbose?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -663,4 +674,7 @@ export interface ResolvedServerStatsConfig {
 
   /** Optional access-control callback. */
   shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+
+  /** Whether verbose informational logging is enabled. Always present after `defineConfig()`. */
+  verbose: boolean
 }

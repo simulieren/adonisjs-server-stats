@@ -1,4 +1,4 @@
-import { bold, dim, yellow } from './utils/logger.js'
+import { bold, dim, setVerbose } from './utils/logger.js'
 
 import type { DevToolbarOptions, ResolvedServerStatsConfig, ServerStatsConfig } from './types.js'
 
@@ -350,6 +350,10 @@ function logDeprecationWarnings(config: ServerStatsConfig): void {
  * ```
  */
 export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConfig {
+  // Apply verbose setting early so all subsequent log.info calls respect it
+  const verbose = config.verbose ?? false
+  setVerbose(verbose)
+
   // Resolve aliases (new names take precedence over old)
   const intervalMs = config.pollInterval ?? config.intervalMs ?? 3000
 
@@ -390,5 +394,6 @@ export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConf
     onStats: config.onStats,
     devToolbar,
     shouldShow,
+    verbose,
   }
 }

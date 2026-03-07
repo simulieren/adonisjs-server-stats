@@ -197,7 +197,8 @@ export function serverStatsCollector(): { type: 'provider'; resolver: (app: any)
           if (stats.queueWaiting !== undefined) this.queueWaitingJobs.set(stats.queueWaiting)
           if (stats.queueDelayed !== undefined) this.queueDelayedJobs.set(stats.queueDelayed)
           if (stats.queueFailed !== undefined) this.queueFailedJobs.set(stats.queueFailed)
-          if (stats.queueWorkerCount !== undefined) this.queueWorkerCount.set(stats.queueWorkerCount)
+          if (stats.queueWorkerCount !== undefined)
+            this.queueWorkerCount.set(stats.queueWorkerCount)
 
           if (stats.systemLoadAvg1m !== undefined)
             this.systemLoadAvg.set({ period: '1m' }, stats.systemLoadAvg1m)
@@ -211,7 +212,8 @@ export function serverStatsCollector(): { type: 'provider'; resolver: (app: any)
             this.systemMemoryTotalMb.set(stats.systemMemoryTotalMb)
 
           if (stats.onlineUsers !== undefined) this.appOnlineUsers.set(stats.onlineUsers)
-          if (stats.pendingWebhooks !== undefined) this.appPendingWebhooks.set(stats.pendingWebhooks)
+          if (stats.pendingWebhooks !== undefined)
+            this.appPendingWebhooks.set(stats.pendingWebhooks)
           if (stats.pendingEmails !== undefined) this.appPendingEmails.set(stats.pendingEmails)
         }
       }

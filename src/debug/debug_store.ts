@@ -77,15 +77,33 @@ export class DebugStore {
 
   /** Serialize all collector data to a JSON file (atomic write). */
   async saveToDisk(filePath: string): Promise<void> {
-    const data: Record<string, unknown> = {
-      queries: this.queries.getQueries(),
-      events: this.events.getEvents(),
-      emails: this.emails.getEmails(),
-    }
+    // Build JSON incrementally to avoid a single massive JSON.stringify
+    // that blocks the event loop when buffers are large.
+    const parts: string[] = ['{']
+
+    const queries = this.queries.getQueries()
+    parts.push(`"queries":${JSON.stringify(queries)},`)
+
+    // Yield between each collector's serialization to let the event loop breathe
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    const events = this.events.getEvents()
+    parts.push(`"events":${JSON.stringify(events)},`)
+
+    await new Promise<void>((resolve) => setImmediate(resolve))
+
+    const emails = this.emails.getEmails()
+    parts.push(`"emails":${JSON.stringify(emails)}`)
+
     if (this.traces) {
-      data.traces = this.traces.getTraces()
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      const traces = this.traces.getTraces()
+      parts.push(`,"traces":${JSON.stringify(traces)}`)
     }
-    const json = JSON.stringify(data)
+
+    parts.push('}')
+    const json = parts.join('')
+
     const tmpPath = filePath + '.tmp'
     await mkdir(dirname(filePath), { recursive: true })
     await writeFile(tmpPath, json, 'utf-8')

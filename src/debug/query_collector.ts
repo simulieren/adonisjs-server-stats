@@ -15,7 +15,12 @@ export class QueryCollector {
   private slowThresholdMs: number
   private emitter: Emitter | null = null
   private handler: ((data: DbQueryEvent) => void) | null = null
-  private cachedSummary: { total: number; slow: number; duplicates: number; avgDuration: number } | null = null
+  private cachedSummary: {
+    total: number
+    slow: number
+    duplicates: number
+    avgDuration: number
+  } | null = null
   private summaryComputedAt: number = 0
 
   constructor(maxQueries: number = 500, slowThresholdMs: number = 100) {
@@ -94,23 +99,29 @@ export class QueryCollector {
       return this.cachedSummary
     }
 
+    // Single pass over the buffer to compute all metrics at once
     const queries = this.buffer.toArray()
     const total = queries.length
-    const slow = queries.filter((q) => q.duration > this.slowThresholdMs).length
-
+    let slow = 0
+    let totalDuration = 0
     const sqlCounts = new Map<string, number>()
+
     for (const q of queries) {
+      if (q.duration > this.slowThresholdMs) slow++
+      totalDuration += q.duration
       sqlCounts.set(q.sql, (sqlCounts.get(q.sql) || 0) + 1)
     }
-    const duplicates = Array.from(sqlCounts.values()).filter((c) => c > 1).length
 
-    const avgDuration = total > 0 ? queries.reduce((sum, q) => sum + q.duration, 0) / total : 0
+    let duplicates = 0
+    for (const count of sqlCounts.values()) {
+      if (count > 1) duplicates++
+    }
 
     this.cachedSummary = {
       total,
       slow,
       duplicates,
-      avgDuration: round(avgDuration),
+      avgDuration: total > 0 ? round(totalDuration / total) : 0,
     }
     this.summaryComputedAt = now
     return this.cachedSummary

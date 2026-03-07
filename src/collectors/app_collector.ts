@@ -31,7 +31,9 @@ export function appCollector(): MetricCollector {
 
     async collect() {
       try {
-        const { default: db } = await appImport<typeof import('@adonisjs/lucid/services/db')>('@adonisjs/lucid/services/db')
+        const { default: db } = await appImport<typeof import('@adonisjs/lucid/services/db')>(
+          '@adonisjs/lucid/services/db'
+        )
 
         const [sessions, webhooks, emails] = await Promise.all([
           db

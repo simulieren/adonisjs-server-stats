@@ -62,6 +62,7 @@ export class DebugDataController<T = unknown> {
   private timer: ReturnType<typeof setInterval> | null = null
   private currentTab: string | null = null
   private fetchOnceCache: Record<string, unknown> = {}
+  private abortController: AbortController | null = null
 
   constructor(config: DebugDataControllerConfig<T>) {
     this.client = new ApiClient({
@@ -104,6 +105,8 @@ export class DebugDataController<T = unknown> {
       clearInterval(this.timer)
       this.timer = null
     }
+    this.abortController?.abort()
+    this.abortController = null
   }
 
   /**
@@ -187,13 +190,23 @@ export class DebugDataController<T = unknown> {
       return
     }
 
+    // Cancel any previous in-flight fetch
+    this.abortController?.abort()
+    const controller = new AbortController()
+    this.abortController = controller
+
     try {
       const path = `${this.endpoint}${getDebugTabPath(tab)}`
-      const result = await this.client.fetch<T>(path)
+      const result = await this.client.fetch<T>(path, { signal: controller.signal })
+      // Discard if aborted (tab changed while in-flight)
+      if (controller.signal.aborted) return
       this.callbacks.onData(result)
       this.callbacks.onError(null)
       this.callbacks.onLoading(false)
     } catch (err) {
+      // Silently ignore aborted requests
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (controller.signal.aborted) return
       if (err instanceof UnauthorizedError) {
         this.callbacks.onError(err)
         this.callbacks.onLoading(false)

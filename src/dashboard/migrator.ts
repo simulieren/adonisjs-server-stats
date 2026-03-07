@@ -39,6 +39,12 @@ export async function autoMigrate(db: Knex): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_ss_requests_created ON server_stats_requests(created_at)`
   )
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_requests_url ON server_stats_requests(url)`)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_requests_duration ON server_stats_requests(duration)`
+  )
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_requests_status ON server_stats_requests(status_code)`
+  )
   await yieldToEventLoop()
 
   // -- server_stats_queries ---------------------------------------------------
@@ -66,6 +72,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_queries_request ON server_stats_queries(request_id)`
   )
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_queries_duration ON server_stats_queries(duration)`
+  )
   await yieldToEventLoop()
 
   // -- server_stats_events ----------------------------------------------------
@@ -81,6 +90,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_events_created ON server_stats_events(created_at)`
   )
+  await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_events_name ON server_stats_events(event_name)`)
   await yieldToEventLoop()
 
   // -- server_stats_emails ----------------------------------------------------
@@ -140,6 +150,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_traces_created ON server_stats_traces(created_at)`
   )
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_traces_request ON server_stats_traces(request_id)`
+  )
   await yieldToEventLoop()
 
   // -- server_stats_metrics ---------------------------------------------------
@@ -157,6 +170,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
     )
   `)
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_metrics_bucket ON server_stats_metrics(bucket)`)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_metrics_created ON server_stats_metrics(created_at)`
+  )
   await yieldToEventLoop()
 
   // -- server_stats_saved_filters ---------------------------------------------
@@ -169,6 +185,9 @@ export async function autoMigrate(db: Knex): Promise<void> {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_filters_section ON server_stats_saved_filters(section)`
+  )
 }
 
 /**
@@ -189,18 +208,42 @@ export async function runRetentionCleanup(db: Knex, retentionDays: number): Prom
   const cutoff = `datetime('now', '-${days} days')`
 
   try {
+    // Batch deletes to avoid blocking the event loop for large tables.
+    // Each batch deletes up to 1000 rows, yielding between batches.
+    const batchDelete = async (table: string) => {
+      let deleted: number
+      do {
+        const result = await db.raw(
+          `DELETE FROM ${table} WHERE rowid IN (SELECT rowid FROM ${table} WHERE created_at < ${cutoff} LIMIT 1000)`
+        )
+        deleted = (result as unknown as number) ?? 0
+        // SQLite returns the number of changes via better-sqlite3's .run().changes
+        // but through Knex.raw() the exact shape varies — loop until no matches
+        const remaining = await db.raw(
+          `SELECT COUNT(*) as cnt FROM ${table} WHERE created_at < ${cutoff} LIMIT 1`
+        )
+        const cnt = (remaining as unknown as Array<{ cnt: number }>)?.[0]?.cnt ?? 0
+        if (cnt === 0) break
+        await yieldToEventLoop()
+      } while (true)
+    }
+
     // Cascade deletes queries, events, traces via FK ON DELETE CASCADE
-    await db.raw(`DELETE FROM server_stats_requests WHERE created_at < ${cutoff}`)
+    await batchDelete('server_stats_requests')
     await yieldToEventLoop()
 
     // Standalone tables
-    await db.raw(`DELETE FROM server_stats_logs WHERE created_at < ${cutoff}`)
+    await batchDelete('server_stats_logs')
     await yieldToEventLoop()
 
-    await db.raw(`DELETE FROM server_stats_emails WHERE created_at < ${cutoff}`)
+    await batchDelete('server_stats_emails')
     await yieldToEventLoop()
 
-    await db.raw(`DELETE FROM server_stats_metrics WHERE created_at < ${cutoff}`)
+    await batchDelete('server_stats_metrics')
+    await yieldToEventLoop()
+
+    // Reclaim space and update query planner statistics
+    await db.raw('PRAGMA optimize')
   } catch (err) {
     // Log but don't throw — retention cleanup failure shouldn't block init
     const { log } = await import('../utils/logger.js')

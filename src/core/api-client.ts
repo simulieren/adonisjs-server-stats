@@ -86,6 +86,12 @@ export class ApiClient {
       credentials: this.authToken ? 'omit' : 'include',
     })
 
+    // Check abort before consuming the response body — response.json()
+    // is not interruptible by AbortSignal and can hang on slow connections
+    if (init?.signal?.aborted) {
+      throw new DOMException('The operation was aborted.', 'AbortError')
+    }
+
     if (response.status === 401 || response.status === 403) {
       throw new UnauthorizedError(response.status)
     }

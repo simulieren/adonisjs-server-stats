@@ -12,14 +12,14 @@ import {
   setOnRequestComplete,
 } from '../middleware/request_tracking_middleware.js'
 import { registerAllRoutes } from '../routes/register_routes.js'
-import { log, dim, bold } from '../utils/logger.js'
+import { log, dim, bold, setVerbose } from '../utils/logger.js'
 
 import type { MetricCollector } from '../collectors/collector.js'
 import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
-import type { DashboardStore } from '../dashboard/dashboard_store.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
+import type { DashboardStore } from '../dashboard/dashboard_store.js'
 import type { DevToolbarConfig } from '../debug/types.js'
 import type { ResolvedServerStatsConfig } from '../types.js'
 import type { ApplicationService } from '@adonisjs/core/types'
@@ -79,6 +79,10 @@ export default class ServerStatsProvider {
       log.warn('no config found — is config/server_stats.ts set up?')
       return
     }
+
+    // Re-apply verbose setting from resolved config so the logger
+    // respects it even if defineConfig() ran in a separate context.
+    setVerbose(config.verbose)
 
     log.info('booting...')
 
@@ -416,11 +420,7 @@ export default class ServerStatsProvider {
       if (this.debugStore) {
         const logPath = this.app.makePath('logs', 'adonisjs.log')
         const { DataAccess: DataAccessClass } = await import('../data/data_access.js')
-        const dataAccess = new DataAccessClass(
-          this.debugStore,
-          () => this.dashboardStore,
-          logPath
-        )
+        const dataAccess = new DataAccessClass(this.debugStore, () => this.dashboardStore, logPath)
         const { ApiController: ApiControllerClass } =
           await import('../controller/api_controller.js')
         this.apiController = new ApiControllerClass(dataAccess)
@@ -480,10 +480,7 @@ export default class ServerStatsProvider {
         const stats = await this.engine!.collect()
 
         if (transmit && config.channelName) {
-          ;(transmit as { broadcast: Function }).broadcast(
-            config.channelName,
-            JSON.parse(JSON.stringify(stats))
-          )
+          ;(transmit as { broadcast: Function }).broadcast(config.channelName, stats)
         }
 
         if (prometheusCollector) {
@@ -631,7 +628,10 @@ export default class ServerStatsProvider {
       )
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(
-          () => reject(new Error(`Dashboard SQLite initialization timed out after ${TIMEOUT_MS / 1000}s`)),
+          () =>
+            reject(
+              new Error(`Dashboard SQLite initialization timed out after ${TIMEOUT_MS / 1000}s`)
+            ),
           TIMEOUT_MS
         )
       })

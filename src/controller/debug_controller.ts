@@ -7,8 +7,8 @@ import type { DashboardStore } from '../dashboard/dashboard_store.js'
 import type { DebugStore } from '../debug/debug_store.js'
 import type { StatsEngine } from '../engine/stats_engine.js'
 import type { ResolvedServerStatsConfig } from '../types.js'
-import type { ApplicationService } from '@adonisjs/core/types'
 import type { HttpContext } from '@adonisjs/core/http'
+import type { ApplicationService } from '@adonisjs/core/types'
 
 interface DiagnosticsDeps {
   getEngine?: () => StatsEngine | null

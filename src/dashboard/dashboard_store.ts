@@ -132,9 +132,47 @@ export class DashboardStore {
   private dbFilePath: string = ''
   private lastCleanupAt: number | null = null
 
+  // In-flight request coalescing — prevents concurrent identical reads from
+  // each acquiring the single-connection pool independently. When 30 rapid
+  // clicks trigger 30 getOverviewMetrics('1h') calls, only ONE actually
+  // executes; the other 29 get the same promise.
+  private inflight = new Map<string, Promise<unknown>>()
+
+  private coalesce<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const existing = this.inflight.get(key)
+    if (existing) return existing as Promise<T>
+
+    const promise = fn().finally(() => this.inflight.delete(key))
+    this.inflight.set(key, promise)
+    return promise
+  }
+
+  // Short-lived result cache — serves stale data for repeat requests within
+  // the TTL window. Cache miss falls through to coalesce(), so concurrent
+  // cache misses still only execute once.
+  private resultCache = new Map<string, { data: unknown; expiresAt: number }>()
+
+  private cached<T>(key: string, ttlMs: number, fn: () => Promise<T>): Promise<T> {
+    const entry = this.resultCache.get(key)
+    if (entry && Date.now() < entry.expiresAt) return Promise.resolve(entry.data as T)
+
+    return this.coalesce(key, async () => {
+      const result = await fn()
+      this.resultCache.set(key, { data: result, expiresAt: Date.now() + ttlMs })
+      return result
+    })
+  }
+
   // Cached storage stats (polled every 3s by Internals tab — cache for 10s)
   private cachedStorageStats: { data: unknown; cachedAt: number } | null = null
   private static readonly STORAGE_STATS_TTL_MS = 10_000
+
+  // TTL constants for the cached() helper
+  private static readonly WIDGETS_CACHE_TTL_MS = 2_000
+  private static readonly SPARKLINE_CACHE_TTL_MS = 5_000
+  private static readonly CHART_CACHE_TTL_MS = 5_000
+  private static readonly QUERIES_GROUPED_CACHE_TTL_MS = 3_000
+  private static readonly PAGINATE_CACHE_TTL_MS = 1_000
 
   // Write queue — buffers pending writes and flushes them in batch
   // transactions to avoid overwhelming the single-connection pool.
@@ -214,15 +252,20 @@ export class DashboardStore {
       pool: {
         min: 1,
         max: 1,
-        // Fast-fail: if the connection can't be acquired within 5s,
-        // throw instead of silently queueing for tarn's default 30s.
-        acquireTimeoutMillis: 2_000,
+        // Allow up to 10s for connection acquisition under load.
+        // The previous 2s timeout caused cascading failures during rapid
+        // tab switching when the write flush held the connection.
+        acquireTimeoutMillis: 10_000,
         // Set PRAGMAs on every new connection (not just the first one)
         afterCreate(conn: unknown, done: (err: Error | null, conn: unknown) => void) {
           const raw = conn as { pragma: (stmt: string) => void }
           try {
             raw.pragma('journal_mode = WAL')
             raw.pragma('foreign_keys = ON')
+            raw.pragma('synchronous = NORMAL')
+            raw.pragma('cache_size = -64000') // 64 MB page cache
+            raw.pragma('mmap_size = 268435456') // 256 MB memory-mapped I/O
+            raw.pragma('temp_store = MEMORY')
             // Note: busy_timeout is a no-op via PRAGMA in better-sqlite3.
             // Use the `timeout` constructor option in better-sqlite3 if needed.
           } catch {
@@ -238,6 +281,10 @@ export class DashboardStore {
     log.info('dashboard: setting PRAGMA...')
     await db.raw('PRAGMA journal_mode=WAL')
     await db.raw('PRAGMA foreign_keys=ON')
+    await db.raw('PRAGMA synchronous=NORMAL')
+    await db.raw('PRAGMA cache_size=-64000')
+    await db.raw('PRAGMA mmap_size=268435456')
+    await db.raw('PRAGMA temp_store=MEMORY')
     log.info('dashboard: PRAGMA set')
 
     log.info('dashboard: running migrations...')
@@ -349,60 +396,62 @@ export class DashboardStore {
       return this.cachedStorageStats.data as Awaited<ReturnType<DashboardStore['getStorageStats']>>
     }
 
-    let fileSizeMb = 0
-    let walSizeMb = 0
-    try {
-      const s = await fsStat(this.dbFilePath)
-      fileSizeMb = Math.round((s.size / (1024 * 1024)) * 100) / 100
-    } catch {
-      // File may not exist yet
-    }
-    try {
-      const ws = await fsStat(this.dbFilePath + '-wal')
-      walSizeMb = Math.round((ws.size / (1024 * 1024)) * 100) / 100
-    } catch {
-      // WAL file may not exist
-    }
-
-    const tableNames = [
-      'server_stats_requests',
-      'server_stats_queries',
-      'server_stats_events',
-      'server_stats_emails',
-      'server_stats_logs',
-      'server_stats_traces',
-      'server_stats_metrics',
-      'server_stats_saved_filters',
-    ]
-
-    // Single transaction for all 8 COUNT queries — 1 pool acquire instead of 8
-    const tables: Array<{ name: string; rowCount: number }> = await this.db.transaction(
-      async (trx) => {
-        const result: Array<{ name: string; rowCount: number }> = []
-        for (const name of tableNames) {
-          try {
-            const [row] = await trx(name).count('* as count')
-            result.push({ name, rowCount: Number(row.count) })
-          } catch {
-            result.push({ name, rowCount: 0 })
-          }
-        }
-        return result
+    return this.coalesce('storageStats', async () => {
+      let fileSizeMb = 0
+      let walSizeMb = 0
+      try {
+        const s = await fsStat(this.dbFilePath)
+        fileSizeMb = Math.round((s.size / (1024 * 1024)) * 100) / 100
+      } catch {
+        // File may not exist yet
       }
-    )
+      try {
+        const ws = await fsStat(this.dbFilePath + '-wal')
+        walSizeMb = Math.round((ws.size / (1024 * 1024)) * 100) / 100
+      } catch {
+        // WAL file may not exist
+      }
 
-    const stats = {
-      ready: true as const,
-      dbPath: this.config.dbPath,
-      fileSizeMb,
-      walSizeMb,
-      retentionDays: this.config.retentionDays,
-      tables,
-      lastCleanupAt: this.lastCleanupAt,
-    }
+      const tableNames = [
+        'server_stats_requests',
+        'server_stats_queries',
+        'server_stats_events',
+        'server_stats_emails',
+        'server_stats_logs',
+        'server_stats_traces',
+        'server_stats_metrics',
+        'server_stats_saved_filters',
+      ]
 
-    this.cachedStorageStats = { data: stats, cachedAt: Date.now() }
-    return stats
+      // Single transaction for all 8 COUNT queries — 1 pool acquire instead of 8
+      const tables: Array<{ name: string; rowCount: number }> = await this.db!.transaction(
+        async (trx) => {
+          const result: Array<{ name: string; rowCount: number }> = []
+          for (const name of tableNames) {
+            try {
+              const [row] = await trx(name).count('* as count')
+              result.push({ name, rowCount: Number(row.count) })
+            } catch {
+              result.push({ name, rowCount: 0 })
+            }
+          }
+          return result
+        }
+      )
+
+      const stats = {
+        ready: true as const,
+        dbPath: this.config.dbPath,
+        fileSizeMb,
+        walSizeMb,
+        retentionDays: this.config.retentionDays,
+        tables,
+        lastCleanupAt: this.lastCleanupAt,
+      }
+
+      this.cachedStorageStats = { data: stats, cachedAt: Date.now() }
+      return stats
+    })
   }
 
   // =========================================================================
@@ -524,17 +573,14 @@ export class DashboardStore {
             total_duration: round(input.trace.totalDuration),
             span_count: input.trace.spanCount,
             spans: JSON.stringify(input.trace.spans),
-            warnings:
-              input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
+            warnings: input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
           }
         : null,
     }))
 
     const preparedLogs = logs.map((entry) => {
       const levelName =
-        typeof entry.levelName === 'string'
-          ? entry.levelName
-          : String(entry.level || 'unknown')
+        typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
       return {
         level: levelName,
         message: String(entry.msg || entry.message || ''),
@@ -671,21 +717,28 @@ export class DashboardStore {
     perPage: number = 50,
     filters?: RequestFilters
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    return this.paginate('server_stats_requests', page, perPage, (query) => {
-      if (filters?.method) query.where('method', filters.method)
-      if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
-      if (filters?.status) query.where('status_code', filters.status)
-      if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
-      if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
-      if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
-      if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
-      if (filters?.search) {
-        const term = `%${filters.search}%`
-        query.where((qb) => {
-          qb.where('url', 'like', term).orWhere('method', 'like', term)
-        })
-      }
-    })
+    const fk = filters ? JSON.stringify(filters) : ''
+    return this.paginate(
+      'server_stats_requests',
+      page,
+      perPage,
+      (query) => {
+        if (filters?.method) query.where('method', filters.method)
+        if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
+        if (filters?.status) query.where('status_code', filters.status)
+        if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
+        if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
+        if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
+        if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
+        if (filters?.search) {
+          const term = `%${filters.search}%`
+          query.where((qb) => {
+            qb.where('url', 'like', term).orWhere('method', 'like', term)
+          })
+        }
+      },
+      fk
+    )
   }
 
   /** Paginated query history with optional filters. */
@@ -694,22 +747,29 @@ export class DashboardStore {
     perPage: number = 50,
     filters?: QueryFilters
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    return this.paginate('server_stats_queries', page, perPage, (query) => {
-      if (filters?.method) query.where('method', filters.method)
-      if (filters?.model) query.where('model', filters.model)
-      if (filters?.connection) query.where('connection', filters.connection)
-      if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
-      if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
-      if (filters?.requestId) query.where('request_id', filters.requestId)
-      if (filters?.search) {
-        const term = `%${filters.search}%`
-        query.where((qb) => {
-          qb.where('sql_text', 'like', term)
-            .orWhere('model', 'like', term)
-            .orWhere('connection', 'like', term)
-        })
-      }
-    })
+    const fk = filters ? JSON.stringify(filters) : ''
+    return this.paginate(
+      'server_stats_queries',
+      page,
+      perPage,
+      (query) => {
+        if (filters?.method) query.where('method', filters.method)
+        if (filters?.model) query.where('model', filters.model)
+        if (filters?.connection) query.where('connection', filters.connection)
+        if (filters?.durationMin) query.where('duration', '>=', filters.durationMin)
+        if (filters?.durationMax) query.where('duration', '<=', filters.durationMax)
+        if (filters?.requestId) query.where('request_id', filters.requestId)
+        if (filters?.search) {
+          const term = `%${filters.search}%`
+          query.where((qb) => {
+            qb.where('sql_text', 'like', term)
+              .orWhere('model', 'like', term)
+              .orWhere('connection', 'like', term)
+          })
+        }
+      },
+      fk
+    )
   }
 
   /**
@@ -723,31 +783,41 @@ export class DashboardStore {
   ): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
-    const validSorts: Record<string, string> = {
-      count: 'count',
-      avg_duration: 'avg_duration',
-      total_duration: 'total_duration',
-    }
-    const orderCol = validSorts[sort] || 'total_duration'
+    return this.cached(
+      'queriesGrouped:' + limit + ':' + sort + ':' + (search || ''),
+      DashboardStore.QUERIES_GROUPED_CACHE_TTL_MS,
+      async () => {
+        const validSorts: Record<string, string> = {
+          count: 'count',
+          avg_duration: 'avg_duration',
+          total_duration: 'total_duration',
+        }
+        const orderCol = validSorts[sort] || 'total_duration'
 
-    const query = this.db('server_stats_queries')
-      .select(
-        'sql_normalized',
-        this.db.raw('COUNT(*) as count'),
-        this.db.raw('ROUND(AVG(duration), 2) as avg_duration'),
-        this.db.raw('ROUND(MIN(duration), 2) as min_duration'),
-        this.db.raw('ROUND(MAX(duration), 2) as max_duration'),
-        this.db.raw('ROUND(SUM(duration), 2) as total_duration')
-      )
-      .groupBy('sql_normalized')
-      .orderBy(orderCol, 'desc')
-      .limit(limit)
+        // Apply a time cutoff to avoid scanning the entire table
+        const cutoff = rangeToCutoff('7d')
 
-    if (search) {
-      query.where('sql_normalized', 'like', `%${search}%`)
-    }
+        const query = this.db!('server_stats_queries')
+          .select(
+            'sql_normalized',
+            this.db!.raw('COUNT(*) as count'),
+            this.db!.raw('ROUND(AVG(duration), 2) as avg_duration'),
+            this.db!.raw('ROUND(MIN(duration), 2) as min_duration'),
+            this.db!.raw('ROUND(MAX(duration), 2) as max_duration'),
+            this.db!.raw('ROUND(SUM(duration), 2) as total_duration')
+          )
+          .where('created_at', '>=', cutoff)
+          .groupBy('sql_normalized')
+          .orderBy(orderCol, 'desc')
+          .limit(limit)
 
-    return query
+        if (search) {
+          query.where('sql_normalized', 'like', `%${search}%`)
+        }
+
+        return query
+      }
+    )
   }
 
   /** Paginated event history with optional filters. */
@@ -756,12 +826,19 @@ export class DashboardStore {
     perPage: number = 50,
     filters?: EventFilters
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    return this.paginate('server_stats_events', page, perPage, (query) => {
-      if (filters?.eventName) query.where('event_name', 'like', `%${filters.eventName}%`)
-      if (filters?.search) {
-        query.where('event_name', 'like', `%${filters.search}%`)
-      }
-    })
+    const fk = filters ? JSON.stringify(filters) : ''
+    return this.paginate(
+      'server_stats_events',
+      page,
+      perPage,
+      (query) => {
+        if (filters?.eventName) query.where('event_name', 'like', `%${filters.eventName}%`)
+        if (filters?.search) {
+          query.where('event_name', 'like', `%${filters.search}%`)
+        }
+      },
+      fk
+    )
   }
 
   /** Paginated email history with optional filters. */
@@ -771,48 +848,57 @@ export class DashboardStore {
     filters?: EmailFilters,
     excludeBody: boolean = false
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    return this.paginate('server_stats_emails', page, perPage, (query) => {
-      if (filters?.search) {
-        const term = `%${filters.search}%`
-        query.where((sub) => {
-          sub
-            .where('from_addr', 'like', term)
-            .orWhere('to_addr', 'like', term)
-            .orWhere('subject', 'like', term)
-        })
-      }
-      if (filters?.from) query.where('from_addr', 'like', `%${filters.from}%`)
-      if (filters?.to) query.where('to_addr', 'like', `%${filters.to}%`)
-      if (filters?.subject) query.where('subject', 'like', `%${filters.subject}%`)
-      if (filters?.mailer) query.where('mailer', filters.mailer)
-      if (filters?.status) query.where('status', filters.status)
-      if (excludeBody) {
-        query.select(
-          'id',
-          'from_addr',
-          'to_addr',
-          'cc',
-          'bcc',
-          'subject',
-          'mailer',
-          'status',
-          'message_id',
-          'attachment_count',
-          'created_at'
-        )
-      }
-    })
+    const fk = (filters ? JSON.stringify(filters) : '') + (excludeBody ? ':noBody' : '')
+    return this.paginate(
+      'server_stats_emails',
+      page,
+      perPage,
+      (query) => {
+        if (filters?.search) {
+          const term = `%${filters.search}%`
+          query.where((sub) => {
+            sub
+              .where('from_addr', 'like', term)
+              .orWhere('to_addr', 'like', term)
+              .orWhere('subject', 'like', term)
+          })
+        }
+        if (filters?.from) query.where('from_addr', 'like', `%${filters.from}%`)
+        if (filters?.to) query.where('to_addr', 'like', `%${filters.to}%`)
+        if (filters?.subject) query.where('subject', 'like', `%${filters.subject}%`)
+        if (filters?.mailer) query.where('mailer', filters.mailer)
+        if (filters?.status) query.where('status', filters.status)
+        if (excludeBody) {
+          query.select(
+            'id',
+            'from_addr',
+            'to_addr',
+            'cc',
+            'bcc',
+            'subject',
+            'mailer',
+            'status',
+            'message_id',
+            'attachment_count',
+            'created_at'
+          )
+        }
+      },
+      fk
+    )
   }
 
   /** Get email HTML body for preview (falls back to text_body). */
   async getEmailHtml(id: number): Promise<string | null> {
     if (!this.db) return null
-    const row = await this.db('server_stats_emails')
-      .where('id', id)
-      .select('html', 'text_body')
-      .first()
-    if (!row) return null
-    return row.html || row.text_body || null
+    return this.coalesce('emailHtml:' + id, async () => {
+      const row = await this.db!('server_stats_emails')
+        .where('id', id)
+        .select('html', 'text_body')
+        .first()
+      if (!row) return null
+      return row.html || row.text_body || null
+    })
   }
 
   /**
@@ -826,29 +912,36 @@ export class DashboardStore {
     perPage: number = 50,
     filters?: LogFilters
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    return this.paginate('server_stats_logs', page, perPage, (query) => {
-      if (filters?.level) query.where('level', filters.level)
-      if (filters?.requestId) query.where('request_id', filters.requestId)
-      if (filters?.search) {
-        query.where('message', 'like', `%${filters.search}%`)
-      }
-      if (filters?.structured && filters.structured.length > 0) {
-        for (const sf of filters.structured) {
-          const jsonPath = `$.${sf.field}`
-          switch (sf.operator) {
-            case 'equals':
-              query.whereRaw(`json_extract(data, ?) = ?`, [jsonPath, sf.value])
-              break
-            case 'contains':
-              query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `%${sf.value}%`])
-              break
-            case 'startsWith':
-              query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `${sf.value}%`])
-              break
+    const fk = filters ? JSON.stringify(filters) : ''
+    return this.paginate(
+      'server_stats_logs',
+      page,
+      perPage,
+      (query) => {
+        if (filters?.level) query.where('level', filters.level)
+        if (filters?.requestId) query.where('request_id', filters.requestId)
+        if (filters?.search) {
+          query.where('message', 'like', `%${filters.search}%`)
+        }
+        if (filters?.structured && filters.structured.length > 0) {
+          for (const sf of filters.structured) {
+            const jsonPath = `$.${sf.field}`
+            switch (sf.operator) {
+              case 'equals':
+                query.whereRaw(`json_extract(data, ?) = ?`, [jsonPath, sf.value])
+                break
+              case 'contains':
+                query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `%${sf.value}%`])
+                break
+              case 'startsWith':
+                query.whereRaw(`json_extract(data, ?) LIKE ?`, [jsonPath, `${sf.value}%`])
+                break
+            }
           }
         }
-      }
-    })
+      },
+      fk
+    )
   }
 
   /** Paginated trace history with optional filters. */
@@ -857,32 +950,41 @@ export class DashboardStore {
     perPage: number = 50,
     filters?: TraceFilters
   ): Promise<PaginatedResult<Record<string, unknown>>> {
-    return this.paginate('server_stats_traces', page, perPage, (query) => {
-      if (filters?.method) query.where('method', filters.method)
-      if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
-      if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
-      if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
-      if (filters?.search) {
-        const term = `%${filters.search}%`
-        query.where((qb) => {
-          qb.where('url', 'like', term).orWhere('method', 'like', term)
-        })
-      }
-    })
+    const fk = filters ? JSON.stringify(filters) : ''
+    return this.paginate(
+      'server_stats_traces',
+      page,
+      perPage,
+      (query) => {
+        if (filters?.method) query.where('method', filters.method)
+        if (filters?.url) query.where('url', 'like', `%${filters.url}%`)
+        if (filters?.statusMin) query.where('status_code', '>=', filters.statusMin)
+        if (filters?.statusMax) query.where('status_code', '<=', filters.statusMax)
+        if (filters?.search) {
+          const term = `%${filters.search}%`
+          query.where((qb) => {
+            qb.where('url', 'like', term).orWhere('method', 'like', term)
+          })
+        }
+      },
+      fk
+    )
   }
 
   /** Single trace with full span data. */
   async getTraceDetail(id: number): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
-    const row = await this.db('server_stats_traces').where('id', id).first()
-    if (!row) return null
+    return this.coalesce('traceDetail:' + id, async () => {
+      const row = await this.db!('server_stats_traces').where('id', id).first()
+      if (!row) return null
 
-    return {
-      ...row,
-      spans: safeParseJson(row.spans) ?? [],
-      warnings: safeParseJsonArray(row.warnings),
-    }
+      return {
+        ...row,
+        spans: safeParseJson(row.spans) ?? [],
+        warnings: safeParseJsonArray(row.warnings),
+      }
+    })
   }
 
   /**
@@ -892,26 +994,32 @@ export class DashboardStore {
   async getRequestDetail(id: number): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
-    return this.db.transaction(async (trx) => {
-      const request = await trx('server_stats_requests').where('id', id).first()
-      if (!request) return null
+    return this.coalesce('requestDetail:' + id, async () => {
+      return this.db!.transaction(async (trx) => {
+        const request = await trx('server_stats_requests').where('id', id).first()
+        if (!request) return null
 
-      const queries = await trx('server_stats_queries').where('request_id', id).orderBy('created_at', 'asc')
-      const events = await trx('server_stats_events').where('request_id', id).orderBy('created_at', 'asc')
-      const trace = await trx('server_stats_traces').where('request_id', id).first()
+        const queries = await trx('server_stats_queries')
+          .where('request_id', id)
+          .orderBy('created_at', 'asc')
+        const events = await trx('server_stats_events')
+          .where('request_id', id)
+          .orderBy('created_at', 'asc')
+        const trace = await trx('server_stats_traces').where('request_id', id).first()
 
-      return {
-        ...request,
-        queries,
-        events,
-        trace: trace
-          ? {
-              ...trace,
-              spans: safeParseJson(trace.spans) ?? [],
-              warnings: safeParseJsonArray(trace.warnings),
-            }
-          : null,
-      }
+        return {
+          ...request,
+          queries,
+          events,
+          trace: trace
+            ? {
+                ...trace,
+                spans: safeParseJson(trace.spans) ?? [],
+                warnings: safeParseJsonArray(trace.warnings),
+              }
+            : null,
+        }
+      })
     })
   }
 
@@ -930,94 +1038,95 @@ export class DashboardStore {
   async getOverviewMetrics(range: string = '1h'): Promise<Record<string, unknown> | null> {
     if (!this.db) return null
 
-    const cutoff = rangeToCutoff(range)
+    return this.cached('overviewMetrics:' + range, 2_000, async () => {
+      const cutoff = rangeToCutoff(range)
 
-    return this.db.transaction(async (trx) => {
-      const stats: Record<string, unknown> | undefined = await trx('server_stats_requests')
-        .where('created_at', '>=', cutoff)
-        .select(
-          trx.raw('COUNT(*) as total'),
-          trx.raw('ROUND(AVG(duration), 2) as avg_duration'),
-          trx.raw('SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as error_count')
-        )
-        .first()
+      const result = await this.db!.transaction(async (trx) => {
+        const stats: Record<string, unknown> | undefined = await trx('server_stats_requests')
+          .where('created_at', '>=', cutoff)
+          .select(
+            trx.raw('COUNT(*) as total'),
+            trx.raw('ROUND(AVG(duration), 2) as avg_duration'),
+            trx.raw('SUM(CASE WHEN status_code >= 400 THEN 1 ELSE 0 END) as error_count')
+          )
+          .first()
 
-      const total = Number(stats?.total ?? 0)
-      if (total === 0) {
-        return {
-          avgResponseTime: 0,
-          p95ResponseTime: 0,
-          requestsPerMinute: 0,
-          errorRate: 0,
-          totalRequests: 0,
-          slowestEndpoints: [],
-          queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
-          recentErrors: [],
+        const total = Number(stats?.total ?? 0)
+        if (total === 0) {
+          return {
+            avgResponseTime: 0,
+            p95ResponseTime: 0,
+            requestsPerMinute: 0,
+            errorRate: 0,
+            totalRequests: 0,
+            slowestEndpoints: [],
+            queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
+            recentErrors: [],
+          }
         }
-      }
 
-      const avgResponseTime = stats?.avg_duration as number
-      const errorCount = Number(stats?.error_count ?? 0)
-      const rangeMinutes = rangeToMinutes(range)
-      const requestsPerMin = total / rangeMinutes
+        const avgResponseTime = stats?.avg_duration as number
+        const errorCount = Number(stats?.error_count ?? 0)
+        const rangeMinutes = rangeToMinutes(range)
+        const requestsPerMin = total / rangeMinutes
 
-      const p95Offset = Math.floor(total * 0.95)
-      const p95Row = await trx('server_stats_requests')
-        .where('created_at', '>=', cutoff)
-        .orderBy('duration', 'asc')
-        .offset(Math.min(p95Offset, total - 1))
-        .limit(1)
-        .select('duration')
-        .first()
-      const p95ResponseTime = (p95Row?.duration as number) ?? 0
+        const p95Offset = Math.floor(total * 0.95)
+        const p95Row = await trx('server_stats_requests')
+          .where('created_at', '>=', cutoff)
+          .orderBy('duration', 'asc')
+          .offset(Math.min(p95Offset, total - 1))
+          .limit(1)
+          .select('duration')
+          .first()
+        const p95ResponseTime = (p95Row?.duration as number) ?? 0
 
-      const slowestEndpoints = await trx('server_stats_requests')
-        .where('created_at', '>=', cutoff)
-        .select(
-          'url',
-          trx.raw('COUNT(*) as count'),
-          trx.raw('ROUND(AVG(duration), 2) as avg_duration')
-        )
-        .groupBy('url')
-        .orderBy('avg_duration', 'desc')
-        .limit(5)
+        const slowestEndpoints = await trx('server_stats_requests')
+          .where('created_at', '>=', cutoff)
+          .select(
+            'url',
+            trx.raw('COUNT(*) as count'),
+            trx.raw('ROUND(AVG(duration), 2) as avg_duration')
+          )
+          .groupBy('url')
+          .orderBy('avg_duration', 'desc')
+          .limit(5)
 
-      const queryStats: Record<string, unknown> | undefined = await trx('server_stats_queries')
-        .where('created_at', '>=', cutoff)
-        .select(
-          trx.raw('COUNT(*) as total'),
-          trx.raw('ROUND(AVG(duration), 2) as avg_duration')
-        )
-        .first()
+        const queryStats: Record<string, unknown> | undefined = await trx('server_stats_queries')
+          .where('created_at', '>=', cutoff)
+          .select(trx.raw('COUNT(*) as total'), trx.raw('ROUND(AVG(duration), 2) as avg_duration'))
+          .first()
 
-      const recentErrors = await trx('server_stats_logs')
-        .where('created_at', '>=', cutoff)
-        .whereIn('level', ['error', 'fatal'])
-        .orderBy('created_at', 'desc')
-        .limit(5)
+        const recentErrors = await trx('server_stats_logs')
+          .where('created_at', '>=', cutoff)
+          .whereIn('level', ['error', 'fatal'])
+          .orderBy('created_at', 'desc')
+          .limit(5)
 
-      return {
-        avgResponseTime: round(avgResponseTime),
-        p95ResponseTime: round(p95ResponseTime),
-        requestsPerMinute: round(requestsPerMin),
-        errorRate: round((errorCount / total) * 100),
-        totalRequests: total,
-        slowestEndpoints: slowestEndpoints.map((s: Record<string, unknown>) => ({
-          url: s.url,
-          count: s.count,
-          avgDuration: s.avg_duration,
-        })),
-        queryStats: {
-          total: (queryStats?.total as number) ?? 0,
-          avgDuration: (queryStats?.avg_duration as number) ?? 0,
-          perRequest: total > 0 ? round(((queryStats?.total as number) ?? 0) / total) : 0,
-        },
-        recentErrors: recentErrors.map((e: Record<string, unknown>) => ({
-          id: e.id,
-          message: e.message,
-          createdAt: e.created_at,
-        })),
-      }
+        return {
+          avgResponseTime: round(avgResponseTime),
+          p95ResponseTime: round(p95ResponseTime),
+          requestsPerMinute: round(requestsPerMin),
+          errorRate: round((errorCount / total) * 100),
+          totalRequests: total,
+          slowestEndpoints: slowestEndpoints.map((s: Record<string, unknown>) => ({
+            url: s.url,
+            count: s.count,
+            avgDuration: s.avg_duration,
+          })),
+          queryStats: {
+            total: (queryStats?.total as number) ?? 0,
+            avgDuration: (queryStats?.avg_duration as number) ?? 0,
+            perRequest: total > 0 ? round(((queryStats?.total as number) ?? 0) / total) : 0,
+          },
+          recentErrors: recentErrors.map((e: Record<string, unknown>) => ({
+            id: e.id,
+            message: e.message,
+            createdAt: e.created_at,
+          })),
+        }
+      })
+
+      return result
     })
   }
 
@@ -1029,65 +1138,67 @@ export class DashboardStore {
   async getChartData(range: string = '1h'): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
-    const cutoff = rangeToCutoff(range)
+    return this.cached('chartData:' + range, DashboardStore.CHART_CACHE_TTL_MS, async () => {
+      const cutoff = rangeToCutoff(range)
 
-    // For 1h/6h, use the per-minute metrics table.
-    // For 24h/7d, aggregate metrics into larger buckets.
-    const rows = await this.db('server_stats_metrics')
-      .where('bucket', '>=', cutoff)
-      .orderBy('bucket', 'asc')
+      // For 1h/6h, use the per-minute metrics table.
+      // For 24h/7d, aggregate metrics into larger buckets.
+      const rows = await this.db!('server_stats_metrics')
+        .where('bucket', '>=', cutoff)
+        .orderBy('bucket', 'asc')
 
-    if (range === '1h' || range === '6h') {
-      return rows
-    }
-
-    // For 24h: group by 15-minute buckets; for 7d: group by hourly buckets
-    const bucketMinutes = range === '7d' ? 60 : 15
-    interface MetricsBucket {
-      bucket: string
-      request_count: number
-      avg_duration: number
-      p95_duration: number
-      error_count: number
-      query_count: number
-      avg_query_duration: number
-      _count: number
-    }
-    const grouped = new Map<string, MetricsBucket>()
-
-    for (const row of rows) {
-      const bucketKey = roundBucket(row.bucket as string, bucketMinutes)
-      if (!grouped.has(bucketKey)) {
-        grouped.set(bucketKey, {
-          bucket: bucketKey,
-          request_count: 0,
-          avg_duration: 0,
-          p95_duration: 0,
-          error_count: 0,
-          query_count: 0,
-          avg_query_duration: 0,
-          _count: 0,
-        })
+      if (range === '1h' || range === '6h') {
+        return rows
       }
-      const g = grouped.get(bucketKey)!
-      g.request_count += row.request_count as number
-      g.error_count += row.error_count as number
-      g.query_count += row.query_count as number
-      g.avg_duration += row.avg_duration as number
-      g.p95_duration = Math.max(g.p95_duration, row.p95_duration as number)
-      g.avg_query_duration += row.avg_query_duration as number
-      g._count++
-    }
 
-    return Array.from(grouped.values()).map((g) => ({
-      bucket: g.bucket,
-      request_count: g.request_count,
-      avg_duration: g._count > 0 ? round(g.avg_duration / g._count) : 0,
-      p95_duration: round(g.p95_duration),
-      error_count: g.error_count,
-      query_count: g.query_count,
-      avg_query_duration: g._count > 0 ? round(g.avg_query_duration / g._count) : 0,
-    }))
+      // For 24h: group by 15-minute buckets; for 7d: group by hourly buckets
+      const bucketMinutes = range === '7d' ? 60 : 15
+      interface MetricsBucket {
+        bucket: string
+        request_count: number
+        avg_duration: number
+        p95_duration: number
+        error_count: number
+        query_count: number
+        avg_query_duration: number
+        _count: number
+      }
+      const grouped = new Map<string, MetricsBucket>()
+
+      for (const row of rows) {
+        const bucketKey = roundBucket(row.bucket as string, bucketMinutes)
+        if (!grouped.has(bucketKey)) {
+          grouped.set(bucketKey, {
+            bucket: bucketKey,
+            request_count: 0,
+            avg_duration: 0,
+            p95_duration: 0,
+            error_count: 0,
+            query_count: 0,
+            avg_query_duration: 0,
+            _count: 0,
+          })
+        }
+        const g = grouped.get(bucketKey)!
+        g.request_count += row.request_count as number
+        g.error_count += row.error_count as number
+        g.query_count += row.query_count as number
+        g.avg_duration += row.avg_duration as number
+        g.p95_duration = Math.max(g.p95_duration, row.p95_duration as number)
+        g.avg_query_duration += row.avg_query_duration as number
+        g._count++
+      }
+
+      return Array.from(grouped.values()).map((g) => ({
+        bucket: g.bucket,
+        request_count: g.request_count,
+        avg_duration: g._count > 0 ? round(g.avg_duration / g._count) : 0,
+        p95_duration: round(g.p95_duration),
+        error_count: g.error_count,
+        query_count: g.query_count,
+        avg_query_duration: g._count > 0 ? round(g.avg_query_duration / g._count) : 0,
+      }))
+    })
   }
 
   /**
@@ -1112,119 +1223,127 @@ export class DashboardStore {
 
     if (!this.db) return empty
 
-    const cutoff = rangeToCutoff(range)
+    return this.cached(
+      'overviewWidgets:' + range,
+      DashboardStore.WIDGETS_CACHE_TTL_MS,
+      async () => {
+        const cutoff = rangeToCutoff(range)
 
-    try {
-      // Single transaction — 1 pool acquire instead of 5.
-      const { topEventsRaw, emailStatusRaw, logLevelsRaw, statusRaw, slowQueriesRaw } =
-        await this.db.transaction(async (trx) => ({
-          topEventsRaw: await trx('server_stats_events')
-            .select('event_name', trx.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('event_name')
-            .orderBy('count', 'desc')
-            .limit(5),
+        try {
+          // Single transaction — 1 pool acquire instead of 5.
+          const { topEventsRaw, emailStatusRaw, logLevelsRaw, statusRaw, slowQueriesRaw } =
+            await this.db!.transaction(async (trx) => ({
+              topEventsRaw: await trx('server_stats_events')
+                .select('event_name', trx.raw('COUNT(*) as count'))
+                .where('created_at', '>=', cutoff)
+                .groupBy('event_name')
+                .orderBy('count', 'desc')
+                .limit(5),
 
-          emailStatusRaw: await trx('server_stats_emails')
-            .select('status', trx.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('status'),
+              emailStatusRaw: await trx('server_stats_emails')
+                .select('status', trx.raw('COUNT(*) as count'))
+                .where('created_at', '>=', cutoff)
+                .groupBy('status'),
 
-          logLevelsRaw: await trx('server_stats_logs')
-            .select('level', trx.raw('COUNT(*) as count'))
-            .where('created_at', '>=', cutoff)
-            .groupBy('level'),
+              logLevelsRaw: await trx('server_stats_logs')
+                .select('level', trx.raw('COUNT(*) as count'))
+                .where('created_at', '>=', cutoff)
+                .groupBy('level'),
 
-          statusRaw: await trx('server_stats_requests')
-            .select(
-              trx.raw(
-                `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
-              ),
-              trx.raw(
-                `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
-              ),
-              trx.raw(
-                `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
-              ),
-              trx.raw(
-                `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
-              )
-            )
-            .where('created_at', '>=', cutoff)
-            .first(),
+              statusRaw: await trx('server_stats_requests')
+                .select(
+                  trx.raw(
+                    `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
+                  ),
+                  trx.raw(
+                    `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
+                  ),
+                  trx.raw(
+                    `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
+                  ),
+                  trx.raw(
+                    `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
+                  )
+                )
+                .where('created_at', '>=', cutoff)
+                .first(),
 
-          slowQueriesRaw: await trx('server_stats_queries')
-            .select(
-              'sql_normalized',
-              trx.raw('ROUND(AVG(duration), 2) as avg_duration'),
-              trx.raw('COUNT(*) as count')
-            )
-            .where('created_at', '>=', cutoff)
-            .groupBy('sql_normalized')
-            .orderBy('avg_duration', 'desc')
-            .limit(5),
-        }))
+              slowQueriesRaw: await trx('server_stats_queries')
+                .select(
+                  'sql_normalized',
+                  trx.raw('ROUND(AVG(duration), 2) as avg_duration'),
+                  trx.raw('COUNT(*) as count')
+                )
+                .where('created_at', '>=', cutoff)
+                .groupBy('sql_normalized')
+                .orderBy('avg_duration', 'desc')
+                .limit(5),
+            }))
 
-      // Map top events
-      const topEvents = (topEventsRaw || []).map((r: Record<string, unknown>) => ({
-        eventName: r.event_name as string,
-        count: r.count as number,
-      }))
+          // Map top events
+          const topEvents = (topEventsRaw || []).map((r: Record<string, unknown>) => ({
+            eventName: r.event_name as string,
+            count: r.count as number,
+          }))
 
-      // Map email activity
-      const emailActivity = { sent: 0, queued: 0, failed: 0 }
-      for (const row of emailStatusRaw || []) {
-        const status = row.status as string
-        const count = row.count as number
-        if (status === 'sent') emailActivity.sent = count
-        else if (status === 'queued') emailActivity.queued = count
-        else if (status === 'failed') emailActivity.failed = count
-      }
+          // Map email activity
+          const emailActivity = { sent: 0, queued: 0, failed: 0 }
+          for (const row of emailStatusRaw || []) {
+            const status = row.status as string
+            const count = row.count as number
+            if (status === 'sent') emailActivity.sent = count
+            else if (status === 'queued') emailActivity.queued = count
+            else if (status === 'failed') emailActivity.failed = count
+          }
 
-      // Map log level breakdown
-      const logLevelBreakdown = { error: 0, warn: 0, info: 0, debug: 0 }
-      for (const row of logLevelsRaw || []) {
-        const level = row.level as string
-        if (level in logLevelBreakdown) {
-          logLevelBreakdown[level as keyof typeof logLevelBreakdown] = row.count as number
+          // Map log level breakdown
+          const logLevelBreakdown = { error: 0, warn: 0, info: 0, debug: 0 }
+          for (const row of logLevelsRaw || []) {
+            const level = row.level as string
+            if (level in logLevelBreakdown) {
+              logLevelBreakdown[level as keyof typeof logLevelBreakdown] = row.count as number
+            }
+          }
+
+          // Map status distribution
+          const statusDistribution = {
+            '2xx': statusRaw?.s2xx ?? 0,
+            '3xx': statusRaw?.s3xx ?? 0,
+            '4xx': statusRaw?.s4xx ?? 0,
+            '5xx': statusRaw?.s5xx ?? 0,
+          }
+
+          // Map slowest queries
+          const slowestQueries = (slowQueriesRaw || []).map((r: Record<string, unknown>) => ({
+            sqlNormalized: r.sql_normalized as string,
+            avgDuration: r.avg_duration as number,
+            count: r.count as number,
+          }))
+
+          return { topEvents, emailActivity, logLevelBreakdown, statusDistribution, slowestQueries }
+        } catch (err) {
+          if (!overviewWidgetWarned) {
+            overviewWidgetWarned = true
+            log.warn('dashboard: getOverviewWidgets query failed — ' + (err as Error)?.message)
+          }
+          return empty
         }
       }
-
-      // Map status distribution
-      const statusDistribution = {
-        '2xx': statusRaw?.s2xx ?? 0,
-        '3xx': statusRaw?.s3xx ?? 0,
-        '4xx': statusRaw?.s4xx ?? 0,
-        '5xx': statusRaw?.s5xx ?? 0,
-      }
-
-      // Map slowest queries
-      const slowestQueries = (slowQueriesRaw || []).map((r: Record<string, unknown>) => ({
-        sqlNormalized: r.sql_normalized as string,
-        avgDuration: r.avg_duration as number,
-        count: r.count as number,
-      }))
-
-      return { topEvents, emailActivity, logLevelBreakdown, statusDistribution, slowestQueries }
-    } catch (err) {
-      if (!overviewWidgetWarned) {
-        overviewWidgetWarned = true
-        log.warn('dashboard: getOverviewWidgets query failed — ' + (err as Error)?.message)
-      }
-      return empty
-    }
+    )
   }
 
   /** Get sparkline data points from pre-aggregated metrics. */
   async getSparklineData(range: string): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
-    const cutoff = rangeToCutoff(range)
-    const metrics: Record<string, unknown>[] = await this.db('server_stats_metrics')
-      .where('created_at', '>=', cutoff)
-      .orderBy('bucket', 'asc')
+    return this.cached('sparkline:' + range, DashboardStore.SPARKLINE_CACHE_TTL_MS, async () => {
+      const cutoff = rangeToCutoff(range)
+      const metrics: Record<string, unknown>[] = await this.db!('server_stats_metrics')
+        .where('bucket', '>=', cutoff)
+        .orderBy('bucket', 'asc')
 
-    return metrics.slice(-15)
+      return metrics.slice(-15)
+    })
   }
 
   // =========================================================================
@@ -1234,9 +1353,11 @@ export class DashboardStore {
   async getSavedFilters(section?: string): Promise<Record<string, unknown>[]> {
     if (!this.db) return []
 
-    const query = this.db('server_stats_saved_filters').orderBy('created_at', 'desc')
-    if (section) query.where('section', section)
-    return query
+    return this.coalesce('savedFilters:' + (section || ''), async () => {
+      const query = this.db!('server_stats_saved_filters').orderBy('created_at', 'desc')
+      if (section) query.where('section', section)
+      return query
+    })
   }
 
   async createSavedFilter(
@@ -1276,22 +1397,24 @@ export class DashboardStore {
   async runExplain(queryId: number, appDb: unknown): Promise<Record<string, unknown> | null> {
     if (!this.db) return { error: 'Dashboard store not initialized' }
 
-    const row = await this.db('server_stats_queries').where('id', queryId).first()
-    if (!row) return { error: 'Query not found' }
+    return this.coalesce('explain:' + queryId, async () => {
+      const row = await this.db!('server_stats_queries').where('id', queryId).first()
+      if (!row) return { error: 'Query not found' }
 
-    const sql = row.sql_text.trim()
-    if (!sql.toLowerCase().startsWith('select')) {
-      return { error: 'EXPLAIN is only supported for SELECT queries' }
-    }
+      const sql = row.sql_text.trim()
+      if (!sql.toLowerCase().startsWith('select')) {
+        return { error: 'EXPLAIN is only supported for SELECT queries' }
+      }
 
-    try {
-      const result = await (
-        appDb as { rawQuery: (sql: string) => Promise<{ rows?: unknown[] }> }
-      ).rawQuery(`EXPLAIN ${sql}`)
-      return { plan: result.rows || result }
-    } catch (err) {
-      return { error: (err as Error).message || 'EXPLAIN failed' }
-    }
+      try {
+        const result = await (
+          appDb as { rawQuery: (sql: string) => Promise<{ rows?: unknown[] }> }
+        ).rawQuery(`EXPLAIN ${sql}`)
+        return { plan: result.rows || result }
+      } catch (err) {
+        return { error: (err as Error).message || 'EXPLAIN failed' }
+      }
+    })
   }
 
   // =========================================================================
@@ -1309,24 +1432,29 @@ export class DashboardStore {
     table: string,
     page: number,
     perPage: number,
-    applyFilters?: (query: Knex.QueryBuilder) => void
+    applyFilters?: (query: Knex.QueryBuilder) => void,
+    filterKey?: string
   ): Promise<PaginatedResult<Record<string, unknown>>> {
     if (!this.db) {
       return { data: [], total: 0, page, perPage, lastPage: 0 }
     }
 
-    return this.db.transaction(async (trx) => {
-      const countQuery = trx(table)
-      if (applyFilters) applyFilters(countQuery)
-      const [{ count: totalRaw }] = await countQuery.count('* as count')
-      const total = Number(totalRaw)
+    const coalesceKey = 'paginate:' + table + ':' + page + ':' + perPage + ':' + (filterKey || '')
 
-      const offset = (page - 1) * perPage
-      const dataQuery = trx(table).orderBy('created_at', 'desc').limit(perPage).offset(offset)
-      if (applyFilters) applyFilters(dataQuery)
-      const data = await dataQuery
+    return this.cached(coalesceKey, DashboardStore.PAGINATE_CACHE_TTL_MS, async () => {
+      return this.db!.transaction(async (trx) => {
+        const countQuery = trx(table)
+        if (applyFilters) applyFilters(countQuery)
+        const [{ count: totalRaw }] = await countQuery.count('* as count')
+        const total = Number(totalRaw)
 
-      return { data, total, page, perPage, lastPage: Math.ceil(total / perPage) }
+        const offset = (page - 1) * perPage
+        const dataQuery = trx(table).orderBy('created_at', 'desc').limit(perPage).offset(offset)
+        if (applyFilters) applyFilters(dataQuery)
+        const data = await dataQuery
+
+        return { data, total, page, perPage, lastPage: Math.ceil(total / perPage) }
+      })
     })
   }
 

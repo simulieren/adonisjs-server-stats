@@ -177,6 +177,7 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | `onStats`       | `(stats) => void`                 | --                          | Callback after each collection tick                              |
 | `toolbar`       | `boolean \| ToolbarConfig`        | --                          | `true` to enable with defaults, or pass a `ToolbarConfig` object |
 | `dashboard`     | `boolean \| DashboardConfig`      | --                          | `true` to enable at `/__stats`, or pass a `DashboardConfig`      |
+| `verbose`       | `boolean`                         | `false`                     | Log initialization details (collectors, routes, etc) to console  |
 | `advanced`      | `AdvancedConfig`                  | --                          | Rarely-needed options (channel name, db path, buffer sizes, etc) |
 
 ### `ToolbarConfig`

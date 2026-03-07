@@ -16,4 +16,7 @@ export default defineConfig({
 
   // Enable the full-page dashboard at /__stats
   // dashboard: true,
+
+  // Log detailed initialization steps (SQLite, migrations, routes, etc.)
+  // verbose: true,
 })

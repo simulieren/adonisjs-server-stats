@@ -63,7 +63,9 @@ export function dbPoolCollector(opts?: DbPoolCollectorOptions): MetricCollector 
 
     async collect() {
       try {
-        const { default: db } = await appImport<typeof import('@adonisjs/lucid/services/db')>('@adonisjs/lucid/services/db')
+        const { default: db } = await appImport<typeof import('@adonisjs/lucid/services/db')>(
+          '@adonisjs/lucid/services/db'
+        )
         const connection = db.manager.get(connectionName)
         if (!connection) {
           if (!warnedConnectionNotFound) {

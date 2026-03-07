@@ -44,8 +44,17 @@ export class RingBuffer<T> {
 
   /** Returns the most recent N items (newest first). */
   latest(n: number): T[] {
-    const all = this.toArray()
-    return all.slice(-n).reverse()
+    if (this.count === 0) return []
+    const take = Math.min(n, this.count)
+    const result: T[] = new Array(take)
+
+    // Walk backwards from the most recently inserted item
+    for (let i = 0; i < take; i++) {
+      const idx = (this.head - 1 - i + this.capacity) % this.capacity
+      result[i] = this.buffer[idx] as T
+    }
+
+    return result
   }
 
   getNextId(): number {

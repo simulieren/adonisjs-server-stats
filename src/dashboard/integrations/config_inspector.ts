@@ -85,18 +85,28 @@ function redact(value: string): RedactedValue {
  * Automatically redacts values whose keys match sensitive patterns.
  */
 export class ConfigInspector {
+  private cachedConfig: SanitizedConfig | null = null
+  private cachedEnv: SanitizedEnvVars | null = null
+  private cacheTimestamp: number = 0
+  private static readonly CACHE_TTL_MS = 30_000 // 30 seconds
+
   constructor(private app: ApplicationService) {}
 
   /**
    * Get the full application config with sensitive values redacted.
    */
   getConfig(): SanitizedConfig {
+    if (this.cachedConfig && Date.now() - this.cacheTimestamp < ConfigInspector.CACHE_TTL_MS) {
+      return this.cachedConfig
+    }
     try {
       const raw =
         (
           this.app as unknown as { config?: { all?: () => Record<string, unknown> } }
         ).config?.all?.() ?? {}
-      return { config: sanitizeObject(raw) as Record<string, unknown> }
+      this.cachedConfig = { config: sanitizeObject(raw) as Record<string, unknown> }
+      this.cacheTimestamp = Date.now()
+      return this.cachedConfig
     } catch {
       return { config: {} }
     }
@@ -106,6 +116,9 @@ export class ConfigInspector {
    * Get environment variables with sensitive values redacted.
    */
   getEnvVars(): SanitizedEnvVars {
+    if (this.cachedEnv && Date.now() - this.cacheTimestamp < ConfigInspector.CACHE_TTL_MS) {
+      return this.cachedEnv
+    }
     try {
       const env: Record<string, string | RedactedValue> = {}
       const sorted = Object.keys(process.env).sort()
@@ -119,7 +132,9 @@ export class ConfigInspector {
           env[key] = value
         }
       }
-      return { env }
+      this.cachedEnv = { env }
+      this.cacheTimestamp = Date.now()
+      return this.cachedEnv
     } catch {
       return { env: {} }
     }

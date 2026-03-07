@@ -58,14 +58,22 @@ export class EventCollector {
     this.emitter = null
   }
 
+  /** Reusable WeakSet to avoid GC churn on every event. */
+  private circulars = new WeakSet<WeakKey>()
+
   private summarizeData(data: unknown): string | null {
     if (data === undefined || data === null) return null
 
     try {
-      if (typeof data === 'string') return data
-      const json = JSON.stringify(data, this.safeReplacer(), 2)
-      // Cap at 4KB per event to avoid memory bloat
-      return json.length > 4096 ? json.slice(0, 4096) + '\n...' : json
+      if (typeof data === 'string') return data.length > 4096 ? data.slice(0, 4096) + '...' : data
+      if (typeof data !== 'object') return String(data)
+
+      // Reuse the WeakSet across calls to avoid per-event allocation
+      this.circulars = new WeakSet()
+      const limited = this.limitDepth(data, 3, this.circulars)
+      // Compact JSON (no indent) to reduce string size and serialization time
+      const result = JSON.stringify(limited) ?? ''
+      return result.length > 4096 ? result.slice(0, 4096) + '...' : result
     } catch {
       if (typeof data === 'object' && data !== null) {
         const ctorName = (data as { constructor?: { name?: string } }).constructor?.name
@@ -75,17 +83,42 @@ export class EventCollector {
     }
   }
 
-  private safeReplacer() {
-    const seen = new WeakSet()
-    return (_key: string, value: unknown) => {
-      if (typeof value === 'object' && value !== null) {
-        if (seen.has(value)) return '[Circular]'
-        seen.add(value)
+  /**
+   * Recursively limit object depth to prevent deeply-nested payloads
+   * from causing expensive serialization.
+   */
+  private limitDepth(value: unknown, maxDepth: number, seen: WeakSet<WeakKey>): unknown {
+    if (maxDepth <= 0) return '[...]'
+    if (value === null || value === undefined) return value
+    if (typeof value === 'function') return `[Function: ${value.name || 'anonymous'}]`
+    if (typeof value === 'bigint') return value.toString()
+    if (typeof value !== 'object') return value
+    if (seen.has(value)) return '[Circular]'
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      const take = Math.min(value.length, 20)
+      const arr = new Array(take)
+      for (let i = 0; i < take; i++) {
+        arr[i] = this.limitDepth(value[i], maxDepth - 1, seen)
       }
-      if (typeof value === 'function') return `[Function: ${value.name || 'anonymous'}]`
-      if (typeof value === 'bigint') return value.toString()
-      return value
+      return arr
     }
+
+    const keys = Object.keys(value as Record<string, unknown>)
+    const result: Record<string, unknown> = {}
+    const limit = Math.min(keys.length, 50)
+    for (let i = 0; i < limit; i++) {
+      result[keys[i]] = this.limitDepth(
+        (value as Record<string, unknown>)[keys[i]],
+        maxDepth - 1,
+        seen
+      )
+    }
+    if (keys.length > 50) {
+      result['...'] = `(${keys.length - 50} more keys)`
+    }
+    return result
   }
 
   getEvents(): EventRecord[] {

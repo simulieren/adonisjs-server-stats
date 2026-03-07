@@ -33,10 +33,25 @@ export interface HistoryBuffer {
  * @returns A {@link HistoryBuffer} instance.
  */
 export function createHistoryBuffer(maxLength: number = MAX_HISTORY): HistoryBuffer {
-  const buffer: Record<string, number[]> = {}
+  // Use circular buffers to avoid O(N) Array.shift() on every push.
+  // Each metric gets a fixed-size array with a write index.
+  const rings: Record<string, { data: number[]; head: number; count: number }> = {}
+  const cache: Record<string, number[]> = {}
+  let cacheValid = false
+
+  function toArray(ring: { data: number[]; head: number; count: number }): number[] {
+    if (ring.count === 0) return []
+    const result = new Array(ring.count)
+    const start = ring.count < maxLength ? 0 : ring.head
+    for (let i = 0; i < ring.count; i++) {
+      result[i] = ring.data[(start + i) % maxLength]
+    }
+    return result
+  }
 
   return {
     push(stats: ServerStats) {
+      cacheValid = false
       for (const metric of METRIC_DEFINITIONS) {
         const key = metric.historyKey
         if (!key) continue
@@ -44,18 +59,26 @@ export function createHistoryBuffer(maxLength: number = MAX_HISTORY): HistoryBuf
         const value = metric.extract(stats)
         if (typeof value !== 'number') continue
 
-        if (!buffer[key]) buffer[key] = []
-        buffer[key].push(value)
-        if (buffer[key].length > maxLength) buffer[key].shift()
+        if (!rings[key]) rings[key] = { data: new Array(maxLength), head: 0, count: 0 }
+        const ring = rings[key]
+        ring.data[ring.head] = value
+        ring.head = (ring.head + 1) % maxLength
+        if (ring.count < maxLength) ring.count++
       }
     },
 
     get(key: string): number[] {
-      return buffer[key] || []
+      const ring = rings[key]
+      return ring ? toArray(ring) : []
     },
 
     getAll() {
-      return buffer
+      if (cacheValid) return cache
+      for (const key of Object.keys(rings)) {
+        cache[key] = toArray(rings[key])
+      }
+      cacheValid = true
+      return cache
     },
   }
 }

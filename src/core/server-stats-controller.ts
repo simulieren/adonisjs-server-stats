@@ -95,6 +95,7 @@ export class ServerStatsController {
   private staleTimer: ReturnType<typeof setInterval> | null = null
   private lastSuccess = 0
   private unauthorized = false
+  private stopped = false
   private sseActive = false
   private isConnected = false
   private isStale = false
@@ -127,6 +128,7 @@ export class ServerStatsController {
    */
   start(): void {
     if (this.unauthorized) return
+    this.stopped = false
 
     let usePolling = false
 
@@ -149,8 +151,9 @@ export class ServerStatsController {
         onDisconnect: () => {
           this.setSseActive(false)
           this.setConnected(false)
-          // Fall back to polling
-          if (!this.pollTimer && !this.unauthorized) {
+          // Fall back to polling — but only if not already stopped
+          // (onDisconnect can fire asynchronously after stop())
+          if (!this.pollTimer && !this.unauthorized && !this.stopped) {
             this.startPollInterval()
           }
         },
@@ -174,7 +177,7 @@ export class ServerStatsController {
     } else {
       // Give SSE 3 seconds to connect, then start polling as backup
       const fallbackTimer = setTimeout(() => {
-        if (!this.isConnected && !this.pollTimer) {
+        if (!this.isConnected && !this.pollTimer && !this.stopped) {
           this.startPollInterval()
         }
       }, 3000)
@@ -201,6 +204,7 @@ export class ServerStatsController {
    * Stop all timers and subscriptions. Call on unmount.
    */
   stop(): void {
+    this.stopped = true
     this.sseHandle?.unsubscribe()
     this.sseHandle = null
     this.stopPolling()
@@ -271,6 +275,7 @@ export class ServerStatsController {
   /** Start the poll interval timer. */
   private startPollInterval(): void {
     if (this.pollTimer) return
+    if (this.stopped) return
     this.pollTimer = setInterval(() => this.poll(), this.pollInterval)
     this.onPollActiveChange?.(true)
   }

@@ -38,6 +38,7 @@ export function parseAndEnrich(line: string): Record<string, unknown> | null {
 
 export class LogStreamService {
   private recentEntries: LogTimestamp[] = []
+  private static readonly MAX_RECENT_ENTRIES = 10_000
   private lastSize = 0
   private intervalId: ReturnType<typeof setInterval> | null = null
   private logPath: string | null
@@ -56,6 +57,10 @@ export class LogStreamService {
    */
   ingest(entry: Record<string, unknown>) {
     const level = typeof entry.level === 'number' ? entry.level : 30
+    // Cap the array to prevent unbounded growth under high log volume
+    if (this.recentEntries.length >= LogStreamService.MAX_RECENT_ENTRIES) {
+      this.recentEntries.splice(0, Math.floor(LogStreamService.MAX_RECENT_ENTRIES / 4))
+    }
     this.recentEntries.push({ time: Date.now(), level })
     this.onEntry?.(entry)
   }
@@ -64,9 +69,14 @@ export class LogStreamService {
     const now = Date.now()
     const cutoff = now - ROLLING_WINDOW_MS
 
-    // Prune old entries
-    while (this.recentEntries.length > 0 && this.recentEntries[0].time < cutoff) {
-      this.recentEntries.shift()
+    // Prune old entries using splice (O(1) amortized) instead of
+    // repeated shift() which is O(N) per call
+    let pruneEnd = 0
+    while (pruneEnd < this.recentEntries.length && this.recentEntries[pruneEnd].time < cutoff) {
+      pruneEnd++
+    }
+    if (pruneEnd > 0) {
+      this.recentEntries.splice(0, pruneEnd)
     }
 
     let errors = 0

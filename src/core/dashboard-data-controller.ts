@@ -101,6 +101,8 @@ export class DashboardDataController {
   private hasFetched: boolean = false
   /** Whether the controller has been stopped (disposed). */
   private stopped: boolean = false
+  /** AbortController for the current in-flight fetch. */
+  private abortController: AbortController | null = null
 
   constructor(config: DashboardDataControllerConfig) {
     this.client = new ApiClient({ baseUrl: config.baseUrl, authToken: config.authToken })
@@ -129,6 +131,8 @@ export class DashboardDataController {
   stop(): void {
     this.stopped = true
     this.stopRefreshTimer()
+    this.abortController?.abort()
+    this.abortController = null
   }
 
   /**
@@ -141,6 +145,11 @@ export class DashboardDataController {
     // Skip silent refreshes while an explicit fetch is pending to prevent
     // a stale timer/SSE refresh from racing with a user-initiated change.
     if (silent && this.explicitFetchPending) return
+
+    // Cancel any previous in-flight fetch
+    this.abortController?.abort()
+    const controller = new AbortController()
+    this.abortController = controller
 
     const myFetchId = ++this.fetchId
     const currentSection = this.section
@@ -170,7 +179,9 @@ export class DashboardDataController {
     }
 
     try {
-      const result = await this.api.fetchSection(currentSection, qs || undefined)
+      const result = await this.api.fetchSection(currentSection, qs || undefined, {
+        signal: controller.signal,
+      })
 
       // Discard stale responses
       if (myFetchId !== this.fetchId) return
@@ -198,6 +209,10 @@ export class DashboardDataController {
       this.callbacks.onLoading(false)
       this.hasFetched = true
     } catch (err) {
+      // Silently ignore aborted requests
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (controller.signal.aborted) return
+
       if (myFetchId !== this.fetchId) return
       if (this.stopped) return
 

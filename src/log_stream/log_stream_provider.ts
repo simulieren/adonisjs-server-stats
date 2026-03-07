@@ -29,7 +29,7 @@ export default class LogStreamProvider {
 
     const broadcast = (entry: Record<string, unknown>) => {
       try {
-        transmit.broadcast(channelName, JSON.parse(JSON.stringify(entry)))
+        transmit.broadcast(channelName, entry)
       } catch {
         // Silently ignore broadcast errors
       }

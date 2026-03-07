@@ -81,14 +81,12 @@ export class ChartAggregator {
         .select('duration')
         .first()
 
-      const queryStats: { query_count: number; avg_query_duration: number } | undefined =
-        await trx('server_stats_queries')
-          .where('created_at', '>=', cutoff)
-          .select(
-            trx.raw('COUNT(*) as query_count'),
-            trx.raw('AVG(duration) as avg_query_duration')
-          )
-          .first()
+      const queryStats: { query_count: number; avg_query_duration: number } | undefined = await trx(
+        'server_stats_queries'
+      )
+        .where('created_at', '>=', cutoff)
+        .select(trx.raw('COUNT(*) as query_count'), trx.raw('AVG(duration) as avg_query_duration'))
+        .first()
 
       await trx('server_stats_metrics').insert({
         bucket,
