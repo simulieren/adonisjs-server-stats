@@ -274,7 +274,7 @@ function selectValue(e: Event): string {
 
     <template v-else>
       <div class="ss-dash-log-entries">
-        <div v-for="(log, i) in logs" :key="log.id || i" class="ss-dash-log-entry">
+        <div v-for="(log, i) in logs" :key="String(log.id || i)" class="ss-dash-log-entry">
           <span
             :class="`ss-dash-log-level ${getLogLevelCssClass(resolveLogLevel(log), 'ss-dash-log-level')}`"
           >

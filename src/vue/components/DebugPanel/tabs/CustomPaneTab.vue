@@ -161,7 +161,7 @@ onMounted(() => {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(row, i) in filteredData" :key="row.id ?? i">
+        <tr v-for="(row, i) in filteredData" :key="String(row.id ?? i)">
           <td
             v-for="col in pane.columns"
             :key="col.key"
