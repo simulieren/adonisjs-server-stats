@@ -62,14 +62,7 @@ npm install adonisjs-server-stats
 ```ts
 // adonisrc.ts
 providers: [
-  {
-    file: () => import('adonisjs-server-stats/provider'),
-    environment: ['web'],
-  },
-  {
-    file: () => import('adonisjs-server-stats/log-stream/provider'),
-    environment: ['web'],
-  },
+  () => import('adonisjs-server-stats/provider'),
 ]
 ```
 
@@ -643,6 +636,29 @@ The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `m
 >   action: 'SAMEORIGIN',
 > },
 > ```
+
+### Cross-Process Email Capture (Queue Workers)
+
+AdonisJS mail events (`mail:sending`, `mail:sent`, etc.) are process-local. If your app sends emails from **Bull queue workers** or other separate processes, the web server's email collector never sees them.
+
+The provider handles this automatically via a **Redis pub/sub bridge**:
+
+1. In queue workers (`console` environment), the provider only starts a lightweight email bridge publisher — no debug store, routes, or dashboard overhead
+2. When an email is sent, the event is published to a Redis pub/sub channel
+3. In the web server (`web` environment), the provider subscribes to the same channel and ingests the email into both the debug panel and the dashboard
+
+**Requirements:**
+- `@adonisjs/redis` must be installed and configured (used for pub/sub between processes)
+- The provider must be registered **without** an `environment` restriction so it loads in all environments:
+
+```ts
+// adonisrc.ts
+providers: [
+  () => import('adonisjs-server-stats/provider'), // runs in web + console
+]
+```
+
+> **Note:** If you previously used separate `adonisjs-server-stats/email-bridge/provider` and `adonisjs-server-stats/log-stream/provider` registrations, you can replace all three with the single provider above. The email bridge and log stream functionality are now built into the main provider.
 
 ### Persistent Debug Data
 

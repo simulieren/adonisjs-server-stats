@@ -74,10 +74,6 @@
       "types": "./dist/src/log_stream/log_stream_provider.d.ts",
       "import": "./dist/src/log_stream/log_stream_provider.js"
     },
-    "./email-bridge/provider": {
-      "types": "./dist/src/provider/email_bridge_provider.d.ts",
-      "import": "./dist/src/provider/email_bridge_provider.js"
-    },
     "./edge": {
       "types": "./dist/src/edge/plugin.d.ts",
       "import": "./dist/src/edge/plugin.js"

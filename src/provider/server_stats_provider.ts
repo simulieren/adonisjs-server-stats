@@ -53,6 +53,9 @@ export default class ServerStatsProvider {
   private emailBridgeRedis: unknown = null
   private emailBridgeChannel: string = 'adonisjs-server-stats:emails'
 
+  // Log stream (merged from LogStreamProvider)
+  private logStreamService: LogStreamService | null = null
+
   // Diagnostics tracking
   private pinoHookActive: boolean = false
   private edgePluginActive: boolean = false
@@ -65,6 +68,11 @@ export default class ServerStatsProvider {
   constructor(protected app: ApplicationService) {}
 
   async boot() {
+    // In non-web environments (queue workers, scheduler, REPL), skip all
+    // route registration, Edge plugin, and heavy initialization. The
+    // email bridge publisher is set up in ready() instead.
+    if (this.app.getEnvironment() !== 'web') return
+
     try {
       await this.initializeBoot()
     } catch (err) {
@@ -332,10 +340,16 @@ export default class ServerStatsProvider {
 
     if (this.app.inTest && config.skipInTest !== false) return
 
-    // Defer the entire initialization to setImmediate so ready() returns
-    // immediately. AdonisJS waits for all provider ready() hooks before
-    // processing HTTP requests — blocking here would hang the server.
-    // Routes use lazy controller getters that return 503 until init completes.
+    // ── Non-web environments: only start the email bridge publisher ──
+    if (this.app.getEnvironment() !== 'web') {
+      await this.setupEmailBridgePublisher()
+      return
+    }
+
+    // ── Web environment: full initialization ──
+    // Defer to setImmediate so ready() returns immediately. AdonisJS waits
+    // for all provider ready() hooks before processing HTTP requests —
+    // blocking here would hang the server.
     setImmediate(() => {
       this.initializeServerStats(config).catch((err) => {
         log.warn(
@@ -434,6 +448,9 @@ export default class ServerStatsProvider {
 
     // ── Stats collection interval + transmit (lightweight, set up inline) ──
     this.setupStatsInterval(config)
+
+    // ── Live log streaming via Transmit ──
+    this.setupLogStream().catch(() => {})
 
     log.info('ready')
   }
@@ -792,6 +809,122 @@ export default class ServerStatsProvider {
   }
 
   /**
+   * Lightweight email bridge publisher for non-web environments
+   * (queue workers, scheduler). Listens to local AdonisJS mail events
+   * and publishes them to Redis so the web server can ingest them.
+   */
+  private async setupEmailBridgePublisher(): Promise<void> {
+    let emitter: { on(event: string, handler: (...args: unknown[]) => void): void }
+    try {
+      emitter = (await this.app.container.make('emitter')) as typeof emitter
+    } catch {
+      return
+    }
+
+    const { appImport } = await import('../utils/app_import.js')
+
+    let redis: { publish(channel: string, message: string): Promise<unknown> }
+    try {
+      const mod = await appImport<typeof import('@adonisjs/redis/services/main')>(
+        '@adonisjs/redis/services/main'
+      )
+      redis = mod.default as typeof redis
+    } catch {
+      return // @adonisjs/redis not installed
+    }
+
+    const tag = `${process.pid}-${Date.now()}`
+    const ch = this.emailBridgeChannel
+
+    const statusMap: [string, string][] = [
+      ['mail:sending', 'sending'],
+      ['mail:sent', 'sent'],
+      ['mail:queueing', 'queueing'],
+      ['mail:queued', 'queued'],
+      ['queued:mail:error', 'failed'],
+    ]
+
+    const MAX_HTML = 50_000 // 50 KB cap per email body, same as EmailCollector
+    const capSize = (v: unknown): string | null => {
+      if (!v || typeof v !== 'string') return null
+      return v.length <= MAX_HTML ? v : v.slice(0, MAX_HTML) + '\n<!-- truncated -->'
+    }
+
+    for (const [event, status] of statusMap) {
+      emitter.on(event, (data: unknown) => {
+        try {
+          const d = data as Record<string, unknown>
+          const msg = (d?.message || d) as Record<string, unknown>
+          const payload = JSON.stringify({
+            _t: tag,
+            from: extractAddresses(msg?.from) || 'unknown',
+            to: extractAddresses(msg?.to) || 'unknown',
+            cc: extractAddresses(msg?.cc) || null,
+            bcc: extractAddresses(msg?.bcc) || null,
+            subject: (msg?.subject as string) || '(no subject)',
+            html: capSize(msg?.html),
+            text: capSize(msg?.text),
+            mailer: (d?.mailerName as string) || (d?.mailer as string) || 'unknown',
+            status,
+            messageId:
+              (d?.response as Record<string, unknown>)?.messageId ||
+              (d?.messageId as string) ||
+              null,
+            attachmentCount: Array.isArray(msg?.attachments) ? msg.attachments.length : 0,
+            timestamp: Date.now(),
+          })
+          redis.publish(ch, payload).catch(() => {})
+        } catch {
+          // Silently ignore serialization errors
+        }
+      })
+    }
+
+    log.info('email bridge publisher active (queue worker → Redis)')
+  }
+
+  /**
+   * Set up live log streaming via Transmit (web environment only).
+   * Merged from the former standalone LogStreamProvider.
+   */
+  private async setupLogStream(): Promise<void> {
+    let transmit: { broadcast(channel: string, data: unknown): void }
+    try {
+      transmit = (await this.app.container.make('transmit')) as typeof transmit
+    } catch {
+      return // @adonisjs/transmit not available
+    }
+
+    const channelName = this.app.config.get<string>('server_stats.logChannelName', 'admin/logs')
+
+    const broadcast = (entry: Record<string, unknown>) => {
+      try {
+        transmit.broadcast(channelName, entry)
+      } catch {
+        // Silently ignore broadcast errors
+      }
+    }
+
+    // If logCollector() is already hooked into Pino (zero-config),
+    // piggyback on its stream instead of creating a file poller.
+    const existing = getLogStreamService()
+    if (existing) {
+      const internal = existing as unknown as { onEntry?: (entry: Record<string, unknown>) => void }
+      const origOnEntry = internal.onEntry
+      internal.onEntry = (entry: Record<string, unknown>) => {
+        origOnEntry?.(entry)
+        broadcast(entry)
+      }
+      return
+    }
+
+    // Fallback: poll the log file directly
+    const logPath = this.app.makePath('logs', 'adonisjs.log')
+    this.logStreamService = new LogStreamService(logPath, broadcast)
+    await this.logStreamService.start()
+  }
+
+  /**
    * Set up a Redis pub/sub bridge for cross-process email capture.
    *
    * Mail events (`mail:sending`, `mail:sent`, etc.) are process-local.
@@ -836,6 +969,12 @@ export default class ServerStatsProvider {
       ['queued:mail:error', 'failed'],
     ]
 
+    const MAX_HTML = 50_000
+    const capSize = (v: unknown): string | null => {
+      if (!v || typeof v !== 'string') return null
+      return v.length <= MAX_HTML ? v : v.slice(0, MAX_HTML) + '\n<!-- truncated -->'
+    }
+
     for (const [event, status] of statusMap) {
       em.on(event, (data: unknown) => {
         try {
@@ -848,6 +987,8 @@ export default class ServerStatsProvider {
             cc: extractAddresses(msg?.cc) || null,
             bcc: extractAddresses(msg?.bcc) || null,
             subject: msg?.subject || '(no subject)',
+            html: capSize(msg?.html),
+            text: capSize(msg?.text),
             mailer: d?.mailerName || d?.mailer || 'unknown',
             status,
             messageId: d?.response?.messageId || d?.messageId || null,
@@ -869,15 +1010,18 @@ export default class ServerStatsProvider {
           if (parsed._t === processTag) return // Skip own messages
 
           const { _t: _, ...fields } = parsed
-
-          // Ingest into in-memory ring buffer (debug panel).
-          // SQLite persistence is NOT done here — the sending process's
-          // own DashboardStore already persists via wireEventListeners.
-          this.debugStore?.emails.ingest({
+          const record = {
             ...fields,
-            html: null,
-            text: null,
-          })
+            html: fields.html || null,
+            text: fields.text || null,
+          }
+
+          // Ingest into in-memory ring buffer (debug panel)
+          this.debugStore?.emails.ingest(record)
+
+          // Also persist to SQLite dashboard (the sending process has
+          // no DashboardStore, so we must record it here)
+          this.dashboardStore?.recordEmail({ id: 0, ...record })
         } catch {
           // Ignore malformed messages
         }
@@ -1007,7 +1151,8 @@ export default class ServerStatsProvider {
       this.emailBridgeRedis = null
     }
 
-    // Clean up dashboard resources
+    // Clean up log stream and dashboard resources
+    this.logStreamService?.stop()
     this.dashboardLogStream?.stop()
     setOnRequestComplete(null)
     setDashboardPath(null)
