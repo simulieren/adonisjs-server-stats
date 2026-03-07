@@ -83,8 +83,35 @@ export default class ServerStatsProvider {
       const debugEndpoint = toolbarConfig?.enabled
         ? (toolbarConfig.debugEndpoint ?? '/admin/api/debug')
         : undefined
+
+      // Check dashboard dependencies before registering dashboard routes
+      let dashboardDepsAvailable = true
+      if (toolbarConfig?.enabled && toolbarConfig.dashboard) {
+        const missing: string[] = []
+        try {
+          await import('knex')
+        } catch {
+          missing.push('knex')
+        }
+        try {
+          await import('better-sqlite3')
+        } catch {
+          missing.push('better-sqlite3')
+        }
+        if (missing.length > 0) {
+          dashboardDepsAvailable = false
+          log.block(`Dashboard requires ${missing.join(' and ')}. Install with:`, [
+            '',
+            bold(`npm install ${missing.join(' ')}`),
+            '',
+            dim('Dashboard routes have been skipped for now.'),
+            dim('Everything else (stats bar, debug panel) works without it.'),
+          ])
+        }
+      }
+
       const dashboardPath =
-        toolbarConfig?.enabled && toolbarConfig.dashboard
+        toolbarConfig?.enabled && toolbarConfig.dashboard && dashboardDepsAvailable
           ? (toolbarConfig.dashboardPath ?? '/__stats')
           : undefined
 
