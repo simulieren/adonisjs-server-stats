@@ -8,7 +8,13 @@
     "node": true
   },
   "rules": {
-    "max-params": ["warn", { "max": 5 }],
+    "max-lines": ["warn", { "max": 300, "skipBlankLines": true, "skipComments": true }],
+    "max-lines-per-function": ["warn", { "max": 50, "skipBlankLines": true, "skipComments": true }],
+    "complexity": ["warn", { "max": 10 }],
+    "max-depth": ["warn", { "max": 3 }],
+    "max-params": ["warn", { "max": 4 }],
+    "max-nested-callbacks": ["warn", { "max": 3 }],
+    "no-else-return": "warn",
     "eqeqeq": "warn",
     "typescript/no-explicit-any": "warn"
   },

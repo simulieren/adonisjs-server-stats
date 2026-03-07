@@ -46,7 +46,7 @@ export default class DebugController {
       statsBar: true,
       debugPanel: !!toolbarConfig?.enabled,
       dashboard: !!toolbarConfig?.dashboard,
-      tracing: !!toolbarConfig?.tracing,
+      tracing: toolbarConfig?.tracing ?? true,
       process: isAuto || collectorNames.has('process'),
       system: isAuto || collectorNames.has('system'),
       http: isAuto || collectorNames.has('http'),

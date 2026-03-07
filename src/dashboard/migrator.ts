@@ -32,6 +32,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
       duration REAL NOT NULL,
       span_count INTEGER DEFAULT 0,
       warning_count INTEGER DEFAULT 0,
+      http_request_id TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `)
@@ -44,6 +45,10 @@ export async function autoMigrate(db: Knex): Promise<void> {
   )
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_requests_status ON server_stats_requests(status_code)`
+  )
+  try { await db.raw('ALTER TABLE server_stats_requests ADD COLUMN http_request_id TEXT') } catch {}
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_requests_http_req ON server_stats_requests(http_request_id)`
   )
   await yieldToEventLoop()
 

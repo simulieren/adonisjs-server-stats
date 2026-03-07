@@ -2,7 +2,7 @@
 /**
  * Request waterfall / timeline tab for the debug panel.
  */
-import { ref, computed, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import {
   formatDuration,
   formatTime,
@@ -13,6 +13,8 @@ import {
 import { useApiClient } from '../../../composables/useApiClient.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
 import { TAB_ICONS } from '../../../../core/icons.js'
+import { initSplitPane } from '../../../../core/split-pane.js'
+import RelatedLogs from '../../shared/RelatedLogs.vue'
 import type { TraceRecord, TraceSpan } from '../../../../core/index.js'
 
 const props = defineProps<{
@@ -124,8 +126,37 @@ function getBarStyle(span: TraceSpan, totalDuration: number): Record<string, str
 
 const { tableRef } = useResizableTable(() => traces.value)
 
+const splitContainerRef = ref<HTMLElement | null>(null)
+const splitHandleRef = ref<HTMLElement | null>(null)
+const splitTopRef = ref<HTMLElement | null>(null)
+const splitBottomRef = ref<HTMLElement | null>(null)
+let splitCleanup: (() => void) | null = null
+
+const detailLogs = computed(() => {
+  if (!traceDetail.value) return []
+  return traceDetail.value.logs || []
+})
+
+watch([selectedTraceId, traceDetail], async () => {
+  splitCleanup?.()
+  splitCleanup = null
+  if (traceDetail.value && detailLogs.value.length > 0) {
+    await nextTick()
+    if (splitContainerRef.value && splitHandleRef.value && splitTopRef.value && splitBottomRef.value) {
+      splitCleanup = initSplitPane({
+        container: splitContainerRef.value,
+        handle: splitHandleRef.value,
+        topPane: splitTopRef.value,
+        bottomPane: splitBottomRef.value,
+        storageKey: 'ss-dbg-timeline-split',
+      })
+    }
+  }
+})
+
 onBeforeUnmount(() => {
   if (fetchAbortController) fetchAbortController.abort()
+  splitCleanup?.()
 })
 
 function dbgDurationClass(ms: number): string {
@@ -152,7 +183,7 @@ function dbgDurationClass(ms: number): string {
       </template>
 
       <!-- Detail content -->
-      <template v-else-if="traceDetail">
+      <div v-else-if="traceDetail" class="ss-dbg-tl-detail-wrapper">
         <div class="ss-dbg-tl-detail-header">
           <button type="button" class="ss-dbg-btn-clear" @click="goBack">&larr; Back</button>
           <span :class="`ss-dbg-method ss-dbg-method-${traceDetail.method.toLowerCase()}`">
@@ -170,39 +201,86 @@ function dbgDurationClass(ms: number): string {
           </span>
         </div>
 
-        <div class="ss-dbg-tl-legend">
-          <span v-for="(color, cat) in CATEGORY_COLORS" :key="cat" class="ss-dbg-tl-legend-item">
-            <span class="ss-dbg-tl-legend-dot" :style="{ background: color }"></span>
-            {{ CATEGORY_LABELS[cat] || cat }}
-          </span>
-        </div>
+        <!-- With logs: split pane -->
+        <template v-if="detailLogs.length > 0">
+          <div ref="splitContainerRef" class="ss-dbg-split-container">
+            <div ref="splitTopRef" class="ss-dbg-split-top">
+              <div class="ss-dbg-tl-legend">
+                <span v-for="(color, cat) in CATEGORY_COLORS" :key="cat" class="ss-dbg-tl-legend-item">
+                  <span class="ss-dbg-tl-legend-dot" :style="{ background: color }"></span>
+                  {{ CATEGORY_LABELS[cat] || cat }}
+                </span>
+              </div>
 
-        <div id="ss-dbg-tl-waterfall">
-          <div v-if="detailSpans.length === 0" class="ss-dbg-empty">
-            No spans captured for this request
-          </div>
-          <div v-for="span in detailSpans" :key="span.id" class="ss-dbg-tl-row">
-            <span class="ss-dbg-tl-label" :title="span.label">
-              {{ span.label }}
-            </span>
-            <span class="ss-dbg-tl-track">
-              <span
-                :class="`ss-dbg-tl-bar ss-dbg-tl-bar-${span.category}`"
-                :style="getBarStyle(span, traceDetail.totalDuration)"
-                :title="`${span.label}: ${formatDuration(span.duration)}`"
-              ></span>
-            </span>
-            <span class="ss-dbg-tl-dur">{{ formatDuration(span.duration) }}</span>
-          </div>
-        </div>
+              <div id="ss-dbg-tl-waterfall">
+                <div v-if="detailSpans.length === 0" class="ss-dbg-empty">
+                  No spans captured for this request
+                </div>
+                <div v-for="span in detailSpans" :key="span.id" class="ss-dbg-tl-row">
+                  <span class="ss-dbg-tl-label" :title="span.label">
+                    {{ span.label }}
+                  </span>
+                  <span class="ss-dbg-tl-track">
+                    <span
+                      :class="`ss-dbg-tl-bar ss-dbg-tl-bar-${span.category}`"
+                      :style="getBarStyle(span, traceDetail.totalDuration)"
+                      :title="`${span.label}: ${formatDuration(span.duration)}`"
+                    ></span>
+                  </span>
+                  <span class="ss-dbg-tl-dur">{{ formatDuration(span.duration) }}</span>
+                </div>
+              </div>
 
-        <div v-if="detailWarnings.length > 0" class="ss-dbg-tl-warnings">
-          <div class="ss-dbg-tl-warnings-title">Warnings</div>
-          <div v-for="(w, i) in detailWarnings" :key="i" class="ss-dbg-tl-warning">
-            {{ w }}
+              <div v-if="detailWarnings.length > 0" class="ss-dbg-tl-warnings">
+                <div class="ss-dbg-tl-warnings-title">Warnings</div>
+                <div v-for="(w, i) in detailWarnings" :key="i" class="ss-dbg-tl-warning">
+                  {{ w }}
+                </div>
+              </div>
+            </div>
+            <div ref="splitHandleRef" class="ss-dbg-split-handle" />
+            <div ref="splitBottomRef" class="ss-dbg-split-bottom">
+              <RelatedLogs :logs="detailLogs" class-prefix="ss-dbg" />
+            </div>
           </div>
-        </div>
-      </template>
+        </template>
+
+        <!-- Without logs: original layout -->
+        <template v-else>
+          <div class="ss-dbg-tl-legend">
+            <span v-for="(color, cat) in CATEGORY_COLORS" :key="cat" class="ss-dbg-tl-legend-item">
+              <span class="ss-dbg-tl-legend-dot" :style="{ background: color }"></span>
+              {{ CATEGORY_LABELS[cat] || cat }}
+            </span>
+          </div>
+
+          <div id="ss-dbg-tl-waterfall">
+            <div v-if="detailSpans.length === 0" class="ss-dbg-empty">
+              No spans captured for this request
+            </div>
+            <div v-for="span in detailSpans" :key="span.id" class="ss-dbg-tl-row">
+              <span class="ss-dbg-tl-label" :title="span.label">
+                {{ span.label }}
+              </span>
+              <span class="ss-dbg-tl-track">
+                <span
+                  :class="`ss-dbg-tl-bar ss-dbg-tl-bar-${span.category}`"
+                  :style="getBarStyle(span, traceDetail.totalDuration)"
+                  :title="`${span.label}: ${formatDuration(span.duration)}`"
+                ></span>
+              </span>
+              <span class="ss-dbg-tl-dur">{{ formatDuration(span.duration) }}</span>
+            </div>
+          </div>
+
+          <div v-if="detailWarnings.length > 0" class="ss-dbg-tl-warnings">
+            <div class="ss-dbg-tl-warnings-title">Warnings</div>
+            <div v-for="(w, i) in detailWarnings" :key="i" class="ss-dbg-tl-warning">
+              {{ w }}
+            </div>
+          </div>
+        </template>
+      </div>
 
       <!-- Fallback loading -->
       <div v-else class="ss-dbg-empty">Loading trace detail...</div>
@@ -241,7 +319,7 @@ function dbgDurationClass(ms: number): string {
               {{ t.url }}
               <a
                 v-if="dashboardPath"
-                :href="`${dashboardPath}#timeline?id=${t.id}`"
+                :href="`${dashboardPath}#requests?id=${t.id}`"
                 target="_blank"
                 class="ss-dbg-deeplink"
                 @click.stop

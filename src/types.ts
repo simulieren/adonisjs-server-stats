@@ -317,7 +317,7 @@ export interface DevToolbarOptions {
    * of all operations (DB queries, events, mail) that occurred
    * during the request.
    *
-   * @default false
+   * @default true
    */
   tracing?: boolean
 

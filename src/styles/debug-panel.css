@@ -432,6 +432,15 @@
 }
 
 /* Timeline base → components.css */
+/* Trace detail wrapper: flex column to let split pane fill available height */
+.ss-dbg-tl-detail-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Debug-specific timeline overrides */
 .ss-dbg-tl-detail-url {
   color: var(--ss-text);

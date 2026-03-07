@@ -5,7 +5,7 @@
  * Self-contained: injects dependencies and fetches its own data
  * via useDashboardData. CSS classes match the React RequestsSection.
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, type Ref, watch, nextTick, onUnmounted } from 'vue'
 import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js'
 import { useApiClient } from '../../../composables/useApiClient.js'
 import { normalizeTraceFields } from '../../../../core/trace-utils.js'
@@ -14,6 +14,8 @@ import { useResizableTable } from '../../../composables/useResizableTable.js'
 import FilterBar from '../shared/FilterBar.vue'
 import PaginationControls from '../shared/PaginationControls.vue'
 import WaterfallChart from '../shared/WaterfallChart.vue'
+import RelatedLogs from '../../shared/RelatedLogs.vue'
+import { initSplitPane } from '../../../../core/split-pane.js'
 
 import type { NormalizedTrace, TraceDetail } from '../../../../core/trace-utils.js'
 
@@ -52,7 +54,12 @@ async function handleRowClick(row: Record<string, unknown>) {
   try {
     const endpoint = dashboardEndpoint || '/__stats/api'
     const result = await getClient().fetch<TraceDetail>(`${endpoint}/requests/${id}`)
-    traceDetail.value = normalizeTraceFields(result as unknown as Record<string, unknown>)
+    // Flatten nested trace fields (spans, totalDuration, warnings) to top level
+    // so normalizeTraceFields() can find them
+    const raw = result as unknown as Record<string, unknown>
+    const trace = raw.trace as Record<string, unknown> | null
+    const merged = trace ? { ...raw, ...trace, logs: raw.logs } : raw
+    traceDetail.value = normalizeTraceFields(merged)
     selectedTrace.value = row
   } catch {
     // silently fail
@@ -83,6 +90,38 @@ function dashDurationClass(ms: number): string {
 }
 
 const { tableRef } = useResizableTable(() => requests.value)
+
+const splitContainerRef = ref<HTMLElement | null>(null)
+const splitHandleRef = ref<HTMLElement | null>(null)
+const splitTopRef = ref<HTMLElement | null>(null)
+const splitBottomRef = ref<HTMLElement | null>(null)
+let splitCleanup: (() => void) | null = null
+
+const detailLogs = computed(() => {
+  if (!traceDetail.value) return []
+  return traceDetail.value.logs || []
+})
+
+watch([() => selectedTrace.value, () => traceDetail.value], async () => {
+  splitCleanup?.()
+  splitCleanup = null
+  if (traceDetail.value && detailLogs.value.length > 0) {
+    await nextTick()
+    if (splitContainerRef.value && splitHandleRef.value && splitTopRef.value && splitBottomRef.value) {
+      splitCleanup = initSplitPane({
+        container: splitContainerRef.value,
+        handle: splitHandleRef.value,
+        topPane: splitTopRef.value,
+        bottomPane: splitBottomRef.value,
+        storageKey: 'ss-requests-split',
+      })
+    }
+  }
+})
+
+onUnmounted(() => {
+  splitCleanup?.()
+})
 </script>
 
 <template>
@@ -106,7 +145,25 @@ const { tableRef } = useResizableTable(() => requests.value)
           {{ traceDetail.totalDuration.toFixed(1) }}ms &middot; {{ traceDetail.spanCount }} spans
         </span>
       </div>
+      <!-- With logs: split pane -->
+      <template v-if="detailLogs.length > 0">
+        <div ref="splitContainerRef" class="ss-dash-split-container">
+          <div ref="splitTopRef" class="ss-dash-split-top">
+            <WaterfallChart
+              :spans="traceDetail.spans as any"
+              :total-duration="traceDetail.totalDuration"
+              :warnings="traceDetail.warnings"
+            />
+          </div>
+          <div ref="splitHandleRef" class="ss-dash-split-handle" />
+          <div ref="splitBottomRef" class="ss-dash-split-bottom">
+            <RelatedLogs :logs="detailLogs" class-prefix="ss-dash" />
+          </div>
+        </div>
+      </template>
+      <!-- Without logs: just waterfall -->
       <WaterfallChart
+        v-else
         :spans="traceDetail.spans as any"
         :total-duration="traceDetail.totalDuration"
         :warnings="traceDetail.warnings"

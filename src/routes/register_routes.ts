@@ -199,9 +199,11 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
         router.get('/diagnostics', bindDebug('diagnostics')).as('server-stats.debug.diagnostics')
 
         // Data endpoints — unified through ApiController
-        // Debug panel always reads from ring buffers (source: 'memory')
+        // Queries, events, and traces read from ring buffers (source: 'memory')
         // because SQLite column names (snake_case) differ from the
         // camelCase QueryRecord/EventRecord/etc. shapes the frontend expects.
+        // Logs and emails use 'auto' (SQLite when available) since the
+        // frontend resolvers handle both snake_case and camelCase fields.
         router
           .get(
             '/queries',
@@ -237,7 +239,10 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
           .get(
             '/logs',
             bindApi(async (api, ctx) => {
-              const result = await api.getLogs({ source: 'memory' })
+              // Request up to 200 entries so the debug panel frontend
+              // (which caps at `.slice(0, 200)`) always has enough
+              // recent logs instead of the default 50-row page.
+              const result = await api.getLogs({ source: 'auto', perPage: 200 })
               return ctx.response.json(result.data)
             })
           )

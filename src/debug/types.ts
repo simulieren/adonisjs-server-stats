@@ -319,6 +319,12 @@ export interface TraceRecord {
   /** Warnings captured via `console.warn` during this request. */
   warnings: string[]
 
+  /** Log entries correlated to this request. */
+  logs?: Record<string, unknown>[]
+
+  /** Unique HTTP request identifier used for log correlation. */
+  httpRequestId?: string
+
   /** Unix timestamp in **milliseconds** when the request started. */
   timestamp: number
 }

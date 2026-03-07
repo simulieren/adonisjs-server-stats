@@ -38,6 +38,7 @@ export interface RequestInput {
 export interface PersistRequestInput extends RequestInput {
   queries: QueryRecord[]
   trace: TraceRecord | null
+  httpRequestId?: string | null
 }
 
 export interface RequestFilters {
@@ -549,62 +550,63 @@ export class DashboardStore {
       return
     }
 
-    // Pre-stringify JSON OUTSIDE the transaction so the synchronous
-    // better-sqlite3 execution doesn't block the event loop on large spans.
-    const preparedRequests = requests.map((input) => ({
-      input,
-      filteredQueries: input.queries
-        .filter((q) => q.connection !== 'server_stats')
-        .map((q) => ({
-          sql_text: q.sql,
-          sql_normalized: normalizeSql(q.sql),
-          bindings: q.bindings ? JSON.stringify(q.bindings) : null,
-          duration: round(q.duration),
-          method: q.method,
-          model: q.model,
-          connection: q.connection,
-          in_transaction: q.inTransaction ? 1 : 0,
-        })),
-      traceRow: input.trace
-        ? {
-            method: input.trace.method,
-            url: input.trace.url,
-            status_code: input.trace.statusCode,
-            total_duration: round(input.trace.totalDuration),
-            span_count: input.trace.spanCount,
-            spans: JSON.stringify(input.trace.spans),
-            warnings: input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
-          }
-        : null,
-    }))
-
-    const preparedLogs = logs.map((entry) => {
-      const levelName =
-        typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
-      return {
-        level: levelName,
-        message: String(entry.msg || entry.message || ''),
-        request_id:
-          entry.request_id || entry.requestId || entry['x-request-id']
-            ? String(entry.request_id || entry.requestId || entry['x-request-id'])
-            : null,
-        data: JSON.stringify(entry),
-      }
-    })
-
     try {
+      // Pre-stringify JSON OUTSIDE the transaction so the synchronous
+      // better-sqlite3 execution doesn't block the event loop on large spans.
+      const preparedRequests = requests.map((input) => ({
+        input,
+        filteredQueries: input.queries
+          .filter((q) => q.connection !== 'server_stats')
+          .map((q) => ({
+            sql_text: q.sql,
+            sql_normalized: normalizeSql(q.sql),
+            bindings: q.bindings ? JSON.stringify(q.bindings) : null,
+            duration: round(q.duration),
+            method: q.method,
+            model: q.model,
+            connection: q.connection,
+            in_transaction: q.inTransaction ? 1 : 0,
+          })),
+        traceRow: input.trace
+          ? {
+              method: input.trace.method,
+              url: input.trace.url,
+              status_code: input.trace.statusCode,
+              total_duration: round(input.trace.totalDuration),
+              span_count: input.trace.spanCount,
+              spans: JSON.stringify(input.trace.spans),
+              warnings: input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
+            }
+          : null,
+      }))
+
+      const preparedLogs = logs.map((entry) => {
+        const levelName =
+          typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
+        return {
+          level: levelName,
+          message: String(entry.msg || entry.message || ''),
+          request_id:
+            entry.request_id || entry.requestId || entry['x-request-id']
+              ? String(entry.request_id || entry.requestId || entry['x-request-id'])
+              : null,
+          data: JSON.stringify(entry),
+        }
+      })
       await this.db.transaction(async (trx) => {
         // -- Requests + queries + traces --
         for (const { input, filteredQueries, traceRow } of preparedRequests) {
           try {
-            const [requestId] = await trx('server_stats_requests').insert({
+            const row: Record<string, unknown> = {
               method: input.method,
               url: input.url,
               status_code: input.statusCode,
               duration: round(input.duration),
               span_count: input.trace?.spanCount ?? 0,
               warning_count: input.trace?.warnings?.length ?? 0,
-            })
+            }
+            if (input.httpRequestId) row.http_request_id = String(input.httpRequestId)
+            const [requestId] = await trx('server_stats_requests').insert(row)
 
             if (requestId !== null && requestId !== undefined && filteredQueries.length > 0) {
               const rows = filteredQueries.map((q) => ({ ...q, request_id: requestId }))
@@ -979,10 +981,40 @@ export class DashboardStore {
       const row = await this.db!('server_stats_traces').where('id', id).first()
       if (!row) return null
 
+      // Look up correlated logs
+      let logs: Record<string, unknown>[] = []
+      let httpRequestId: string | null = null
+
+      // Get the linked request to find http_request_id
+      if (row.request_id) {
+        const linkedRequest = await this.db!('server_stats_requests')
+          .where('id', row.request_id)
+          .select('http_request_id', 'created_at')
+          .first()
+        if (linkedRequest?.http_request_id) {
+          httpRequestId = linkedRequest.http_request_id
+          logs = await this.db!('server_stats_logs')
+            .where('request_id', linkedRequest.http_request_id)
+            .orderBy('created_at', 'asc')
+        }
+      }
+
+      // Fallback: time-window query if no precise match
+      if (logs.length === 0 && row.created_at) {
+        const windowSec = Math.ceil((row.total_duration || 0) / 1000) + 2
+        logs = await this.db!('server_stats_logs')
+          .where('created_at', '>=', this.db!.raw(`datetime(?, '-${windowSec} seconds')`, [row.created_at]))
+          .where('created_at', '<=', this.db!.raw(`datetime(?, '+${windowSec} seconds')`, [row.created_at]))
+          .orderBy('created_at', 'asc')
+          .limit(100)
+      }
+
       return {
         ...row,
         spans: safeParseJson(row.spans) ?? [],
         warnings: safeParseJsonArray(row.warnings),
+        logs,
+        http_request_id: httpRequestId,
       }
     })
   }
@@ -1007,10 +1039,29 @@ export class DashboardStore {
           .orderBy('created_at', 'asc')
         const trace = await trx('server_stats_traces').where('request_id', id).first()
 
+        // Correlated logs
+        let logs: Record<string, unknown>[] = []
+        if (request.http_request_id) {
+          logs = await trx('server_stats_logs')
+            .where('request_id', request.http_request_id)
+            .orderBy('created_at', 'asc')
+        }
+
+        // Fallback: time-window
+        if (logs.length === 0 && request.created_at) {
+          const windowSec = Math.ceil((request.duration || 0) / 1000) + 2
+          logs = await trx('server_stats_logs')
+            .where('created_at', '>=', trx.raw(`datetime(?, '-${windowSec} seconds')`, [request.created_at]))
+            .where('created_at', '<=', trx.raw(`datetime(?, '+${windowSec} seconds')`, [request.created_at]))
+            .orderBy('created_at', 'asc')
+            .limit(100)
+        }
+
         return {
           ...request,
           queries,
           events,
+          logs,
           trace: trace
             ? {
                 ...trace,

@@ -83,6 +83,7 @@ export interface RequestCompleteData {
   statusCode: number
   duration: number
   trace?: TraceRecord
+  httpRequestId?: string
 }
 
 /**
@@ -154,10 +155,12 @@ export default class RequestTrackingMiddleware {
         metrics.recordRequest(duration, ctx.response.getStatus())
 
         if (!skipTracing) {
+          const reqId = typeof ctx.request.id === 'function' ? String(ctx.request.id()) : undefined
           const traceRecord = traceCollector?.finishTrace(
             ctx.request.method(),
             ctx.request.url(true),
-            ctx.response.getStatus()
+            ctx.response.getStatus(),
+            reqId
           )
 
           onRequestCompleteFn?.({
@@ -166,6 +169,7 @@ export default class RequestTrackingMiddleware {
             statusCode: ctx.response.getStatus(),
             duration,
             trace: traceRecord ?? undefined,
+            httpRequestId: reqId,
           })
         }
       }

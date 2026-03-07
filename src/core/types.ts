@@ -350,7 +350,6 @@ export type DashboardSection =
   | 'routes'
   | 'logs'
   | 'emails'
-  | 'timeline'
   | 'cache'
   | 'jobs'
   | 'config'

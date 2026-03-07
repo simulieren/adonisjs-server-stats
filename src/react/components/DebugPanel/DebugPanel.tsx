@@ -77,7 +77,7 @@ export function DebugPanel(props: DebugPanelProps) {
       { id: 'emails', label: 'Emails', visible: true },
       { id: 'routes', label: 'Routes', visible: true },
       { id: 'logs', label: 'Logs', visible: true },
-      { id: 'timeline', label: 'Timeline', visible: features.tracing },
+      { id: 'timeline', label: 'Requests', visible: features.tracing },
       { id: 'cache', label: 'Cache', visible: features.cache },
       { id: 'jobs', label: 'Jobs', visible: features.queues },
       { id: 'config', label: 'Config', visible: true },
