@@ -1,3 +1,4 @@
+import { appImport } from '../utils/app_import.js'
 import { log, dim, green, bold } from '../utils/logger.js'
 
 import type { MetricCollector } from './collector.js'
@@ -5,12 +6,15 @@ import type { MetricCollector } from './collector.js'
 /**
  * Probe whether a package is importable at runtime.
  *
- * Uses dynamic `import()` wrapped in try/catch so a missing
- * optional dependency simply returns `false` instead of crashing.
+ * Uses {@link appImport} which resolves from `process.cwd()` first,
+ * handling the common case where adonisjs-server-stats is symlinked
+ * (e.g. `file:../../adonisjs-server-stats` in package.json). Without
+ * this, `import(pkg)` resolves from the symlink *target* directory,
+ * which may have devDependency stubs instead of the real packages.
  */
 async function isInstalled(pkg: string): Promise<boolean> {
   try {
-    await import(pkg)
+    await appImport(pkg)
     return true
   } catch {
     return false

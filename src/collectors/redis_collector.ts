@@ -1,3 +1,4 @@
+import { appImport } from '../utils/app_import.js'
 import { log, dim, bold } from '../utils/logger.js'
 
 import type { MetricCollector } from './collector.js'
@@ -42,7 +43,7 @@ export function redisCollector(): MetricCollector {
       let redis: Awaited<typeof import('@adonisjs/redis/services/main')>['default']
 
       try {
-        const mod = await import('@adonisjs/redis/services/main')
+        const mod = await appImport<typeof import('@adonisjs/redis/services/main')>('@adonisjs/redis/services/main')
         redis = mod.default
       } catch {
         if (!warnedNotInstalled) {

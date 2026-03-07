@@ -154,18 +154,23 @@ export class DashboardStore {
 
     // Create a standalone Knex connection to SQLite — bypasses Lucid's
     // connection manager entirely so we never pollute the app's pool.
+    log.info('dashboard: loading knex...')
     const knexModule = await import('knex')
     const knexFactory = knexModule.default ?? knexModule
+    log.info('dashboard: opening SQLite database...')
     this.db = knexFactory({
       client: 'better-sqlite3',
       connection: { filename: dbFilePath },
       useNullAsDefault: true,
     })
 
+    log.info('dashboard: setting PRAGMA...')
     await this.db.raw('PRAGMA journal_mode=WAL')
     await this.db.raw('PRAGMA foreign_keys=ON')
 
+    log.info('dashboard: running migrations...')
     await autoMigrate(this.db)
+    log.info('dashboard: running retention cleanup...')
     await runRetentionCleanup(this.db, this.config.retentionDays)
     this.lastCleanupAt = Date.now()
 
@@ -190,6 +195,8 @@ export class DashboardStore {
 
     // Wire email event listeners
     this.wireEventListeners()
+
+    log.info('dashboard: store initialized')
   }
 
   /** Shut down timers, event listeners, and database connection. */

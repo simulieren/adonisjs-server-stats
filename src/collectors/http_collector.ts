@@ -34,17 +34,13 @@ let sharedInstance: RequestMetrics | null = null
  * Returns the shared {@link RequestMetrics} instance created by
  * `httpCollector()`.
  *
+ * Returns `null` if `httpCollector()` has not been called yet
+ * (e.g. during the startup window before collectors initialize).
+ *
  * Useful for accessing request metrics outside of the collector
  * (e.g. in custom middleware or controllers).
- *
- * @throws If `httpCollector()` has not been included in the config.
  */
-export function getRequestMetrics(): RequestMetrics {
-  if (!sharedInstance) {
-    throw new Error(
-      'RequestMetrics not initialized. Ensure httpCollector() is included in your collectors config.'
-    )
-  }
+export function getRequestMetrics(): RequestMetrics | null {
   return sharedInstance
 }
 

@@ -125,15 +125,29 @@ function fromDashboardResult<T>(result: {
  * -- that happens in Phase 3.
  */
 export class DataAccess {
+  private debugStore: DebugStore
+  private getDashboardStore: () => DashboardStore | null
+  private logPath?: string
+
   constructor(
-    private debugStore: DebugStore,
-    private dashboardStore: DashboardStore | null,
-    private logPath?: string
-  ) {}
+    debugStore: DebugStore,
+    dashboardStore: DashboardStore | null | (() => DashboardStore | null),
+    logPath?: string
+  ) {
+    this.debugStore = debugStore
+    this.getDashboardStore =
+      typeof dashboardStore === 'function' ? dashboardStore : () => dashboardStore
+    this.logPath = logPath
+  }
 
   /** Whether SQLite persistence is available and initialised. */
   get hasPersistence(): boolean {
-    return this.dashboardStore?.isReady() ?? false
+    return this.getDashboardStore()?.isReady() ?? false
+  }
+
+  /** Resolve the dashboard store (may be null if not yet initialized). */
+  private get dashboardStore(): DashboardStore | null {
+    return this.getDashboardStore()
   }
 
   // =========================================================================

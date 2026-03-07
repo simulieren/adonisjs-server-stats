@@ -60,8 +60,27 @@ export default class ServerStatsProvider {
   constructor(protected app: ApplicationService) {}
 
   async boot() {
+    try {
+      await this.initializeBoot()
+    } catch (err) {
+      log.warn(
+        `boot failed: ${(err as Error)?.message ?? err}\n` +
+          `  ${dim('The server will continue without server-stats.')}`
+      )
+      if ((err as Error)?.stack) {
+        console.error((err as Error).stack)
+      }
+    }
+  }
+
+  private async initializeBoot() {
     const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
-    if (!config) return
+    if (!config) {
+      log.warn('no config found — is config/server_stats.ts set up?')
+      return
+    }
+
+    log.info('booting...')
 
     // Wire up the per-request shouldShow callback
     if (config.shouldShow) {
@@ -177,7 +196,11 @@ export default class ServerStatsProvider {
     if (!this.app.usingEdgeJS) return
 
     try {
-      const edge = await import('edge.js')
+      // Must use appImport for edge.js — when this package is symlinked,
+      // bare import('edge.js') resolves to the package's devDep copy,
+      // which is a different singleton than the app's Edge instance.
+      const { appImport } = await import('../utils/app_import.js')
+      const edge = await appImport<typeof import('edge.js')>('edge.js')
       const { edgePluginServerStats } = await import('../edge/plugin.js')
       edge.default.use(edgePluginServerStats(config))
       this.edgePluginActive = true
@@ -297,17 +320,21 @@ export default class ServerStatsProvider {
 
     if (this.app.inTest && config.skipInTest !== false) return
 
-    try {
-      await this.initializeServerStats(config)
-    } catch (err) {
-      log.warn(
-        `failed to initialize: ${(err as Error)?.message ?? err}\n` +
-          `  ${dim('The server will continue without server-stats.')}`
-      )
-      if ((err as Error)?.stack) {
-        console.error((err as Error).stack)
-      }
-    }
+    // Defer the entire initialization to setImmediate so ready() returns
+    // immediately. AdonisJS waits for all provider ready() hooks before
+    // processing HTTP requests — blocking here would hang the server.
+    // Routes use lazy controller getters that return 503 until init completes.
+    setImmediate(() => {
+      this.initializeServerStats(config).catch((err) => {
+        log.warn(
+          `failed to initialize: ${(err as Error)?.message ?? err}\n` +
+            `  ${dim('The server will continue without server-stats.')}`
+        )
+        if ((err as Error)?.stack) {
+          console.error((err as Error).stack)
+        }
+      })
+    })
   }
 
   private async initializeServerStats(config: ResolvedServerStatsConfig) {
@@ -380,46 +407,70 @@ export default class ServerStatsProvider {
         setExcludedPrefixes(prefixes)
       }
 
-      // Create the unified ApiController now that both stores are available
+      // Create the unified ApiController now that debug store is available.
+      // Dashboard store is passed as a getter so it picks up the reference
+      // once setupDashboard() completes asynchronously.
       if (this.debugStore) {
         const logPath = this.app.makePath('logs', 'adonisjs.log')
         const { DataAccess: DataAccessClass } = await import('../data/data_access.js')
-        const dataAccess = new DataAccessClass(this.debugStore, this.dashboardStore, logPath)
+        const dataAccess = new DataAccessClass(
+          this.debugStore,
+          () => this.dashboardStore,
+          logPath
+        )
         const { ApiController: ApiControllerClass } =
           await import('../controller/api_controller.js')
         this.apiController = new ApiControllerClass(dataAccess)
       }
     }
 
+    // ── Stats collection interval + transmit (lightweight, set up inline) ──
+    this.setupStatsInterval(config)
+
+    log.info('ready')
+  }
+
+  /**
+   * Set up the stats collection interval, transmit broadcasting,
+   * and Prometheus integration. Extracted from initializeServerStats
+   * so the ready log fires promptly.
+   */
+  private setupStatsInterval(config: ResolvedServerStatsConfig) {
     let transmit: unknown = null
-    if (config.transport === 'transmit') {
-      try {
-        transmit = await this.app.container.make('transmit')
-        if (transmit) {
-          this.transmitAvailable = true
-          if (config.channelName) {
-            this.transmitChannels.push(config.channelName)
+    let prometheusCollector: unknown = null
+
+    // Resolve transmit + prometheus asynchronously but don't block ready()
+    const resolveIntegrations = async () => {
+      if (config.transport === 'transmit') {
+        try {
+          transmit = await this.app.container.make('transmit')
+          if (transmit) {
+            this.transmitAvailable = true
+            if (config.channelName) {
+              this.transmitChannels.push(config.channelName)
+            }
           }
+        } catch {
+          log.info(
+            'transport is "transmit" but @adonisjs/transmit is not installed — falling back to polling'
+          )
         }
+      }
+
+      try {
+        const mod = await import('../prometheus/prometheus_collector.js')
+        prometheusCollector = mod.ServerStatsCollector.instance
       } catch {
-        log.info(
-          'transport is "transmit" but @adonisjs/transmit is not installed — falling back to polling'
-        )
+        // Prometheus not installed — skip (optional dependency)
+      }
+
+      if (prometheusCollector) {
+        this.prometheusActive = true
+        log.info('Prometheus integration active')
       }
     }
 
-    let prometheusCollector: unknown = null
-    try {
-      const mod = await import('../prometheus/prometheus_collector.js')
-      prometheusCollector = mod.ServerStatsCollector.instance
-    } catch {
-      // Prometheus not installed — skip (optional dependency)
-    }
-
-    if (prometheusCollector) {
-      this.prometheusActive = true
-      log.info('Prometheus integration active')
-    }
+    resolveIntegrations().catch(() => {})
 
     this.intervalId = setInterval(async () => {
       try {
@@ -441,8 +492,6 @@ export default class ServerStatsProvider {
         // Silently ignore collection errors
       }
     }, config.intervalMs)
-
-    log.info('ready')
   }
 
   private async setupDevToolbar(toolbarConfig: DevToolbarConfig) {
@@ -538,9 +587,19 @@ export default class ServerStatsProvider {
       })
     }
 
-    // Full-page dashboard setup (routes already registered in boot)
+    // Full-page dashboard setup — deferred with setImmediate so it runs
+    // AFTER the current event-loop cycle completes. This guarantees
+    // ready() returns and AdonisJS can process HTTP requests while the
+    // SQLite store initializes in the background.
     if (toolbarConfig.dashboard && this.dashboardDepsAvailable) {
-      await this.setupDashboard(toolbarConfig, emitter)
+      setImmediate(() => {
+        this.setupDashboard(toolbarConfig, emitter).catch((err) => {
+          log.warn(
+            `dashboard setup failed: ${(err as Error)?.message ?? err}\n` +
+              `  ${dim('Everything else continues to work.')}`
+          )
+        })
+      })
     }
   }
 
@@ -552,6 +611,7 @@ export default class ServerStatsProvider {
    * This method creates the controller so those routes become functional.
    */
   private async setupDashboard(toolbarConfig: DevToolbarConfig, emitter: unknown) {
+    log.info('dashboard: initializing SQLite store...')
     // Dynamically import DashboardStore so knex/better-sqlite3 are truly optional
     const { DashboardStore: DashboardStoreClass } = await import('../dashboard/dashboard_store.js')
     this.dashboardStore = new DashboardStoreClass(toolbarConfig)
@@ -562,6 +622,7 @@ export default class ServerStatsProvider {
         emitter as Parameters<DashboardStore['start']>[1],
         appRoot
       )
+      log.info('dashboard: SQLite store ready')
     } catch (err) {
       const msg = (err as Error)?.message || ''
       const code = (err as NodeJS.ErrnoException)?.code || ''

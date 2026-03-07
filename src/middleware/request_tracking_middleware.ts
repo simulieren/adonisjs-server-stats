@@ -104,7 +104,15 @@ export default class RequestTrackingMiddleware {
       return
     }
 
+    // Gracefully handle the startup window before collectors initialize.
+    // The provider defers initialization via setImmediate, so early
+    // requests may arrive before httpCollector() has been called.
     const metrics = getRequestMetrics()
+    if (!metrics) {
+      await next()
+      return
+    }
+
     const start = performance.now()
     metrics.incrementActiveConnections()
 
