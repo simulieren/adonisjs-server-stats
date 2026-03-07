@@ -199,7 +199,7 @@ export class TraceCollector {
   }
 
   getTraces(): TraceRecord[] {
-    return this.buffer.toArray()
+    return this.buffer.toArray().reverse()
   }
 
   getLatest(n: number): TraceRecord[] {

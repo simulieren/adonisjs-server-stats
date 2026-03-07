@@ -169,7 +169,7 @@ test.group('TraceCollector | Core lifecycle', (group) => {
     })
   })
 
-  test('trace IDs are monotonically increasing', async ({ assert }) => {
+  test('trace IDs are monotonically increasing (newest-first order)', async ({ assert }) => {
     for (let i = 0; i < 5; i++) {
       await collector.startTrace(async () => {
         collector.finishTrace('GET', `/t/${i}`, 200)
@@ -177,8 +177,9 @@ test.group('TraceCollector | Core lifecycle', (group) => {
     }
 
     const traces = collector.getTraces()
+    // newest-first: IDs should be decreasing
     for (let i = 1; i < traces.length; i++) {
-      assert.isAbove(traces[i].id, traces[i - 1].id)
+      assert.isBelow(traces[i].id, traces[i - 1].id)
     }
   })
 })
@@ -376,10 +377,11 @@ test.group('TraceCollector | Context management', (group) => {
 
     const traces = collector.getTraces()
     assert.lengthOf(traces, 2)
-    assert.equal(traces[0].spanCount, 1)
-    assert.equal(traces[1].spanCount, 2)
-    assert.equal(traces[0].url, '/first')
-    assert.equal(traces[1].url, '/second')
+    // newest-first: /second is at index 0
+    assert.equal(traces[0].spanCount, 2)
+    assert.equal(traces[1].spanCount, 1)
+    assert.equal(traces[0].url, '/second')
+    assert.equal(traces[1].url, '/first')
   })
 
   test('concurrent traces via Promise.all maintain isolation', async ({ assert }) => {
@@ -426,6 +428,28 @@ test.group('TraceCollector | Buffer management', (group) => {
 
     const traces = collector.getTraces()
     assert.lengthOf(traces, 5)
+  })
+
+  test('returns traces in newest-first order', async ({ assert }) => {
+    collector = new TraceCollector(100)
+
+    await collector.startTrace(async () => {
+      collector.finishTrace('GET', '/first', 200)
+    })
+
+    await collector.startTrace(async () => {
+      collector.finishTrace('GET', '/second', 200)
+    })
+
+    await collector.startTrace(async () => {
+      collector.finishTrace('GET', '/third', 200)
+    })
+
+    const traces = collector.getTraces()
+    assert.lengthOf(traces, 3)
+    assert.equal(traces[0].url, '/third')
+    assert.equal(traces[1].url, '/second')
+    assert.equal(traces[2].url, '/first')
   })
 
   test('getLatest(n) returns the n most recent traces (newest first)', async ({ assert }) => {
@@ -491,9 +515,9 @@ test.group('TraceCollector | Buffer management', (group) => {
     const traces = collector.getTraces()
     assert.lengthOf(traces, 5)
 
-    // Only the last 5 should remain
-    assert.equal(traces[0].url, '/t/5')
-    assert.equal(traces[4].url, '/t/9')
+    // Only the last 5 should remain, newest-first
+    assert.equal(traces[0].url, '/t/9')
+    assert.equal(traces[4].url, '/t/5')
   })
 
   test('MAX_SPANS_PER_TRACE (200) is enforced', async ({ assert }) => {
@@ -855,10 +879,11 @@ test.group('TraceCollector | Console.warn interception', (group) => {
     })
 
     const traces = collector.getTraces()
+    // newest-first: /second is at index 0
     assert.lengthOf(traces[0].warnings, 1)
-    assert.equal(traces[0].warnings[0], 'trace-1-warning')
+    assert.equal(traces[0].warnings[0], 'trace-2-warning')
     assert.lengthOf(traces[1].warnings, 1)
-    assert.equal(traces[1].warnings[0], 'trace-2-warning')
+    assert.equal(traces[1].warnings[0], 'trace-1-warning')
   })
 
   test('console.warn with non-string arguments converts to string', async ({ assert }) => {
@@ -987,10 +1012,11 @@ test.group('TraceCollector | loadRecords and onNewItem', (group) => {
 
     const traces = collector.getTraces()
     assert.lengthOf(traces, 2)
-    assert.equal(traces[0].id, 10)
-    assert.equal(traces[1].id, 20)
-    assert.equal(traces[0].url, '/loaded/1')
-    assert.equal(traces[1].url, '/loaded/2')
+    // newest-first (by insertion order, reversed)
+    assert.equal(traces[0].id, 20)
+    assert.equal(traces[1].id, 10)
+    assert.equal(traces[0].url, '/loaded/2')
+    assert.equal(traces[1].url, '/loaded/1')
   })
 
   test('loadRecords sets nextId so new traces continue after max loaded ID', async ({
@@ -1019,7 +1045,8 @@ test.group('TraceCollector | loadRecords and onNewItem', (group) => {
 
     const traces = collector.getTraces()
     assert.lengthOf(traces, 2)
-    assert.equal(traces[1].id, 51)
+    // newest-first: new trace (id 51) is at index 0
+    assert.equal(traces[0].id, 51)
   })
 
   test('loadRecords with empty array has no effect', async ({ assert }) => {
@@ -1232,14 +1259,14 @@ test.group('TraceCollector | Edge cases', (group) => {
     const traces = collector.getTraces()
     assert.lengthOf(traces, 8)
 
-    // IDs should be monotonically increasing
+    // newest-first: IDs should be monotonically decreasing
     for (let i = 1; i < traces.length; i++) {
-      assert.isAbove(traces[i].id, traces[i - 1].id)
+      assert.isBelow(traces[i].id, traces[i - 1].id)
     }
 
-    // New IDs should be 6, 7, 8
-    assert.equal(traces[5].id, 6)
-    assert.equal(traces[6].id, 7)
-    assert.equal(traces[7].id, 8)
+    // New IDs should be 8, 7, 6 (newest-first)
+    assert.equal(traces[0].id, 8)
+    assert.equal(traces[1].id, 7)
+    assert.equal(traces[2].id, 6)
   })
 })
