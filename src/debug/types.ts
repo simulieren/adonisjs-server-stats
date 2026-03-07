@@ -216,7 +216,7 @@ export interface EmailRecord {
   mailer: string
 
   /** Current delivery status. */
-  status: 'sending' | 'sent' | 'queued' | 'failed'
+  status: 'sending' | 'sent' | 'queueing' | 'queued' | 'failed'
 
   /** Message ID from the mail transport response, or `null`. */
   messageId: string | null

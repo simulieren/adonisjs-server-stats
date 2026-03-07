@@ -1291,8 +1291,8 @@ export class DashboardStore {
           for (const row of emailStatusRaw || []) {
             const status = row.status as string
             const count = row.count as number
-            if (status === 'sent') emailActivity.sent = count
-            else if (status === 'queued') emailActivity.queued = count
+            if (status === 'sent' || status === 'sending') emailActivity.sent += count
+            else if (status === 'queued' || status === 'queueing') emailActivity.queued += count
             else if (status === 'failed') emailActivity.failed = count
           }
 
@@ -1495,6 +1495,7 @@ export class DashboardStore {
     this.handlers = [
       { event: 'mail:sending', fn: (data: unknown) => buildAndPersistEmail(data, 'sending') },
       { event: 'mail:sent', fn: (data: unknown) => buildAndPersistEmail(data, 'sent') },
+      { event: 'mail:queueing', fn: (data: unknown) => buildAndPersistEmail(data, 'queueing') },
       { event: 'mail:queued', fn: (data: unknown) => buildAndPersistEmail(data, 'queued') },
       { event: 'queued:mail:error', fn: (data: unknown) => buildAndPersistEmail(data, 'failed') },
     ]
@@ -1502,6 +1503,7 @@ export class DashboardStore {
     for (const h of this.handlers) {
       this.emitter.on(h.event, h.fn)
     }
+    log.info(`dashboard: email listeners wired (${this.handlers.length} events)`)
   }
 }
 

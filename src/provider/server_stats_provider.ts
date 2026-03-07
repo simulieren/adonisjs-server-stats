@@ -13,6 +13,7 @@ import {
 } from '../middleware/request_tracking_middleware.js'
 import { registerAllRoutes } from '../routes/register_routes.js'
 import { log, dim, bold, setVerbose } from '../utils/logger.js'
+import { extractAddresses } from '../utils/mail_helpers.js'
 
 import type { MetricCollector } from '../collectors/collector.js'
 import type { ApiController } from '../controller/api_controller.js'
@@ -47,6 +48,10 @@ export default class ServerStatsProvider {
 
   // Dashboard dependency check (set in boot, read in ready)
   private dashboardDepsAvailable: boolean = true
+
+  // Redis email bridge (cross-process email capture)
+  private emailBridgeRedis: unknown = null
+  private emailBridgeChannel: string = 'adonisjs-server-stats:emails'
 
   // Diagnostics tracking
   private pinoHookActive: boolean = false
@@ -530,6 +535,10 @@ export default class ServerStatsProvider {
 
     await this.debugStore.start(emitter, router)
 
+    // Set up Redis pub/sub bridge for cross-process email capture
+    // (e.g., emails sent from Bull queue workers)
+    await this.setupEmailBridge(emitter)
+
     // Create the debug controller (makes the debug routes functional)
     const serverConfig = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     const DebugControllerClass = (await import('../controller/debug_controller.js')).default
@@ -782,6 +791,105 @@ export default class ServerStatsProvider {
     }
   }
 
+  /**
+   * Set up a Redis pub/sub bridge for cross-process email capture.
+   *
+   * Mail events (`mail:sending`, `mail:sent`, etc.) are process-local.
+   * When emails are sent from a Bull queue worker, the web server's
+   * {@link EmailCollector} never sees them. This bridge solves that:
+   *
+   * 1. **Every process** publishes mail events to a Redis channel.
+   * 2. **Every process** subscribes and ingests events from *other*
+   *    processes (identified by a unique process tag).
+   *
+   * Requires `@adonisjs/redis`. Silently skipped if not installed.
+   */
+  private async setupEmailBridge(emitter: unknown): Promise<void> {
+    if (!emitter) return
+
+    const { appImport } = await import('../utils/app_import.js')
+
+    let redis: {
+      publish(channel: string, message: string): Promise<unknown>
+      subscribe(channel: string, handler: (message: string) => void): unknown
+      unsubscribe(channel: string): unknown
+    }
+    try {
+      const mod = await appImport<typeof import('@adonisjs/redis/services/main')>(
+        '@adonisjs/redis/services/main'
+      )
+      redis = mod.default as typeof redis
+    } catch {
+      return // @adonisjs/redis not installed — skip
+    }
+
+    const CHANNEL = this.emailBridgeChannel
+    const processTag = `${process.pid}-${Date.now()}`
+    const em = emitter as import('../debug/types.js').Emitter
+
+    // ── Publish local mail events to Redis ──────────────────────
+    const statusMap: Array<[string, import('../debug/types.js').EmailRecord['status']]> = [
+      ['mail:sending', 'sending'],
+      ['mail:sent', 'sent'],
+      ['mail:queueing', 'queueing'],
+      ['mail:queued', 'queued'],
+      ['queued:mail:error', 'failed'],
+    ]
+
+    for (const [event, status] of statusMap) {
+      em.on(event, (data: unknown) => {
+        try {
+          const d = data as import('../debug/types.js').MailEventData
+          const msg = d?.message || d
+          const payload = JSON.stringify({
+            _t: processTag,
+            from: extractAddresses(msg?.from) || 'unknown',
+            to: extractAddresses(msg?.to) || 'unknown',
+            cc: extractAddresses(msg?.cc) || null,
+            bcc: extractAddresses(msg?.bcc) || null,
+            subject: msg?.subject || '(no subject)',
+            mailer: d?.mailerName || d?.mailer || 'unknown',
+            status,
+            messageId: d?.response?.messageId || d?.messageId || null,
+            attachmentCount: Array.isArray(msg?.attachments) ? msg.attachments.length : 0,
+            timestamp: Date.now(),
+          })
+          redis.publish(CHANNEL, payload).catch(() => {})
+        } catch {
+          // Silently ignore serialization errors
+        }
+      })
+    }
+
+    // ── Subscribe to receive emails from other processes ─────────
+    try {
+      await redis.subscribe(CHANNEL, (message: string) => {
+        try {
+          const parsed = JSON.parse(message)
+          if (parsed._t === processTag) return // Skip own messages
+
+          const { _t: _, ...fields } = parsed
+
+          // Ingest into in-memory ring buffer (debug panel).
+          // SQLite persistence is NOT done here — the sending process's
+          // own DashboardStore already persists via wireEventListeners.
+          this.debugStore?.emails.ingest({
+            ...fields,
+            html: null,
+            text: null,
+          })
+        } catch {
+          // Ignore malformed messages
+        }
+      })
+
+      this.emailBridgeRedis = redis
+      log.info('email bridge active (cross-process capture via Redis)')
+    } catch {
+      // Subscribe failed — bridge unavailable, local capture still works
+    }
+  }
+
   /** Return diagnostics state for the Internals endpoint. */
   getDiagnostics() {
     const config = this.resolvedConfig
@@ -821,6 +929,7 @@ export default class ServerStatsProvider {
           mode: this.pinoHookActive ? 'stream' : toolbarConfig?.enabled ? 'none' : 'none',
         },
         edgePlugin: { active: this.edgePluginActive },
+        emailBridge: { active: this.emailBridgeRedis !== null },
         cacheInspector: {
           available: this.resolvedCollectors.some((c) => c.name === 'redis'),
         },
@@ -886,6 +995,16 @@ export default class ServerStatsProvider {
       } catch (err) {
         log.warn('could not save debug data on shutdown — ' + (err as Error)?.message)
       }
+    }
+
+    // Unsubscribe Redis email bridge
+    if (this.emailBridgeRedis) {
+      try {
+        ;(this.emailBridgeRedis as { unsubscribe: Function }).unsubscribe(this.emailBridgeChannel)
+      } catch {
+        // Ignore cleanup errors
+      }
+      this.emailBridgeRedis = null
     }
 
     // Clean up dashboard resources

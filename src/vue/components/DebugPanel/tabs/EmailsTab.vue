@@ -39,6 +39,7 @@ function statusClass(status: string): string {
   const map: Record<string, string> = {
     sent: 'ss-dbg-email-status-sent',
     sending: 'ss-dbg-email-status-sending',
+    queueing: 'ss-dbg-email-status-queued',
     queued: 'ss-dbg-email-status-queued',
     failed: 'ss-dbg-email-status-failed',
   }

@@ -602,6 +602,9 @@
   background: var(--ss-amber-bg);
   color: var(--ss-amber-fg);
 }
+.ss-email-status-queueing,
+.ss-dash-email-status-queueing,
+.ss-dbg-email-status-queueing,
 .ss-email-status-queued,
 .ss-dash-email-status-queued,
 .ss-dbg-email-status-queued {

@@ -78,18 +78,20 @@ test.group('EmailCollector | Constructor', () => {
 // ---------------------------------------------------------------------------
 
 test.group('EmailCollector | start(emitter)', () => {
-  test('registers handlers for all four mail events', async ({ assert }) => {
+  test('registers handlers for all five mail events', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
     await collector.start(emitter as any)
 
     assert.isTrue('mail:sending' in emitter.handlers)
     assert.isTrue('mail:sent' in emitter.handlers)
+    assert.isTrue('mail:queueing' in emitter.handlers)
     assert.isTrue('mail:queued' in emitter.handlers)
     assert.isTrue('queued:mail:error' in emitter.handlers)
 
     assert.lengthOf(emitter.handlers['mail:sending'], 1)
     assert.lengthOf(emitter.handlers['mail:sent'], 1)
+    assert.lengthOf(emitter.handlers['mail:queueing'], 1)
     assert.lengthOf(emitter.handlers['mail:queued'], 1)
     assert.lengthOf(emitter.handlers['queued:mail:error'], 1)
 
@@ -272,6 +274,67 @@ test.group('EmailCollector | mail:sent with no matching sending', () => {
     assert.lengthOf(emails, 2, 'should create a new record, not update the mismatched one')
     assert.equal(emails[0].status, 'sent')
     assert.equal(emails[1].status, 'sending')
+
+    collector.stop()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Tests -- mail:queueing event
+// ---------------------------------------------------------------------------
+
+test.group('EmailCollector | mail:queueing', () => {
+  test('creates a record with status "queueing"', async ({ assert }) => {
+    const collector = new EmailCollector()
+    const emitter = createMockEmitter()
+    await collector.start(emitter as any)
+
+    emitter.emit('mail:queueing', {
+      message: {
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Queueing Email',
+        html: '<p>Queueing</p>',
+      },
+      mailerName: 'ses',
+    })
+
+    const emails = collector.getEmails()
+    assert.lengthOf(emails, 1)
+    assert.equal(emails[0].status, 'queueing')
+    assert.equal(emails[0].subject, 'Queueing Email')
+    assert.equal(emails[0].mailer, 'ses')
+
+    collector.stop()
+  })
+
+  test('mail:queued updates matching queueing record to queued', async ({ assert }) => {
+    const collector = new EmailCollector()
+    const emitter = createMockEmitter()
+    await collector.start(emitter as any)
+
+    emitter.emit('mail:queueing', {
+      message: {
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Test Email',
+      },
+      mailerName: 'ses',
+    })
+
+    emitter.emit('mail:queued', {
+      message: {
+        from: 'sender@example.com',
+        to: 'recipient@example.com',
+        subject: 'Test Email',
+      },
+      mailerName: 'ses',
+    })
+
+    const emails = collector.getEmails()
+    // Should be 1 record (queueing updated to queued), not 2
+    assert.lengthOf(emails, 1)
+    assert.equal(emails[0].status, 'queued')
 
     collector.stop()
   })
@@ -525,6 +588,7 @@ test.group('EmailCollector | stop()', () => {
     // Handlers should be removed
     assert.lengthOf(emitter.handlers['mail:sending'] || [], 0)
     assert.lengthOf(emitter.handlers['mail:sent'] || [], 0)
+    assert.lengthOf(emitter.handlers['mail:queueing'] || [], 0)
     assert.lengthOf(emitter.handlers['mail:queued'] || [], 0)
     assert.lengthOf(emitter.handlers['queued:mail:error'] || [], 0)
   })

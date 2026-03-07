@@ -9,7 +9,8 @@ import type { EmailRecord, Emitter, MailEventData, MailMessage } from './types.j
  * Events:
  * - `mail:sending` — email about to be sent
  * - `mail:sent` — email successfully sent (updates matching 'sending' record)
- * - `mail:queued` — email queued for later delivery
+ * - `mail:queueing` — email about to be queued (sendLater)
+ * - `mail:queued` — email successfully queued (updates matching 'queueing' record)
  * - `queued:mail:error` — queued email failed
  */
 export class EmailCollector {
@@ -53,8 +54,26 @@ export class EmailCollector {
       this.buffer.push(record)
     }
 
+    const onQueueing = (data: MailEventData) => {
+      const msg: MailMessage = data?.message || data
+      const record = this.buildRecord(msg, 'queueing', data)
+      this.buffer.push(record)
+    }
+
     const onQueued = (data: MailEventData) => {
       const msg: MailMessage = data?.message || data
+      const to = extractAddresses(msg?.to)
+      const subject = msg?.subject || ''
+
+      // Try to find the matching 'queueing' record and update it
+      const match = this.buffer.findFromEnd(
+        (rec) => rec.status === 'queueing' && rec.to === to && rec.subject === subject
+      )
+      if (match) {
+        match.status = 'queued'
+        return
+      }
+
       const record = this.buildRecord(msg, 'queued', data)
       this.buffer.push(record)
     }
@@ -68,6 +87,7 @@ export class EmailCollector {
     this.handlers = [
       { event: 'mail:sending', fn: onSending },
       { event: 'mail:sent', fn: onSent },
+      { event: 'mail:queueing', fn: onQueueing },
       { event: 'mail:queued', fn: onQueued },
       { event: 'queued:mail:error', fn: onQueuedError },
     ]
@@ -138,6 +158,22 @@ export class EmailCollector {
     if (!value) return null
     if (value.length <= EmailCollector.MAX_HTML_SIZE) return value
     return value.slice(0, EmailCollector.MAX_HTML_SIZE) + '\n<!-- truncated -->'
+  }
+
+  /**
+   * Push an externally-created email record into the buffer.
+   *
+   * Used by the Redis email bridge to ingest emails captured in
+   * other processes (e.g., queue workers). The caller provides all
+   * fields except `id`, which is assigned from the ring buffer's
+   * auto-increment counter.
+   */
+  ingest(partial: Omit<EmailRecord, 'id'>): void {
+    const record: EmailRecord = {
+      ...partial,
+      id: this.buffer.getNextId(),
+    }
+    this.buffer.push(record)
   }
 
   /** Register a callback that fires whenever a new email is recorded. */
