@@ -258,25 +258,26 @@ function logDeprecationWarnings(config: ServerStatsConfig): void {
   const TAG = '\x1b[36m[ \x1b[1m\uD83D\uDD0D server-stats\x1b[0m\x1b[36m ]\x1b[0m'
   const lines: string[] = []
   lines.push('')
-  lines.push(`${TAG} ${yellow('\u26A0 deprecated config options detected:')}`)
+  lines.push(`${TAG} Some config options have been renamed — here's how to update:`)
   lines.push('')
 
   for (const entry of entries) {
-    lines.push(`    ${bold(entry.old)} ${dim('\u2192')} ${bold(entry.new)}`)
+    lines.push(`    ${dim(entry.old)} ${dim('\u2192')} ${bold(entry.new)}`)
+    lines.push('')
     for (const line of entry.before) {
       lines.push(`      ${dim('before:')}  ${dim(line)}`)
     }
     for (const line of entry.after) {
-      lines.push(`      ${yellow('after:')}   ${line}`)
+      lines.push(`      ${dim('after:')}   ${line}`)
     }
     lines.push('')
   }
 
   lines.push(
-    `    ${dim('These old names still work but will be removed in the next major version.')}`
+    `    ${dim('No rush — the old names still work. They will be removed in the next major version.')}`
   )
   lines.push(
-    `    ${dim('Update your')} ${bold('config/server_stats.ts')} ${dim('to silence these warnings.')}`
+    `    ${dim('Update')} ${bold('config/server_stats.ts')} ${dim('when you get a chance.')}`
   )
   lines.push('')
 
