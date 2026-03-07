@@ -83,6 +83,7 @@ export interface RequestCompleteData {
   statusCode: number
   duration: number
   trace?: TraceRecord
+  httpRequestId?: string
 }
 
 /**
@@ -166,6 +167,7 @@ export default class RequestTrackingMiddleware {
             statusCode: ctx.response.getStatus(),
             duration,
             trace: traceRecord ?? undefined,
+            httpRequestId: typeof ctx.request.id === 'function' ? String(ctx.request.id()) : undefined,
           })
         }
       }

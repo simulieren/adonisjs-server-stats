@@ -7,6 +7,8 @@
 // utilities normalize the data into a consistent shape.
 // ---------------------------------------------------------------------------
 
+import type { LogEntry } from './log-utils.js'
+
 /**
  * Raw trace detail as returned by the dashboard API.
  *
@@ -26,6 +28,8 @@ export interface TraceDetail {
   span_count?: number
   spans: unknown[] | string
   warnings: string[] | string
+  logs?: LogEntry[]
+  httpRequestId?: string
 }
 
 /**
@@ -39,6 +43,8 @@ export interface NormalizedTrace {
   spanCount: number
   spans: unknown[]
   warnings: string[]
+  logs: LogEntry[]
+  httpRequestId?: string
 }
 
 /**
@@ -111,5 +117,7 @@ export function normalizeTraceFields(trace: Record<string, unknown>): Normalized
     spanCount: resolveTraceField(trace, 'span_count', 'spanCount'),
     spans: parseTraceSpans(trace.spans),
     warnings: parseTraceWarnings(trace.warnings),
+    logs: (trace.logs as LogEntry[]) || [],
+    httpRequestId: (trace.httpRequestId as string) || (trace.http_request_id as string) || undefined,
   }
 }

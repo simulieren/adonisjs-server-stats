@@ -246,6 +246,7 @@ export default class DashboardController {
         ...formatRequest(detail),
         queries: ((detail.queries as Record<string, unknown>[]) || []).map(formatQuery),
         trace: detail.trace ? formatTrace(detail.trace as Record<string, unknown>) : null,
+        logs: ((detail.logs as Record<string, unknown>[]) || []).map(formatLog),
       })
     } catch {
       return response.notFound({ error: 'Not found' })
@@ -727,6 +728,7 @@ function formatRequest(r: Record<string, unknown>) {
     spanCount: r.span_count,
     warningCount: r.warning_count,
     createdAt: r.created_at,
+    ...(r.http_request_id ? { httpRequestId: r.http_request_id } : {}),
   }
 }
 
@@ -758,6 +760,18 @@ function formatTrace(t: Record<string, unknown>) {
     spans: safeParseJson(t.spans) ?? [],
     warnings: safeParseJsonArray(t.warnings),
     createdAt: t.created_at,
+    ...(t.http_request_id ? { httpRequestId: t.http_request_id } : {}),
+  }
+}
+
+function formatLog(l: Record<string, unknown>) {
+  return {
+    id: l.id,
+    level: l.level,
+    message: l.message,
+    requestId: l.request_id,
+    data: l.data,
+    createdAt: l.created_at,
   }
 }
 

@@ -27,7 +27,6 @@ const EventsSection = defineAsyncComponent(() => import('./sections/EventsSectio
 const RoutesSection = defineAsyncComponent(() => import('./sections/RoutesSection.vue'))
 const LogsSection = defineAsyncComponent(() => import('./sections/LogsSection.vue'))
 const EmailsSection = defineAsyncComponent(() => import('./sections/EmailsSection.vue'))
-const TimelineSection = defineAsyncComponent(() => import('./sections/TimelineSection.vue'))
 const CacheSection = defineAsyncComponent(() => import('./sections/CacheSection.vue'))
 const JobsSection = defineAsyncComponent(() => import('./sections/JobsSection.vue'))
 const ConfigSection = defineAsyncComponent(() => import('./sections/ConfigSection.vue'))
@@ -42,7 +41,6 @@ const VALID_SECTIONS: DashboardSection[] = [
   'routes',
   'logs',
   'emails',
-  'timeline',
   'cache',
   'jobs',
   'config',
@@ -195,7 +193,6 @@ const builtInSections = computed(() => [
   { id: 'routes' as DashboardSection, label: 'Routes', visible: true },
   { id: 'logs' as DashboardSection, label: 'Logs', visible: true },
   { id: 'emails' as DashboardSection, label: 'Emails', visible: true },
-  { id: 'timeline' as DashboardSection, label: 'Timeline', visible: features.value.tracing },
   { id: 'cache' as DashboardSection, label: 'Cache', visible: features.value.cache },
   { id: 'jobs' as DashboardSection, label: 'Jobs', visible: features.value.queues },
   { id: 'config' as DashboardSection, label: 'Config', visible: true },
@@ -246,7 +243,6 @@ const sectionComponents: Record<string, ReturnType<typeof defineAsyncComponent>>
   routes: RoutesSection,
   logs: LogsSection,
   emails: EmailsSection,
-  timeline: TimelineSection,
   cache: CacheSection,
   jobs: JobsSection,
   config: ConfigSection,
@@ -255,10 +251,6 @@ const sectionComponents: Record<string, ReturnType<typeof defineAsyncComponent>>
 
 const activeSectionComponent = computed(() => sectionComponents[activeSection.value] || null)
 
-/** Resolve icon key for a dashboard section, using the clock variant for timeline. */
-function sectionIconKey(sectionId: string): string {
-  return sectionId === 'timeline' ? 'dashboard-timeline' : sectionId
-}
 </script>
 
 <template>
@@ -310,14 +302,14 @@ function sectionIconKey(sectionId: string): string {
               <svg
                 width="20"
                 height="20"
-                :viewBox="(TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).viewBox"
+                :viewBox="(TAB_ICONS[section.id] || TAB_ICONS.config).viewBox"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
                 v-html="
-                  (TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).elements.join('')
+                  (TAB_ICONS[section.id] || TAB_ICONS.config).elements.join('')
                 "
               ></svg>
             </span>

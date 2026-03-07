@@ -237,7 +237,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
           .get(
             '/logs',
             bindApi(async (api, ctx) => {
-              const result = await api.getLogs({ source: 'memory' })
+              const result = await api.getLogs({ source: 'auto' })
               return ctx.response.json(result.data)
             })
           )

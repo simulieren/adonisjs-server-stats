@@ -293,25 +293,38 @@ export default class ServerStatsProvider {
    * Hook into the AdonisJS logger's Pino stream to feed log entries
    * directly into the LogStreamService — no file path needed.
    *
-   * Uses `Symbol.for('pino.stream')` (documented Pino API) to access
-   * the underlying destination stream, then wraps its `write` method
-   * to tee entries into the log collector.
+   * Uses pino's exported `symbols.streamSym` to access the underlying
+   * destination stream, then wraps its `write` method to tee entries
+   * into the log collector.
    */
   private async hookPinoLogger() {
     const logStream = getLogStreamService()
-    if (!logStream) return // logCollector() not in the config
+    if (!logStream) return
 
     let logger: unknown
     try {
       logger = await this.app.container.make('logger')
     } catch {
-      // Logger not available
+      // Logger not available yet
     }
 
     const pino = (logger as Record<string, unknown> | null)?.pino
     if (!pino) return
 
-    const streamSym = Symbol.for('pino.stream')
+    // Use pino's exported streamSym — NOT Symbol.for('pino.stream').
+    // Pino uses a local Symbol('pino.stream'), not a global registry symbol.
+    let streamSym: symbol | undefined
+    try {
+      const pinoMod = await import('pino')
+      streamSym = pinoMod.default?.symbols?.streamSym
+    } catch {
+      // pino not directly importable — try finding the symbol on the instance
+    }
+    if (!streamSym) {
+      streamSym = Object.getOwnPropertySymbols(pino).find((s) => s.description === 'pino.stream')
+    }
+    if (!streamSym) return
+
     const rawStream = (pino as Record<symbol, unknown>)[streamSym]
     if (!rawStream || typeof (rawStream as Record<string, unknown>).write !== 'function') return
 
@@ -404,7 +417,7 @@ export default class ServerStatsProvider {
           maxEmails: toolbarConfig.maxEmails ?? 100,
           slowQueryThresholdMs: toolbarConfig.slowQueryThresholdMs ?? 100,
           persistDebugData: toolbarConfig.persistDebugData ?? false,
-          tracing: toolbarConfig.tracing ?? false,
+          tracing: toolbarConfig.tracing ?? true,
           maxTraces: toolbarConfig.maxTraces ?? 200,
           dashboard: toolbarConfig.dashboard ?? false,
           dashboardPath: toolbarConfig.dashboardPath ?? '/__stats',
@@ -725,11 +738,11 @@ export default class ServerStatsProvider {
     this.dashboardController = new DashboardControllerClass(this.dashboardStore, this.app)
 
     // ── Log piping ────────────────────────────────────────────────
-    // If the log collector is already hooked into Pino (zero-config mode),
-    // piggyback on it instead of creating a separate file poller.
+    // If the Pino stream hook is active, piggyback on it for real-time
+    // log persistence. Otherwise fall back to polling the log file.
     log.info('dashboard: setting up log piping...')
     const existingLogStream = getLogStreamService()
-    if (existingLogStream && !existingLogStream['logPath']) {
+    if (this.pinoHookActive && existingLogStream && !existingLogStream['logPath']) {
       // Stream mode — add a listener for dashboard persistence
       const origOnEntry = existingLogStream['onEntry']
       existingLogStream['onEntry'] = (entry: Record<string, unknown>) => {
@@ -751,7 +764,7 @@ export default class ServerStatsProvider {
 
     let lastQueryId = 0
 
-    setOnRequestComplete(({ method, url, statusCode, duration, trace }) => {
+    setOnRequestComplete(({ method, url, statusCode, duration, trace, httpRequestId }) => {
       if (!dashStore.isReady()) return
 
       // O(K) collection of new queries since last seen ID — avoids
@@ -769,6 +782,7 @@ export default class ServerStatsProvider {
         duration,
         queries: newQueries,
         trace: trace ?? null,
+        httpRequestId: httpRequestId ?? null,
       })
     })
 
@@ -905,10 +919,9 @@ export default class ServerStatsProvider {
       }
     }
 
-    // If logCollector() is already hooked into Pino (zero-config),
-    // piggyback on its stream instead of creating a file poller.
+    // If the Pino stream hook is active, piggyback on its onEntry chain.
     const existing = getLogStreamService()
-    if (existing) {
+    if (this.pinoHookActive && existing) {
       const internal = existing as unknown as { onEntry?: (entry: Record<string, unknown>) => void }
       const origOnEntry = internal.onEntry
       internal.onEntry = (entry: Record<string, unknown>) => {
@@ -1097,7 +1110,7 @@ export default class ServerStatsProvider {
         maxEmails: toolbarConfig?.maxEmails ?? 100,
         maxTraces: toolbarConfig?.maxTraces ?? 200,
         slowQueryThresholdMs: toolbarConfig?.slowQueryThresholdMs ?? 100,
-        tracing: toolbarConfig?.tracing ?? false,
+        tracing: toolbarConfig?.tracing ?? true,
         dashboard: toolbarConfig?.dashboard ?? false,
         dashboardPath: toolbarConfig?.dashboardPath ?? '/__stats',
         debugEndpoint: toolbarConfig?.debugEndpoint ?? '/admin/api/debug',

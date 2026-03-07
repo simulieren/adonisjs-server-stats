@@ -1130,3 +1130,84 @@ tr:hover .ss-dbg-copy-row-btn,
 .ss-dbg-btn-group .ss-dbg-btn:last-child {
   border-radius: 0 4px 4px 0;
 }
+
+/* ── 8. Split pane layout ────────────────────────────────────── */
+.ss-split-container,
+.ss-dash-split-container,
+.ss-dbg-split-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.ss-split-top,
+.ss-dash-split-top,
+.ss-dbg-split-top {
+  flex: 0.6;
+  min-height: 60px;
+  overflow: auto;
+}
+.ss-split-handle,
+.ss-dash-split-handle,
+.ss-dbg-split-handle {
+  height: 6px;
+  background: var(--ss-border-dim);
+  cursor: row-resize;
+  flex-shrink: 0;
+  position: relative;
+  user-select: none;
+  touch-action: none;
+}
+.ss-split-handle:hover,
+.ss-dash-split-handle:hover,
+.ss-dbg-split-handle:hover {
+  background: var(--ss-accent, #6d28d9);
+  opacity: 0.8;
+}
+.ss-split-handle::after,
+.ss-dash-split-handle::after,
+.ss-dbg-split-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 2px;
+  background: var(--ss-muted);
+  border-radius: 1px;
+  opacity: 0.5;
+}
+.ss-split-bottom,
+.ss-dash-split-bottom,
+.ss-dbg-split-bottom {
+  flex: 0.4;
+  min-height: 60px;
+  overflow: auto;
+  border-top: 1px solid var(--ss-border-dim);
+}
+.ss-related-logs-title,
+.ss-dash-related-logs-title,
+.ss-dbg-related-logs-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  background: var(--ss-surface);
+  border-bottom: 1px solid var(--ss-border-faint);
+}
+.ss-related-logs-count,
+.ss-dash-related-logs-count,
+.ss-dbg-related-logs-count {
+  font-weight: 400;
+  color: var(--ss-dim);
+}

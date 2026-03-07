@@ -23,7 +23,6 @@ const VALID_SECTIONS: DashboardSection[] = [
   'routes',
   'logs',
   'emails',
-  'timeline',
   'cache',
   'jobs',
   'config',
@@ -38,16 +37,10 @@ const EventsSection = lazy(() => import('./sections/EventsSection.js'))
 const RoutesSection = lazy(() => import('./sections/RoutesSection.js'))
 const LogsSection = lazy(() => import('./sections/LogsSection.js'))
 const EmailsSection = lazy(() => import('./sections/EmailsSection.js'))
-const TimelineSection = lazy(() => import('./sections/TimelineSection.js'))
 const CacheSection = lazy(() => import('./sections/CacheSection.js'))
 const JobsSection = lazy(() => import('./sections/JobsSection.js'))
 const ConfigSection = lazy(() => import('./sections/ConfigSection.js'))
 const InternalsSection = lazy(() => import('./sections/InternalsSection.js'))
-
-/** Resolve icon key for a dashboard section, using the clock variant for timeline. */
-function sectionIconKey(sectionId: string): string {
-  return sectionId === 'timeline' ? 'dashboard-timeline' : sectionId
-}
 
 interface DashboardPageProps {
   /** Base URL for API requests. */
@@ -162,7 +155,6 @@ export function DashboardPage(props: DashboardPageProps) {
       { id: 'routes', label: 'Routes', visible: true },
       { id: 'logs', label: 'Logs', visible: true },
       { id: 'emails', label: 'Emails', visible: true },
-      { id: 'timeline', label: 'Timeline', visible: features.tracing },
       { id: 'cache', label: 'Cache', visible: features.cache },
       { id: 'jobs', label: 'Jobs', visible: features.queues },
       { id: 'config', label: 'Config', visible: true },
@@ -218,7 +210,6 @@ export function DashboardPage(props: DashboardPageProps) {
       routes: <RoutesSection options={dashOptions} />,
       logs: <LogsSection options={dashOptions} />,
       emails: <EmailsSection options={dashOptions} />,
-      timeline: <TimelineSection options={dashOptions} />,
       cache: <CacheSection options={dashOptions} />,
       jobs: <JobsSection options={dashOptions} />,
       config: <ConfigSection options={dashOptions} />,
@@ -291,7 +282,7 @@ export function DashboardPage(props: DashboardPageProps) {
                     <svg
                       width="20"
                       height="20"
-                      viewBox={(TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config).viewBox}
+                      viewBox={(TAB_ICONS[section.id] || TAB_ICONS.config).viewBox}
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="2"
@@ -299,7 +290,7 @@ export function DashboardPage(props: DashboardPageProps) {
                       strokeLinejoin="round"
                       dangerouslySetInnerHTML={{
                         __html: (
-                          TAB_ICONS[sectionIconKey(section.id)] || TAB_ICONS.config
+                          TAB_ICONS[section.id] || TAB_ICONS.config
                         ).elements.join(''),
                       }}
                     />

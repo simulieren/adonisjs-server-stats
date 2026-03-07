@@ -81,7 +81,7 @@ const TABS = computed<TabDef[]>(() => {
   ]
 
   if (features.value.tracing || props.tracingEnabled) {
-    tabs.push({ id: 'timeline', label: 'Timeline', icon: 'T' })
+    tabs.push({ id: 'timeline', label: 'Requests', icon: 'R' })
   }
 
   if (features.value.cache) {

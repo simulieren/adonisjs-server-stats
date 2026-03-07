@@ -1,10 +1,12 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 
 import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
+import { initSplitPane } from '../../../../core/split-pane.js'
 import { normalizeTraceFields } from '../../../../core/trace-utils.js'
 import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
+import { RelatedLogs } from '../../shared/RelatedLogs.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
@@ -12,6 +14,45 @@ import { WaterfallChart } from '../shared/WaterfallChart.js'
 
 import type { TraceDetail } from '../../../../core/trace-utils.js'
 import type { DashboardHookOptions, TraceSpan } from '../../../../core/types.js'
+
+function SplitPaneWrapper({
+  children,
+  classPrefix = 'ss-dash',
+  storageKey,
+}: {
+  children: [React.ReactNode, React.ReactNode]
+  classPrefix?: string
+  storageKey?: string
+}) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const handleRef = useRef<HTMLDivElement>(null)
+  const topRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (containerRef.current && handleRef.current && topRef.current && bottomRef.current) {
+      return initSplitPane({
+        container: containerRef.current,
+        handle: handleRef.current,
+        topPane: topRef.current,
+        bottomPane: bottomRef.current,
+        storageKey,
+      })
+    }
+  }, [storageKey])
+
+  return (
+    <div ref={containerRef} className={`${classPrefix}-split-container`}>
+      <div ref={topRef} className={`${classPrefix}-split-top`}>
+        {children[0]}
+      </div>
+      <div ref={handleRef} className={`${classPrefix}-split-handle`} />
+      <div ref={bottomRef} className={`${classPrefix}-split-bottom`}>
+        {children[1]}
+      </div>
+    </div>
+  )
+}
 
 interface RequestsSectionProps {
   options?: DashboardHookOptions
@@ -46,7 +87,16 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
       getClient()
         .fetch<TraceDetail>(`${endpoint}/requests/${id}`)
         .then((result) => {
-          setSelectedTrace(result)
+          // Flatten nested trace fields (spans, totalDuration, warnings) to top level
+          // so normalizeTraceFields() can find them
+          const raw = result as Record<string, unknown>
+          const trace = raw.trace as Record<string, unknown> | null
+          if (trace) {
+            const merged = { ...raw, ...trace, logs: raw.logs }
+            setSelectedTrace(merged as TraceDetail)
+          } else {
+            setSelectedTrace(result)
+          }
           setDetailLoading(false)
         })
         .catch(() => {
@@ -72,6 +122,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
 
   if (selectedTrace) {
     const normalized = normalizeTraceFields(selectedTrace as unknown as Record<string, unknown>)
+    const hasLogs = normalized.logs.length > 0
 
     return (
       <div>
@@ -86,11 +137,22 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
             {normalized.totalDuration.toFixed(1)}ms &middot; {normalized.spanCount} spans
           </span>
         </div>
-        <WaterfallChart
-          spans={normalized.spans as TraceSpan[]}
-          totalDuration={normalized.totalDuration}
-          warnings={normalized.warnings}
-        />
+        {hasLogs ? (
+          <SplitPaneWrapper classPrefix="ss-dash" storageKey="ss-requests-split">
+            <WaterfallChart
+              spans={normalized.spans as TraceSpan[]}
+              totalDuration={normalized.totalDuration}
+              warnings={normalized.warnings}
+            />
+            <RelatedLogs logs={normalized.logs} classPrefix="ss-dash" />
+          </SplitPaneWrapper>
+        ) : (
+          <WaterfallChart
+            spans={normalized.spans as TraceSpan[]}
+            totalDuration={normalized.totalDuration}
+            warnings={normalized.warnings}
+          />
+        )}
       </div>
     )
   }
