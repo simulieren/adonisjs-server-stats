@@ -114,7 +114,7 @@ export default class ServerStatsProvider {
 
       // Log registered routes
       if (registeredPaths.length > 0) {
-        log.list('routes registered:', registeredPaths)
+        log.list('routes auto-registered (no manual setup needed):', registeredPaths)
 
         // Only warn about global auth middleware if:
         // 1. shouldShow is NOT configured (user hasn't set up access control)
