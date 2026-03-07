@@ -4,6 +4,22 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.9] - 2026-03-06
+
+### Bug Fixes
+
+- Replace all `Promise.all` with sequential awaits in SQLite queries — the `max: 1` connection pool makes concurrent acquires pointless and thrashes tarn's scheduler
+- Use SQL aggregation instead of loading all rows into JS for overview metrics and chart aggregation, significantly reducing memory pressure
+- Compute p95 latency via `ORDER BY` + `OFFSET` in SQL instead of sorting all rows in JS
+- Add `acquireTimeoutMillis: 5000` for fast-fail on connection acquire instead of the default 30s silent timeout
+- Remove no-op `busy_timeout` PRAGMA (not supported by `better-sqlite3`)
+- Move `recordEmail` into the batch write queue to keep writes serialized
+- Pre-stringify JSON outside transactions to avoid blocking the event loop during serialization
+- Yield to the event loop after each flush transaction to prevent starvation under sustained load
+- Add `RingBuffer.collectFromEnd()` for O(K) query collection per request instead of O(N)
+- Cap spans per trace at 200 to bound memory usage
+- Reduce dashboard broadcast timer from 5s to 30s to lower idle CPU overhead
+
 ## [1.5.0] - 2026-02-25
 
 ### Features
