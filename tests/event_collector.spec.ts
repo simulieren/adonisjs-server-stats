@@ -277,6 +277,30 @@ test.group('EventCollector | safeReplacer handles nested objects', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Tests -- newest-first ordering
+// ---------------------------------------------------------------------------
+
+test.group('EventCollector | Ordering', () => {
+  test('returns events in newest-first order', ({ assert }) => {
+    const collector = new EventCollector(100)
+    const { emitter } = createMockEmitter()
+    collector.start(emitter as any)
+
+    emitter.emit('event:first', { order: 1 })
+    emitter.emit('event:second', { order: 2 })
+    emitter.emit('event:third', { order: 3 })
+
+    const events = collector.getEvents()
+    assert.lengthOf(events, 3)
+    assert.equal(events[0].event, 'event:third')
+    assert.equal(events[1].event, 'event:second')
+    assert.equal(events[2].event, 'event:first')
+
+    collector.stop()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Tests -- emit pass-through
 // ---------------------------------------------------------------------------
 

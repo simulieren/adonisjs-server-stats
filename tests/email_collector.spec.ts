@@ -233,8 +233,8 @@ test.group('EmailCollector | mail:sent updates matching sending', () => {
 
     const emails = collector.getEmails()
     assert.lengthOf(emails, 2)
-    assert.equal(emails[0].status, 'sending', 'first record should stay as sending')
-    assert.equal(emails[1].status, 'sent', 'second record should be updated to sent')
+    assert.equal(emails[0].status, 'sent', 'second (most recent) record should be updated to sent')
+    assert.equal(emails[1].status, 'sending', 'first record should stay as sending')
 
     collector.stop()
   })
@@ -270,8 +270,8 @@ test.group('EmailCollector | mail:sent with no matching sending', () => {
 
     const emails = collector.getEmails()
     assert.lengthOf(emails, 2, 'should create a new record, not update the mismatched one')
-    assert.equal(emails[0].status, 'sending')
-    assert.equal(emails[1].status, 'sent')
+    assert.equal(emails[0].status, 'sent')
+    assert.equal(emails[1].status, 'sending')
 
     collector.stop()
   })
@@ -341,7 +341,7 @@ test.group('EmailCollector | queued:mail:error', () => {
 // ---------------------------------------------------------------------------
 
 test.group('EmailCollector | getEmails()', () => {
-  test('returns all emails in insertion order', async ({ assert }) => {
+  test('returns all emails in newest-first order', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
     await collector.start(emitter as any)
@@ -352,9 +352,9 @@ test.group('EmailCollector | getEmails()', () => {
 
     const emails = collector.getEmails()
     assert.lengthOf(emails, 3)
-    assert.equal(emails[0].subject, 'First')
+    assert.equal(emails[0].subject, 'Third')
     assert.equal(emails[1].subject, 'Second')
-    assert.equal(emails[2].subject, 'Third')
+    assert.equal(emails[2].subject, 'First')
 
     collector.stop()
   })
@@ -623,8 +623,8 @@ test.group('EmailCollector | HTML truncation', () => {
     emitter.emit('mail:sending', makeSendingData({ html: '' }))
 
     const emails = collector.getEmails()
-    assert.isNull(emails[0].html)
-    assert.isNull(emails[1].html) // empty string is falsy, capSize returns null
+    assert.isNull(emails[0].html) // empty string is falsy, capSize returns null
+    assert.isNull(emails[1].html)
 
     collector.stop()
   })
@@ -849,7 +849,7 @@ test.group('EmailCollector | loadRecords + continued recording', () => {
     const emails = collector.getEmails()
     assert.lengthOf(emails, 3)
 
-    const newEmail = emails[2]
+    const newEmail = emails[0]
     assert.equal(newEmail.subject, 'New Email')
     assert.isTrue(newEmail.id > 20, `Expected id > 20 but got ${newEmail.id}`)
 
@@ -1062,9 +1062,9 @@ test.group('EmailCollector | Ring buffer overflow', () => {
     assert.equal(collector.getTotalCount(), 3)
 
     const emails = collector.getEmails()
-    assert.equal(emails[0].subject, 'Email 2')
+    assert.equal(emails[0].subject, 'Email 4')
     assert.equal(emails[1].subject, 'Email 3')
-    assert.equal(emails[2].subject, 'Email 4')
+    assert.equal(emails[2].subject, 'Email 2')
 
     collector.stop()
   })

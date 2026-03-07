@@ -89,6 +89,26 @@ test.group('QueryCollector | Core functionality', () => {
   })
 })
 
+test.group('QueryCollector | Ordering', () => {
+  test('returns queries in newest-first order', async ({ assert }) => {
+    const collector = new QueryCollector()
+    const emitter = new MockEmitter()
+    await collector.start(emitter as any)
+
+    emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT first' }))
+    emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT second' }))
+    emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT third' }))
+
+    const queries = collector.getQueries()
+    assert.lengthOf(queries, 3)
+    assert.equal(queries[0].sql, 'SELECT third')
+    assert.equal(queries[1].sql, 'SELECT second')
+    assert.equal(queries[2].sql, 'SELECT first')
+
+    collector.stop()
+  })
+})
+
 test.group('QueryCollector | Performance-critical methods', () => {
   test('getQueriesSince(lastId) returns only new queries', async ({ assert }) => {
     const collector = new QueryCollector(500)
@@ -227,9 +247,9 @@ test.group('QueryCollector | Buffer behavior', () => {
 
     const queries = collector.getQueries()
     assert.lengthOf(queries, 10)
-    // oldest 5 (0-4) should be gone, first remaining is SELECT 5
-    assert.equal(queries[0].sql, 'SELECT 5')
-    assert.equal(queries[9].sql, 'SELECT 14')
+    // newest first: SELECT 14 at index 0, SELECT 5 at index 9
+    assert.equal(queries[0].sql, 'SELECT 14')
+    assert.equal(queries[9].sql, 'SELECT 5')
 
     collector.stop()
   })

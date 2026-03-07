@@ -122,7 +122,7 @@ export class EventCollector {
   }
 
   getEvents(): EventRecord[] {
-    return this.buffer.toArray()
+    return this.buffer.toArray().reverse()
   }
 
   getLatest(n: number = 100): EventRecord[] {

@@ -440,6 +440,7 @@ export class DataAccess {
         .filter(Boolean)
         .map((line) => parseAndEnrich(line))
         .filter((entry): entry is Record<string, unknown> => entry !== null)
+        .reverse()
     } catch {
       return []
     }

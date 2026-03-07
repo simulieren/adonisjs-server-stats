@@ -88,7 +88,7 @@ export class EmailCollector {
   }
 
   getEmails(): EmailRecord[] {
-    return this.buffer.toArray()
+    return this.buffer.toArray().reverse()
   }
 
   getLatest(n: number = 100): EmailRecord[] {

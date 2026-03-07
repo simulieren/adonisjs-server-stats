@@ -99,9 +99,9 @@ test.group('Stress | QueryCollector under load', () => {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
     }
 
-    // Record the lastId before emitting 10 more
+    // Record the lastId before emitting 10 more (newest-first, so index 0 is the latest)
     const before = collector.getQueries()
-    const lastId = before[before.length - 1].id
+    const lastId = before[0].id
 
     // Emit 10 more queries
     for (let i = 0; i < 10; i++) {
@@ -161,13 +161,13 @@ test.group('Stress | QueryCollector under load', () => {
     const queries = collector.getQueries()
     assert.lengthOf(queries, 100)
 
-    // IDs should be monotonically increasing across the returned array
+    // Newest-first: IDs should be monotonically decreasing across the returned array
     for (let i = 1; i < queries.length; i++) {
-      assert.isAbove(queries[i].id, queries[i - 1].id)
+      assert.isBelow(queries[i].id, queries[i - 1].id)
     }
 
-    // First ID should be > 400 (items 1-400 were overwritten)
-    assert.isAbove(queries[0].id, 400)
+    // Last ID (oldest remaining) should be > 400 (items 1-400 were overwritten)
+    assert.isAbove(queries[queries.length - 1].id, 400)
 
     collector.stop()
   })
@@ -200,10 +200,10 @@ test.group('Stress | QueryCollector under load', () => {
     const queries = collector.getQueries()
     assert.lengthOf(queries, 80)
 
-    // IDs of new items should start at 51
+    // Newest-first: new items appear first, oldest new item has id 51
     const newItems = queries.filter((q) => q.sql.startsWith('NEW'))
     assert.lengthOf(newItems, 30)
-    assert.equal(newItems[0].id, 51)
+    assert.equal(newItems[newItems.length - 1].id, 51)
 
     collector.stop()
   })
@@ -245,9 +245,9 @@ test.group('Stress | TraceCollector under load', (group) => {
     const traces = collector.getTraces()
     assert.lengthOf(traces, 200)
 
-    // IDs should be monotonic
+    // IDs should be monotonically decreasing (newest-first)
     for (let i = 1; i < traces.length; i++) {
-      assert.isAbove(traces[i].id, traces[i - 1].id)
+      assert.isBelow(traces[i].id, traces[i - 1].id)
     }
   })
 
@@ -287,9 +287,9 @@ test.group('Stress | TraceCollector under load', (group) => {
     const traces = collector.getTraces()
     assert.lengthOf(traces, 50)
 
-    // Verify all 50 are recorded with correct data
+    // Verify all 50 are recorded with correct data (newest-first)
     for (let i = 0; i < 50; i++) {
-      assert.equal(traces[i].url, `/request/${i}`)
+      assert.equal(traces[i].url, `/request/${49 - i}`)
       assert.equal(traces[i].method, 'GET')
       assert.equal(traces[i].statusCode, 200)
       assert.equal(traces[i].spanCount, 1)

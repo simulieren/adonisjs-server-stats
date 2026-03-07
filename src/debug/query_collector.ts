@@ -72,7 +72,7 @@ export class QueryCollector {
   }
 
   getQueries(): QueryRecord[] {
-    return this.buffer.toArray()
+    return this.buffer.toArray().reverse()
   }
 
   /**
