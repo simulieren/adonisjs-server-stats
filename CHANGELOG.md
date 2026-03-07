@@ -4,6 +4,25 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.10] - 2026-03-06
+
+### Bug Fixes
+
+- Wrap all multi-query SQLite reads in single transactions, reducing pool acquires per method from 2-8 down to 1:
+  - `paginate()`: 2 acquires → 1
+  - `getRequestDetail()`: 4 acquires → 1
+  - `getOverviewMetrics()`: 5 acquires → 1
+  - `getOverviewWidgets()`: 5 acquires → 1
+  - `getStorageStats()`: 8 acquires → 1
+  - `ChartAggregator.aggregate()`: 5 acquires → 1
+- Total pool pressure per interaction cycle reduced from ~28 acquires to ~6, eliminating thundering-herd freezes under rapid clicking
+- Reduce `acquireTimeoutMillis` from 5 s to 2 s for faster failure recovery and a shorter pending-acquire queue
+- Cache `getStorageStats()` with a 10 s TTL (Internals tab polls every 3 s, making repeated reads unnecessary)
+- Cache package version reads in `DebugController` to avoid disk I/O on every poll
+- Add `RingBuffer.findFromEnd()` for zero-copy single-item lookup
+- Use `findFromEnd` in `TraceCollector.getTrace(id)` instead of `toArray().find()`
+- Cache `QueryCollector.getSummary()` for 1 s to avoid 4x O(500) recomputation per poll
+
 ## [1.6.9] - 2026-03-06
 
 ### Bug Fixes
