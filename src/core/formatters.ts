@@ -105,6 +105,16 @@ export function formatDuration(ms: number): string {
 // ---------------------------------------------------------------------------
 
 /**
+ * Ensure a bare datetime string (from SQLite's `datetime('now')`) is treated
+ * as UTC. SQLite returns `"2026-03-07 10:30:00"` without a timezone suffix;
+ * `new Date()` would interpret that as local time. Appending `Z` forces UTC.
+ */
+function asUtc(s: string): string {
+  if (/([+-]\d{2}:?\d{2}|Z)\s*$/.test(s)) return s
+  return s + 'Z'
+}
+
+/**
  * Format a Unix timestamp (ms) or ISO string as `HH:MM:SS.mmm`.
  *
  * Returns `'-'` if the input is falsy or produces an invalid date.
@@ -113,7 +123,7 @@ export function formatDuration(ms: number): string {
  */
 export function formatTime(ts: number | string): string {
   if (!ts) return '-'
-  const d = typeof ts === 'string' ? new Date(ts) : new Date(ts)
+  const d = typeof ts === 'string' ? new Date(asUtc(ts)) : new Date(ts)
   if (Number.isNaN(d.getTime())) return '-'
   return (
     d.toLocaleTimeString('en-US', {
@@ -142,7 +152,7 @@ export function formatTime(ts: number | string): string {
  */
 export function timeAgo(ts: number | string): string {
   if (!ts) return '-'
-  const d = typeof ts === 'string' ? new Date(ts).getTime() : ts
+  const d = typeof ts === 'string' ? new Date(asUtc(ts)).getTime() : ts
   const diff = Math.floor((Date.now() - d) / 1000)
   if (diff < 0) return 'just now'
   if (diff < 60) return `${diff}s ago`
