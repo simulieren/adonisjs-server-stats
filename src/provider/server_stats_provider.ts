@@ -1,8 +1,6 @@
 import { readFileSync } from 'node:fs'
 
 import { getLogStreamService } from '../collectors/log_collector.js'
-import { DashboardStore } from '../dashboard/dashboard_store.js'
-import { DataAccess } from '../data/data_access.js'
 import { DebugStore } from '../debug/debug_store.js'
 import { StatsEngine } from '../engine/stats_engine.js'
 import { LogStreamService } from '../log_stream/log_stream_service.js'
@@ -20,6 +18,7 @@ import type { MetricCollector } from '../collectors/collector.js'
 import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
+import type { DashboardStore } from '../dashboard/dashboard_store.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { DevToolbarConfig } from '../debug/types.js'
 import type { ResolvedServerStatsConfig } from '../types.js'
@@ -298,6 +297,20 @@ export default class ServerStatsProvider {
 
     if (this.app.inTest && config.skipInTest !== false) return
 
+    try {
+      await this.initializeServerStats(config)
+    } catch (err) {
+      log.warn(
+        `failed to initialize: ${(err as Error)?.message ?? err}\n` +
+          `  ${dim('The server will continue without server-stats.')}`
+      )
+      if ((err as Error)?.stack) {
+        console.error((err as Error).stack)
+      }
+    }
+  }
+
+  private async initializeServerStats(config: ResolvedServerStatsConfig) {
     this.resolvedConfig = config
 
     let collectors: MetricCollector[]
@@ -330,21 +343,28 @@ export default class ServerStatsProvider {
     // Dev toolbar setup
     const toolbarConfig = config.devToolbar
     if (toolbarConfig?.enabled && !this.app.inProduction) {
-      await this.setupDevToolbar({
-        enabled: true,
-        maxQueries: toolbarConfig.maxQueries ?? 500,
-        maxEvents: toolbarConfig.maxEvents ?? 200,
-        maxEmails: toolbarConfig.maxEmails ?? 100,
-        slowQueryThresholdMs: toolbarConfig.slowQueryThresholdMs ?? 100,
-        persistDebugData: toolbarConfig.persistDebugData ?? false,
-        tracing: toolbarConfig.tracing ?? false,
-        maxTraces: toolbarConfig.maxTraces ?? 200,
-        dashboard: toolbarConfig.dashboard ?? false,
-        dashboardPath: toolbarConfig.dashboardPath ?? '/__stats',
-        retentionDays: toolbarConfig.retentionDays ?? 7,
-        dbPath: toolbarConfig.dbPath ?? '.adonisjs/server-stats/dashboard.sqlite3',
-        debugEndpoint: toolbarConfig.debugEndpoint ?? '/admin/api/debug',
-      })
+      try {
+        await this.setupDevToolbar({
+          enabled: true,
+          maxQueries: toolbarConfig.maxQueries ?? 500,
+          maxEvents: toolbarConfig.maxEvents ?? 200,
+          maxEmails: toolbarConfig.maxEmails ?? 100,
+          slowQueryThresholdMs: toolbarConfig.slowQueryThresholdMs ?? 100,
+          persistDebugData: toolbarConfig.persistDebugData ?? false,
+          tracing: toolbarConfig.tracing ?? false,
+          maxTraces: toolbarConfig.maxTraces ?? 200,
+          dashboard: toolbarConfig.dashboard ?? false,
+          dashboardPath: toolbarConfig.dashboardPath ?? '/__stats',
+          retentionDays: toolbarConfig.retentionDays ?? 7,
+          dbPath: toolbarConfig.dbPath ?? '.adonisjs/server-stats/dashboard.sqlite3',
+          debugEndpoint: toolbarConfig.debugEndpoint ?? '/admin/api/debug',
+        })
+      } catch (err) {
+        log.warn(
+          `dev toolbar setup failed: ${(err as Error)?.message ?? err}\n` +
+            `  ${dim('Stats bar will still work, but debug panel may be unavailable.')}`
+        )
+      }
 
       // Exclude the stats endpoint and user-specified prefixes from tracing
       // so the debug panel's own polling doesn't flood the timeline
@@ -363,7 +383,8 @@ export default class ServerStatsProvider {
       // Create the unified ApiController now that both stores are available
       if (this.debugStore) {
         const logPath = this.app.makePath('logs', 'adonisjs.log')
-        const dataAccess = new DataAccess(this.debugStore, this.dashboardStore, logPath)
+        const { DataAccess: DataAccessClass } = await import('../data/data_access.js')
+        const dataAccess = new DataAccessClass(this.debugStore, this.dashboardStore, logPath)
         const { ApiController: ApiControllerClass } =
           await import('../controller/api_controller.js')
         this.apiController = new ApiControllerClass(dataAccess)
@@ -420,6 +441,8 @@ export default class ServerStatsProvider {
         // Silently ignore collection errors
       }
     }, config.intervalMs)
+
+    log.info('ready')
   }
 
   private async setupDevToolbar(toolbarConfig: DevToolbarConfig) {
@@ -529,8 +552,9 @@ export default class ServerStatsProvider {
    * This method creates the controller so those routes become functional.
    */
   private async setupDashboard(toolbarConfig: DevToolbarConfig, emitter: unknown) {
-    // Create and start the DashboardStore
-    this.dashboardStore = new DashboardStore(toolbarConfig)
+    // Dynamically import DashboardStore so knex/better-sqlite3 are truly optional
+    const { DashboardStore: DashboardStoreClass } = await import('../dashboard/dashboard_store.js')
+    this.dashboardStore = new DashboardStoreClass(toolbarConfig)
     const appRoot = this.app.makePath('')
     try {
       await this.dashboardStore.start(
@@ -541,14 +565,15 @@ export default class ServerStatsProvider {
     } catch (err) {
       const msg = (err as Error)?.message || ''
       const code = (err as NodeJS.ErrnoException)?.code || ''
-      if (
+      const isMissingDep =
         msg.includes('better-sqlite3') ||
         msg.includes('knex') ||
         msg.includes('Cannot find module') ||
         msg.includes('Cannot find package') ||
         code === 'ERR_MODULE_NOT_FOUND' ||
         code === 'MODULE_NOT_FOUND'
-      ) {
+
+      if (isMissingDep) {
         log.block('Dashboard could not start — missing dependencies. Install with:', [
           '',
           bold('npm install knex better-sqlite3'),
@@ -556,10 +581,14 @@ export default class ServerStatsProvider {
           dim('Dashboard has been disabled for this session.'),
           dim('Everything else (stats bar, debug panel) works without it.'),
         ])
-        this.dashboardStore = null
-        return
+      } else {
+        log.warn(
+          `Dashboard could not start: ${msg}\n` +
+            `  ${dim('Dashboard has been disabled for this session.')}`
+        )
       }
-      throw err
+      this.dashboardStore = null
+      return
     }
 
     // Bind to container
