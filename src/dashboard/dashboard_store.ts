@@ -464,7 +464,12 @@ export class DashboardStore {
 
   /**
    * Flush all pending writes in a single transaction.
-   * One pool acquire/release cycle for the entire batch.
+   *
+   * A transaction acquires the pool connection ONCE, runs all INSERTs
+   * (synchronous via better-sqlite3), then releases. Without a
+   * transaction, each INSERT does its own async acquire/release cycle —
+   * under load this creates hundreds of microtasks that starve the
+   * event loop and freeze the server.
    */
   private async flushWriteQueue(): Promise<void> {
     if (this.flushing || !this.db) return
@@ -473,111 +478,120 @@ export class DashboardStore {
     // Snapshot and clear the queues
     const requests = this.writeQueue.splice(0)
     const logs = this.pendingLogs.splice(0)
-    // pendingEvents is cleared after processing (needs request IDs)
     const events = this.pendingEvents.splice(0)
 
+    if (requests.length === 0 && logs.length === 0 && events.length === 0) {
+      this.flushing = false
+      return
+    }
+
     try {
-      const db = this.db
+      await this.db.transaction(async (trx) => {
+        // -- Requests + queries + traces --
+        for (const input of requests) {
+          try {
+            const [requestId] = await trx('server_stats_requests').insert({
+              method: input.method,
+              url: input.url,
+              status_code: input.statusCode,
+              duration: round(input.duration),
+              span_count: input.trace?.spanCount ?? 0,
+              warning_count: input.trace?.warnings?.length ?? 0,
+            })
 
-      // -- Requests + queries + traces --
-      for (const input of requests) {
-        try {
-          const [requestId] = await db('server_stats_requests').insert({
-            method: input.method,
-            url: input.url,
-            status_code: input.statusCode,
-            duration: round(input.duration),
-            span_count: input.trace?.spanCount ?? 0,
-            warning_count: input.trace?.warnings?.length ?? 0,
-          })
-
-          if (requestId != null && input.queries.length > 0) {
-            const filtered = input.queries.filter((q) => q.connection !== 'server_stats')
-            if (filtered.length > 0) {
-              const rows = filtered.map((q) => ({
-                request_id: requestId,
-                sql_text: q.sql,
-                sql_normalized: normalizeSql(q.sql),
-                bindings: q.bindings ? JSON.stringify(q.bindings) : null,
-                duration: round(q.duration),
-                method: q.method,
-                model: q.model,
-                connection: q.connection,
-                in_transaction: q.inTransaction ? 1 : 0,
-              }))
-              for (let i = 0; i < rows.length; i += 50) {
-                await db('server_stats_queries').insert(rows.slice(i, i + 50))
+            if (requestId != null && input.queries.length > 0) {
+              const filtered = input.queries.filter((q) => q.connection !== 'server_stats')
+              if (filtered.length > 0) {
+                const rows = filtered.map((q) => ({
+                  request_id: requestId,
+                  sql_text: q.sql,
+                  sql_normalized: normalizeSql(q.sql),
+                  bindings: q.bindings ? JSON.stringify(q.bindings) : null,
+                  duration: round(q.duration),
+                  method: q.method,
+                  model: q.model,
+                  connection: q.connection,
+                  in_transaction: q.inTransaction ? 1 : 0,
+                }))
+                for (let i = 0; i < rows.length; i += 50) {
+                  await trx('server_stats_queries').insert(rows.slice(i, i + 50))
+                }
               }
             }
-          }
 
-          if (requestId != null && input.trace) {
-            await db('server_stats_traces').insert({
-              request_id: requestId,
-              method: input.trace.method,
-              url: input.trace.url,
-              status_code: input.trace.statusCode,
-              total_duration: round(input.trace.totalDuration),
-              span_count: input.trace.spanCount,
-              spans: JSON.stringify(input.trace.spans),
-              warnings:
-                input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
-            })
-          }
-        } catch (err) {
-          if (!warnedWritePaths.has('persistRequest')) {
-            warnedWritePaths.add('persistRequest')
-            log.warn(`dashboard: persistRequest failed — ${(err as Error)?.message}`)
-          }
-        }
-      }
-
-      // -- Events (rarely used, low volume) --
-      for (const { events: evts } of events) {
-        try {
-          const rows = evts.map((e) => ({
-            request_id: null, // Events queued without request ID context
-            event_name: e.event,
-            data: e.data,
-          }))
-          for (let i = 0; i < rows.length; i += 50) {
-            await db('server_stats_events').insert(rows.slice(i, i + 50))
-          }
-        } catch (err) {
-          if (!warnedWritePaths.has('recordEvents')) {
-            warnedWritePaths.add('recordEvents')
-            log.warn(`dashboard: recordEvents failed — ${(err as Error)?.message}`)
-          }
-        }
-      }
-
-      // -- Logs --
-      if (logs.length > 0) {
-        try {
-          const rows = logs.map((entry) => {
-            const levelName =
-              typeof entry.levelName === 'string'
-                ? entry.levelName
-                : String(entry.level || 'unknown')
-            return {
-              level: levelName,
-              message: String(entry.msg || entry.message || ''),
-              request_id:
-                entry.request_id || entry.requestId || entry['x-request-id']
-                  ? String(entry.request_id || entry.requestId || entry['x-request-id'])
-                  : null,
-              data: JSON.stringify(entry),
+            if (requestId != null && input.trace) {
+              await trx('server_stats_traces').insert({
+                request_id: requestId,
+                method: input.trace.method,
+                url: input.trace.url,
+                status_code: input.trace.statusCode,
+                total_duration: round(input.trace.totalDuration),
+                span_count: input.trace.spanCount,
+                spans: JSON.stringify(input.trace.spans),
+                warnings:
+                  input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
+              })
             }
-          })
-          for (let i = 0; i < rows.length; i += 50) {
-            await db('server_stats_logs').insert(rows.slice(i, i + 50))
-          }
-        } catch (err) {
-          if (!warnedWritePaths.has('recordLog')) {
-            warnedWritePaths.add('recordLog')
-            log.warn(`dashboard: recordLog failed — ${(err as Error)?.message}`)
+          } catch (err) {
+            if (!warnedWritePaths.has('persistRequest')) {
+              warnedWritePaths.add('persistRequest')
+              log.warn(`dashboard: persistRequest failed — ${(err as Error)?.message}`)
+            }
           }
         }
+
+        // -- Events --
+        for (const { events: evts } of events) {
+          try {
+            const rows = evts.map((e) => ({
+              request_id: null,
+              event_name: e.event,
+              data: e.data,
+            }))
+            for (let i = 0; i < rows.length; i += 50) {
+              await trx('server_stats_events').insert(rows.slice(i, i + 50))
+            }
+          } catch (err) {
+            if (!warnedWritePaths.has('recordEvents')) {
+              warnedWritePaths.add('recordEvents')
+              log.warn(`dashboard: recordEvents failed — ${(err as Error)?.message}`)
+            }
+          }
+        }
+
+        // -- Logs --
+        if (logs.length > 0) {
+          try {
+            const rows = logs.map((entry) => {
+              const levelName =
+                typeof entry.levelName === 'string'
+                  ? entry.levelName
+                  : String(entry.level || 'unknown')
+              return {
+                level: levelName,
+                message: String(entry.msg || entry.message || ''),
+                request_id:
+                  entry.request_id || entry.requestId || entry['x-request-id']
+                    ? String(entry.request_id || entry.requestId || entry['x-request-id'])
+                    : null,
+                data: JSON.stringify(entry),
+              }
+            })
+            for (let i = 0; i < rows.length; i += 50) {
+              await trx('server_stats_logs').insert(rows.slice(i, i + 50))
+            }
+          } catch (err) {
+            if (!warnedWritePaths.has('recordLog')) {
+              warnedWritePaths.add('recordLog')
+              log.warn(`dashboard: recordLog failed — ${(err as Error)?.message}`)
+            }
+          }
+        }
+      })
+    } catch (err) {
+      if (!warnedWritePaths.has('flush')) {
+        warnedWritePaths.add('flush')
+        log.warn(`dashboard: flush transaction failed — ${(err as Error)?.message}`)
       }
     } finally {
       this.flushing = false
