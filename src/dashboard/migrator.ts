@@ -1,11 +1,25 @@
 import type { Knex } from 'knex'
 
 /**
+ * Yield control back to the event loop so Node.js can process pending
+ * I/O (incoming HTTP requests, timers, etc.).
+ *
+ * `better-sqlite3` is fully synchronous — when Knex wraps it, each
+ * `await db.raw(...)` resolves via the microtask queue, never actually
+ * yielding to the I/O phase. Without explicit yields, 25+ sequential
+ * migration statements block the event loop for their entire duration.
+ */
+const yieldToEventLoop = () => new Promise<void>((resolve) => setImmediate(resolve))
+
+/**
  * Auto-migrate all dashboard SQLite tables.
  *
  * Uses raw SQL (not Lucid migrations) so we never pollute the host
  * application's migration history.  Each `CREATE TABLE` / `CREATE INDEX`
  * uses `IF NOT EXISTS` so the function is idempotent.
+ *
+ * Yields to the event loop between each table so the server can
+ * continue processing HTTP requests during migration.
  */
 export async function autoMigrate(db: Knex): Promise<void> {
   // -- server_stats_requests --------------------------------------------------
@@ -25,6 +39,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_ss_requests_created ON server_stats_requests(created_at)`
   )
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_requests_url ON server_stats_requests(url)`)
+  await yieldToEventLoop()
 
   // -- server_stats_queries ---------------------------------------------------
   await db.raw(`
@@ -51,6 +66,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_queries_request ON server_stats_queries(request_id)`
   )
+  await yieldToEventLoop()
 
   // -- server_stats_events ----------------------------------------------------
   await db.raw(`
@@ -65,6 +81,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_events_created ON server_stats_events(created_at)`
   )
+  await yieldToEventLoop()
 
   // -- server_stats_emails ----------------------------------------------------
   await db.raw(`
@@ -87,6 +104,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_emails_created ON server_stats_emails(created_at)`
   )
+  await yieldToEventLoop()
 
   // -- server_stats_logs ------------------------------------------------------
   await db.raw(`
@@ -102,6 +120,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_logs_created ON server_stats_logs(created_at)`)
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_logs_level ON server_stats_logs(level)`)
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_logs_request ON server_stats_logs(request_id)`)
+  await yieldToEventLoop()
 
   // -- server_stats_traces ----------------------------------------------------
   await db.raw(`
@@ -121,6 +140,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_traces_created ON server_stats_traces(created_at)`
   )
+  await yieldToEventLoop()
 
   // -- server_stats_metrics ---------------------------------------------------
   await db.raw(`
@@ -137,6 +157,7 @@ export async function autoMigrate(db: Knex): Promise<void> {
     )
   `)
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_metrics_bucket ON server_stats_metrics(bucket)`)
+  await yieldToEventLoop()
 
   // -- server_stats_saved_filters ---------------------------------------------
   await db.raw(`
@@ -156,6 +177,8 @@ export async function autoMigrate(db: Knex): Promise<void> {
  * Foreign-key cascades on `server_stats_requests` handle the child
  * tables (queries, events, traces).  Standalone tables (logs, emails,
  * metrics, saved_filters) are pruned individually.
+ *
+ * Yields between each DELETE so the event loop stays responsive.
  */
 export async function runRetentionCleanup(db: Knex, retentionDays: number): Promise<void> {
   const modifier = `-${retentionDays} days`
@@ -164,9 +187,14 @@ export async function runRetentionCleanup(db: Knex, retentionDays: number): Prom
   await db.raw(`DELETE FROM server_stats_requests WHERE created_at < datetime('now', ?)`, [
     modifier,
   ])
+  await yieldToEventLoop()
 
   // Standalone tables
   await db.raw(`DELETE FROM server_stats_logs WHERE created_at < datetime('now', ?)`, [modifier])
+  await yieldToEventLoop()
+
   await db.raw(`DELETE FROM server_stats_emails WHERE created_at < datetime('now', ?)`, [modifier])
+  await yieldToEventLoop()
+
   await db.raw(`DELETE FROM server_stats_metrics WHERE created_at < datetime('now', ?)`, [modifier])
 }

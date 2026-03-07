@@ -155,23 +155,46 @@ export class DashboardStore {
     // Create a standalone Knex connection to SQLite — bypasses Lucid's
     // connection manager entirely so we never pollute the app's pool.
     log.info('dashboard: loading knex...')
-    const knexModule = await import('knex')
-    const knexFactory = knexModule.default ?? knexModule
+    let knexModule: unknown
+    try {
+      knexModule = await import('knex')
+    } catch (err) {
+      throw new Error(
+        `Could not load knex: ${(err as Error)?.message}. ` +
+          'Install it with: npm install knex better-sqlite3'
+      )
+    }
+
+    let betterSqlite3Available = true
+    try {
+      await import('better-sqlite3')
+    } catch {
+      betterSqlite3Available = false
+    }
+    if (!betterSqlite3Available) {
+      throw new Error(
+        'Could not load better-sqlite3. ' +
+          'Install it with: npm install better-sqlite3'
+      )
+    }
+
+    const knexFactory = (knexModule as Record<string, unknown>).default ?? knexModule
     log.info('dashboard: opening SQLite database...')
-    this.db = knexFactory({
+    const db: Knex = (knexFactory as Function)({
       client: 'better-sqlite3',
       connection: { filename: dbFilePath },
       useNullAsDefault: true,
     })
+    this.db = db
 
     log.info('dashboard: setting PRAGMA...')
-    await this.db.raw('PRAGMA journal_mode=WAL')
-    await this.db.raw('PRAGMA foreign_keys=ON')
+    await db.raw('PRAGMA journal_mode=WAL')
+    await db.raw('PRAGMA foreign_keys=ON')
 
     log.info('dashboard: running migrations...')
-    await autoMigrate(this.db)
+    await autoMigrate(db)
     log.info('dashboard: running retention cleanup...')
-    await runRetentionCleanup(this.db, this.config.retentionDays)
+    await runRetentionCleanup(db, this.config.retentionDays)
     this.lastCleanupAt = Date.now()
 
     // Hourly retention cleanup
@@ -190,7 +213,7 @@ export class DashboardStore {
     )
 
     // Start chart aggregation (every 60s)
-    this.chartAggregator = new ChartAggregator(this.db)
+    this.chartAggregator = new ChartAggregator(db)
     this.chartAggregator.start()
 
     // Wire email event listeners

@@ -23,8 +23,9 @@ export class ChartAggregator {
   }
 
   start(): void {
-    // Run immediately on startup, then every 60s
-    this.aggregate().catch(() => {})
+    // Defer the first aggregation so the event loop stays responsive
+    // during dashboard initialization. Then run every 60s.
+    setTimeout(() => this.aggregate().catch(() => {}), 2_000)
     this.timer = setInterval(() => {
       this.aggregate().catch(() => {})
     }, 60_000)
