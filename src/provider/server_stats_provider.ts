@@ -46,6 +46,9 @@ export default class ServerStatsProvider {
   private debugController: DebugController | null = null
   private apiController: ApiController | null = null
 
+  // Dashboard dependency check (set in boot, read in ready)
+  private dashboardDepsAvailable: boolean = true
+
   // Diagnostics tracking
   private pinoHookActive: boolean = false
   private edgePluginActive: boolean = false
@@ -85,7 +88,6 @@ export default class ServerStatsProvider {
         : undefined
 
       // Check dashboard dependencies before registering dashboard routes
-      let dashboardDepsAvailable = true
       if (toolbarConfig?.enabled && toolbarConfig.dashboard) {
         const missing: string[] = []
         try {
@@ -99,7 +101,7 @@ export default class ServerStatsProvider {
           missing.push('better-sqlite3')
         }
         if (missing.length > 0) {
-          dashboardDepsAvailable = false
+          this.dashboardDepsAvailable = false
           log.block(`Dashboard requires ${missing.join(' and ')}. Install with:`, [
             '',
             bold(`npm install ${missing.join(' ')}`),
@@ -111,7 +113,7 @@ export default class ServerStatsProvider {
       }
 
       const dashboardPath =
-        toolbarConfig?.enabled && toolbarConfig.dashboard && dashboardDepsAvailable
+        toolbarConfig?.enabled && toolbarConfig.dashboard && this.dashboardDepsAvailable
           ? (toolbarConfig.dashboardPath ?? '/__stats')
           : undefined
 
@@ -514,7 +516,7 @@ export default class ServerStatsProvider {
     }
 
     // Full-page dashboard setup (routes already registered in boot)
-    if (toolbarConfig.dashboard) {
+    if (toolbarConfig.dashboard && this.dashboardDepsAvailable) {
       await this.setupDashboard(toolbarConfig, emitter)
     }
   }
@@ -538,12 +540,22 @@ export default class ServerStatsProvider {
       )
     } catch (err) {
       const msg = (err as Error)?.message || ''
-      if (msg.includes('better-sqlite3') || msg.includes('Cannot find module')) {
-        log.warn(
-          'Dashboard requires better-sqlite3. Install it with:\n' +
-            '  npm install better-sqlite3\n' +
-            '  Dashboard has been disabled for this session.'
-        )
+      const code = (err as NodeJS.ErrnoException)?.code || ''
+      if (
+        msg.includes('better-sqlite3') ||
+        msg.includes('knex') ||
+        msg.includes('Cannot find module') ||
+        msg.includes('Cannot find package') ||
+        code === 'ERR_MODULE_NOT_FOUND' ||
+        code === 'MODULE_NOT_FOUND'
+      ) {
+        log.block('Dashboard could not start — missing dependencies. Install with:', [
+          '',
+          bold('npm install knex better-sqlite3'),
+          '',
+          dim('Dashboard has been disabled for this session.'),
+          dim('Everything else (stats bar, debug panel) works without it.'),
+        ])
         this.dashboardStore = null
         return
       }
