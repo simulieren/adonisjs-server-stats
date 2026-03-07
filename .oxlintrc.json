@@ -8,7 +8,6 @@
     "node": true
   },
   "rules": {
-    "no-console": "warn",
     "max-params": ["warn", { "max": 5 }],
     "eqeqeq": "warn",
     "typescript/no-explicit-any": "warn"

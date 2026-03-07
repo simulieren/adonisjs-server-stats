@@ -2,11 +2,17 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { performance } from 'node:perf_hooks'
 
 import { getRequestMetrics } from '../collectors/http_collector.js'
+import { log } from '../utils/logger.js'
 
 import type { TraceCollector } from '../debug/trace_collector.js'
 import type { TraceRecord } from '../debug/types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
+
+/** Minimal interface for Edge.js view sharing on the HTTP context. */
+interface EdgeViewShare {
+  share(data: Record<string, unknown>): void
+}
 
 /**
  * AsyncLocalStorage that marks the current request as "excluded" from
@@ -25,11 +31,16 @@ export function isExcludedRequest(): boolean {
 }
 
 /**
+ * Warn-once guard for shouldShow callback failures.
+ */
+let warnedShouldShow = false
+
+/**
  * Module-level `shouldShow` callback, set by the provider at boot.
  */
-let shouldShowFn: ((ctx: any) => boolean) | null = null
+let shouldShowFn: ((ctx: HttpContext) => boolean) | null = null
 
-export function setShouldShow(fn: ((ctx: any) => boolean) | null) {
+export function setShouldShow(fn: ((ctx: HttpContext) => boolean) | null) {
   shouldShowFn = fn
 }
 
@@ -102,12 +113,19 @@ export default class RequestTrackingMiddleware {
     // runs BEFORE router middleware like initialize_auth_middleware and
     // silentAuth — so ctx.auth isn't populated yet. The function is called
     // at Edge render time (inside the controller), when auth is available.
-    if (shouldShowFn && typeof (ctx as any).view?.share === 'function') {
-      ;(ctx as any).view.share({
+    const ctxView = (ctx as unknown as { view?: EdgeViewShare }).view
+    if (shouldShowFn && typeof ctxView?.share === 'function') {
+      ctxView.share({
         __ssShowFn: () => {
           try {
             return shouldShowFn!(ctx)
-          } catch {
+          } catch (err) {
+            if (!warnedShouldShow) {
+              warnedShouldShow = true
+              log.warn(
+                'shouldShow callback threw — stats bar will be hidden: ' + (err as Error)?.message
+              )
+            }
             return false
           }
         },
@@ -117,9 +135,7 @@ export default class RequestTrackingMiddleware {
     // Skip tracing and dashboard persistence for the debug panel's own requests
     // (e.g. /admin/api/debug/*, /admin/api/server-stats) so they don't flood
     // the timeline. HTTP metrics (req/s, avg latency) are still recorded.
-    const skipTracing =
-      excludedPrefixes.length > 0 &&
-      excludedPrefixes.some((prefix) => requestUrl.startsWith(prefix))
+    const skipTracing = excludedPrefixes.some((prefix) => requestUrl.startsWith(prefix))
 
     const runRequest = async () => {
       try {

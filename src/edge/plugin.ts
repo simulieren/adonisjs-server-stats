@@ -4,9 +4,44 @@ import { fileURLToPath } from 'node:url'
 
 import { Template } from 'edge.js'
 
+import { log } from '../utils/logger.js'
 import { loadTransmitClient } from '../utils/transmit_client.js'
 
-import type { ServerStatsConfig } from '../types.js'
+import type { ResolvedServerStatsConfig } from '../types.js'
+
+/** Minimal interface for the Edge.js engine used in the plugin. */
+interface EdgeEngine {
+  mount(name: string, path: string): void
+  compiler: unknown
+  globals: Record<string, unknown>
+  processor: unknown
+  registerTag(tag: EdgeTagDefinition): void
+}
+
+/** Minimal interface for an Edge tag definition. */
+interface EdgeTagDefinition {
+  tagName: string
+  block: boolean
+  seekable: boolean
+  compile(parser: EdgeParser, buffer: EdgeBuffer, token: EdgeToken): void
+}
+
+/** Minimal interface for the Edge tag compiler parser. */
+interface EdgeParser {
+  // Parser is unused in our compile but required by the tag signature
+}
+
+/** Minimal interface for the Edge tag compiler buffer. */
+interface EdgeBuffer {
+  writeStatement(statement: string, filename: string, line: number): void
+  outputExpression(expression: string, filename: string, line: number, escape: boolean): void
+}
+
+/** Minimal interface for the Edge tag compiler token. */
+interface EdgeToken {
+  filename: string
+  loc: { start: { line: number } }
+}
 
 const DIR = dirname(fileURLToPath(import.meta.url))
 const read = (rel: string) => readFileSync(join(DIR, rel), 'utf-8')
@@ -30,97 +65,68 @@ const read = (rel: string) => readFileSync(join(DIR, rel), 'utf-8')
  * @serverStats()
  * ```
  */
-export function edgePluginServerStats(config: ServerStatsConfig) {
-  return (edge: any) => {
+export function edgePluginServerStats(config: ResolvedServerStatsConfig) {
+  return (edge: EdgeEngine) => {
     // Mount Edge views under the `ss` disk (needed for @include resolution)
     edge.mount('ss', join(DIR, 'views'))
 
     // Read client assets once at boot
-    const css = read('client/stats-bar.css')
-    const js = read('client/stats-bar.js')
+    const componentsCss = read('../styles/components.css')
+    const utilitiesCss = read('../styles/utilities.css')
+    const css = componentsCss + '\n' + utilitiesCss + '\n' + read('../styles/stats-bar.css')
+
+    const renderer = config.devToolbar?.renderer || 'preact'
+    const clientDir = renderer === 'vue' ? 'client-vue' : 'client'
+    const js = read(clientDir + '/stats-bar.js')
 
     const endpoint =
       typeof config.endpoint === 'string' ? config.endpoint : '/admin/api/server-stats'
     const intervalMs = config.intervalMs || 3000
     const showDebug = !!config.devToolbar?.enabled
 
-    // Badge groups for the Edge template
-    const groups = [
-      // Process
-      [
-        { id: 'node', label: 'NODE' },
-        { id: 'up', label: 'UP' },
-        { id: 'cpu', label: 'CPU' },
-        { id: 'evt', label: 'EVT' },
-      ],
-      // Memory
-      [
-        { id: 'mem', label: 'HEAP' },
-        { id: 'rss', label: 'RSS' },
-        { id: 'sys', label: 'SYS' },
-      ],
-      // HTTP
-      [
-        { id: 'rps', label: 'REQ/s' },
-        { id: 'avg', label: 'AVG' },
-        { id: 'err', label: 'ERR' },
-        { id: 'conn', label: 'CONN' },
-      ],
-      // DB
-      [{ id: 'db', label: 'DB' }],
-      // Redis
-      [
-        { id: 'redis', label: 'REDIS' },
-        { id: 'rmem', label: 'MEM' },
-        { id: 'rkeys', label: 'KEYS' },
-        { id: 'rhit', label: 'HIT' },
-      ],
-      // Queue
-      [
-        { id: 'q', label: 'Q' },
-        { id: 'workers', label: 'WORKERS' },
-      ],
-      // App
-      [
-        { id: 'users', label: 'USERS' },
-        { id: 'hooks', label: 'HOOKS' },
-        { id: 'mail', label: 'MAIL' },
-      ],
-      // Logs
-      [
-        { id: 'logerr', label: 'LOG ERR' },
-        { id: 'lograte', label: 'LOG/m' },
-      ],
-      // Debug (conditional)
-      ...(showDebug ? [[{ id: 'dbg-queries', label: 'QRY' }]] : []),
-    ]
+    const channelName = config.channelName || 'admin/server-stats'
 
-    const state: Record<string, any> = {
+    const barConfig: Record<string, unknown> = {
+      endpoint,
+      pollInterval: intervalMs,
+      channelName,
+      showDebug,
+      ...(showDebug && {
+        debugEndpoint: config.devToolbar?.debugEndpoint || '/admin/api/debug',
+        dashboardPath: config.devToolbar?.dashboard
+          ? config.devToolbar.dashboardPath || '/__stats'
+          : null,
+      }),
+    }
+
+    // Always try to load the Transmit client — both the stats bar and the
+    // debug panel use it for live (SSE) updates.
+    const transmitClient = loadTransmitClient(join(process.cwd(), 'package.json'))
+    if (!transmitClient) {
+      log.info('@adonisjs/transmit-client not found — will use polling')
+    }
+
+    const state: Record<string, unknown> = {
       css,
       js,
-      endpoint,
-      intervalMs,
+      barConfig,
       showDebug,
-      groups,
+      transmitClient,
     }
 
     if (showDebug) {
-      const debugEndpoint = config.devToolbar?.debugEndpoint || '/admin/api/debug'
-      state.debugCss = read('client/debug-panel.css')
-      state.debugJs = read('client/debug-panel.js')
-      state.debugEndpoint = debugEndpoint
-      state.logsEndpoint = debugEndpoint + '/logs'
-      state.customPanes = config.devToolbar?.panes || []
-      state.showTracing = !!config.devToolbar?.tracing
-      state.dashboardPath = config.devToolbar?.dashboard
-        ? config.devToolbar.dashboardPath || '/__stats'
-        : null
-      state.transmitClient = loadTransmitClient(join(process.cwd(), 'package.json'))
+      state.debugCss = read('../styles/debug-panel.css')
+      state.debugDeferredJs = read(clientDir + '/debug-panel-deferred.js')
     }
 
     // Pre-render via Template directly — bypasses edge.createRenderer() which
     // would re-run #executePlugins and cause infinite recursion.
-    const template = new Template(edge.compiler, edge.globals, {}, edge.processor)
+    const template = new Template(
+      edge.compiler as ConstructorParameters<typeof Template>[0],
+      edge.globals,
+      {},
+      edge.processor as ConstructorParameters<typeof Template>[3]
+    )
     const html = template.render<string>('ss::stats-bar', state)
     const escaped = JSON.stringify(html)
 
@@ -131,7 +137,7 @@ export function edgePluginServerStats(config: ServerStatsConfig) {
       tagName: 'serverStats',
       block: false,
       seekable: true,
-      compile(_parser: any, buffer: any, token: any) {
+      compile(_parser: EdgeParser, buffer: EdgeBuffer, token: EdgeToken) {
         if (hasShouldShow) {
           // Guard: call the lazy __ssShowFn at render time (after auth middleware has run)
           buffer.writeStatement(

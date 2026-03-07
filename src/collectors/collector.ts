@@ -38,6 +38,16 @@ export interface MetricCollector {
   name: string
 
   /**
+   * Short description shown in the startup log.
+   *
+   * Include key options so the developer can verify the collector
+   * is configured correctly at a glance.
+   *
+   * @example `'http — buffer: 10k, window: 60s'`
+   */
+  label?: string
+
+  /**
    * Called once when the {@link StatsEngine} starts.
    *
    * Use this to initialize resources (e.g. start monitoring the
@@ -51,6 +61,15 @@ export interface MetricCollector {
    * Use this to clean up resources (e.g. close connections, clear timers).
    */
   stop?(): void | Promise<void>
+
+  /**
+   * Return collector-specific configuration for diagnostics.
+   *
+   * Used by the Internals diagnostics endpoint to show resolved
+   * configuration for each collector. Sensitive values (e.g. passwords)
+   * should be redacted.
+   */
+  getConfig?(): Record<string, unknown>
 
   /**
    * Collect metrics and return them as a flat key-value record.

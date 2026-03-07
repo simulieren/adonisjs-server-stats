@@ -22,10 +22,10 @@ export default class StatsQuery extends BaseModel {
 
   @column({
     columnName: 'bindings',
-    prepare: (value: any) => (value ? JSON.stringify(value) : null),
+    prepare: (value: unknown) => (value ? JSON.stringify(value) : null),
     consume: (value: string | null) => (value ? JSON.parse(value) : null),
   })
-  declare bindings: any[] | null
+  declare bindings: unknown[] | null
 
   @column()
   declare duration: number

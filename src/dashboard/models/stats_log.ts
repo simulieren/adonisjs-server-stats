@@ -18,10 +18,10 @@ export default class StatsLog extends BaseModel {
 
   @column({
     columnName: 'data',
-    prepare: (value: any) => (value ? JSON.stringify(value) : null),
+    prepare: (value: unknown) => (value ? JSON.stringify(value) : null),
     consume: (value: string | null) => (value ? JSON.parse(value) : null),
   })
-  declare data: any | null
+  declare data: Record<string, unknown> | null
 
   @column({ columnName: 'created_at' })
   declare createdAt: string

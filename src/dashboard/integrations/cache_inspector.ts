@@ -1,6 +1,28 @@
 import type { ApplicationService } from '@adonisjs/core/types'
 
 // ---------------------------------------------------------------------------
+// Minimal Redis client interface
+// ---------------------------------------------------------------------------
+
+/** Minimal interface for the Redis client methods used by CacheInspector. */
+interface RedisClient {
+  ping(): Promise<string>
+  info(section: string): Promise<string>
+  dbsize(): Promise<number>
+  scan(cursor: string, ...args: (string | number)[]): Promise<[string, string[]]>
+  type(key: string): Promise<string>
+  ttl(key: string): Promise<number>
+  get(key: string): Promise<string | null>
+  del(key: string): Promise<number>
+  lrange(key: string, start: number, stop: number): Promise<string[]>
+  smembers(key: string): Promise<string[]>
+  zrange(key: string, start: number, stop: number, ...args: string[]): Promise<string[]>
+  hgetall(key: string): Promise<Record<string, string>>
+  xrange(key: string, start: string, end: string, ...args: (string | number)[]): Promise<unknown[]>
+  call(...args: (string | number)[]): Promise<unknown>
+}
+
+// ---------------------------------------------------------------------------
 // Response types
 // ---------------------------------------------------------------------------
 
@@ -78,7 +100,7 @@ export interface CacheKeyDetail {
  * they catch errors and return sensible defaults.
  */
 export class CacheInspector {
-  constructor(private redis: any) {}
+  constructor(private redis: RedisClient) {}
 
   /**
    * Detect whether `@adonisjs/cache` or `@adonisjs/redis` is available

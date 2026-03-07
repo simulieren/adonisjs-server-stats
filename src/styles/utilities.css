@@ -1,0 +1,75 @@
+/* Reusable utility classes for adonisjs-server-stats.
+ * Each utility groups all selectors that share the same pattern,
+ * so the inline declarations can be removed from individual CSS files.
+ *
+ * Loaded AFTER tokens.css + components.css, BEFORE dashboard/debug/stats-bar.
+ */
+
+/* ── Scrollbar hiding ────────────────────────────────────────── */
+.ss-u-no-scrollbar,
+.ss-dash-sidebar,
+.ss-bar-scroll,
+.ss-dbg-tabs-scroll,
+.ss-dbg-pane,
+.ss-dbg-data-full,
+#ss-dbg-tl-waterfall,
+.ss-dbg-cache-detail pre,
+.ss-dbg-config-table-wrap {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ss-u-no-scrollbar::-webkit-scrollbar,
+.ss-dash-sidebar::-webkit-scrollbar,
+.ss-bar-scroll::-webkit-scrollbar,
+.ss-dbg-tabs-scroll::-webkit-scrollbar,
+.ss-dbg-pane::-webkit-scrollbar,
+.ss-dbg-data-full::-webkit-scrollbar,
+#ss-dbg-tl-waterfall::-webkit-scrollbar,
+.ss-dbg-cache-detail pre::-webkit-scrollbar,
+.ss-dbg-config-table-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Text truncation ─────────────────────────────────────────── */
+/* NOTE: table td, tl-label, info-card-value, config-inner-table td
+ * are already in components.css — not duplicated here. */
+.ss-u-truncate,
+.ss-dash-sql,
+.ss-dash-secondary-list li > span:first-child,
+.ss-dash-env-key,
+.ss-dash-env-val,
+.ss-dash-widget-row-link > span:first-child,
+.ss-dbg-sql,
+.ss-dbg-event-name,
+.ss-dbg-event-data,
+.ss-dbg-data-preview,
+.ss-dbg-data-cell,
+.ss-dbg-tl-detail-url,
+.ss-dbg-env-key,
+.ss-dbg-env-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Tabular numbers ─────────────────────────────────────────── */
+/* NOTE: duration, log-time, tl-dur are already in components.css — not
+ * duplicated here. */
+.ss-u-tabular,
+.ss-dash-nav-badge,
+.ss-dash-event-time,
+.ss-dash-card-value,
+.ss-dash-secondary-list-value,
+.ss-dash-cache-stat-value,
+.ss-dash-job-stat-value,
+.ss-dash-widget-stat-value,
+.ss-value,
+.ss-toggle-summary .ss-value,
+.ss-tooltip-current,
+.ss-tooltip-stats,
+.ss-dbg-event-time,
+.ss-dbg-mini-stat-value,
+.ss-dbg-cache-stat-value,
+.ss-dbg-job-stat-value {
+  font-variant-numeric: tabular-nums;
+}

@@ -1,13 +1,14 @@
 import { writeFile, readFile, rename, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
+import { log, bold } from '../utils/logger.js'
 import { EmailCollector } from './email_collector.js'
 import { EventCollector } from './event_collector.js'
 import { QueryCollector } from './query_collector.js'
 import { RouteInspector } from './route_inspector.js'
 import { TraceCollector } from './trace_collector.js'
 
-import type { DevToolbarConfig } from './types.js'
+import type { DevToolbarConfig, Emitter, Router } from './types.js'
 
 /**
  * Singleton store holding all debug data collectors.
@@ -39,12 +40,32 @@ export class DebugStore {
     this.traces?.onNewItem(cb ? () => cb('trace') : null)
   }
 
-  async start(emitter: any, router: any): Promise<void> {
-    await this.queries.start(emitter)
-    this.events.start(emitter)
-    await this.emails.start(emitter)
-    this.routes.inspect(router)
-    this.traces?.start(emitter)
+  /** Return buffer utilization stats for all debug collectors. */
+  getBufferStats(): {
+    queries: { current: number; max: number }
+    events: { current: number; max: number }
+    emails: { current: number; max: number }
+    traces: { current: number; max: number }
+  } {
+    return {
+      queries: this.queries.getBufferInfo(),
+      events: this.events.getBufferInfo(),
+      emails: this.emails.getBufferInfo(),
+      traces: this.traces?.getBufferInfo() ?? { current: 0, max: 0 },
+    }
+  }
+
+  async start(emitter: unknown, router: unknown): Promise<void> {
+    // Runtime-check the emitter before passing to collectors.
+    // The container returns `unknown`; collectors guard internally too.
+    const e = emitter as Emitter
+    await this.queries.start(e)
+    this.events.start(e)
+    await this.emails.start(e)
+    if (router && typeof (router as Router).toJSON === 'function') {
+      this.routes.inspect(router as Router)
+    }
+    this.traces?.start(e)
   }
 
   stop(): void {
@@ -56,7 +77,7 @@ export class DebugStore {
 
   /** Serialize all collector data to a JSON file (atomic write). */
   async saveToDisk(filePath: string): Promise<void> {
-    const data: Record<string, any> = {
+    const data: Record<string, unknown> = {
       queries: this.queries.getQueries(),
       events: this.events.getEvents(),
       emails: this.emails.getEmails(),
@@ -76,23 +97,37 @@ export class DebugStore {
     let raw: string
     try {
       raw = await readFile(filePath, 'utf-8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+        log.warn(
+          `Failed to read persisted debug data from ${bold(filePath)}: ${(error as Error)?.message}`
+        )
+      }
+      return
+    }
+
+    let data: unknown
+    try {
+      data = JSON.parse(raw)
     } catch {
-      return // file doesn't exist yet
+      log.warn(`Persisted debug data corrupted, resetting: ${bold(filePath)}`)
+      return
     }
 
-    const data = JSON.parse(raw)
+    if (typeof data !== 'object' || data === null) return
+    const record = data as Record<string, unknown>
 
-    if (Array.isArray(data.queries) && data.queries.length > 0) {
-      this.queries.loadRecords(data.queries)
+    if (Array.isArray(record.queries) && record.queries.length > 0) {
+      this.queries.loadRecords(record.queries)
     }
-    if (Array.isArray(data.events) && data.events.length > 0) {
-      this.events.loadRecords(data.events)
+    if (Array.isArray(record.events) && record.events.length > 0) {
+      this.events.loadRecords(record.events)
     }
-    if (Array.isArray(data.emails) && data.emails.length > 0) {
-      this.emails.loadRecords(data.emails)
+    if (Array.isArray(record.emails) && record.emails.length > 0) {
+      this.emails.loadRecords(record.emails)
     }
-    if (this.traces && Array.isArray(data.traces) && data.traces.length > 0) {
-      this.traces.loadRecords(data.traces)
+    if (this.traces && Array.isArray(record.traces) && record.traces.length > 0) {
+      this.traces.loadRecords(record.traces)
     }
   }
 }

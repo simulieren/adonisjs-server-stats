@@ -18,6 +18,11 @@
     "LICENSE"
   ],
   "type": "module",
+  "sideEffects": [
+    "*.css",
+    "./dist/react/index.js",
+    "./dist/vue/index.js"
+  ],
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "exports": {
@@ -84,17 +89,36 @@
     "./configure": {
       "types": "./dist/configure.d.ts",
       "import": "./dist/configure.js"
-    }
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./react/css": "./dist/react/style.css",
+    "./vue": {
+      "types": "./dist/vue/index.d.ts",
+      "import": "./dist/vue/index.js"
+    },
+    "./vue/css": "./dist/vue/style.css"
   },
   "scripts": {
-    "copy-assets": "cp -r src/stubs/config.stub dist/src/stubs/ && cp -r src/edge/views dist/src/edge/ && cp -r src/edge/client dist/src/edge/",
-    "build": "tsc && npm run copy-assets",
+    "copy-assets": "cp -r src/stubs/config.stub dist/src/stubs/ && cp -r src/edge/views dist/src/edge/ && cp -r src/edge/client dist/src/edge/ && cp -r src/edge/client-vue dist/src/edge/ && cp -r src/styles dist/src/styles",
+    "build": "rm -rf dist && tsc && npm run build:edge && npm run build:edge-vue && npm run copy-assets && npm run build:core && npm run build:react && npm run build:vue",
+    "build:core": "vite build --config vite.config.core.ts",
+    "build:react": "vite build --config vite.config.react.ts",
+    "build:vue": "vite build --config vite.config.vue.ts",
+    "build:edge": "bash scripts/build-edge.sh vite.config.edge.ts",
+    "build:edge-vue": "bash scripts/build-edge.sh vite.config.edge-vue.ts",
     "dev": "tsc --watch",
     "prepublishOnly": "npm run build",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
-    "format": "oxfmt",
-    "format:check": "oxfmt --check",
+    "lint": "oxlint src/ configure.ts vite.config.*.ts vite-plugins/ --ignore-pattern 'src/edge/client/**' --ignore-pattern 'src/edge/client-vue/**'",
+    "lint:fix": "oxlint --fix src/ configure.ts vite.config.*.ts vite-plugins/ --ignore-pattern 'src/edge/client/**' --ignore-pattern 'src/edge/client-vue/**'",
+    "format": "oxfmt src/ configure.ts vite.config.*.ts vite-plugins/",
+    "format:check": "oxfmt --check src/ configure.ts vite.config.*.ts vite-plugins/",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -103,17 +127,39 @@
     "@adonisjs/redis": "^9.0.0",
     "@adonisjs/transmit": "^1.0.0",
     "@julr/adonisjs-prometheus": "^1.4.0",
+    "@preact/preset-vite": "^2.9.0",
     "@types/better-sqlite3": "^7.0.0",
     "@types/node": "^22.0.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.4",
+    "@vitejs/plugin-vue": "^6.0.4",
     "better-sqlite3": "^11.10.0",
     "bullmq": "^5.0.0",
     "edge.js": "^6.0.0",
     "oxfmt": "^0.35.0",
     "oxlint": "^1.50.0",
-    "typescript": "^5.9.0"
+    "preact": "^10.25.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "typescript": "^5.9.0",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vue": "^3.5.29"
   },
   "peerDependencies": {
-    "@adonisjs/core": "^6.0.0 || ^7.0.0-next || ^7.0.0"
+    "@adonisjs/core": "^6.0.0 || ^7.0.0-next || ^7.0.0",
+    "@adonisjs/lucid": "^21.0.0",
+    "@adonisjs/redis": "^9.0.0",
+    "@adonisjs/transmit": "^1.0.0",
+    "@adonisjs/transmit-client": "^1.0.0",
+    "@julr/adonisjs-prometheus": "^1.4.0",
+    "better-sqlite3": "^7.0.0 || ^11.0.0",
+    "bullmq": "^5.0.0",
+    "edge.js": "^6.0.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0",
+    "vue": "^3.3.0"
   },
   "peerDependenciesMeta": {
     "@adonisjs/lucid": {
@@ -135,6 +181,18 @@
       "optional": true
     },
     "better-sqlite3": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    },
+    "@adonisjs/transmit-client": {
       "optional": true
     }
   }

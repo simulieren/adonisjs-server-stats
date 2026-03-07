@@ -4,7 +4,7 @@ import { performance } from 'node:perf_hooks'
 import { round } from '../utils/math_helpers.js'
 import { RingBuffer } from './ring_buffer.js'
 
-import type { TraceSpan, TraceRecord } from './types.js'
+import type { TraceSpan, TraceRecord, Emitter, DbQueryEvent } from './types.js'
 
 /**
  * Per-request trace context stored in AsyncLocalStorage.
@@ -52,13 +52,13 @@ export async function trace<T>(label: string, fn: () => Promise<T>): Promise<T> 
 export class TraceCollector {
   private buffer: RingBuffer<TraceRecord>
   private als = new AsyncLocalStorage<TraceContext>()
-  private emitter: any = null
-  private dbHandler: ((data: any) => void) | null = null
+  private emitter: Emitter | null = null
+  private dbHandler: ((data: DbQueryEvent) => void) | null = null
   private originalConsoleWarn: typeof console.warn | null = null
 
   constructor(maxTraces: number = 200) {
     this.buffer = new RingBuffer<TraceRecord>(maxTraces)
-    globalTraceCollector = this
+    globalTraceCollector = this // eslint-disable-line @typescript-eslint/no-this-alias
   }
 
   /** Start a new trace context for an HTTP request. */
@@ -102,7 +102,7 @@ export class TraceCollector {
     category: TraceSpan['category'],
     startOffset: number,
     duration: number,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): void {
     const ctx = this.als.getStore()
     if (!ctx) return
@@ -145,11 +145,11 @@ export class TraceCollector {
   }
 
   /** Hook into db:query events and console.warn to auto-create spans. */
-  start(emitter: any): void {
+  start(emitter: Emitter): void {
     this.emitter = emitter
 
     if (emitter && typeof emitter.on === 'function') {
-      this.dbHandler = (data: any) => {
+      this.dbHandler = (data: DbQueryEvent) => {
         const ctx = this.als.getStore()
         if (!ctx) return
 
@@ -173,13 +173,12 @@ export class TraceCollector {
 
     // Intercept console.warn to capture warnings per-request
     this.originalConsoleWarn = console.warn
-    const self = this
-    console.warn = function (...args: any[]) {
-      const ctx = self.als.getStore()
+    console.warn = (...args: unknown[]) => {
+      const ctx = this.als.getStore()
       if (ctx) {
         ctx.warnings.push(args.map(String).join(' '))
       }
-      self.originalConsoleWarn!.apply(console, args)
+      this.originalConsoleWarn!.apply(console, args)
     }
   }
 
@@ -211,6 +210,10 @@ export class TraceCollector {
 
   getTotalCount(): number {
     return this.buffer.size()
+  }
+
+  getBufferInfo(): { current: number; max: number } {
+    return { current: this.buffer.size(), max: this.buffer.getCapacity() }
   }
 
   clear(): void {

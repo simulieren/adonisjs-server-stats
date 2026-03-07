@@ -1,0 +1,747 @@
+/* Scoped CSS for the debug panel overlay.
+ * All classes use the `.ss-dbg-` prefix to avoid conflicts.
+ * Theme via CSS custom properties scoped to .ss-dbg-panel.
+ */
+
+/* ── Theme: Dark (default) ────────────────────────────────────── */
+.ss-dbg-panel {
+  --ss-bg: #0f0f0f;
+  --ss-surface: #171717;
+  --ss-surface-alt: #141414;
+  --ss-input-bg: #1a1a1a;
+  --ss-text: #d4d4d4;
+  --ss-text-bright: #e5e5e5;
+  --ss-text-secondary: #a3a3a3;
+  --ss-muted: #737373;
+  --ss-dim: #525252;
+  --ss-accent: #34d399;
+  --ss-accent-dim: #064e3b;
+  --ss-border: #333;
+  --ss-border-dim: #262626;
+  --ss-border-faint: #1f1f1f;
+  --ss-border-strong: #404040;
+  --ss-hover: rgba(38, 38, 38, 0.4);
+  --ss-hover-accent: rgba(52, 211, 153, 0.08);
+  --ss-shadow: rgb(0 0 0 / 0.4);
+  --ss-green-bg: #064e3b;
+  --ss-green-fg: #34d399;
+  --ss-blue-bg: #1e3a5f;
+  --ss-blue-fg: #60a5fa;
+  --ss-amber-bg: #422006;
+  --ss-amber-fg: #fbbf24;
+  --ss-red-bg: #450a0a;
+  --ss-red-fg: #f87171;
+  --ss-purple-bg: #2e1065;
+  --ss-purple-fg: #c084fc;
+  --ss-sql-color: #93c5fd;
+  --ss-reqid-bg: #1e1b2e;
+  --ss-reqid-fg: #6d28d9;
+  --ss-reqid-hover-bg: #2e2644;
+  --ss-reqid-hover-fg: #a78bfa;
+  position: fixed;
+  inset-inline: 0;
+  bottom: 28px;
+  z-index: 147;
+  height: 50vh;
+  display: none;
+  flex-direction: column;
+  background: var(--ss-bg);
+  border-top: 1px solid var(--ss-border);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: var(--ss-text);
+  box-shadow: 0 -8px 24px var(--ss-shadow);
+  overflow-x: hidden;
+}
+
+/* ── Theme: Light (auto via system preference) ────────────────── */
+@media (prefers-color-scheme: light) {
+  .ss-dbg-panel:not([data-ss-theme='dark']) {
+    --ss-bg: #fafafa;
+    --ss-surface: #ffffff;
+    --ss-surface-alt: #f5f5f5;
+    --ss-input-bg: #ffffff;
+    --ss-text: #171717;
+    --ss-text-bright: #0f0f0f;
+    --ss-text-secondary: #525252;
+    --ss-muted: #6b7280;
+    --ss-dim: #9ca3af;
+    --ss-accent: #059669;
+    --ss-accent-dim: #d1fae5;
+    --ss-border: #e5e5e5;
+    --ss-border-dim: #e5e5e5;
+    --ss-border-faint: #f0f0f0;
+    --ss-border-strong: #d4d4d4;
+    --ss-hover: rgba(0, 0, 0, 0.03);
+    --ss-hover-accent: rgba(5, 150, 105, 0.06);
+    --ss-shadow: rgb(0 0 0 / 0.08);
+    --ss-green-bg: #d1fae5;
+    --ss-green-fg: #059669;
+    --ss-blue-bg: #dbeafe;
+    --ss-blue-fg: #2563eb;
+    --ss-amber-bg: #fef3c7;
+    --ss-amber-fg: #b45309;
+    --ss-red-bg: #fee2e2;
+    --ss-red-fg: #dc2626;
+    --ss-purple-bg: #ede9fe;
+    --ss-purple-fg: #7c3aed;
+    --ss-sql-color: #2563eb;
+    --ss-reqid-bg: #ede9fe;
+    --ss-reqid-fg: #7c3aed;
+    --ss-reqid-hover-bg: #ddd6fe;
+    --ss-reqid-hover-fg: #6d28d9;
+  }
+}
+
+/* ── Reset: inherit font-family on form elements ─────────────── */
+.ss-dbg-panel button,
+.ss-dbg-panel input,
+.ss-dbg-panel select,
+.ss-dbg-panel textarea,
+.ss-dbg-panel pre {
+  font-family: inherit;
+}
+
+/* ── Theme: Light (manual override) ───────────────────────────── */
+.ss-dbg-panel[data-ss-theme='light'] {
+  --ss-bg: #fafafa;
+  --ss-surface: #ffffff;
+  --ss-surface-alt: #f5f5f5;
+  --ss-input-bg: #ffffff;
+  --ss-text: #171717;
+  --ss-text-bright: #0f0f0f;
+  --ss-text-secondary: #525252;
+  --ss-muted: #6b7280;
+  --ss-dim: #9ca3af;
+  --ss-accent: #059669;
+  --ss-accent-dim: #d1fae5;
+  --ss-border: #e5e5e5;
+  --ss-border-dim: #e5e5e5;
+  --ss-border-faint: #f0f0f0;
+  --ss-border-strong: #d4d4d4;
+  --ss-hover: rgba(0, 0, 0, 0.03);
+  --ss-hover-accent: rgba(5, 150, 105, 0.06);
+  --ss-shadow: rgb(0 0 0 / 0.08);
+  --ss-green-bg: #d1fae5;
+  --ss-green-fg: #059669;
+  --ss-blue-bg: #dbeafe;
+  --ss-blue-fg: #2563eb;
+  --ss-amber-bg: #fef3c7;
+  --ss-amber-fg: #b45309;
+  --ss-red-bg: #fee2e2;
+  --ss-red-fg: #dc2626;
+  --ss-purple-bg: #ede9fe;
+  --ss-purple-fg: #7c3aed;
+  --ss-sql-color: #2563eb;
+  --ss-reqid-bg: #ede9fe;
+  --ss-reqid-fg: #7c3aed;
+  --ss-reqid-hover-bg: #ddd6fe;
+  --ss-reqid-hover-fg: #6d28d9;
+}
+
+.ss-dbg-panel.ss-dbg-open {
+  display: flex;
+}
+
+/* Tab bar */
+.ss-dbg-tabs {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--ss-border);
+  background: var(--ss-surface);
+  flex-shrink: 0;
+  padding: 0;
+  min-height: 0;
+}
+.ss-dbg-tabs-scroll {
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+  min-width: 0;
+  padding-left: 8px;
+  /* scrollbar hiding → utilities.css */
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 0,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 0,
+    black calc(100% - 24px),
+    transparent 100%
+  );
+}
+.ss-dbg-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--ss-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+  text-transform: uppercase;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.ss-dbg-tab-icon {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ss-dbg-tab:hover {
+  color: var(--ss-text-secondary);
+}
+.ss-dbg-tab.ss-dbg-active {
+  color: var(--ss-accent);
+  border-bottom-color: var(--ss-accent);
+}
+.ss-dbg-tabs-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0 8px 0 12px;
+  border-left: 1px solid var(--ss-border-dim);
+}
+.ss-dbg-close {
+  padding: 4px 8px;
+  font-size: 14px;
+  color: var(--ss-muted);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+.ss-dbg-close:hover {
+  color: var(--ss-text-bright);
+}
+
+/* Tab content */
+.ss-dbg-content {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 0;
+}
+.ss-dbg-pane {
+  display: none;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* scrollbar hiding → utilities.css */
+}
+.ss-dbg-pane.ss-dbg-active {
+  display: block;
+}
+
+/* Search */
+.ss-dbg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+}
+.ss-dbg-search {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--ss-text);
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  outline: none;
+}
+.ss-dbg-search:focus {
+  border-color: var(--ss-accent);
+}
+.ss-dbg-search::placeholder {
+  color: var(--ss-dim);
+}
+.ss-dbg-summary {
+  font-size: 11px;
+  color: var(--ss-muted);
+  white-space: nowrap;
+  padding: 0 4px;
+}
+.ss-dbg-btn-clear {
+  padding: 3px 8px;
+  font-size: 10px;
+  color: var(--ss-muted);
+  background: var(--ss-border-dim);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.ss-dbg-btn-clear:hover {
+  color: var(--ss-text);
+  border-color: var(--ss-dim);
+}
+
+/* Table base / column resize → components.css */
+
+/* Query-specific styles */
+.ss-dbg-sql {
+  font-size: 11px;
+  color: var(--ss-sql-color);
+  word-break: break-all;
+  cursor: pointer;
+  max-width: 500px;
+  /* truncation → utilities.css */
+}
+.ss-dbg-sql.ss-dbg-expanded {
+  white-space: pre-wrap;
+  max-width: none;
+}
+/* Duration → components.css */
+.ss-dbg-dup {
+  color: var(--ss-purple-fg);
+  font-size: 10px;
+}
+
+/* Method badges → components.css */
+
+/* Route highlight */
+.ss-dbg-current-route td {
+  background: var(--ss-hover-accent) !important;
+}
+
+/* Event list */
+.ss-dbg-event-name {
+  color: var(--ss-sql-color);
+  /* truncation → utilities.css */
+}
+.ss-dbg-event-data {
+  color: var(--ss-muted);
+  font-size: 10px;
+  position: relative;
+  /* truncation → utilities.css */
+}
+.ss-dbg-event-time {
+  color: var(--ss-dim);
+  font-size: 10px;
+  /* tabular-nums → utilities.css */
+  white-space: nowrap;
+}
+.ss-dbg-data-preview {
+  cursor: pointer;
+  color: var(--ss-text-secondary);
+  border-bottom: 1px dashed var(--ss-dim);
+  /* truncation → utilities.css */
+  display: block;
+}
+.ss-dbg-data-preview:hover {
+  color: var(--ss-text);
+}
+/* Data cell wrapper used by JsonViewer */
+.ss-dbg-data-cell {
+  /* truncation → utilities.css */
+}
+/* When expanded data is shown, allow the cell to wrap */
+.ss-dbg-event-data:has(.ss-dbg-data-full),
+.ss-dbg-data-cell:has(.ss-dbg-data-full) {
+  white-space: normal;
+  overflow: visible;
+}
+.ss-dbg-data-full {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  color: var(--ss-text-secondary);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow: auto;
+  cursor: pointer;
+  /* scrollbar hiding → utilities.css */
+}
+/* Copy button → components.css */
+
+/* Logs */
+.ss-dbg-log-filters {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+}
+/* Filter buttons share a common style (log, job, config tabs) */
+.ss-dbg-log-filter,
+.ss-dbg-job-filter,
+.ss-dbg-config-tab {
+  padding: 3px 10px;
+  font-size: 10px;
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: none;
+  color: var(--ss-muted);
+  text-transform: uppercase;
+}
+.ss-dbg-log-filter:hover,
+.ss-dbg-job-filter:hover,
+.ss-dbg-config-tab:hover {
+  border-color: var(--ss-dim);
+  color: var(--ss-text-secondary);
+}
+.ss-dbg-log-filter.ss-dbg-active,
+.ss-dbg-job-filter.ss-dbg-active,
+.ss-dbg-config-tab.ss-dbg-active {
+  border-color: var(--ss-accent);
+  color: var(--ss-accent);
+}
+
+/* Log entry / level / time / reqid / msg → components.css */
+.ss-dbg-reqid-input {
+  max-width: 200px;
+  margin-left: auto;
+}
+
+/* Empty state → components.css */
+
+/* Badge → components.css */
+
+/* Email preview / row / status → components.css */
+
+/* Filterable cell */
+.ss-dbg-filterable:hover {
+  background: var(--ss-hover-accent);
+}
+
+/* Timeline base → components.css */
+/* Debug-specific timeline overrides */
+.ss-dbg-tl-detail-url {
+  color: var(--ss-text);
+  font-size: 11px;
+  /* truncation → utilities.css */
+  min-width: 0;
+}
+#ss-dbg-tl-waterfall {
+  padding: 8px 12px;
+  overflow: auto;
+  /* scrollbar hiding → utilities.css */
+}
+
+/* Status code badges → components.css */
+
+/* Dashboard deep link button in tab bar */
+.ss-dbg-dashboard-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  color: var(--ss-muted);
+  border-radius: 4px;
+  text-decoration: none;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.ss-dbg-dashboard-link:hover {
+  color: var(--ss-accent);
+  background: var(--ss-hover-accent);
+}
+
+/* Row-level deep link icon (visible on hover) */
+.ss-dbg-deeplink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--ss-border-strong);
+  text-decoration: none;
+  border-radius: 3px;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
+  vertical-align: middle;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+.ss-dbg-table tr:hover .ss-dbg-deeplink,
+.ss-dbg-email-row:hover .ss-dbg-deeplink {
+  opacity: 1;
+}
+.ss-dbg-deeplink:hover {
+  color: var(--ss-accent);
+  background: var(--ss-hover-accent);
+}
+.ss-dbg-deeplink svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Connection mode indicator */
+.ss-dbg-conn-mode {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.ss-dbg-conn-polling {
+  background: var(--ss-border-dim);
+  color: var(--ss-muted);
+}
+.ss-dbg-conn-live {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+
+/* Mini stats bar */
+.ss-dbg-mini-stats {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--ss-muted);
+  padding: 0 4px;
+}
+.ss-dbg-mini-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+.ss-dbg-mini-stat-value {
+  /* tabular-nums → utilities.css */
+  font-weight: 600;
+  color: var(--ss-text);
+}
+.ss-dbg-mini-stat-value.ss-dbg-stat-green {
+  color: var(--ss-green-fg);
+}
+.ss-dbg-mini-stat-value.ss-dbg-stat-amber {
+  color: var(--ss-amber-fg);
+}
+.ss-dbg-mini-stat-value.ss-dbg-stat-red {
+  color: var(--ss-red-fg);
+}
+
+/* Cache tab */
+.ss-dbg-cache-stats {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  font-size: 11px;
+}
+.ss-dbg-cache-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ss-dbg-cache-stat-label {
+  color: var(--ss-muted);
+}
+.ss-dbg-cache-stat-value {
+  color: var(--ss-text);
+  font-weight: 600;
+  /* tabular-nums → utilities.css */
+}
+
+/* Cache detail overlay */
+.ss-dbg-cache-detail {
+  padding: 12px;
+}
+.ss-dbg-cache-detail strong {
+  color: var(--ss-text);
+}
+.ss-dbg-cache-detail pre {
+  margin: 8px 0 0;
+  padding: 8px;
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  color: var(--ss-text-secondary);
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow: auto;
+  /* scrollbar hiding → utilities.css */
+}
+
+/* Jobs tab */
+.ss-dbg-job-stats-area {
+  border-bottom: 1px solid var(--ss-border-dim);
+}
+.ss-dbg-job-stats {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  background: var(--ss-surface-alt);
+  font-size: 11px;
+}
+.ss-dbg-job-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ss-dbg-job-stat-label {
+  color: var(--ss-muted);
+}
+.ss-dbg-job-stat-value {
+  color: var(--ss-text);
+  font-weight: 600;
+  /* tabular-nums → utilities.css */
+}
+
+/* .ss-dbg-job-filter → consolidated above with log-filter & config-tab */
+
+.ss-dbg-job-status-completed {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-dbg-job-status-failed {
+  background: var(--ss-red-bg);
+  color: var(--ss-red-fg);
+}
+.ss-dbg-job-status-active {
+  background: var(--ss-blue-bg);
+  color: var(--ss-blue-fg);
+}
+.ss-dbg-job-status-waiting {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-dbg-job-status-delayed {
+  background: var(--ss-purple-bg);
+  color: var(--ss-purple-fg);
+}
+
+.ss-dbg-retry-btn {
+  padding: 2px 8px;
+  font-size: 10px;
+  color: var(--ss-muted);
+  background: var(--ss-border-dim);
+  border: 1px solid var(--ss-border-strong);
+  border-radius: 4px;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+.ss-dbg-retry-btn:hover {
+  color: var(--ss-text);
+  border-color: var(--ss-dim);
+}
+.ss-dbg-retry-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* .ss-dbg-config-tab → consolidated above with log-filter & job-filter */
+/* Config sections/toggle/key/val/match/leaf/redacted/copy-row/inner-table → components.css */
+/* Btn / btn-group → components.css */
+
+/* Debug-specific: config toolbar, env table, search wrap */
+.ss-dbg-config-table-wrap {
+  overflow: auto;
+  /* scrollbar hiding → utilities.css */
+}
+.ss-dbg-config-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--ss-border-faint);
+}
+.ss-dbg-config-env-table {
+  table-layout: fixed;
+}
+.ss-dbg-env-key {
+  width: 200px;
+  min-width: 200px;
+  /* truncation → utilities.css */
+}
+.ss-dbg-env-val {
+  /* truncation → utilities.css */
+  max-width: 0;
+}
+.ss-dbg-config-search-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 120px;
+  max-width: 280px;
+}
+
+/* Debug-specific btn overrides */
+.ss-dbg-btn {
+  --ss-btn-py: 2px;
+  --ss-btn-px: 6px;
+  --ss-btn-font: 12px;
+}
+
+/* Theme toggle button */
+.ss-dbg-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  color: var(--ss-muted);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 14px;
+  border-radius: 4px;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.ss-dbg-theme-toggle:hover {
+  color: var(--ss-accent);
+  background: var(--ss-hover-accent);
+}
+
+/* Utility color classes → components.css */
+
+/* ── Internals section title ──────────────────────────────────── */
+.ss-dbg-internals-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ss-muted);
+  margin: 20px 0 8px;
+  padding: 0 10px 6px;
+  border-bottom: 1px solid var(--ss-border);
+}
+.ss-dbg-internals-title:first-child {
+  margin-top: 4px;
+}
+
+/* Info cards → components.css */
+/* Status indicator dot → components.css */
+
+/* Progress bar → components.css */
+/* Debug panel override: constrain bar-track width */
+.ss-dbg-bar-track {
+  max-width: 120px;
+}

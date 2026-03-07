@@ -1,0 +1,208 @@
+<script setup lang="ts">
+/**
+ * Config-driven custom pane tab for the debug panel.
+ *
+ * Renders a table based on DebugPane column definitions
+ * with support for search, formatting, and badge colors.
+ */
+import { ref, computed, onMounted } from 'vue'
+import {
+  compactPreview,
+  formatTime,
+  timeAgo,
+  formatDuration,
+  durationSeverity,
+} from '../../../../core/index.js'
+import { useApiClient } from '../../../composables/useApiClient.js'
+import { useResizableTable } from '../../../composables/useResizableTable.js'
+import type { DebugPane, DebugPaneColumn } from '../../../../core/index.js'
+
+const props = defineProps<{
+  pane: DebugPane
+  baseUrl?: string
+  authToken?: string
+}>()
+
+const data = ref<Record<string, unknown>[]>([])
+const loading = ref(false)
+const search = ref('')
+
+const getClient = useApiClient(props.baseUrl || '', props.authToken)
+let fetched = false
+
+async function fetchData() {
+  if (props.pane.fetchOnce && fetched) return
+  loading.value = true
+  try {
+    const result = await getClient().fetch(props.pane.endpoint)
+    // Extract data using dataKey or pane id
+    const dataKey = props.pane.dataKey || props.pane.id
+    const parts = dataKey.split('.')
+    let extracted: unknown = result
+    for (const part of parts) {
+      extracted = (extracted as Record<string, unknown>)?.[part]
+    }
+    data.value = Array.isArray(extracted) ? extracted : []
+    fetched = true
+  } catch {
+    data.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+const filteredData = computed(() => {
+  if (!search.value.trim()) return data.value
+  const term = search.value.toLowerCase()
+  const searchableCols = props.pane.columns.filter((c) => c.searchable).map((c) => c.key)
+  if (searchableCols.length === 0) return data.value
+  return data.value.filter((row) =>
+    searchableCols.some((key) => {
+      const val = row[key]
+      if (val === null || val === undefined) return false
+      return String(val).toLowerCase().includes(term)
+    })
+  )
+})
+
+function formatCell(value: unknown, col: DebugPaneColumn): string {
+  if (value === null || value === undefined) return '-'
+  const fmt = col.format || 'text'
+  switch (fmt) {
+    case 'time':
+      return typeof value === 'number' ? timeAgo(value) : String(value)
+    case 'timeAgo':
+      return timeAgo(value as number | string)
+    case 'duration':
+      return formatDuration(typeof value === 'number' ? value : parseFloat(String(value)))
+    case 'method':
+      return String(value)
+    case 'json': {
+      let parsed: unknown = value
+      if (typeof value === 'string') {
+        try {
+          parsed = JSON.parse(value)
+        } catch {}
+      }
+      return compactPreview(parsed, 80)
+    }
+    case 'badge':
+      return String(value)
+    default:
+      return String(value)
+  }
+}
+
+function cellTitle(value: unknown, col: DebugPaneColumn): string | undefined {
+  if (col.format === 'time' || col.format === 'timeAgo') {
+    return formatTime(value as number | string)
+  }
+  return undefined
+}
+
+function isNullish(value: unknown): boolean {
+  return value === null || value === undefined
+}
+
+function durationClass(value: unknown): string {
+  const ms = typeof value === 'number' ? value : parseFloat(String(value))
+  if (isNaN(ms)) return 'ss-dbg-duration'
+  const sev = durationSeverity(ms)
+  if (sev === 'very-slow') return 'ss-dbg-duration ss-dbg-very-slow'
+  if (sev === 'slow') return 'ss-dbg-duration ss-dbg-slow'
+  return 'ss-dbg-duration'
+}
+
+function badgeColor(value: unknown, col: DebugPaneColumn): string {
+  if (col.format === 'badge' && col.badgeColorMap) {
+    const sv = String(value).toLowerCase()
+    return col.badgeColorMap[sv] || 'muted'
+  }
+  return ''
+}
+
+function methodClass(value: unknown): string {
+  return `ss-dbg-method ss-dbg-method-${String(value).toLowerCase()}`
+}
+
+function handleClear() {
+  data.value = []
+}
+
+const { tableRef } = useResizableTable(() => filteredData.value)
+
+onMounted(() => {
+  fetchData()
+})
+</script>
+
+<template>
+  <div>
+    <div v-if="pane.search" class="ss-dbg-search-bar">
+      <input
+        v-model="search"
+        class="ss-dbg-search"
+        :placeholder="pane.search.placeholder"
+        type="text"
+      />
+      <span class="ss-dbg-summary">{{ filteredData.length }} items</span>
+      <button v-if="pane.clearable" class="ss-dbg-btn-clear" @click="handleClear">Clear</button>
+    </div>
+
+    <div v-if="loading" class="ss-dbg-empty">Loading...</div>
+    <div v-else-if="filteredData.length === 0" class="ss-dbg-empty">No data</div>
+
+    <table v-else ref="tableRef" class="ss-dbg-table">
+      <thead>
+        <tr>
+          <th v-for="col in pane.columns" :key="col.key">
+            {{ col.label }}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(row, i) in filteredData" :key="(row.id as PropertyKey) ?? i">
+          <td
+            v-for="col in pane.columns"
+            :key="col.key"
+            :class="{ 'ss-dbg-filterable': col.filterable }"
+            @click="col.filterable ? (search = String(row[col.key])) : undefined"
+          >
+            <!-- null / undefined -->
+            <template v-if="isNullish(row[col.key])">
+              <span class="ss-dbg-c-dim">-</span>
+            </template>
+            <!-- time / timeAgo -->
+            <template v-else-if="col.format === 'time' || col.format === 'timeAgo'">
+              <span class="ss-dbg-event-time" :title="cellTitle(row[col.key], col)">
+                {{ formatCell(row[col.key], col) }}
+              </span>
+            </template>
+            <!-- duration -->
+            <template v-else-if="col.format === 'duration'">
+              <span :class="durationClass(row[col.key])">
+                {{ formatCell(row[col.key], col) }}
+              </span>
+            </template>
+            <!-- method -->
+            <template v-else-if="col.format === 'method'">
+              <span :class="methodClass(row[col.key])">
+                {{ formatCell(row[col.key], col) }}
+              </span>
+            </template>
+            <!-- badge -->
+            <template v-else-if="col.format === 'badge'">
+              <span :class="`ss-dbg-badge ss-dbg-badge-${badgeColor(row[col.key], col)}`">
+                {{ formatCell(row[col.key], col) }}
+              </span>
+            </template>
+            <!-- json / text / default -->
+            <template v-else>
+              {{ formatCell(row[col.key], col) }}
+            </template>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</template>

@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist/vue",
+    "rootDir": "./src",
+    "jsx": "preserve"
+  },
+  "include": ["src/vue/**/*.ts", "src/vue/**/*.vue", "src/core/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

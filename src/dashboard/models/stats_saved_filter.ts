@@ -15,10 +15,10 @@ export default class StatsSavedFilter extends BaseModel {
 
   @column({
     columnName: 'filter_config',
-    prepare: (value: any) => JSON.stringify(value),
+    prepare: (value: unknown) => JSON.stringify(value),
     consume: (value: string) => JSON.parse(value),
   })
-  declare filterConfig: Record<string, any>
+  declare filterConfig: Record<string, unknown>
 
   @column({ columnName: 'created_at' })
   declare createdAt: string

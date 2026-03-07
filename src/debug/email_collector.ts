@@ -1,7 +1,7 @@
 import { extractAddresses } from '../utils/mail_helpers.js'
 import { RingBuffer } from './ring_buffer.js'
 
-import type { EmailRecord } from './types.js'
+import type { EmailRecord, Emitter, MailEventData, MailMessage } from './types.js'
 
 /**
  * Listens to AdonisJS mail events and stores captured emails in a ring buffer.
@@ -14,25 +14,25 @@ import type { EmailRecord } from './types.js'
  */
 export class EmailCollector {
   private buffer: RingBuffer<EmailRecord>
-  private emitter: any = null
-  private handlers: { event: string; fn: (data: any) => void }[] = []
+  private emitter: Emitter | null = null
+  private handlers: { event: string; fn: (data: MailEventData) => void }[] = []
 
   constructor(maxEmails: number = 100) {
     this.buffer = new RingBuffer<EmailRecord>(maxEmails)
   }
 
-  async start(emitter: any): Promise<void> {
+  async start(emitter: Emitter): Promise<void> {
     if (!emitter || typeof emitter.on !== 'function') return
     this.emitter = emitter
 
-    const onSending = (data: any) => {
-      const msg = data?.message || data
+    const onSending = (data: MailEventData) => {
+      const msg: MailMessage = data?.message || data
       const record = this.buildRecord(msg, 'sending', data)
       this.buffer.push(record)
     }
 
-    const onSent = (data: any) => {
-      const msg = data?.message || data
+    const onSent = (data: MailEventData) => {
+      const msg: MailMessage = data?.message || data
       const to = extractAddresses(msg?.to)
       const subject = msg?.subject || ''
 
@@ -53,14 +53,14 @@ export class EmailCollector {
       this.buffer.push(record)
     }
 
-    const onQueued = (data: any) => {
-      const msg = data?.message || data
+    const onQueued = (data: MailEventData) => {
+      const msg: MailMessage = data?.message || data
       const record = this.buildRecord(msg, 'queued', data)
       this.buffer.push(record)
     }
 
-    const onQueuedError = (data: any) => {
-      const msg = data?.message || data
+    const onQueuedError = (data: MailEventData) => {
+      const msg: MailMessage = data?.message || data
       const record = this.buildRecord(msg, 'failed', data)
       this.buffer.push(record)
     }
@@ -105,11 +105,19 @@ export class EmailCollector {
     return this.buffer.size()
   }
 
+  getBufferInfo(): { current: number; max: number } {
+    return { current: this.buffer.size(), max: this.buffer.getCapacity() }
+  }
+
   clear(): void {
     this.buffer.clear()
   }
 
-  private buildRecord(msg: any, status: EmailRecord['status'], data: any): EmailRecord {
+  private buildRecord(
+    msg: MailMessage,
+    status: EmailRecord['status'],
+    data: MailEventData
+  ): EmailRecord {
     return {
       id: this.buffer.getNextId(),
       from: extractAddresses(msg?.from) || 'unknown',

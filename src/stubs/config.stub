@@ -1,39 +1,19 @@
 {{{
   exports({ to: app.configPath('server_stats.ts') })
 }}}
-import env from '#start/env'
 import { defineConfig } from 'adonisjs-server-stats'
-import {
-  processCollector,
-  systemCollector,
-  httpCollector,
-  dbPoolCollector,
-  redisCollector,
-  queueCollector,
-  logCollector,
-  appCollector,
-} from 'adonisjs-server-stats/collectors'
 
 export default defineConfig({
-  intervalMs: 3000,
-  transport: 'transmit',
-  channelName: 'admin/server-stats',
-  endpoint: '/admin/api/server-stats',
-  collectors: [
-    processCollector(),
-    systemCollector(),
-    httpCollector({ maxRecords: 10_000 }),
-    dbPoolCollector({ connectionName: 'postgres' }),
-    redisCollector(),
-    queueCollector({
-      queueName: 'default',
-      connection: {
-        host: env.get('QUEUE_REDIS_HOST'),
-        port: env.get('QUEUE_REDIS_PORT'),
-        password: env.get('QUEUE_REDIS_PASSWORD'),
-      },
-    }),
-    logCollector({ logPath: 'logs/adonisjs.log' }),
-    appCollector(),
-  ],
+  // Auto-detects installed packages and enables matching collectors.
+  // Override with a specific array if needed.
+  // collectors: 'auto',
+
+  // Who can see the stats bar, debug toolbar, and dashboard.
+  // authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+
+  // Enable the debug toolbar (SQL queries, events, emails, logs)
+  // toolbar: true,
+
+  // Enable the full-page dashboard at /__stats
+  // dashboard: true,
 })

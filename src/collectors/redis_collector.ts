@@ -1,4 +1,10 @@
+import { log, dim, bold } from '../utils/logger.js'
+
 import type { MetricCollector } from './collector.js'
+
+let warnedNotInstalled = false
+let warnedPingFailed = false
+let warnedConnectionError = false
 
 /**
  * Monitors Redis health, memory, connections, keys, and cache hit rate.
@@ -18,6 +24,11 @@ import type { MetricCollector } from './collector.js'
 export function redisCollector(): MetricCollector {
   return {
     name: 'redis',
+    label: 'redis — memory, clients, keys, hit rate',
+
+    getConfig() {
+      return {}
+    },
 
     async collect() {
       const defaults = {
@@ -28,10 +39,37 @@ export function redisCollector(): MetricCollector {
         redisHitRate: 0,
       }
 
+      let redis: Awaited<typeof import('@adonisjs/redis/services/main')>['default']
+
       try {
-        const { default: redis } = await import('@adonisjs/redis/services/main')
+        const mod = await import('@adonisjs/redis/services/main')
+        redis = mod.default
+      } catch {
+        if (!warnedNotInstalled) {
+          warnedNotInstalled = true
+          log.block(`Redis collector ${bold('skipped')} — @adonisjs/redis is not installed`, [
+            dim('Redis metrics will return defaults until the package is added.'),
+            `Run ${bold('node ace add @adonisjs/redis')} to install it.`,
+          ])
+        }
+        return defaults
+      }
+
+      try {
         const pong = await redis.ping()
-        if (pong !== 'PONG') return defaults
+        if (pong !== 'PONG') {
+          if (!warnedPingFailed) {
+            warnedPingFailed = true
+            log.block(
+              `Redis collector ${bold('unhealthy')} — PING returned ${bold(String(pong))} instead of PONG`,
+              [
+                dim('Redis may be down or misconfigured.'),
+                `Check your connection settings in ${bold('config/redis.ts')}.`,
+              ]
+            )
+          }
+          return defaults
+        }
 
         const [memoryInfo, statsInfo, dbSize] = await Promise.all([
           redis.info('memory') as Promise<string>,
@@ -70,7 +108,15 @@ export function redisCollector(): MetricCollector {
           redisKeysCount: typeof dbSize === 'number' ? dbSize : 0,
           redisHitRate: hitRate,
         }
-      } catch {
+      } catch (error) {
+        if (!warnedConnectionError) {
+          warnedConnectionError = true
+          const message = error instanceof Error ? error.message : String(error)
+          log.block(`Redis collector ${bold('error')} — failed to communicate with Redis`, [
+            dim(message),
+            `Make sure Redis is running and accessible. Check ${bold('config/redis.ts')} for connection details.`,
+          ])
+        }
         return defaults
       }
     },
