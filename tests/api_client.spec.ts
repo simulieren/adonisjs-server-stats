@@ -182,7 +182,7 @@ test.group('ApiClient | fetch abort guard', (group) => {
     try {
       await client.fetch('/resource', { signal: controller.signal })
       assert.fail('Expected an AbortError to be thrown')
-    } catch (error: any) {
+    } catch (error: unknown) {
       assert.instanceOf(error, DOMException)
       assert.equal(error.name, 'AbortError')
     }
@@ -209,7 +209,7 @@ test.group('ApiClient | fetch error responses', (group) => {
     try {
       await client.fetch('/secure')
       assert.fail('Expected UnauthorizedError')
-    } catch (error: any) {
+    } catch (error: unknown) {
       assert.instanceOf(error, UnauthorizedError)
       assert.equal(error.status, 401)
     }
@@ -222,7 +222,7 @@ test.group('ApiClient | fetch error responses', (group) => {
     try {
       await client.fetch('/forbidden')
       assert.fail('Expected UnauthorizedError')
-    } catch (error: any) {
+    } catch (error: unknown) {
       assert.instanceOf(error, UnauthorizedError)
       assert.equal(error.status, 403)
     }
@@ -243,7 +243,7 @@ test.group('ApiClient | fetch error responses', (group) => {
     try {
       await client.fetch('/broken')
       assert.fail('Expected ApiError')
-    } catch (error: any) {
+    } catch (error: unknown) {
       assert.instanceOf(error, ApiError)
       assert.equal(error.status, 500)
       assert.equal(error.body, 'Internal Server Error')
@@ -271,7 +271,7 @@ test.group('ApiClient | fetch error responses', (group) => {
     try {
       await client.fetch('/bad-gateway')
       assert.fail('Expected ApiError')
-    } catch (error: any) {
+    } catch (error: unknown) {
       assert.instanceOf(error, ApiError)
       assert.equal(error.status, 502)
       assert.equal(error.body, '')

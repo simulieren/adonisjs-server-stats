@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import type { ApplicationService } from '@adonisjs/core/types'
 import { ConfigInspector } from '../src/dashboard/integrations/config_inspector.js'
 
 // ---------------------------------------------------------------------------
@@ -26,7 +27,7 @@ function createMockApp(configData: Record<string, unknown> = {}) {
 test.group('ConfigInspector - sanitization', () => {
   test('redacts sensitive keys', ({ assert }) => {
     const app = createMockApp({ password: 'secret123', appName: 'MyApp' })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getConfig()
 
     assert.deepEqual(result.config.password, {
@@ -47,21 +48,21 @@ test.group('ConfigInspector - sanitization', () => {
       dsn: 'sentry://abc@sentry.io/123',
       safe_value: 'visible',
     })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getConfig()
 
-    assert.property(result.config.api_key as any, '__redacted')
-    assert.property(result.config.SECRET as any, '__redacted')
-    assert.property(result.config.TOKEN as any, '__redacted')
-    assert.property(result.config.auth as any, '__redacted')
-    assert.property(result.config.private as any, '__redacted')
-    assert.property(result.config.dsn as any, '__redacted')
+    assert.property(result.config.api_key as unknown as Record<string, unknown>, '__redacted')
+    assert.property(result.config.SECRET as unknown as Record<string, unknown>, '__redacted')
+    assert.property(result.config.TOKEN as unknown as Record<string, unknown>, '__redacted')
+    assert.property(result.config.auth as unknown as Record<string, unknown>, '__redacted')
+    assert.property(result.config.private as unknown as Record<string, unknown>, '__redacted')
+    assert.property(result.config.dsn as unknown as Record<string, unknown>, '__redacted')
     assert.equal(result.config.safe_value, 'visible')
   })
 
   test('redacts email values regardless of key name', ({ assert }) => {
     const app = createMockApp({ contact: 'user@example.com' })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getConfig()
 
     assert.deepEqual(result.config.contact, {
@@ -73,7 +74,7 @@ test.group('ConfigInspector - sanitization', () => {
 
   test('redacts URLs with credentials', ({ assert }) => {
     const app = createMockApp({ databaseUrl: 'postgres://user:pass@host/db' })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getConfig()
 
     assert.deepEqual(result.config.databaseUrl, {
@@ -85,7 +86,7 @@ test.group('ConfigInspector - sanitization', () => {
 
   test('does not redact booleans and numbers', ({ assert }) => {
     const app = createMockApp({ debug: true, port: 3000 })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getConfig()
 
     assert.equal(result.config.debug, true)
@@ -101,11 +102,11 @@ test.group('ConfigInspector - sanitization', () => {
         },
       },
     })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getConfig()
 
-    const db = result.config.db as Record<string, any>
-    const connection = db.connection as Record<string, any>
+    const db = result.config.db as Record<string, unknown>
+    const connection = db.connection as Record<string, unknown>
 
     assert.deepEqual(connection.password, {
       __redacted: true,
@@ -116,15 +117,15 @@ test.group('ConfigInspector - sanitization', () => {
   })
 
   test('handles circular references without throwing', ({ assert }) => {
-    const circular: Record<string, any> = { name: 'root' }
+    const circular: Record<string, unknown> = { name: 'root' }
     circular.self = circular
 
     const app = createMockApp(circular)
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
 
     assert.doesNotThrow(() => {
       const result = inspector.getConfig()
-      const config = result.config as Record<string, any>
+      const config = result.config as Record<string, unknown>
       assert.equal(config.name, 'root')
       assert.equal(config.self, '[Circular]')
     })
@@ -164,7 +165,7 @@ test.group('ConfigInspector - env', (group) => {
     process.env.TEST_CI_MIDDLE = 'm'
 
     const app = createMockApp()
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getEnvVars()
 
     const keys = Object.keys(result.env)
@@ -181,10 +182,10 @@ test.group('ConfigInspector - env', (group) => {
     process.env.TEST_CI_APP_NAME = 'my-app'
 
     const app = createMockApp()
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getEnvVars()
 
-    const passwordEntry = result.env.TEST_CI_PASSWORD as any
+    const passwordEntry = result.env.TEST_CI_PASSWORD as unknown as Record<string, unknown>
     assert.property(passwordEntry, '__redacted')
     assert.equal(passwordEntry.__redacted, true)
     assert.equal(passwordEntry.value, 'super-secret')
@@ -200,7 +201,7 @@ test.group('ConfigInspector - env', (group) => {
 test.group('ConfigInspector - caching', () => {
   test('getConfig caches result and calls config.all() only once', ({ assert }) => {
     const app = createMockApp({ foo: 'bar' })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
 
     const first = inspector.getConfig()
     const second = inspector.getConfig()
@@ -211,7 +212,7 @@ test.group('ConfigInspector - caching', () => {
 
   test('getEnvVars caches result on repeated calls', ({ assert }) => {
     const app = createMockApp()
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
 
     const first = inspector.getEnvVars()
     const second = inspector.getEnvVars()
@@ -231,10 +232,10 @@ test.group('ConfigInspector - caching', () => {
       },
     }
 
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
 
     const first = inspector.getConfig()
-    assert.equal((first.config as any).version, 'v1')
+    assert.equal((first.config as unknown as Record<string, unknown>).version, 'v1')
     assert.equal(callCount, 1)
 
     // Change what the mock would return
@@ -242,13 +243,13 @@ test.group('ConfigInspector - caching', () => {
 
     // Second call should still return cached v1
     const second = inspector.getConfig()
-    assert.equal((second.config as any).version, 'v1')
+    assert.equal((second.config as unknown as Record<string, unknown>).version, 'v1')
     assert.equal(callCount, 1)
   })
 
   test('getConfig and getEnvVars share cacheTimestamp', ({ assert }) => {
     const app = createMockApp({ key: 'value' })
-    const inspector = new ConfigInspector(app as any)
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
 
     // Call getConfig first — sets cacheTimestamp
     inspector.getConfig()

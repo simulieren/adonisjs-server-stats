@@ -160,24 +160,10 @@ export function countLeaves(obj: ConfigValue): number {
  * Useful for "Expand All" / "Collapse All" functionality.
  */
 export function collectTopLevelObjectKeys(obj: ConfigValue): string[] {
-  if (
-    obj === null ||
-    obj === undefined ||
-    typeof obj !== 'object' ||
-    Array.isArray(obj) ||
-    isRedactedValue(obj)
-  ) {
-    return []
-  }
+  if (!isPlainConfigObject(obj)) return []
   const keys: string[] = []
   for (const key of Object.keys(obj)) {
-    const value = (obj as Record<string, ConfigValue>)[key]
-    if (
-      value !== null &&
-      typeof value === 'object' &&
-      !Array.isArray(value) &&
-      !isRedactedValue(value)
-    ) {
+    if (isPlainConfigObject(obj[key])) {
       keys.push(key)
     }
   }

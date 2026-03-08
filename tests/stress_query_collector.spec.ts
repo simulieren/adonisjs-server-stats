@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import type { Emitter } from '../src/debug/types.js'
 import { QueryCollector } from '../src/debug/query_collector.js'
 import { TraceCollector } from '../src/debug/trace_collector.js'
 
@@ -37,7 +38,7 @@ test.group('Stress | QueryCollector under load', () => {
   test('10,000 queries — getQueriesSince returns only tail', async ({ assert }) => {
     const collector = new QueryCollector(500)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 10_000; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -67,7 +68,7 @@ test.group('Stress | QueryCollector under load', () => {
   }) => {
     const collector = new QueryCollector(500)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 500; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -93,7 +94,7 @@ test.group('Stress | QueryCollector under load', () => {
   test('getQueriesSince performance — 50,000 queries, get last 10', async ({ assert }) => {
     const collector = new QueryCollector(500)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 50_000; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -127,7 +128,7 @@ test.group('Stress | QueryCollector under load', () => {
   }) => {
     const collector = new QueryCollector(500)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 500; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -152,7 +153,7 @@ test.group('Stress | QueryCollector under load', () => {
   test('buffer wrap consistency — IDs remain monotonic after wrap', async ({ assert }) => {
     const collector = new QueryCollector(100)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 500; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -191,7 +192,7 @@ test.group('Stress | QueryCollector under load', () => {
 
     // Emit 30 more queries
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 30; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `NEW ${i}` }))

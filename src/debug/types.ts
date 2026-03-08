@@ -3,8 +3,7 @@
 // ---------------------------------------------------------------------------
 
 /** Callback type for emitter event handlers. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type EmitterHandler = (...args: any[]) => void
+export type EmitterHandler = (...args: unknown[]) => void
 
 /**
  * Minimal interface for the AdonisJS event emitter.

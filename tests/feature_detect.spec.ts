@@ -422,7 +422,7 @@ test.group('detectFeatures', (group) => {
   test('returns DEFAULT_FEATURES when fetch throws', async ({ assert }) => {
     globalThis.fetch = (() => {
       throw new Error('network failure')
-    }) as any
+    }) as unknown as Record<string, unknown>
 
     const result = await detectFeatures({ baseUrl: 'http://localhost:3333' })
     assert.deepEqual(result, DEFAULT_FEATURES)
@@ -431,7 +431,7 @@ test.group('detectFeatures', (group) => {
   test('returns DEFAULT_FEATURES when fetch rejects', async ({ assert }) => {
     globalThis.fetch = (async () => {
       throw new Error('connection refused')
-    }) as any
+    }) as unknown as Record<string, unknown>
 
     const result = await detectFeatures({ baseUrl: 'http://localhost:3333' })
     assert.deepEqual(result, DEFAULT_FEATURES)

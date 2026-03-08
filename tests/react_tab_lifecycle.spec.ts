@@ -141,7 +141,7 @@ test.group('Tab lifecycle | single controller reuse', (group) => {
 
     // Only the last tab's data should arrive (others were aborted)
     const dataWithUrls = calls.data.filter(
-      (d: any) => d !== null && typeof d === 'object' && 'url' in d
+      (d: unknown) => d !== null && typeof d === 'object' && 'url' in d
     ) as Array<{ url: string }>
 
     assert.isTrue(
@@ -266,7 +266,7 @@ test.group('Tab lifecycle | switchTab aborts previous fetch', (group) => {
 
     // Only events data should appear in onData
     const dataWithUrls = calls.data.filter(
-      (d: any) => d !== null && typeof d === 'object' && 'url' in d
+      (d: unknown) => d !== null && typeof d === 'object' && 'url' in d
     ) as Array<{ url: string }>
 
     for (const d of dataWithUrls) {
@@ -327,7 +327,7 @@ test.group('Tab lifecycle | fetchOnceCache prevents redundant fetches', (group) 
 
     // The cached payload should have been delivered via onData
     assert.isTrue(
-      calls.data.some((d: any) => d && d.cached === true),
+      calls.data.some((d: unknown) => d && d.cached === true),
       'Expected cached data to be served via onData'
     )
 

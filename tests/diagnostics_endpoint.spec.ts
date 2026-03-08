@@ -227,7 +227,7 @@ test.group('Diagnostics | getStorageStats under rapid polling', () => {
     store.getStorageStats = function (queryDelayMs?: number) {
       if (shouldFail) {
         // Access private coalesce via the prototype to ensure inflight cleanup is tested
-        return (store as any).coalesce('storageStats', async () => {
+        return (store as unknown as Record<string, (...args: unknown[]) => unknown>).coalesce('storageStats', async () => {
           throw new Error('Simulated DB failure')
         })
       }
@@ -297,12 +297,12 @@ test.group('Diagnostics | graceful handling when dashboard store unavailable', (
   test('diagnostics endpoint handles store error gracefully', async ({ assert }) => {
     // Create a store that will throw
     const brokenStore = {
-      async getStorageStats(): Promise<any> {
+      async getStorageStats(): Promise<unknown> {
         throw new Error('DB connection lost')
       },
     }
 
-    const endpoint = new DiagnosticsEndpoint(brokenStore as any)
+    const endpoint = new DiagnosticsEndpoint(brokenStore as unknown as Record<string, unknown>)
 
     const result = await endpoint.getDiagnostics()
 

@@ -49,7 +49,7 @@ function createMockDebugStore() {
         traces: { current: 0, max: 0 },
       }
     },
-  } as any
+  } as unknown as Record<string, unknown>
 }
 
 /**
@@ -65,8 +65,8 @@ function createMockHttpContext() {
           return data
         },
       },
-    } as any,
-    getCaptured: () => captured as any,
+    } as unknown as Record<string, unknown>,
+    getCaptured: () => captured as unknown,
   }
 }
 

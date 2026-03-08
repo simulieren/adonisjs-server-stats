@@ -3,6 +3,12 @@
 // ---------------------------------------------------------------------------
 
 import { ApiClient } from './api-client.js'
+import {
+  FEATURE_KEYS,
+  FLAG_TO_GROUP,
+  STATS_GROUP_RULES,
+  hasStatValue,
+} from './feature-detect-helpers.js'
 
 import type { FeatureFlags, FeatureConfig } from './types.js'
 
@@ -37,21 +43,12 @@ export const DEFAULT_FEATURES: FeatureConfig = {
  * Flatten a {@link FeatureFlags} server response into a {@link FeatureConfig}.
  */
 function flattenFlags(flags: FeatureFlags): FeatureConfig {
-  return {
-    tracing: flags.features?.tracing ?? false,
-    process: flags.features?.process ?? false,
-    system: flags.features?.system ?? false,
-    http: flags.features?.http ?? false,
-    db: flags.features?.db ?? false,
-    redis: flags.features?.redis ?? false,
-    queues: flags.features?.queues ?? false,
-    cache: flags.features?.cache ?? false,
-    app: flags.features?.app ?? false,
-    log: flags.features?.log ?? false,
-    emails: flags.features?.emails ?? false,
-    dashboard: flags.features?.dashboard ?? false,
-    customPanes: flags.customPanes ?? [],
+  const result = { customPanes: flags.customPanes ?? [] } as FeatureConfig
+  const features = flags.features as Record<string, boolean> | undefined
+  for (const key of FEATURE_KEYS) {
+    result[key] = features?.[key] ?? false
   }
+  return result
 }
 
 /**
@@ -112,23 +109,16 @@ export async function detectFeatures(options: {
 export function getVisibleMetricGroups(features: FeatureFlags | FeatureConfig): Set<string> {
   const groups = new Set<string>()
 
-  // Handle both nested FeatureFlags and flat FeatureConfig
+  // Normalise: nested FeatureFlags -> flat record, or use FeatureConfig directly
   const ff =
     'features' in features && typeof features.features === 'object' && features.features !== null
       ? (features as FeatureFlags).features
       : (features as FeatureConfig)
 
-  if ('process' in ff && ff.process) groups.add('process')
-  // Memory group shows if process (heap/rss) or system (SYS) collector is present
-  if (('process' in ff && ff.process) || ('system' in ff && (ff as FeatureConfig).system)) {
-    groups.add('memory')
+  const flags = ff as Record<string, boolean>
+  for (const { flag, group } of FLAG_TO_GROUP) {
+    if (flags[flag]) groups.add(group)
   }
-  if ('http' in ff && ff.http) groups.add('http')
-  if ('db' in ff && ff.db) groups.add('db')
-  if ('redis' in ff && ff.redis) groups.add('redis')
-  if ('queues' in ff && (ff as FeatureConfig).queues) groups.add('queue')
-  if ('app' in ff && ff.app) groups.add('app')
-  if ('log' in ff && ff.log) groups.add('log')
 
   return groups
 }
@@ -153,80 +143,27 @@ export function getVisibleMetricGroups(features: FeatureFlags | FeatureConfig): 
 export function detectMetricGroupsFromStats(stats: Record<string, unknown>): Set<string> {
   const groups = new Set<string>()
 
-  // Process group: present if cpuPercent or uptime has data
-  if (hasValue(stats.cpuPercent) || hasValue(stats.uptime) || hasString(stats.nodeVersion)) {
+  // Process group has special nodeVersion (string) check
+  if (hasStatValue(stats.cpuPercent) || hasStatValue(stats.uptime) || hasNodeVersion(stats)) {
     groups.add('process')
   }
 
-  // Memory group: present if heap/rss (from process collector) or system memory data exists
-  if (hasValue(stats.memHeapUsed) || hasValue(stats.memRss)) {
-    groups.add('memory')
-  }
-  if (hasValue(stats.systemMemoryTotalMb) || hasValue(stats.systemMemoryFreeMb)) {
-    groups.add('memory')
-  }
-
-  // HTTP group: present if any HTTP collector fields exist
-  if (
-    hasValue(stats.requestsPerSecond) ||
-    hasValue(stats.avgResponseTimeMs) ||
-    hasValue(stats.errorRate) ||
-    hasValue(stats.activeHttpConnections)
-  ) {
-    groups.add('http')
+  // Data-driven: check each group's fields for numeric values
+  for (const rule of STATS_GROUP_RULES) {
+    if (rule.fields.some((f) => hasStatValue(stats[f]))) {
+      groups.add(rule.group)
+    }
   }
 
-  // DB group: present if any pool fields exist (dbPoolMax can be 0 during startup)
-  if (
-    hasValue(stats.dbPoolMax) ||
-    hasValue(stats.dbPoolUsed) ||
-    hasValue(stats.dbPoolFree) ||
-    hasValue(stats.dbPoolPending)
-  ) {
-    groups.add('db')
-  }
-
-  // Redis group: present if redisOk field exists (even if false, it means redis collector is active)
+  // Redis group: special case -- redisOk can be false but still means collector is active
   if (stats.redisOk !== undefined && stats.redisOk !== null) {
     groups.add('redis')
-  }
-
-  // Queue group: present if queue fields exist
-  if (
-    hasValue(stats.queueActive) ||
-    hasValue(stats.queueWaiting) ||
-    hasValue(stats.queueWorkerCount)
-  ) {
-    groups.add('queue')
-  }
-
-  // App group: present if app-specific fields exist
-  if (
-    hasValue(stats.onlineUsers) ||
-    hasValue(stats.pendingWebhooks) ||
-    hasValue(stats.pendingEmails)
-  ) {
-    groups.add('app')
-  }
-
-  // Log group: present if log fields exist
-  if (hasValue(stats.logErrorsLast5m) || hasValue(stats.logEntriesPerMinute)) {
-    groups.add('log')
   }
 
   return groups
 }
 
-/**
- * Check if a value is a number (including 0).
- */
-function hasValue(v: unknown): v is number {
-  return typeof v === 'number' && !Number.isNaN(v)
-}
-
-/**
- * Check if a value is a non-empty string.
- */
-function hasString(v: unknown): v is string {
-  return typeof v === 'string' && v.length > 0
+/** Check if stats has a non-empty nodeVersion string. */
+function hasNodeVersion(stats: Record<string, unknown>): boolean {
+  return typeof stats.nodeVersion === 'string' && stats.nodeVersion.length > 0
 }

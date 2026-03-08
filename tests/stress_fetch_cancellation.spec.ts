@@ -121,7 +121,7 @@ test.group('Stress | DebugDataController rapid switching', (group) => {
 
   test('50 rapid tab switches -- only 1-2 fetches complete', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-    const { calls, ...cbs } = createCallbacks()
+    const { calls: _calls, ...cbs } = createCallbacks()
 
     const ctrl = new DebugDataController({
       baseUrl: '',
@@ -152,7 +152,7 @@ test.group('Stress | DebugDataController rapid switching', (group) => {
     // The last tab is DEBUG_TABS[49 % 6] = DEBUG_TABS[1] = 'events'
     const lastTabPath = '/admin/api/debug/events'
     const dataWithUrls = calls.data.filter(
-      (d: any) => d && typeof d === 'object' && 'url' in d
+      (d: unknown) => d !== null && typeof d === 'object' && 'url' in d
     ) as Array<{ url: string }>
     assert.isTrue(
       dataWithUrls.length >= 1,
@@ -168,7 +168,7 @@ test.group('Stress | DebugDataController rapid switching', (group) => {
 
   test('100 rapid switchTab calls -- server sees minimal load', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-    const { calls, ...cbs } = createCallbacks()
+    const { calls: _calls, ...cbs } = createCallbacks()
 
     const ctrl = new DebugDataController({
       baseUrl: '',
@@ -207,7 +207,7 @@ test.group('Stress | DebugDataController rapid switching', (group) => {
 
   test('start/stop/start/stop rapid cycle -- no leaked timers', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-    const { calls, ...cbs } = createCallbacks()
+    const { calls: _calls, ...cbs } = createCallbacks()
 
     const ctrl = new DebugDataController({
       baseUrl: '',
@@ -244,7 +244,7 @@ test.group('Stress | DebugDataController rapid switching', (group) => {
 
   test('rapid refresh() calls do not pile up', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-    const { calls, ...cbs } = createCallbacks()
+    const { calls: _calls, ...cbs } = createCallbacks()
 
     const ctrl = new DebugDataController({
       baseUrl: '',
@@ -381,7 +381,7 @@ test.group('Stress | DashboardDataController rapid switching', (group) => {
   })
 
   test('mixed section changes + filters -- no stale data', async ({ assert }) => {
-    const tracker = createFetchTracker(50)
+    const _tracker = createFetchTracker(50)
 
     const calls = {
       data: [] as unknown[],
@@ -418,7 +418,7 @@ test.group('Stress | DashboardDataController rapid switching', (group) => {
 
     // onData may have null entries from setSection resets -- filter those out
     const dataWithUrls = calls.data.filter(
-      (d: any) => d !== null && typeof d === 'object' && 'url' in d
+      (d: unknown) => d !== null && typeof d === 'object' && 'url' in d
     ) as Array<{ url: string }>
 
     // The final state should be: section=requests, page=2, search=foo

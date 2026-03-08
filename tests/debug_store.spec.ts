@@ -1,5 +1,5 @@
 import { test } from '@japa/runner'
-import { writeFile, readFile, unlink, mkdir } from 'node:fs/promises'
+import { readFile, unlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 

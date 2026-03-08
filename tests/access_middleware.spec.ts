@@ -1,5 +1,6 @@
 import { test } from '@japa/runner'
 import { createAccessMiddleware } from '../src/routes/access_middleware.js'
+import type { HttpContext } from '@adonisjs/core/http'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -7,17 +8,17 @@ import { createAccessMiddleware } from '../src/routes/access_middleware.js'
 
 function createMockCtx() {
   let responseStatus = 200
-  let responseBody: any = null
+  let responseBody: unknown = null
   return {
     response: {
       status(code: number) {
         responseStatus = code
         return this
       },
-      send(body: any) {
+      send(body: unknown) {
         responseBody = body
       },
-      forbidden(body: any) {
+      forbidden(body: unknown) {
         responseStatus = 403
         responseBody = body
       },
@@ -37,7 +38,7 @@ test.group('createAccessMiddleware | shouldShow returns true', () => {
     const ctx = createMockCtx()
     let nextCalled = false
 
-    await middleware(ctx as any, async () => {
+    await middleware(ctx as unknown as HttpContext, async () => {
       nextCalled = true
     })
 
@@ -53,7 +54,7 @@ test.group('createAccessMiddleware | shouldShow returns false', () => {
     const ctx = createMockCtx()
     let nextCalled = false
 
-    await middleware(ctx as any, async () => {
+    await middleware(ctx as unknown as HttpContext, async () => {
       nextCalled = true
     })
 
@@ -65,11 +66,11 @@ test.group('createAccessMiddleware | shouldShow returns false', () => {
 
 test.group('createAccessMiddleware | async shouldShow', () => {
   test('shouldShow returns Promise<true> — next() is called', async ({ assert }) => {
-    const middleware = createAccessMiddleware((async () => true) as any)
+    const middleware = createAccessMiddleware((async () => true) as unknown as (ctx: HttpContext) => boolean)
     const ctx = createMockCtx()
     let nextCalled = false
 
-    await middleware(ctx as any, async () => {
+    await middleware(ctx as unknown as HttpContext, async () => {
       nextCalled = true
     })
 
@@ -84,11 +85,11 @@ test.group('createAccessMiddleware | async shouldShow', () => {
   }) => {
     // A Promise object is truthy regardless of its resolved value,
     // so `!shouldShow(ctx)` is false and the guard passes through.
-    const middleware = createAccessMiddleware((async () => false) as any)
+    const middleware = createAccessMiddleware((async () => false) as unknown as (ctx: HttpContext) => boolean)
     const ctx = createMockCtx()
     let nextCalled = false
 
-    await middleware(ctx as any, async () => {
+    await middleware(ctx as unknown as HttpContext, async () => {
       nextCalled = true
     })
 
@@ -116,7 +117,7 @@ test.group('createAccessMiddleware | shouldShow throws & warn-once', (group) => 
 
   group.each.setup(() => {
     warnMessages = []
-    console.warn = (...args: any[]) => {
+    console.warn = (...args: unknown[]) => {
       warnMessages.push(args.join(' '))
     }
   })
@@ -130,7 +131,7 @@ test.group('createAccessMiddleware | shouldShow throws & warn-once', (group) => 
     const ctx = createMockCtx()
     let nextCalled = false
 
-    await middleware(ctx as any, async () => {
+    await middleware(ctx as unknown as HttpContext, async () => {
       nextCalled = true
     })
 
@@ -153,8 +154,8 @@ test.group('createAccessMiddleware | shouldShow throws & warn-once', (group) => 
     const ctx1 = createMockCtx()
     const ctx2 = createMockCtx()
 
-    await middleware(ctx1 as any, async () => {})
-    await middleware(ctx2 as any, async () => {})
+    await middleware(ctx1 as unknown as HttpContext, async () => {})
+    await middleware(ctx2 as unknown as HttpContext, async () => {})
 
     // No new warnings should have been logged
     assert.equal(warnMessages.length, 0)
@@ -171,7 +172,7 @@ test.group('createAccessMiddleware | next() is awaited', () => {
     const ctx = createMockCtx()
     const order: string[] = []
 
-    await middleware(ctx as any, async () => {
+    await middleware(ctx as unknown as HttpContext, async () => {
       // Simulate an async next() that takes time
       await new Promise((resolve) => setTimeout(resolve, 10))
       order.push('next-completed')

@@ -51,13 +51,13 @@ function makeConfig(dbPath: string): DevToolbarConfig {
 
 /** Flush the DashboardStore write queue by calling the private method. */
 async function flush(store: DashboardStore): Promise<void> {
-  const timer = (store as any).flushTimer
+  const timer = (store as unknown as Record<string, unknown>).flushTimer
   if (timer) {
     clearTimeout(timer)
-    ;(store as any).flushTimer = null
+    ;(store as unknown as Record<string, unknown>).flushTimer = null
   }
-  await (store as any).flushWriteQueue()
-  ;(store as any).resultCache.clear()
+  await (store as unknown as Record<string, (...args: unknown[]) => Promise<void>>).flushWriteQueue()
+  ;((store as unknown as Record<string, Record<string, () => void>>).resultCache).clear()
 }
 
 // ============================================================================
@@ -71,7 +71,7 @@ test.group('Log collection | recordLog to SQLite', (group) => {
   group.each.setup(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-log-pipeline-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, createMockEmitter() as any, tmpDir)
+    await store.start(null, createMockEmitter() as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -132,7 +132,7 @@ test.group('Log collection | request_id capture', (group) => {
   group.each.setup(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-log-reqid-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, createMockEmitter() as any, tmpDir)
+    await store.start(null, createMockEmitter() as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -203,7 +203,7 @@ test.group('Log collection | data field stores full entry JSON', (group) => {
   group.each.setup(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-log-data-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, createMockEmitter() as any, tmpDir)
+    await store.start(null, createMockEmitter() as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -241,7 +241,7 @@ test.group('Log collection | flush recovery', (group) => {
   group.each.setup(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-log-recovery-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, createMockEmitter() as any, tmpDir)
+    await store.start(null, createMockEmitter() as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -253,7 +253,7 @@ test.group('Log collection | flush recovery', (group) => {
     assert,
   }) => {
     // BigInt causes JSON.stringify to throw during data preparation
-    store.recordLog({ level: 30, msg: 'bad entry', value: BigInt(999) } as any)
+    store.recordLog({ level: 30, msg: 'bad entry', value: BigInt(999)  } as unknown as Record<string, unknown>)
     await flush(store)
 
     // Now queue a normal entry -- this should work if flushing recovered
@@ -269,11 +269,11 @@ test.group('Log collection | flush recovery', (group) => {
 
   test('multiple consecutive errors dont permanently lock flushing', async ({ assert }) => {
     // Three consecutive bad batches
-    store.recordLog({ level: 30, msg: 'bad1', value: BigInt(1) } as any)
+    store.recordLog({ level: 30, msg: 'bad1', value: BigInt(1)  } as unknown as Record<string, unknown>)
     await flush(store)
-    store.recordLog({ level: 30, msg: 'bad2', value: BigInt(2) } as any)
+    store.recordLog({ level: 30, msg: 'bad2', value: BigInt(2)  } as unknown as Record<string, unknown>)
     await flush(store)
-    store.recordLog({ level: 30, msg: 'bad3', value: BigInt(3) } as any)
+    store.recordLog({ level: 30, msg: 'bad3', value: BigInt(3)  } as unknown as Record<string, unknown>)
     await flush(store)
 
     // Then a good entry
@@ -297,7 +297,7 @@ test.group('Log collection | end-to-end request-log correlation', (group) => {
   group.each.setup(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-log-e2e-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, createMockEmitter() as any, tmpDir)
+    await store.start(null, createMockEmitter() as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -460,7 +460,7 @@ test.group('Log collection | queue behavior', (group) => {
   group.each.setup(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-log-queue-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, createMockEmitter() as any, tmpDir)
+    await store.start(null, createMockEmitter() as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {

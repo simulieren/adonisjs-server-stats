@@ -6,6 +6,8 @@
 // names that different logging back-ends may produce.
 // ---------------------------------------------------------------------------
 
+import { parseDataBlob, extractNonStandardKeys } from './log-utils-helpers.js'
+
 /**
  * Generic log entry – the resolver functions only rely on dynamic property
  * access, so a simple index-signature is sufficient.
@@ -150,29 +152,13 @@ export const STANDARD_LOG_KEYS = new Set([
 export function getStructuredData(entry: LogEntry): Record<string, unknown> | null {
   // Try the `data` blob first (dashboard / SQLite shape)
   if (entry.data) {
-    let blob: Record<string, unknown> | null = null
-    if (typeof entry.data === 'string') {
-      try {
-        blob = JSON.parse(entry.data)
-      } catch {
-        // not valid JSON – ignore
-      }
-    } else if (typeof entry.data === 'object' && !Array.isArray(entry.data)) {
-      blob = entry.data as Record<string, unknown>
-    }
+    const blob = parseDataBlob(entry.data)
     if (blob) {
-      const extra: Record<string, unknown> = {}
-      for (const [k, v] of Object.entries(blob)) {
-        if (!STANDARD_LOG_KEYS.has(k)) extra[k] = v
-      }
-      if (Object.keys(extra).length > 0) return extra
+      const result = extractNonStandardKeys(blob)
+      if (result) return result
     }
   }
 
   // Fall back to top-level fields (debug panel / raw Pino shape)
-  const extra: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(entry)) {
-    if (!STANDARD_LOG_KEYS.has(k)) extra[k] = v
-  }
-  return Object.keys(extra).length > 0 ? extra : null
+  return extractNonStandardKeys(entry)
 }

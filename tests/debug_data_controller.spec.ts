@@ -133,7 +133,7 @@ test.group('DebugDataController | fetch cancellation', (group) => {
     await sleep(250)
 
     // Only the logs data should arrive
-    const tabsReceived = calls.data.map((d: any) => d.tab)
+    const tabsReceived = calls.data.map((d: unknown) => (d as Record<string, unknown>).tab)
     assert.deepEqual(tabsReceived, ['logs'])
 
     ctrl.stop()
@@ -175,7 +175,7 @@ test.group('DebugDataController | fetch cancellation', (group) => {
 
     await sleep(250)
 
-    const tabsReceived = calls.data.map((d: any) => d.tab)
+    const tabsReceived = calls.data.map((d: unknown) => (d as Record<string, unknown>).tab)
     assert.deepEqual(tabsReceived, ['events'])
 
     ctrl.stop()
@@ -236,7 +236,7 @@ test.group('DebugDataController | timer behaviour', (group) => {
     const { calls, ...cbs } = createCallbacks()
 
     let fetchCount = 0
-    const origMock = globalThis.fetch
+    const _origMock = globalThis.fetch
     mockFetch({ '/admin/api/debug/queries': { tab: 'queries' } }, 0)
     const mockedFetch = globalThis.fetch
     globalThis.fetch = async (...args: Parameters<typeof globalThis.fetch>) => {

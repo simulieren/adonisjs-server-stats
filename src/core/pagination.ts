@@ -153,6 +153,20 @@ export function createSortState(
  * @param options - Dashboard hook options (page, perPage, search, sort, etc.).
  * @returns A query string (without leading `?`).
  */
+/** Field mappings from option keys to query parameter names. */
+const QUERY_PARAM_FIELDS: Array<{
+  key: string
+  param: string
+  isNumeric?: boolean
+}> = [
+  { key: 'page', param: 'page', isNumeric: true },
+  { key: 'perPage', param: 'perPage', isNumeric: true },
+  { key: 'search', param: 'search' },
+  { key: 'sort', param: 'sort' },
+  { key: 'sortDir', param: 'direction' },
+  { key: 'timeRange', param: 'range' },
+]
+
 export function buildQueryParams(options: {
   page?: number
   perPage?: number
@@ -163,14 +177,14 @@ export function buildQueryParams(options: {
   timeRange?: string
 }): string {
   const params = new URLSearchParams()
+  const opts = options as Record<string, unknown>
 
-  if (options.page !== null && options.page !== undefined) params.set('page', String(options.page))
-  if (options.perPage !== null && options.perPage !== undefined)
-    params.set('perPage', String(options.perPage))
-  if (options.search) params.set('search', options.search)
-  if (options.sort) params.set('sort', options.sort)
-  if (options.sortDir) params.set('direction', options.sortDir)
-  if (options.timeRange) params.set('range', options.timeRange)
+  for (const { key, param, isNumeric } of QUERY_PARAM_FIELDS) {
+    const value = opts[key]
+    if (isNumeric ? value !== null && value !== undefined : value) {
+      params.set(param, String(value))
+    }
+  }
 
   if (options.filters) {
     for (const [key, value] of Object.entries(options.filters)) {

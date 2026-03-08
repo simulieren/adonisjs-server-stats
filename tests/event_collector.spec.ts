@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import type { Emitter } from '../src/debug/types.js'
 import { EventCollector } from '../src/debug/event_collector.js'
 
 // ---------------------------------------------------------------------------
@@ -18,8 +19,8 @@ function createMockEmitter() {
       emittedEvents.push({ event: name, data })
       return undefined
     },
-    on(_event: string, _handler: (...args: any[]) => void): void {},
-    off(_event: string, _handler: (...args: any[]) => void): void {},
+    on(_event: string, _handler: (...args: unknown[]) => void): void {},
+    off(_event: string, _handler: (...args: unknown[]) => void): void {},
   }
 
   return { emitter, emittedEvents }
@@ -35,7 +36,7 @@ test.group('EventCollector | summarizeData truncation', () => {
   }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Create a large payload (well over 4KB when serialized)
     const largeData: Record<string, string> = {}
@@ -69,7 +70,7 @@ test.group('EventCollector | summarizeData truncation', () => {
   test('small payloads are not truncated', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     const smallData = { name: 'test', value: 42 }
     emitter.emit('test:small', smallData)
@@ -101,7 +102,7 @@ test.group('EventCollector | circular references', () => {
   test('circular references in event data do not crash summarizeData', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Create a circular reference
     const circular: Record<string, unknown> = { name: 'root', value: 123 }
@@ -133,7 +134,7 @@ test.group('EventCollector | circular references', () => {
   test('deeply nested circular references are handled correctly', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Create a deeply nested circular reference
     const a: Record<string, unknown> = { level: 'a' }
@@ -169,7 +170,7 @@ test.group('EventCollector | safeReplacer handles nested objects', () => {
   test('shared object references are correctly marked as circular', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Same object referenced twice (not circular, but shared)
     const shared = { id: 1, value: 'shared' }
@@ -199,7 +200,7 @@ test.group('EventCollector | safeReplacer handles nested objects', () => {
   test('functions in event data are serialized as [Function: name]', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     function myHandler() {}
     const data = {
@@ -225,7 +226,7 @@ test.group('EventCollector | safeReplacer handles nested objects', () => {
   test('bigint values are serialized as strings', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     const data = { bigValue: BigInt(9007199254740991) }
 
@@ -247,7 +248,7 @@ test.group('EventCollector | safeReplacer handles nested objects', () => {
   test('null and undefined event data are handled gracefully', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     emitter.emit('test:null', null)
     emitter.emit('test:undefined', undefined)
@@ -264,7 +265,7 @@ test.group('EventCollector | safeReplacer handles nested objects', () => {
   test('string event data is stored as-is without JSON.stringify', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     emitter.emit('test:string', 'hello world')
 
@@ -284,7 +285,7 @@ test.group('EventCollector | Ordering', () => {
   test('returns events in newest-first order', ({ assert }) => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     emitter.emit('event:first', { order: 1 })
     emitter.emit('event:second', { order: 2 })
@@ -307,12 +308,12 @@ test.group('EventCollector | Ordering', () => {
 test.group('EventCollector | emit pass-through', () => {
   test('original emit is called even when collector is active', ({ assert }) => {
     const collector = new EventCollector(100)
-    const { emitter, emittedEvents } = createMockEmitter()
+    const { emitter, emittedEvents: _emittedEvents } = createMockEmitter()
 
     // Capture original emit before collector patches it
-    const originalEmit = emitter.emit.bind(emitter)
+    const _originalEmit = emitter.emit.bind(emitter)
 
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Now emit -- collector intercepts but should pass through
     emitter.emit('user:registered', { id: 1 })
@@ -329,9 +330,9 @@ test.group('EventCollector | emit pass-through', () => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
 
-    const originalEmit = emitter.emit
+    const _originalEmit = emitter.emit
 
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
     assert.notEqual(emitter.emit, originalEmit, 'emit should be patched after start()')
 
     collector.stop()

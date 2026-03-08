@@ -119,8 +119,8 @@ test.group('normalizeTraceFields with nested trace', () => {
     const normalized = normalizeTraceFields(merged)
 
     assert.lengthOf(normalized.logs, 2)
-    assert.equal((normalized.logs[0] as any).message, 'outer log 1')
-    assert.equal((normalized.logs[1] as any).message, 'outer log 2')
+    assert.equal((normalized.logs[0] as unknown as Record<string, unknown>).message, 'outer log 1')
+    assert.equal((normalized.logs[1] as unknown as Record<string, unknown>).message, 'outer log 2')
   })
 
   test('flattened trace with JSON string spans from SQLite', ({ assert }) => {

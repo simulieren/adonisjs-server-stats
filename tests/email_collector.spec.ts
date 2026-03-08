@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import type { Emitter } from '../src/debug/types.js'
 import { EmailCollector } from '../src/debug/email_collector.js'
 
 // ---------------------------------------------------------------------------
@@ -6,7 +7,7 @@ import { EmailCollector } from '../src/debug/email_collector.js'
 // ---------------------------------------------------------------------------
 
 function createMockEmitter() {
-  const handlers: Record<string, Function[]> = {}
+  const handlers: Record<string, ((...args: unknown[]) => void)[]> = {}
   return {
     on(event: string, handler: Function) {
       ;(handlers[event] ??= []).push(handler)
@@ -81,7 +82,7 @@ test.group('EmailCollector | start(emitter)', () => {
   test('registers handlers for all five mail events', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     assert.isTrue('mail:sending' in emitter.handlers)
     assert.isTrue('mail:sent' in emitter.handlers)
@@ -107,7 +108,7 @@ test.group('EmailCollector | mail:sending', () => {
   test('creates a record with status "sending" and extracts fields', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData())
 
@@ -132,7 +133,7 @@ test.group('EmailCollector | mail:sending', () => {
   test('extracts array "to" addresses as comma-separated string', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit(
       'mail:sending',
@@ -150,7 +151,7 @@ test.group('EmailCollector | mail:sending', () => {
   test('extracts cc and bcc addresses', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit(
       'mail:sending',
@@ -170,7 +171,7 @@ test.group('EmailCollector | mail:sending', () => {
   test('defaults subject to "(no subject)" when missing', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit(
       'mail:sending',
@@ -185,7 +186,7 @@ test.group('EmailCollector | mail:sending', () => {
   test('defaults from to "unknown" when missing', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit(
       'mail:sending',
@@ -208,7 +209,7 @@ test.group('EmailCollector | mail:sent updates matching sending', () => {
   }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData())
     emitter.emit('mail:sent', makeSentData())
@@ -224,7 +225,7 @@ test.group('EmailCollector | mail:sent updates matching sending', () => {
   test('updates the most recent matching sending record (findFromEnd)', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     // Two sending events with the same to+subject
     emitter.emit('mail:sending', makeSendingData())
@@ -250,7 +251,7 @@ test.group('EmailCollector | mail:sent with no matching sending', () => {
   test('creates a fresh "sent" record when no matching sending exists', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sent', makeSentData())
 
@@ -265,7 +266,7 @@ test.group('EmailCollector | mail:sent with no matching sending', () => {
   test('does not match a sending record with a different subject', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ subject: 'Different Subject' }))
     emitter.emit('mail:sent', makeSentData())
@@ -287,7 +288,7 @@ test.group('EmailCollector | mail:queueing', () => {
   test('creates a record with status "queueing"', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:queueing', {
       message: {
@@ -311,7 +312,7 @@ test.group('EmailCollector | mail:queueing', () => {
   test('mail:queued updates matching queueing record to queued', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:queueing', {
       message: {
@@ -348,7 +349,7 @@ test.group('EmailCollector | mail:queued', () => {
   test('creates a record with status "queued"', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:queued', {
       message: {
@@ -378,7 +379,7 @@ test.group('EmailCollector | queued:mail:error', () => {
   test('creates a record with status "failed"', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('queued:mail:error', {
       message: {
@@ -407,7 +408,7 @@ test.group('EmailCollector | getEmails()', () => {
   test('returns all emails in newest-first order', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ subject: 'First' }))
     emitter.emit('mail:sending', makeSendingData({ subject: 'Second' }))
@@ -436,7 +437,7 @@ test.group('EmailCollector | getLatest(n)', () => {
   test('returns the most recent n emails', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ subject: 'A' }))
     emitter.emit('mail:sending', makeSendingData({ subject: 'B' }))
@@ -454,7 +455,7 @@ test.group('EmailCollector | getLatest(n)', () => {
   test('returns all emails when n exceeds total count', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ subject: 'Only' }))
 
@@ -474,7 +475,7 @@ test.group('EmailCollector | getEmailHtml(id)', () => {
   test('returns html field for matching ID', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ html: '<b>Important</b>' }))
 
@@ -493,7 +494,7 @@ test.group('EmailCollector | getEmailHtml(id)', () => {
   test('returns null when email has no html', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ html: undefined }))
 
@@ -513,7 +514,7 @@ test.group('EmailCollector | getTotalCount()', () => {
   test('returns the current buffer size', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     assert.equal(collector.getTotalCount(), 0)
 
@@ -535,7 +536,7 @@ test.group('EmailCollector | getBufferInfo()', () => {
   test('returns current count and max capacity', async ({ assert }) => {
     const collector = new EmailCollector(25)
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData())
 
@@ -555,7 +556,7 @@ test.group('EmailCollector | clear()', () => {
   test('resets the buffer to empty', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData())
     emitter.emit('mail:sending', makeSendingData({ subject: 'Two' }))
@@ -578,7 +579,7 @@ test.group('EmailCollector | stop()', () => {
   test('unregisters all handlers from the emitter', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     // Verify handlers are registered
     assert.lengthOf(emitter.handlers['mail:sending'], 1)
@@ -596,7 +597,7 @@ test.group('EmailCollector | stop()', () => {
   test('events emitted after stop are not recorded', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData())
     assert.equal(collector.getTotalCount(), 1)
@@ -610,7 +611,7 @@ test.group('EmailCollector | stop()', () => {
   test('stop() is safe to call multiple times', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     assert.doesNotThrow(() => {
       collector.stop()
@@ -634,7 +635,7 @@ test.group('EmailCollector | HTML truncation', () => {
   }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const largeHtml = 'x'.repeat(60_000)
     emitter.emit('mail:sending', makeSendingData({ html: largeHtml }))
@@ -651,7 +652,7 @@ test.group('EmailCollector | HTML truncation', () => {
   test('HTML bodies at or below 50KB are not truncated', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const html = 'x'.repeat(50_000)
     emitter.emit('mail:sending', makeSendingData({ html }))
@@ -666,7 +667,7 @@ test.group('EmailCollector | HTML truncation', () => {
   test('text bodies larger than 50KB are also truncated', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const largeText = 'y'.repeat(60_000)
     emitter.emit('mail:sending', makeSendingData({ text: largeText }))
@@ -681,7 +682,7 @@ test.group('EmailCollector | HTML truncation', () => {
   test('null or empty html is preserved as null', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ html: null }))
     emitter.emit('mail:sending', makeSendingData({ html: '' }))
@@ -702,7 +703,7 @@ test.group('EmailCollector | Flat message shape', () => {
   test('handles data.message (nested shape)', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', {
       message: {
@@ -724,7 +725,7 @@ test.group('EmailCollector | Flat message shape', () => {
   test('handles data itself as message (flat shape)', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     // No `message` property — data IS the message
     emitter.emit('mail:sending', {
@@ -751,7 +752,7 @@ test.group('EmailCollector | messageId extraction', () => {
   test('extracts messageId from data.response.messageId', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sent', {
       message: {
@@ -773,7 +774,7 @@ test.group('EmailCollector | messageId extraction', () => {
   }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sent', {
       message: {
@@ -793,7 +794,7 @@ test.group('EmailCollector | messageId extraction', () => {
   test('messageId is null when neither source provides it', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sent', {
       message: {
@@ -818,7 +819,7 @@ test.group('EmailCollector | Attachment count', () => {
   test('counts array attachments', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit(
       'mail:sending',
@@ -839,7 +840,7 @@ test.group('EmailCollector | Attachment count', () => {
   test('non-array attachments result in 0', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ attachments: 'not-an-array' }))
     assert.equal(collector.getEmails()[0].attachmentCount, 0)
@@ -850,7 +851,7 @@ test.group('EmailCollector | Attachment count', () => {
   test('missing attachments result in 0', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData())
     assert.equal(collector.getEmails()[0].attachmentCount, 0)
@@ -867,7 +868,7 @@ test.group('EmailCollector | loadRecords + continued recording', () => {
   test('restores records and resets ID counter to avoid collisions', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     // Simulate previously persisted records
     const persisted = [
@@ -956,7 +957,7 @@ test.group('EmailCollector | onNewItem callback', () => {
   test('fires callback on each new email', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const captured: unknown[] = []
     collector.onNewItem((item) => captured.push(item))
@@ -965,8 +966,8 @@ test.group('EmailCollector | onNewItem callback', () => {
     emitter.emit('mail:sending', makeSendingData({ subject: 'CB 2' }))
 
     assert.lengthOf(captured, 2)
-    assert.equal((captured[0] as any).subject, 'CB 1')
-    assert.equal((captured[1] as any).subject, 'CB 2')
+    assert.equal((captured[0] as unknown as Record<string, unknown>).subject, 'CB 1')
+    assert.equal((captured[1] as unknown as Record<string, unknown>).subject, 'CB 2')
 
     collector.stop()
   })
@@ -974,7 +975,7 @@ test.group('EmailCollector | onNewItem callback', () => {
   test('passing null removes the callback', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const captured: unknown[] = []
     collector.onNewItem((item) => captured.push(item))
@@ -995,7 +996,7 @@ test.group('EmailCollector | onNewItem callback', () => {
   }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const captured: unknown[] = []
     collector.onNewItem((item) => captured.push(item))
@@ -1003,7 +1004,7 @@ test.group('EmailCollector | onNewItem callback', () => {
     emitter.emit('mail:sent', makeSentData())
 
     assert.lengthOf(captured, 1)
-    assert.equal((captured[0] as any).status, 'sent')
+    assert.equal((captured[0] as unknown as Record<string, unknown>).status, 'sent')
 
     collector.stop()
   })
@@ -1013,7 +1014,7 @@ test.group('EmailCollector | onNewItem callback', () => {
   }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const captured: unknown[] = []
     collector.onNewItem((item) => captured.push(item))
@@ -1026,7 +1027,7 @@ test.group('EmailCollector | onNewItem callback', () => {
     // The captured object is the same reference as the record in the buffer.
     // Because mail:sent mutates match.status in-place, the captured reference
     // now reflects 'sent'. This confirms only one push happened.
-    assert.equal((captured[0] as any).status, 'sent')
+    assert.equal((captured[0] as unknown as Record<string, unknown>).status, 'sent')
 
     collector.stop()
   })
@@ -1039,22 +1040,22 @@ test.group('EmailCollector | onNewItem callback', () => {
 test.group('EmailCollector | start() with invalid emitter', () => {
   test('null emitter does not throw', async ({ assert }) => {
     const collector = new EmailCollector()
-    await assert.doesNotReject(() => collector.start(null as any))
+    await assert.doesNotReject(() => collector.start(null as unknown as Emitter))
   })
 
   test('undefined emitter does not throw', async ({ assert }) => {
     const collector = new EmailCollector()
-    await assert.doesNotReject(() => collector.start(undefined as any))
+    await assert.doesNotReject(() => collector.start(undefined as unknown as Emitter))
   })
 
   test('emitter without .on method does not throw', async ({ assert }) => {
     const collector = new EmailCollector()
-    await assert.doesNotReject(() => collector.start({} as any))
+    await assert.doesNotReject(() => collector.start({} as unknown as Emitter))
   })
 
   test('emitter with .on as non-function does not throw', async ({ assert }) => {
     const collector = new EmailCollector()
-    await assert.doesNotReject(() => collector.start({ on: 'not-a-function' } as any))
+    await assert.doesNotReject(() => collector.start({ on: 'not-a-function' } as unknown as Emitter))
   })
 })
 
@@ -1066,7 +1067,7 @@ test.group('EmailCollector | mailer name extraction', () => {
   test('uses mailerName when available', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', {
       message: { from: 'a@b.com', to: 'c@d.com', subject: 'Test' },
@@ -1081,7 +1082,7 @@ test.group('EmailCollector | mailer name extraction', () => {
   test('falls back to data.mailer when mailerName is absent', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', {
       message: { from: 'a@b.com', to: 'c@d.com', subject: 'Test' },
@@ -1096,7 +1097,7 @@ test.group('EmailCollector | mailer name extraction', () => {
   test('defaults to "unknown" when neither mailerName nor mailer is set', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', {
       message: { from: 'a@b.com', to: 'c@d.com', subject: 'Test' },
@@ -1116,7 +1117,7 @@ test.group('EmailCollector | Ring buffer overflow', () => {
   test('oldest emails are evicted when capacity is exceeded', async ({ assert }) => {
     const collector = new EmailCollector(3)
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('mail:sending', makeSendingData({ subject: 'Email 1' }))
     emitter.emit('mail:sending', makeSendingData({ subject: 'Email 2' }))
@@ -1142,7 +1143,7 @@ test.group('EmailCollector | Address extraction', () => {
   test('extracts address from { address } object', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit(
       'mail:sending',
@@ -1159,7 +1160,7 @@ test.group('EmailCollector | Address extraction', () => {
   test('handles mixed array of strings and objects', async ({ assert }) => {
     const collector = new EmailCollector()
     const emitter = createMockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit(
       'mail:sending',

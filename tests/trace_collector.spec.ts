@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import type { Emitter } from '../src/debug/types.js'
 import { TraceCollector, trace } from '../src/debug/trace_collector.js'
 import type { TraceRecord, TraceSpan } from '../src/debug/types.js'
 
@@ -7,7 +8,7 @@ import type { TraceRecord, TraceSpan } from '../src/debug/types.js'
 // ---------------------------------------------------------------------------
 
 function createMockEmitter() {
-  const handlers: Record<string, Function[]> = {}
+  const handlers: Record<string, ((...args: unknown[]) => void)[]> = {}
   return {
     on(event: string, handler: Function) {
       ;(handlers[event] ??= []).push(handler)
@@ -81,7 +82,7 @@ test.group('TraceCollector | Core lifecycle', (group) => {
 
   test('addSpan adds a span to the active trace', async ({ assert }) => {
     await collector.startTrace(async () => {
-      collector.addSpan('SELECT * FROM users', 'db', 0, 5.5, { connection: 'pg' })
+      collector.addSpan({ label: 'SELECT * FROM users', category: 'db', startOffset: 0, duration: 5.5, metadata: { connection: 'pg' } })
       const record = collector.finishTrace('GET', '/users', 200)
 
       assert.isNotNull(record)
@@ -135,8 +136,8 @@ test.group('TraceCollector | Core lifecycle', (group) => {
     assert,
   }) => {
     await collector.startTrace(async () => {
-      collector.addSpan('span-1', 'db', 0, 1)
-      collector.addSpan('span-2', 'custom', 1, 2)
+      collector.addSpan({ label: 'span-1', category: 'db', startOffset: 0, duration: 1 })
+      collector.addSpan({ label: 'span-2', category: 'custom', startOffset: 1, duration: 2 })
       collector.addSpan('span-3', 'middleware', 3, 3)
 
       const record = collector.finishTrace('GET', '/test', 200)
@@ -607,7 +608,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('start() hooks db:query events to auto-create spans', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       emitter.emit('db:query', {
@@ -635,7 +636,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('db query span has no parentId (root level)', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       emitter.emit('db:query', {
@@ -652,7 +653,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('db query span inside a span() gets correct parentId', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       await collector.span('fetchUsers', 'custom', async () => {
@@ -674,7 +675,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('duration parsing for hrtime tuple [seconds, nanoseconds]', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       // [1 second, 500_000_000 nanoseconds] = 1500ms
@@ -694,7 +695,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('duration parsing for hrtime [0, nanoseconds]', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       // [0, 2_500_000] = 2.5ms
@@ -713,7 +714,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('duration defaults to 0 when missing', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       emitter.emit('db:query', {
@@ -730,7 +731,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('db:query event outside trace context is ignored', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Emit outside any trace context
     emitter.emit('db:query', {
@@ -745,7 +746,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('sql defaults to "query" when sql field is missing', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       emitter.emit('db:query', {
@@ -761,7 +762,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('stop() unhooks db:query events', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Verify handler is registered
     assert.isAbove(emitter.handlers['db:query']?.length ?? 0, 0)
@@ -773,7 +774,7 @@ test.group('TraceCollector | Event integration', (group) => {
   })
 
   test('multiple db queries create multiple spans', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       for (let i = 0; i < 5; i++) {
@@ -816,7 +817,7 @@ test.group('TraceCollector | Console.warn interception', (group) => {
   test('console.warn calls within a trace context are collected as warnings', async ({
     assert,
   }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       console.warn('something is wrong')
@@ -839,7 +840,7 @@ test.group('TraceCollector | Console.warn interception', (group) => {
     }
     console.warn = mockWarn
 
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // Call console.warn outside any trace
     console.warn('outside-trace')
@@ -851,7 +852,7 @@ test.group('TraceCollector | Console.warn interception', (group) => {
   })
 
   test('console.warn is restored after stop()', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     // console.warn should now be intercepted
     const interceptedWarn = console.warn
@@ -866,7 +867,7 @@ test.group('TraceCollector | Console.warn interception', (group) => {
   })
 
   test('warnings are per-trace and do not leak between traces', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       console.warn('trace-1-warning')
@@ -887,7 +888,7 @@ test.group('TraceCollector | Console.warn interception', (group) => {
   })
 
   test('console.warn with non-string arguments converts to string', async ({ assert }) => {
-    collector.start(emitter as any)
+    collector.start(emitter as unknown as Emitter)
 
     await collector.startTrace(async () => {
       console.warn('count:', 42, true, null, undefined)
@@ -1174,7 +1175,7 @@ test.group('TraceCollector | Edge cases', (group) => {
     const badEmitter = { on: undefined, off() {}, emit() {} }
 
     // Should not throw
-    collector.start(badEmitter as any)
+    collector.start(badEmitter as unknown as Emitter)
     assert.isTrue(true)
   })
 

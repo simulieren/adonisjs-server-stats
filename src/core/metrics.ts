@@ -370,48 +370,21 @@ export const METRIC_DEFINITIONS: MetricDefinition[] = [
   },
 ]
 
-/**
- * Look up a metric definition by its ID.
- *
- * @param id - Metric identifier (e.g. `'cpu'`, `'memory'`).
- * @returns The matching definition, or `undefined` if not found.
- */
+/** Look up a metric definition by its ID. */
 export function getMetricById(id: string): MetricDefinition | undefined {
   return METRIC_DEFINITIONS.find((m) => m.id === id)
 }
 
-/**
- * Group metric definitions by their `group` field.
- *
- * Returns a `Map` where keys are group names and values are
- * arrays of metrics in that group. Metrics without an explicit
- * `group` default to `'core'`.
- *
- * The map iteration order matches first-seen order of groups
- * in {@link METRIC_DEFINITIONS}.
- *
- * @returns A map of group name to metric definitions.
- */
+/** Group metric definitions by their `group` field. */
 export function getMetricsByGroup(): Map<string, MetricDefinition[]> {
   const groups = new Map<string, MetricDefinition[]>()
   for (const metric of METRIC_DEFINITIONS) {
     const group = metric.group || 'core'
-    if (!groups.has(group)) {
-      groups.set(group, [])
-    }
+    if (!groups.has(group)) groups.set(group, [])
     groups.get(group)!.push(metric)
   }
   return groups
 }
 
-/**
- * Maximum number of data points to keep in the sparkline history
- * buffer per metric. Matches the Edge implementation.
- */
-export const MAX_HISTORY = 60
-
-/**
- * Milliseconds after the last successful update before the connection
- * is considered stale (amber dot indicator).
- */
-export const STALE_MS = 10_000
+// Re-exported from constants for backward compatibility
+export { MAX_HISTORY, STALE_MS } from './constants.js'

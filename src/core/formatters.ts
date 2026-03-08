@@ -7,6 +7,7 @@
 // ---------------------------------------------------------------------------
 
 import { SLOW_DURATION_MS, VERY_SLOW_DURATION_MS } from './constants.js'
+import { previewString, previewArray, previewObject } from './formatters-helpers.js'
 
 import type { ThresholdColor } from './types.js'
 
@@ -373,29 +374,10 @@ export function shortReqId(reqId: string): string {
 export function compactPreview(value: unknown, maxLen: number = 100): string {
   if (value === null) return 'null'
   if (value === undefined) return '-'
-  if (typeof value === 'string') {
-    return '"' + (value.length > 40 ? value.slice(0, 40) + '...' : value) + '"'
-  }
+  if (typeof value === 'string') return previewString(value)
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '[]'
-    const items = value.slice(0, 3).map((v) => compactPreview(v, 30))
-    const s =
-      '[' + items.join(', ') + (value.length > 3 ? ', ...' + value.length + ' items' : '') + ']'
-    return s.length > maxLen ? '[' + value.length + ' items]' : s
-  }
-  if (typeof value === 'object') {
-    const keys = Object.keys(value as Record<string, unknown>)
-    if (keys.length === 0) return '{}'
-    const pairs: string[] = []
-    for (let i = 0; i < Math.min(keys.length, 4); i++) {
-      pairs.push(keys[i] + ': ' + compactPreview((value as Record<string, unknown>)[keys[i]], 30))
-    }
-    const s = '{ ' + pairs.join(', ') + (keys.length > 4 ? ', ...+' + (keys.length - 4) : '') + ' }'
-    return s.length > maxLen
-      ? '{ ' + keys.slice(0, 6).join(', ') + (keys.length > 6 ? ', ...' : '') + ' }'
-      : s
-  }
+  if (Array.isArray(value)) return previewArray(value, maxLen, compactPreview)
+  if (typeof value === 'object') return previewObject(value as Record<string, unknown>, maxLen, compactPreview)
   return String(value)
 }
 

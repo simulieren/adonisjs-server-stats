@@ -130,43 +130,7 @@ export class ServerStatsController {
     if (this.unauthorized) return
     this.stopped = false
 
-    let usePolling = false
-
-    try {
-      const sub = subscribeToChannel({
-        baseUrl: this.baseUrl,
-        channelName: this.channelName,
-        authToken: this.authToken,
-        onMessage: (data) => {
-          if (data && typeof data === 'object' && 'timestamp' in data) {
-            this.processStats(data as ServerStats)
-          }
-        },
-        onConnect: () => {
-          this.setSseActive(true)
-          this.setConnected(true)
-          // Stop polling -- SSE is delivering data
-          this.stopPolling()
-        },
-        onDisconnect: () => {
-          this.setSseActive(false)
-          this.setConnected(false)
-          // Fall back to polling — but only if not already stopped
-          // (onDisconnect can fire asynchronously after stop())
-          if (!this.pollTimer && !this.unauthorized && !this.stopped) {
-            this.startPollInterval()
-          }
-        },
-        onError: () => {
-          // SSE failed, fall back to polling
-          usePolling = true
-        },
-      })
-
-      this.sseHandle = sub
-    } catch {
-      usePolling = true
-    }
+    const usePolling = this.initSseSubscription()
 
     // Always do an initial poll to get data fast
     this.poll()
@@ -175,29 +139,10 @@ export class ServerStatsController {
     if (usePolling || !this.sseHandle) {
       this.startPollInterval()
     } else {
-      // Give SSE 3 seconds to connect, then start polling as backup
-      const fallbackTimer = setTimeout(() => {
-        if (!this.isConnected && !this.pollTimer && !this.stopped) {
-          this.startPollInterval()
-        }
-      }, 3000)
-
-      // Store the fallback timer for cleanup
-      const originalUnsubscribe = this.sseHandle?.unsubscribe
-      if (this.sseHandle) {
-        this.sseHandle.unsubscribe = () => {
-          clearTimeout(fallbackTimer)
-          originalUnsubscribe?.()
-        }
-      }
+      this.setupSseFallbackTimer()
     }
 
-    // Stale detection
-    this.staleTimer = setInterval(() => {
-      if (this.lastSuccess > 0 && Date.now() - this.lastSuccess > STALE_MS) {
-        this.setStale(true)
-      }
-    }, 2000)
+    this.startStaleDetection()
   }
 
   /**
@@ -239,6 +184,67 @@ export class ServerStatsController {
   }
 
   // -- Internal helpers -----------------------------------------------------
+
+  /** Initialize the SSE subscription. Returns true if SSE failed and polling should be used. */
+  private initSseSubscription(): boolean {
+    let usePolling = false
+    try {
+      this.sseHandle = subscribeToChannel({
+        baseUrl: this.baseUrl,
+        channelName: this.channelName,
+        authToken: this.authToken,
+        onMessage: (data) => {
+          if (data && typeof data === 'object' && 'timestamp' in data) {
+            this.processStats(data as ServerStats)
+          }
+        },
+        onConnect: () => {
+          this.setSseActive(true)
+          this.setConnected(true)
+          this.stopPolling()
+        },
+        onDisconnect: () => {
+          this.setSseActive(false)
+          this.setConnected(false)
+          if (!this.pollTimer && !this.unauthorized && !this.stopped) {
+            this.startPollInterval()
+          }
+        },
+        onError: () => {
+          usePolling = true
+        },
+      })
+    } catch {
+      usePolling = true
+    }
+    return usePolling
+  }
+
+  /** Set up a 3-second fallback timer to start polling if SSE hasn't connected. */
+  private setupSseFallbackTimer(): void {
+    const fallbackTimer = setTimeout(() => {
+      if (!this.isConnected && !this.pollTimer && !this.stopped) {
+        this.startPollInterval()
+      }
+    }, 3000)
+
+    const originalUnsubscribe = this.sseHandle?.unsubscribe
+    if (this.sseHandle) {
+      this.sseHandle.unsubscribe = () => {
+        clearTimeout(fallbackTimer)
+        originalUnsubscribe?.()
+      }
+    }
+  }
+
+  /** Start the stale detection interval. */
+  private startStaleDetection(): void {
+    this.staleTimer = setInterval(() => {
+      if (this.lastSuccess > 0 && Date.now() - this.lastSuccess > STALE_MS) {
+        this.setStale(true)
+      }
+    }, 2000)
+  }
 
   /** Process incoming stats data from either SSE or polling. */
   private processStats(data: ServerStats): void {

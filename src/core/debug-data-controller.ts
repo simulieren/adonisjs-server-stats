@@ -183,14 +183,8 @@ export class DebugDataController<T = unknown> {
     const tab = this.currentTab
     if (!tab) return
 
-    // Serve from cache if available (fetchOnce pattern)
-    if (this.fetchOnceCache[tab] !== undefined) {
-      this.callbacks.onData(this.fetchOnceCache[tab] as T)
-      this.callbacks.onLoading(false)
-      return
-    }
+    if (this.serveFromCache(tab)) return
 
-    // Cancel any previous in-flight fetch
     this.abortController?.abort()
     const controller = new AbortController()
     this.abortController = controller
@@ -198,24 +192,35 @@ export class DebugDataController<T = unknown> {
     try {
       const path = `${this.endpoint}${getDebugTabPath(tab)}`
       const result = await this.client.fetch<T>(path, { signal: controller.signal })
-      // Discard if aborted (tab changed while in-flight)
       if (controller.signal.aborted) return
       this.callbacks.onData(result)
       this.callbacks.onError(null)
       this.callbacks.onLoading(false)
     } catch (err) {
-      // Silently ignore aborted requests
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      if (controller.signal.aborted) return
-      if (err instanceof UnauthorizedError) {
-        this.callbacks.onError(err)
-        this.callbacks.onLoading(false)
-        this.stop()
-        this.callbacks.onUnauthorized(err)
-        return
-      }
-      this.callbacks.onError(err instanceof Error ? err : new Error(String(err)))
-      this.callbacks.onLoading(false)
+      this.handleFetchError(err, controller)
     }
+  }
+
+  /** Serve cached data if available. Returns true if cache hit. */
+  private serveFromCache(tab: string): boolean {
+    if (this.fetchOnceCache[tab] === undefined) return false
+    this.callbacks.onData(this.fetchOnceCache[tab] as T)
+    this.callbacks.onLoading(false)
+    return true
+  }
+
+  /** Handle errors from fetchData. */
+  private handleFetchError(err: unknown, controller: AbortController): void {
+    if (err instanceof DOMException && err.name === 'AbortError') return
+    if (controller.signal.aborted) return
+    if (err instanceof UnauthorizedError) {
+      this.callbacks.onError(err)
+      this.callbacks.onLoading(false)
+      this.stop()
+      this.callbacks.onUnauthorized(err)
+      return
+    }
+    this.callbacks.onError(err instanceof Error ? err : new Error(String(err)))
+    this.callbacks.onLoading(false)
   }
 }

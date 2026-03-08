@@ -28,143 +28,68 @@ export interface UseDebugDataOptions {
   refreshInterval?: number
 }
 
+/** Build callbacks that bridge DebugDataController events to Vue refs. */
+function buildCallbacks(refs: {
+  data: ReturnType<typeof ref<unknown>>
+  loading: ReturnType<typeof ref<boolean>>
+  error: ReturnType<typeof ref<Error | null>>
+  isUnauthorized: ReturnType<typeof ref<boolean>>
+}) {
+  return {
+    onData: (d: unknown) => { refs.data.value = d },
+    onLoading: (l: boolean) => { refs.loading.value = l },
+    onError: (e: Error | null) => { refs.error.value = e },
+    onUnauthorized: () => { refs.isUnauthorized.value = true },
+  }
+}
+
 export function useDebugData(tab: () => DebugTab | string, options: UseDebugDataOptions = {}) {
-  const {
-    baseUrl = '',
-    debugEndpoint = '/admin/api/debug',
-    dashboardEndpoint,
-    authToken,
-    refreshInterval,
-  } = options
+  const { baseUrl = '', debugEndpoint = '/admin/api/debug', dashboardEndpoint, authToken, refreshInterval } = options
 
   const data = ref<unknown>(null)
   const loading = ref(false)
   const error = ref<Error | null>(null)
   const isUnauthorized = ref(false)
+  const refs = { data, loading, error, isUnauthorized }
 
-  const controller = new DebugDataController({
-    baseUrl,
-    endpoint: debugEndpoint,
-    authToken,
-    refreshInterval,
-    onData: (d) => {
-      data.value = d
-    },
-    onLoading: (l) => {
-      loading.value = l
-    },
-    onError: (e) => {
-      error.value = e
-    },
-    onUnauthorized: () => {
-      isUnauthorized.value = true
-    },
-  })
-
-  // For DASHBOARD_TABS we need a second controller that targets the
-  // dashboard endpoint.  Created lazily only when needed.
+  const controller = new DebugDataController({ baseUrl, endpoint: debugEndpoint, authToken, refreshInterval, ...buildCallbacks(refs) })
   let dashboardController: DebugDataController | null = null
 
   function getDashboardController(): DebugDataController {
     if (!dashboardController && dashboardEndpoint) {
-      dashboardController = new DebugDataController({
-        baseUrl,
-        endpoint: dashboardEndpoint,
-        authToken,
-        refreshInterval,
-        onData: (d) => {
-          data.value = d
-        },
-        onLoading: (l) => {
-          loading.value = l
-        },
-        onError: (e) => {
-          error.value = e
-        },
-        onUnauthorized: () => {
-          isUnauthorized.value = true
-        },
-      })
+      dashboardController = new DebugDataController({ baseUrl, endpoint: dashboardEndpoint, authToken, refreshInterval, ...buildCallbacks(refs) })
     }
     return dashboardController!
   }
 
-  /** Resolve which controller + tab path to use for the current tab. */
   function startForTab() {
     const currentTab = tab()
-    if (!currentTab) return
-
-    // Custom tabs handle their own data fetching via CustomPaneTab
-    if (currentTab.startsWith('custom-')) return
-
-    // Route dashboard-specific tabs to the dashboard endpoint controller
+    if (!currentTab || currentTab.startsWith('custom-')) return
     if (DASHBOARD_TABS.has(currentTab) && dashboardEndpoint) {
-      const dc = getDashboardController()
-      // Use getDebugTabPath for the path suffix but the dashboard controller for the base
       controller.stop()
-      dc.start(currentTab)
+      getDashboardController().start(currentTab)
     } else {
       dashboardController?.stop()
       controller.start(currentTab)
     }
   }
 
-  function stopAll() {
-    controller.stop()
-    dashboardController?.stop()
-  }
+  function stopAll() { controller.stop(); dashboardController?.stop() }
 
-  /**
-   * Fetch data for a custom pane endpoint.
-   */
-  async function fetchCustomPane(endpoint: string, fetchOnce: boolean = false) {
-    await controller.fetchCustomPane(endpoint, fetchOnce)
-  }
-
-  function startRefresh() {
-    startForTab()
-  }
-
-  function stopRefresh() {
-    stopAll()
-  }
-
-  function refresh() {
-    const currentTab = tab()
-    if (DASHBOARD_TABS.has(currentTab) && dashboardEndpoint && dashboardController) {
-      dashboardController.refresh()
-    } else {
-      controller.refresh()
-    }
-  }
-
-  function clear() {
-    data.value = null
-  }
-
-  // Watch for tab changes
-  watch(tab, () => {
-    clear()
-    startForTab()
-  })
-
-  onMounted(() => {
-    startRefresh()
-  })
-
-  onUnmounted(() => {
-    stopAll()
-  })
+  watch(tab, () => { data.value = null; startForTab() })
+  onMounted(() => startForTab())
+  onUnmounted(() => stopAll())
 
   return {
-    data,
-    loading,
-    error,
-    isUnauthorized,
-    refresh,
-    clear,
-    fetchCustomPane,
-    startRefresh,
-    stopRefresh,
+    data, loading, error, isUnauthorized,
+    refresh: () => {
+      const t = tab()
+      if (DASHBOARD_TABS.has(t) && dashboardEndpoint && dashboardController) dashboardController.refresh()
+      else controller.refresh()
+    },
+    clear: () => { data.value = null },
+    fetchCustomPane: (endpoint: string, fetchOnce: boolean = false) => controller.fetchCustomPane(endpoint, fetchOnce),
+    startRefresh: () => startForTab(),
+    stopRefresh: () => stopAll(),
   }
 }

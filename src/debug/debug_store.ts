@@ -10,6 +10,43 @@ import { TraceCollector } from './trace_collector.js'
 
 import type { DevToolbarConfig, Emitter, Router } from './types.js'
 
+
+/** Read and parse persisted debug data from disk. Returns null on failure. */
+async function readPersistedData(filePath: string): Promise<Record<string, unknown> | null> {
+  let raw: string
+  try {
+    raw = await readFile(filePath, 'utf-8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+      log.warn(
+        `Failed to read persisted debug data from ${bold(filePath)}: ${(error as Error)?.message}`
+      )
+    }
+    return null
+  }
+
+  try {
+    const data = JSON.parse(raw)
+    if (typeof data !== 'object' || data === null) return null
+    return data as Record<string, unknown>
+  } catch {
+    log.warn(`Persisted debug data corrupted, resetting: ${bold(filePath)}`)
+    return null
+  }
+}
+
+/** Load an array from the record into a collector if present and non-empty. */
+function loadIfPresent<T>(
+  record: Record<string, unknown>,
+  key: string,
+  loader: { loadRecords(records: T[]): void } | null
+): void {
+  if (!loader) return
+  if (Array.isArray(record[key]) && record[key].length > 0) {
+    loader.loadRecords(record[key] as T[])
+  }
+}
+
 /**
  * Singleton store holding all debug data collectors.
  * Bound to the AdonisJS container as `debug.store`.
@@ -112,40 +149,12 @@ export class DebugStore {
 
   /** Restore collector data from a JSON file on disk. */
   async loadFromDisk(filePath: string): Promise<void> {
-    let raw: string
-    try {
-      raw = await readFile(filePath, 'utf-8')
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
-        log.warn(
-          `Failed to read persisted debug data from ${bold(filePath)}: ${(error as Error)?.message}`
-        )
-      }
-      return
-    }
+    const record = await readPersistedData(filePath)
+    if (!record) return
 
-    let data: unknown
-    try {
-      data = JSON.parse(raw)
-    } catch {
-      log.warn(`Persisted debug data corrupted, resetting: ${bold(filePath)}`)
-      return
-    }
-
-    if (typeof data !== 'object' || data === null) return
-    const record = data as Record<string, unknown>
-
-    if (Array.isArray(record.queries) && record.queries.length > 0) {
-      this.queries.loadRecords(record.queries)
-    }
-    if (Array.isArray(record.events) && record.events.length > 0) {
-      this.events.loadRecords(record.events)
-    }
-    if (Array.isArray(record.emails) && record.emails.length > 0) {
-      this.emails.loadRecords(record.emails)
-    }
-    if (this.traces && Array.isArray(record.traces) && record.traces.length > 0) {
-      this.traces.loadRecords(record.traces)
-    }
+    loadIfPresent(record, 'queries', this.queries)
+    loadIfPresent(record, 'events', this.events)
+    loadIfPresent(record, 'emails', this.emails)
+    loadIfPresent(record, 'traces', this.traces)
   }
 }

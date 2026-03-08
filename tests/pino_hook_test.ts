@@ -17,7 +17,7 @@ import pino from 'pino'
 
 const STREAM_SYM_GLOBAL = Symbol.for('pino.stream')
 // The CORRECT way to access pino's stream symbol (it's a local symbol, not global)
-const STREAM_SYM_LOCAL = (pino as any).symbols?.streamSym as symbol | undefined
+const STREAM_SYM_LOCAL = (pino as unknown as Record<string, Record<string, symbol>>).symbols?.streamSym as symbol | undefined
 
 // ---- Helpers ----------------------------------------------------------------
 
@@ -42,12 +42,12 @@ async function testBaseline() {
   const logger = pino({ level: 'info' }, pino.destination(filePath))
 
   // --- Method A: Symbol.for('pino.stream')  (what hookPinoLogger uses) ---
-  const rawStreamGlobal = (logger as any)[STREAM_SYM_GLOBAL]
+  const rawStreamGlobal = (logger as unknown as Record<symbol, unknown>)[STREAM_SYM_GLOBAL]
   console.log(`  [Symbol.for] rawStream exists:  ${!!rawStreamGlobal}`)
   console.log(`  [Symbol.for] has .write():      ${typeof rawStreamGlobal?.write === 'function'}`)
 
   // --- Method B: pino.symbols.streamSym  (the correct local symbol) ---
-  const rawStreamLocal = STREAM_SYM_LOCAL ? (logger as any)[STREAM_SYM_LOCAL] : undefined
+  const rawStreamLocal = STREAM_SYM_LOCAL ? (logger as unknown as Record<symbol, unknown>)[STREAM_SYM_LOCAL] : undefined
   console.log(`  [local sym]  rawStream exists:  ${!!rawStreamLocal}`)
   console.log(`  [local sym]  has .write():      ${typeof rawStreamLocal?.write === 'function'}`)
   console.log(`  [local sym]  constructor:       ${rawStreamLocal?.constructor?.name ?? 'N/A'}`)
@@ -64,8 +64,8 @@ async function testBaseline() {
 
     // Wait for SonicBoom to be ready before logging
     await new Promise<void>((resolve) => {
-      if ((rawStreamLocal as any).ready) resolve()
-      else (rawStreamLocal as any).once('ready', resolve)
+      if ((rawStreamLocal as unknown as Record<string, unknown>).ready) resolve()
+      else (rawStreamLocal as unknown as Record<string, (...args: unknown[]) => void>).once('ready', resolve)
     })
 
     logger.info({ testId: 1 }, 'baseline test message')
@@ -114,12 +114,12 @@ async function testWorkerTransport() {
   await wait(500)
 
   // --- Method A: Symbol.for('pino.stream') ---
-  const rawStreamGlobal = (logger as any)[STREAM_SYM_GLOBAL]
+  const rawStreamGlobal = (logger as unknown as Record<symbol, unknown>)[STREAM_SYM_GLOBAL]
   console.log(`  [Symbol.for] rawStream exists:  ${!!rawStreamGlobal}`)
   console.log(`  [Symbol.for] has .write():      ${typeof rawStreamGlobal?.write === 'function'}`)
 
   // --- Method B: pino.symbols.streamSym ---
-  const rawStreamLocal = STREAM_SYM_LOCAL ? (logger as any)[STREAM_SYM_LOCAL] : undefined
+  const rawStreamLocal = STREAM_SYM_LOCAL ? (logger as unknown as Record<symbol, unknown>)[STREAM_SYM_LOCAL] : undefined
   console.log(`  [local sym]  rawStream exists:  ${!!rawStreamLocal}`)
   console.log(`  [local sym]  has .write():      ${typeof rawStreamLocal?.write === 'function'}`)
   console.log(`  [local sym]  constructor:       ${rawStreamLocal?.constructor?.name ?? 'N/A'}`)
@@ -214,8 +214,8 @@ async function testSingleTransport() {
 
   await wait(500)
 
-  const rawStreamGlobal = (logger as any)[STREAM_SYM_GLOBAL]
-  const rawStreamLocal = STREAM_SYM_LOCAL ? (logger as any)[STREAM_SYM_LOCAL] : undefined
+  const rawStreamGlobal = (logger as unknown as Record<symbol, unknown>)[STREAM_SYM_GLOBAL]
+  const rawStreamLocal = STREAM_SYM_LOCAL ? (logger as unknown as Record<symbol, unknown>)[STREAM_SYM_LOCAL] : undefined
 
   console.log(`  [Symbol.for] rawStream exists:  ${!!rawStreamGlobal}`)
   console.log(`  [local sym]  rawStream exists:  ${!!rawStreamLocal}`)
@@ -279,9 +279,9 @@ async function testSymbolMismatch() {
 async function main() {
   console.log('Pino Stream Hook Diagnostic Test')
   console.log(`Node.js ${process.version}`)
-  const pinoVersion = (pino as any).version ?? 'unknown'
+  const pinoVersion = (pino as unknown as Record<string, unknown>).version ?? 'unknown'
   console.log(`pino version: ${pinoVersion}`)
-  console.log(`pino.symbols available: ${!!(pino as any).symbols}`)
+  console.log(`pino.symbols available: ${!!(pino as unknown as Record<string, Record<string, symbol>>).symbols}`)
 
   await testSymbolMismatch()
   await testBaseline()

@@ -6,6 +6,15 @@ import { RingBuffer } from './ring_buffer.js'
 
 import type { TraceSpan, TraceRecord, Emitter, DbQueryEvent } from './types.js'
 
+/** Input for adding a span to the current trace. */
+export interface AddSpanInput {
+  label: string
+  category: TraceSpan['category']
+  startOffset: number
+  duration: number
+  metadata?: Record<string, unknown>
+}
+
 /**
  * Per-request trace context stored in AsyncLocalStorage.
  * Tracks spans, warnings, and nesting for one HTTP request.
@@ -59,7 +68,7 @@ export class TraceCollector {
 
   constructor(maxTraces: number = 200) {
     this.buffer = new RingBuffer<TraceRecord>(maxTraces)
-    globalTraceCollector = this // eslint-disable-line @typescript-eslint/no-this-alias
+    globalTraceCollector = this
   }
 
   /** Start a new trace context for an HTTP request. */
@@ -104,13 +113,7 @@ export class TraceCollector {
   }
 
   /** Add a span to the current trace (if active). */
-  addSpan(
-    label: string,
-    category: TraceSpan['category'],
-    startOffset: number,
-    duration: number,
-    metadata?: Record<string, unknown>
-  ): void {
+  addSpan(input: AddSpanInput): void {
     const ctx = this.als.getStore()
     if (!ctx) return
     if (ctx.spans.length >= TraceCollector.MAX_SPANS_PER_TRACE) return
@@ -118,11 +121,11 @@ export class TraceCollector {
     ctx.spans.push({
       id: String(ctx.nextSpanId++),
       parentId: ctx.currentSpanId,
-      label,
-      category,
-      startOffset: round(startOffset),
-      duration: round(duration),
-      metadata,
+      label: input.label,
+      category: input.category,
+      startOffset: round(input.startOffset),
+      duration: round(input.duration),
+      metadata: input.metadata,
     })
   }
 
@@ -170,10 +173,16 @@ export class TraceCollector {
 
         const offset = performance.now() - ctx.requestStart - duration
 
-        this.addSpan(data.sql || 'query', 'db', offset, duration, {
-          method: data.method,
-          model: data.model,
-          connection: data.connection,
+        this.addSpan({
+          label: data.sql || 'query',
+          category: 'db',
+          startOffset: offset,
+          duration,
+          metadata: {
+            method: data.method,
+            model: data.model,
+            connection: data.connection,
+          },
         })
       }
       emitter.on('db:query', this.dbHandler)

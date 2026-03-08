@@ -51,13 +51,13 @@ function makeConfig(dbPath: string): DevToolbarConfig {
 
 /** Flush the DashboardStore write queue by calling the private method. */
 async function flush(store: DashboardStore): Promise<void> {
-  const timer = (store as any).flushTimer
+  const timer = (store as unknown as Record<string, unknown>).flushTimer
   if (timer) {
     clearTimeout(timer)
-    ;(store as any).flushTimer = null
+    ;(store as unknown as Record<string, unknown>).flushTimer = null
   }
-  await (store as any).flushWriteQueue()
-  ;(store as any).resultCache.clear()
+  await (store as unknown as Record<string, (...args: unknown[]) => Promise<void>>).flushWriteQueue()
+  ;((store as unknown as Record<string, Record<string, () => void>>).resultCache).clear()
 }
 
 // ============================================================================
@@ -71,7 +71,7 @@ test.group('Migration | http_request_id', (group) => {
   group.each.setup(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-migration-test-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, createMockEmitter() as any, tmpDir)
+    await store.start(null, createMockEmitter() as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -116,7 +116,7 @@ test.group('DashboardStore | flushWriteQueue stores http_request_id', (group) =>
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-persist-test-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
     emitter = createMockEmitter()
-    await store.start(null, emitter as any, tmpDir)
+    await store.start(null, emitter as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -177,7 +177,7 @@ test.group('DashboardStore | getTraceDetail log correlation', (group) => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-trace-detail-test-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
     emitter = createMockEmitter()
-    await store.start(null, emitter as any, tmpDir)
+    await store.start(null, emitter as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -282,7 +282,7 @@ test.group('DashboardStore | getRequestDetail log correlation', (group) => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-req-detail-test-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
     emitter = createMockEmitter()
-    await store.start(null, emitter as any, tmpDir)
+    await store.start(null, emitter as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -369,16 +369,16 @@ test.group('Middleware | RequestCompleteData includes httpRequestId', () => {
       setOnRequestComplete,
     } = await import('../src/middleware/request_tracking_middleware.js')
 
-    let captured: Record<string, unknown> | null = null
+    let _captured: Record<string, unknown> | null = null
     setOnRequestComplete((data) => {
-      captured = data as Record<string, unknown>
+      _captured = data as Record<string, unknown>
     })
 
     // Simulate calling the callback with httpRequestId
-    const { default: Middleware } = await import('../src/middleware/request_tracking_middleware.js')
+    const { default: _Middleware } = await import('../src/middleware/request_tracking_middleware.js')
 
     // Directly invoke the callback to verify the type allows httpRequestId
-    const callback = (globalThis as any).__test_onRequestComplete ?? null
+    const _callback = (globalThis as unknown as Record<string, unknown>).__test_onRequestComplete ?? null
     // Instead of invoking the middleware (which needs a full HTTP context),
     // verify the type compiles and the setter works
     assert.isFunction(setOnRequestComplete)
@@ -535,7 +535,7 @@ test.group('DashboardController | requestDetail includes logs', (group) => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-ctrl-detail-test-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
     emitter = createMockEmitter()
-    await store.start(null, emitter as any, tmpDir)
+    await store.start(null, emitter as unknown as import('../src/debug/types.js').Emitter, tmpDir)
   })
 
   group.each.teardown(async () => {

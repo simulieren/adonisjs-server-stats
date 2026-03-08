@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import type { Emitter } from '../src/debug/types.js'
 import { QueryCollector } from '../src/debug/query_collector.js'
 
 class MockEmitter {
@@ -36,7 +37,7 @@ test.group('QueryCollector | Core functionality', () => {
   test('records queries from db:query events', async ({ assert }) => {
     const collector = new QueryCollector()
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT 1' }))
 
@@ -52,7 +53,7 @@ test.group('QueryCollector | Core functionality', () => {
   test('skips server_stats connection', async ({ assert }) => {
     const collector = new QueryCollector()
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('db:query', makeQueryEvent({ connection: 'server_stats' }))
 
@@ -64,7 +65,7 @@ test.group('QueryCollector | Core functionality', () => {
   test('handles numeric duration', async ({ assert }) => {
     const collector = new QueryCollector()
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('db:query', makeQueryEvent({ duration: 5.5 }))
 
@@ -77,7 +78,7 @@ test.group('QueryCollector | Core functionality', () => {
   test('handles hrtime tuple duration', async ({ assert }) => {
     const collector = new QueryCollector()
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     // [0 seconds, 5_500_000 nanoseconds] = 5.5 ms
     emitter.emit('db:query', makeQueryEvent({ duration: [0, 5_500_000] }))
@@ -93,7 +94,7 @@ test.group('QueryCollector | Ordering', () => {
   test('returns queries in newest-first order', async ({ assert }) => {
     const collector = new QueryCollector()
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT first' }))
     emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT second' }))
@@ -113,7 +114,7 @@ test.group('QueryCollector | Performance-critical methods', () => {
   test('getQueriesSince(lastId) returns only new queries', async ({ assert }) => {
     const collector = new QueryCollector(500)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 100; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -130,7 +131,7 @@ test.group('QueryCollector | Performance-critical methods', () => {
   test('getQueriesSince(0) returns all', async ({ assert }) => {
     const collector = new QueryCollector(500)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 10; i++) {
       emitter.emit('db:query', makeQueryEvent())
@@ -145,7 +146,7 @@ test.group('QueryCollector | Performance-critical methods', () => {
   test('getQueriesSince with large buffer returns only tail items', async ({ assert }) => {
     const collector = new QueryCollector(10_000)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 10_000; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -163,7 +164,7 @@ test.group('QueryCollector | Performance-critical methods', () => {
     // slowThresholdMs = 50
     const collector = new QueryCollector(500, 50)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     // 3 fast queries with same SQL (duplicates)
     emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT 1', duration: 10 }))
@@ -188,7 +189,7 @@ test.group('QueryCollector | Performance-critical methods', () => {
   test('getSummary() caches for 1 second', async ({ assert }) => {
     const collector = new QueryCollector(500, 50)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('db:query', makeQueryEvent({ sql: 'SELECT 1', duration: 10 }))
 
@@ -216,7 +217,7 @@ test.group('QueryCollector | Performance-critical methods', () => {
   test('getLatest(n) returns n most recent in reverse order', async ({ assert }) => {
     const collector = new QueryCollector(500)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 50; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -239,7 +240,7 @@ test.group('QueryCollector | Buffer behavior', () => {
   test('ring buffer wraps at capacity', async ({ assert }) => {
     const collector = new QueryCollector(10)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 15; i++) {
       emitter.emit('db:query', makeQueryEvent({ sql: `SELECT ${i}` }))
@@ -257,7 +258,7 @@ test.group('QueryCollector | Buffer behavior', () => {
   test('clear() resets everything', async ({ assert }) => {
     const collector = new QueryCollector()
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     emitter.emit('db:query', makeQueryEvent())
     emitter.emit('db:query', makeQueryEvent())
@@ -275,7 +276,7 @@ test.group('QueryCollector | Buffer behavior', () => {
   test('getBufferInfo returns correct current/max', async ({ assert }) => {
     const collector = new QueryCollector(200)
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     for (let i = 0; i < 25; i++) {
       emitter.emit('db:query', makeQueryEvent())
@@ -291,7 +292,7 @@ test.group('QueryCollector | Buffer behavior', () => {
   test('onNewItem fires callback', async ({ assert }) => {
     const collector = new QueryCollector()
     const emitter = new MockEmitter()
-    await collector.start(emitter as any)
+    await collector.start(emitter as unknown as Emitter)
 
     const received: unknown[] = []
     collector.onNewItem((item) => received.push(item))
@@ -299,7 +300,7 @@ test.group('QueryCollector | Buffer behavior', () => {
     emitter.emit('db:query', makeQueryEvent({ sql: 'INSERT INTO logs' }))
 
     assert.lengthOf(received, 1)
-    assert.equal((received[0] as any).sql, 'INSERT INTO logs')
+    assert.equal((received[0] as unknown as Record<string, unknown>).sql, 'INSERT INTO logs')
 
     // Clean up callback
     collector.onNewItem(null)

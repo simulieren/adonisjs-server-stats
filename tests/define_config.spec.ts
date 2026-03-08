@@ -100,19 +100,19 @@ test.group('defineConfig | alias precedence', (group) => {
   test('authorize overrides shouldShow', ({ assert }) => {
     const authorizeFn = () => true
     const shouldShowFn = () => false
-    const resolved = defineConfig({ authorize: authorizeFn, shouldShow: shouldShowFn } as any)
+    const resolved = defineConfig({ authorize: authorizeFn, shouldShow: shouldShowFn } as unknown as Parameters<typeof defineConfig>[0])
     assert.strictEqual(resolved.shouldShow, authorizeFn)
   })
 
   test('authorize is used when shouldShow is not set', ({ assert }) => {
     const authorizeFn = () => true
-    const resolved = defineConfig({ authorize: authorizeFn } as any)
+    const resolved = defineConfig({ authorize: authorizeFn } as unknown as Parameters<typeof defineConfig>[0])
     assert.strictEqual(resolved.shouldShow, authorizeFn)
   })
 
   test('shouldShow is used as fallback when authorize is not set', ({ assert }) => {
     const shouldShowFn = () => false
-    const resolved = defineConfig({ shouldShow: shouldShowFn } as any)
+    const resolved = defineConfig({ shouldShow: shouldShowFn } as unknown as Parameters<typeof defineConfig>[0])
     assert.strictEqual(resolved.shouldShow, shouldShowFn)
   })
 })
@@ -200,7 +200,7 @@ test.group('defineConfig | resolveToolbarAliases — toolbar', (group) => {
 
   test('toolbar object maps panes field', ({ assert }) => {
     const panes = [{ name: 'test', endpoint: '/test', columns: [] }]
-    const resolved = defineConfig({ toolbar: { panes } } as any)
+    const resolved = defineConfig({ toolbar: { panes } } as unknown as Parameters<typeof defineConfig>[0])
     assert.isDefined(resolved.devToolbar)
     assert.deepEqual(resolved.devToolbar!.panes, panes)
   })
@@ -377,7 +377,7 @@ test.group('defineConfig | deprecation warnings', (group) => {
   group.each.setup(() => {
     originalLog = console.log
     logCalls = []
-    console.log = (...args: any[]) => {
+    console.log = (...args: unknown[]) => {
       logCalls.push(args.map(String).join(' '))
     }
   })
@@ -409,7 +409,7 @@ test.group('defineConfig | deprecation warnings', (group) => {
   })
 
   test('shouldShow triggers deprecation warning', ({ assert }) => {
-    defineConfig({ shouldShow: () => true } as any)
+    defineConfig({ shouldShow: () => true } as unknown as Parameters<typeof defineConfig>[0])
     const output = logCalls.join('\n')
     assert.isTrue(output.includes('shouldShow'), 'expected warning to mention shouldShow')
     assert.isTrue(output.includes('authorize'), 'expected warning to mention authorize')
@@ -446,7 +446,7 @@ test.group('defineConfig | deprecation warnings', (group) => {
       pollInterval: 3000,
       realtime: true,
       statsEndpoint: '/stats',
-      authorize: (() => true) as any,
+      authorize: (() => true) as unknown as (...args: unknown[]) => boolean,
       toolbar: true,
       dashboard: true,
       advanced: { skipInTest: false, channelName: 'ch' },
@@ -613,7 +613,7 @@ test.group('defineConfig | verbose and onStats passthrough', (group) => {
   })
 
   test('collectors array is passed through', ({ assert }) => {
-    const collectors: any[] = [{ name: 'test', collect: async () => ({}) }]
+    const collectors: Array<{ name: string; collect: () => Promise<Record<string, unknown>> }> = [{ name: 'test', collect: async () => ({}) }]
     const resolved = defineConfig({ collectors })
     assert.strictEqual(resolved.collectors, collectors)
   })

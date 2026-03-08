@@ -4,6 +4,29 @@ import { RingBuffer } from './ring_buffer.js'
 
 import type { QueryRecord, Emitter, DbQueryEvent } from './types.js'
 
+
+/** Parse duration from DbQueryEvent (may be number, hrtime tuple, or absent). */
+function parseDuration(duration: unknown): number {
+  if (typeof duration === 'number') return duration
+  if (Array.isArray(duration)) return duration[0] * 1e3 + duration[1] / 1e6
+  return 0
+}
+
+/** Build a QueryRecord from a db:query event. */
+function buildQueryRecord(data: DbQueryEvent, id: number): QueryRecord {
+  return {
+    id,
+    sql: data.sql || '',
+    bindings: data.bindings || [],
+    duration: round(parseDuration(data.duration)),
+    method: data.method || 'unknown',
+    model: data.model || null,
+    connection: data.connection || 'default',
+    inTransaction: data.inTransaction || false,
+    timestamp: Date.now(),
+  }
+}
+
 /**
  * Listens to Lucid's `db:query` event and stores queries in a ring buffer.
  *
@@ -31,31 +54,10 @@ export class QueryCollector {
   async start(emitter: Emitter): Promise<void> {
     this.emitter = emitter
     this.handler = (data: DbQueryEvent) => {
-      // Self-exclude: skip queries from the dashboard's dedicated SQLite connection
       if (data.connection === 'server_stats') return
-      // Self-exclude: skip queries triggered by debug panel polling requests
       if (isExcludedRequest()) return
 
-      const duration =
-        typeof data.duration === 'number'
-          ? data.duration
-          : Array.isArray(data.duration)
-            ? data.duration[0] * 1e3 + data.duration[1] / 1e6
-            : 0
-
-      const record: QueryRecord = {
-        id: this.buffer.getNextId(),
-        sql: data.sql || '',
-        bindings: data.bindings || [],
-        duration: round(duration),
-        method: data.method || 'unknown',
-        model: data.model || null,
-        connection: data.connection || 'default',
-        inTransaction: data.inTransaction || false,
-        timestamp: Date.now(),
-      }
-
-      this.buffer.push(record)
+      this.buffer.push(buildQueryRecord(data, this.buffer.getNextId()))
     }
 
     if (emitter && typeof emitter.on === 'function') {
