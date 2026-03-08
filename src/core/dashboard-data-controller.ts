@@ -144,28 +144,16 @@ export class DashboardDataController {
    *   and loading state is not modified.
    */
   async fetch(silent: boolean = true): Promise<void> {
-    if (silent && this.explicitFetchPending) return
+    if (this.shouldSkipFetch(silent)) return
 
-    this.abortController?.abort()
-    const controller = new AbortController()
-    this.abortController = controller
-    const myFetchId = ++this.fetchId
-    if (!this.section) return
-    if (!silent) {
-      this.callbacks.onLoading(true)
-      this.explicitFetchPending = true
-    }
+    const { controller, myFetchId } = this.prepareFetch(silent)
 
     try {
-      const qs = this.buildCurrentQueryString()
-      const result = await this.api.fetchSection(this.section, qs || undefined, {
-        signal: controller.signal,
-      })
-      if (myFetchId !== this.fetchId || this.stopped) return
+      const result = await this.executeFetch(controller)
+      if (this.isStaleResponse(myFetchId)) return
       this.applyFetchResult(result)
     } catch (err) {
-      if (isAbortedRequest(err, controller.signal)) return
-      if (myFetchId !== this.fetchId || this.stopped) return
+      if (this.shouldIgnoreError(err, controller.signal, myFetchId)) return
       this.handleFetchError(err, silent)
     } finally {
       if (!silent) this.explicitFetchPending = false
@@ -323,6 +311,44 @@ export class DashboardDataController {
   }
 
   // -- Fetch helpers (private) -----------------------------------------------
+
+  /** Whether this fetch call should be skipped entirely. */
+  private shouldSkipFetch(silent: boolean): boolean {
+    if (silent && this.explicitFetchPending) return true
+    return !this.section
+  }
+
+  /** Prepare abort controller, increment fetch ID, set loading state. */
+  private prepareFetch(silent: boolean): { controller: AbortController; myFetchId: number } {
+    this.abortController?.abort()
+    const controller = new AbortController()
+    this.abortController = controller
+    const myFetchId = ++this.fetchId
+    if (!silent) {
+      this.callbacks.onLoading(true)
+      this.explicitFetchPending = true
+    }
+    return { controller, myFetchId }
+  }
+
+  /** Execute the actual API fetch for the current section. */
+  private async executeFetch(controller: AbortController): Promise<unknown> {
+    const qs = this.buildCurrentQueryString()
+    return this.api.fetchSection(this.section, qs || undefined, {
+      signal: controller.signal,
+    })
+  }
+
+  /** Check if a response is stale (fetch ID mismatch or controller stopped). */
+  private isStaleResponse(myFetchId: number): boolean {
+    return myFetchId !== this.fetchId || this.stopped
+  }
+
+  /** Check if an error should be silently ignored (abort or stale). */
+  private shouldIgnoreError(err: unknown, signal: AbortSignal, myFetchId: number): boolean {
+    if (isAbortedRequest(err, signal)) return true
+    return this.isStaleResponse(myFetchId)
+  }
 
   /** Build query string from current controller state. */
   private buildCurrentQueryString(): string {
