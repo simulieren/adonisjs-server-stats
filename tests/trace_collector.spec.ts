@@ -138,7 +138,7 @@ test.group('TraceCollector | Core lifecycle', (group) => {
     await collector.startTrace(async () => {
       collector.addSpan({ label: 'span-1', category: 'db', startOffset: 0, duration: 1 })
       collector.addSpan({ label: 'span-2', category: 'custom', startOffset: 1, duration: 2 })
-      collector.addSpan('span-3', 'middleware', 3, 3)
+      collector.addSpan({ label: 'span-3', category: 'middleware', startOffset: 3, duration: 3 })
 
       const record = collector.finishTrace('GET', '/test', 200)
       assert.isNotNull(record)
@@ -151,7 +151,7 @@ test.group('TraceCollector | Core lifecycle', (group) => {
 
   test('addSpan without metadata omits the metadata field', async ({ assert }) => {
     await collector.startTrace(async () => {
-      collector.addSpan('bare-span', 'custom', 0, 1)
+      collector.addSpan({ label: 'bare-span', category: 'custom', startOffset: 0, duration: 1 })
       const record = collector.finishTrace('GET', '/test', 200)
 
       assert.isUndefined(record!.spans[0].metadata)
@@ -282,7 +282,7 @@ test.group('TraceCollector | Span nesting', (group) => {
   test('addSpan within a span() context gets the span as parent', async ({ assert }) => {
     await collector.startTrace(async () => {
       await collector.span('wrapper', 'custom', async () => {
-        collector.addSpan('manual-child', 'db', 0, 1)
+        collector.addSpan({ label: 'manual-child', category: 'db', startOffset: 0, duration: 1 })
       })
 
       const record = collector.finishTrace('GET', '/test', 200)
@@ -343,7 +343,7 @@ test.group('TraceCollector | Context management', (group) => {
 
   test('addSpan without active trace is a no-op', async ({ assert }) => {
     // Should not throw
-    collector.addSpan('orphan', 'db', 0, 1)
+    collector.addSpan({ label: 'orphan', category: 'db', startOffset: 0, duration: 1 })
     assert.equal(collector.getTotalCount(), 0)
   })
 
@@ -358,7 +358,7 @@ test.group('TraceCollector | Context management', (group) => {
   test('startTrace without finishTrace does not add to buffer', async ({ assert }) => {
     await collector.startTrace(async () => {
       // Intentionally not calling finishTrace
-      collector.addSpan('orphan-span', 'custom', 0, 1)
+      collector.addSpan({ label: 'orphan-span', category: 'custom', startOffset: 0, duration: 1 })
     })
 
     assert.equal(collector.getTotalCount(), 0)
@@ -366,13 +366,13 @@ test.group('TraceCollector | Context management', (group) => {
 
   test('each startTrace gets an independent context', async ({ assert }) => {
     await collector.startTrace(async () => {
-      collector.addSpan('trace1-span', 'custom', 0, 1)
+      collector.addSpan({ label: 'trace1-span', category: 'custom', startOffset: 0, duration: 1 })
       collector.finishTrace('GET', '/first', 200)
     })
 
     await collector.startTrace(async () => {
-      collector.addSpan('trace2-span-a', 'db', 0, 1)
-      collector.addSpan('trace2-span-b', 'db', 1, 2)
+      collector.addSpan({ label: 'trace2-span-a', category: 'db', startOffset: 0, duration: 1 })
+      collector.addSpan({ label: 'trace2-span-b', category: 'db', startOffset: 1, duration: 2 })
       collector.finishTrace('POST', '/second', 201)
     })
 
@@ -389,7 +389,7 @@ test.group('TraceCollector | Context management', (group) => {
     const promises = Array.from({ length: 10 }, (_, i) =>
       collector.startTrace(async () => {
         await delay(1) // yield to allow interleaving
-        collector.addSpan(`span-for-trace-${i}`, 'custom', 0, 1)
+        collector.addSpan({ label: `span-for-trace-${i}`, category: 'custom', startOffset: 0, duration: 1 })
         collector.finishTrace('GET', `/concurrent/${i}`, 200)
       })
     )
@@ -526,7 +526,7 @@ test.group('TraceCollector | Buffer management', (group) => {
 
     await collector.startTrace(async () => {
       for (let i = 0; i < 250; i++) {
-        collector.addSpan(`span-${i}`, 'custom', 0, 1)
+        collector.addSpan({ label: `span-${i}`, category: 'custom', startOffset: 0, duration: 1 })
       }
       const record = collector.finishTrace('GET', '/test', 200)
       assert.isNotNull(record)
@@ -1162,7 +1162,7 @@ test.group('TraceCollector | Edge cases', (group) => {
     collector = new TraceCollector(10)
 
     await collector.startTrace(async () => {
-      collector.addSpan('precise', 'custom', 1.23456, 7.89012)
+      collector.addSpan({ label: 'precise', category: 'custom', startOffset: 1.23456, duration: 7.89012 })
       const record = collector.finishTrace('GET', '/test', 200)
 
       assert.equal(record!.spans[0].startOffset, 1.23)
@@ -1211,7 +1211,7 @@ test.group('TraceCollector | Edge cases', (group) => {
 
     await collector.startTrace(async () => {
       for (const cat of categories) {
-        collector.addSpan(`span-${cat}`, cat, 0, 1)
+        collector.addSpan({ label: `span-${cat}`, category: cat, startOffset: 0, duration: 1 })
       }
 
       const record = collector.finishTrace('GET', '/test', 200)

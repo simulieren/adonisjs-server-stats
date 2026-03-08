@@ -44,39 +44,82 @@ export interface QueueCollectorOptions {
   connection: QueueRedisConnection
 }
 
+/** Default metrics returned when queue data is unavailable. */
+const QUEUE_DEFAULTS = {
+  queueActive: 0,
+  queueWaiting: 0,
+  queueDelayed: 0,
+  queueFailed: 0,
+  queueWorkerCount: 0,
+}
+
+interface WarnState {
+  missingBullmq: boolean
+  connectionError: boolean
+  missingConnection: boolean
+}
+
+/** Fetch job counts from a BullMQ queue. */
+async function fetchQueueCounts(queueName: string, connection: QueueRedisConnection) {
+  const { Queue } = await import('bullmq')
+  const queue = new Queue(queueName, { connection })
+  const [counts, workers] = await Promise.all([queue.getJobCounts(), queue.getWorkers()])
+  await queue.close()
+  return {
+    queueActive: counts.active ?? 0,
+    queueWaiting: counts.waiting ?? 0,
+    queueDelayed: counts.delayed ?? 0,
+    queueFailed: counts.failed ?? 0,
+    queueWorkerCount: workers.length,
+  }
+}
+
+/** Handle queue collection errors with one-time warnings. */
+function handleQueueError(
+  error: unknown,
+  queueName: string,
+  connection: QueueRedisConnection,
+  warned: WarnState
+) {
+  const message = error instanceof Error ? error.message : String(error)
+  const isImportError =
+    message.includes('Cannot find package') ||
+    message.includes('MODULE_NOT_FOUND') ||
+    message.includes('ERR_MODULE_NOT_FOUND')
+
+  if (isImportError) {
+    if (!warned.missingBullmq) {
+      warned.missingBullmq = true
+      log.warn(`Queue collector ${bold(queueName)}: ${bold('bullmq')} is not installed`)
+      log.block('Install the peer dependency to enable queue metrics:', [
+        `${bold('npm install bullmq')}`,
+        dim('Queue metrics will return zeros until bullmq is available.'),
+      ])
+    }
+  } else if (!warned.connectionError) {
+    warned.connectionError = true
+    const { host, port } = connection
+    log.warn(
+      `Queue collector ${bold(queueName)}: cannot connect to Redis at ${bold(`${host}:${port}`)}`
+    )
+    log.block('Connection failed:', [
+      `${dim('Error:')} ${message}`,
+      dim('Is Redis running? Check with: redis-cli ping'),
+      dim('Queue metrics will return zeros until the connection succeeds.'),
+    ])
+  }
+}
+
 /**
  * Monitors a BullMQ job queue for active, waiting, delayed, and failed jobs.
- *
- * Creates a temporary BullMQ `Queue` instance each tick to fetch counts,
- * then immediately closes it.
- *
- * **Metrics produced:**
- * - `queueActive` -- jobs being processed
- * - `queueWaiting` -- jobs waiting for a worker
- * - `queueDelayed` -- jobs scheduled for the future
- * - `queueFailed` -- permanently failed jobs
- * - `queueWorkerCount` -- connected worker processes
  *
  * Returns zeros if BullMQ is unavailable or the queue cannot be reached.
  *
  * **Peer dependencies:** `bullmq`
- *
- * @example
- * ```ts
- * import { queueCollector } from 'adonisjs-server-stats/collectors'
- *
- * queueCollector({
- *   queueName: 'default',
- *   connection: { host: 'localhost', port: 6379, password: 'secret' },
- * })
- * ```
  */
 export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
   const queueName = opts.queueName ?? 'default'
-
-  let warnedMissingBullmq = false
-  let warnedConnectionError = false
-  let warnedMissingConnection = false
+  const warned: WarnState = { missingBullmq: false, connectionError: false, missingConnection: false }
 
   return {
     name: 'queue',
@@ -92,72 +135,21 @@ export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
 
     async collect() {
       if (!opts.connection) {
-        if (!warnedMissingConnection) {
-          warnedMissingConnection = true
+        if (!warned.missingConnection) {
+          warned.missingConnection = true
           log.warn(`Queue collector ${bold(queueName)}: missing ${bold('connection')} option`)
           log.block('Provide a Redis connection when creating the collector:', [
             `${dim('queueCollector({ connection: { host: "localhost", port: 6379 } })')}`,
           ])
         }
-        return {
-          queueActive: 0,
-          queueWaiting: 0,
-          queueDelayed: 0,
-          queueFailed: 0,
-          queueWorkerCount: 0,
-        }
+        return QUEUE_DEFAULTS
       }
 
       try {
-        const { Queue } = await import('bullmq')
-        const queue = new Queue(queueName, { connection: opts.connection })
-        const [counts, workers] = await Promise.all([queue.getJobCounts(), queue.getWorkers()])
-        await queue.close()
-        return {
-          queueActive: counts.active ?? 0,
-          queueWaiting: counts.waiting ?? 0,
-          queueDelayed: counts.delayed ?? 0,
-          queueFailed: counts.failed ?? 0,
-          queueWorkerCount: workers.length,
-        }
+        return await fetchQueueCounts(queueName, opts.connection)
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error)
-        const isImportError =
-          message.includes('Cannot find package') ||
-          message.includes('MODULE_NOT_FOUND') ||
-          message.includes('ERR_MODULE_NOT_FOUND')
-
-        if (isImportError) {
-          if (!warnedMissingBullmq) {
-            warnedMissingBullmq = true
-            log.warn(`Queue collector ${bold(queueName)}: ${bold('bullmq')} is not installed`)
-            log.block('Install the peer dependency to enable queue metrics:', [
-              `${bold('npm install bullmq')}`,
-              dim('Queue metrics will return zeros until bullmq is available.'),
-            ])
-          }
-        } else {
-          if (!warnedConnectionError) {
-            warnedConnectionError = true
-            const { host, port } = opts.connection
-            log.warn(
-              `Queue collector ${bold(queueName)}: cannot connect to Redis at ${bold(`${host}:${port}`)}`
-            )
-            log.block('Connection failed:', [
-              `${dim('Error:')} ${message}`,
-              dim('Is Redis running? Check with: redis-cli ping'),
-              dim('Queue metrics will return zeros until the connection succeeds.'),
-            ])
-          }
-        }
-
-        return {
-          queueActive: 0,
-          queueWaiting: 0,
-          queueDelayed: 0,
-          queueFailed: 0,
-          queueWorkerCount: 0,
-        }
+        handleQueueError(error, queueName, opts.connection, warned)
+        return QUEUE_DEFAULTS
       }
     },
   }

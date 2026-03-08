@@ -330,7 +330,7 @@ test.group('EventCollector | emit pass-through', () => {
     const collector = new EventCollector(100)
     const { emitter } = createMockEmitter()
 
-    const _originalEmit = emitter.emit
+    const originalEmit = emitter.emit
 
     collector.start(emitter as unknown as Emitter)
     assert.notEqual(emitter.emit, originalEmit, 'emit should be patched after start()')

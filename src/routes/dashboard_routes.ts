@@ -3,7 +3,6 @@ import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { AdonisRouter } from './router_types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
-/** Bind a dashboard controller method with lazy init and 503 fallback. */
 function bindDash(getController: () => DashboardController | null, method: keyof DashboardController) {
   return async (ctx: HttpContext) => {
     const controller = getController()
@@ -12,7 +11,6 @@ function bindDash(getController: () => DashboardController | null, method: keyof
   }
 }
 
-/** Wrap an ApiController method as a dashboard HTTP handler. */
 function bindApi(getApi: () => ApiController | null, fn: (api: ApiController, ctx: HttpContext) => Promise<unknown> | unknown) {
   return async (ctx: HttpContext) => {
     const api = getApi()
@@ -21,76 +19,75 @@ function bindApi(getApi: () => ApiController | null, fn: (api: ApiController, ct
   }
 }
 
-/** Register dashboard-specific data routes (queries, events, routes, logs, emails, traces). */
-function registerDataRoutes(
-  router: AdonisRouter,
-  getApiController: () => ApiController | null
-) {
-  router.get('/api/queries', bindApi(getApiController, async (api, ctx) => {
+function registerQueryRoutes(router: AdonisRouter, getApi: () => ApiController | null) {
+  router.get('/api/queries', bindApi(getApi, async (api, ctx) => {
     const qs = ctx.request.qs()
     return ctx.response.json(await api.getQueries({
       page: Number(qs.page) || 1, perPage: Number(qs.perPage) || 25, search: qs.search || undefined,
       filters: { durationMin: qs.duration_min ? Number(qs.duration_min) : undefined, model: qs.model || undefined, method: qs.method || undefined, connection: qs.connection || undefined },
     }))
   })).as('server-stats.queries')
+}
 
-  router.get('/api/events', bindApi(getApiController, async (api, ctx) => {
+function registerEventRoutes(router: AdonisRouter, getApi: () => ApiController | null) {
+  router.get('/api/events', bindApi(getApi, async (api, ctx) => {
     const qs = ctx.request.qs()
     return ctx.response.json(await api.getEvents({
       page: Number(qs.page) || 1, perPage: Number(qs.perPage) || 25, search: qs.search || undefined,
       filters: { eventName: qs.event_name || undefined },
     }))
   })).as('server-stats.events')
+}
 
-  router.get('/api/routes', bindApi(getApiController, (api, ctx) => {
-    return ctx.response.json(api.getRoutes(ctx.request.qs().search || undefined))
-  })).as('server-stats.routes')
-
-  router.get('/api/logs', bindApi(getApiController, async (api, ctx) => {
+function registerLogAndMiscRoutes(router: AdonisRouter, getApi: () => ApiController | null) {
+  router.get('/api/routes', bindApi(getApi, (api, ctx) => ctx.response.json(api.getRoutes(ctx.request.qs().search || undefined)))).as('server-stats.routes')
+  router.get('/api/logs', bindApi(getApi, async (api, ctx) => {
     const qs = ctx.request.qs()
     return ctx.response.json(await api.getLogs({
       page: Number(qs.page) || 1, perPage: Number(qs.perPage) || 50, search: qs.message || qs.search || undefined,
       filters: { level: qs.level || undefined, requestId: qs.request_id || qs.requestId || undefined },
     }))
   })).as('server-stats.logs')
-
-  router.get('/api/emails', bindApi(getApiController, async (api, ctx) => {
+  router.get('/api/emails', bindApi(getApi, async (api, ctx) => {
     const qs = ctx.request.qs()
     return ctx.response.json(await api.getEmails({
       page: Number(qs.page) || 1, perPage: Number(qs.perPage) || 25, search: qs.search || undefined,
       filters: { from: qs.from || undefined, to: qs.to || undefined, subject: qs.subject || undefined, status: qs.status || undefined, mailer: qs.mailer || undefined },
     }))
   })).as('server-stats.emails')
-
-  router.get('/api/emails/:id/preview', bindApi(getApiController, async (api, ctx) => {
+  router.get('/api/emails/:id/preview', bindApi(getApi, async (api, ctx) => {
     const html = await api.getEmailPreview(Number(ctx.params.id))
     if (!html) return ctx.response.notFound({ error: 'Email not found' })
     return ctx.response.header('Content-Type', 'text/html; charset=utf-8').send(html)
   })).as('server-stats.emails.preview')
+}
 
-  router.get('/api/traces', bindApi(getApiController, async (api, ctx) => {
+function registerTraceRoutes(router: AdonisRouter, getApi: () => ApiController | null) {
+  router.get('/api/traces', bindApi(getApi, async (api, ctx) => {
     const qs = ctx.request.qs()
     return ctx.response.json(await api.getTraces({
       page: Number(qs.page) || 1, perPage: Number(qs.perPage) || 25, search: qs.search || undefined,
       filters: { method: qs.method ? qs.method.toUpperCase() : undefined, url: qs.url || undefined, statusMin: qs.status_min ? Number(qs.status_min) : undefined, statusMax: qs.status_max ? Number(qs.status_max) : undefined },
     }))
   })).as('server-stats.traces')
-
-  router.get('/api/traces/:id', bindApi(getApiController, async (api, ctx) => {
+  router.get('/api/traces/:id', bindApi(getApi, async (api, ctx) => {
     const trace = await api.getTraceDetail(Number(ctx.params.id))
     if (!trace) return ctx.response.notFound({ error: 'Trace not found' })
     return ctx.response.json(trace)
   })).as('server-stats.traces.show')
 }
 
-/** Register dashboard routes. */
-export function registerDashboardRoutes(
-  router: AdonisRouter,
-  dashboardPath: string,
-  getDashboardController: () => DashboardController | null,
-  getApiController: () => ApiController | null,
+interface DashboardRoutesOpts {
+  router: AdonisRouter
+  dashboardPath: string
+  getDashboardController: () => DashboardController | null
+  getApiController: () => ApiController | null
   middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>
-) {
+}
+
+/** Register dashboard routes. */
+export function registerDashboardRoutes(opts: DashboardRoutesOpts) {
+  const { router, dashboardPath, getDashboardController, getApiController, middleware } = opts
   const base = dashboardPath.replace(/\/+$/, '')
 
   router
@@ -101,7 +98,10 @@ export function registerDashboardRoutes(
       router.get('/api/requests', bindDash(getDashboardController, 'requests')).as('server-stats.requests')
       router.get('/api/requests/:id', bindDash(getDashboardController, 'requestDetail')).as('server-stats.requests.show')
 
-      registerDataRoutes(router, getApiController)
+      registerQueryRoutes(router, getApiController)
+      registerEventRoutes(router, getApiController)
+      registerLogAndMiscRoutes(router, getApiController)
+      registerTraceRoutes(router, getApiController)
 
       router.get('/api/queries/grouped', bindDash(getDashboardController, 'queriesGrouped')).as('server-stats.queries.grouped')
       router.get('/api/queries/:id/explain', bindDash(getDashboardController, 'queryExplain')).as('server-stats.queries.explain')

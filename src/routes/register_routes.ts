@@ -36,10 +36,22 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
   }
 
   if (options.debugEndpoint) {
-    registerDebugRoutes(options.router, options.debugEndpoint, options.getDebugController, options.getApiController, middleware)
+    registerDebugRoutes({
+      router: options.router,
+      debugEndpoint: options.debugEndpoint,
+      getDebugController: options.getDebugController,
+      getApiController: options.getApiController,
+      middleware,
+    })
   }
 
   if (options.dashboardPath) {
-    registerDashboardRoutes(options.router, options.dashboardPath, options.getDashboardController, options.getApiController, middleware)
+    registerDashboardRoutes({
+      router: options.router,
+      dashboardPath: options.dashboardPath,
+      getDashboardController: options.getDashboardController,
+      getApiController: options.getApiController,
+      middleware,
+    })
   }
 }

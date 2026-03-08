@@ -1,121 +1,32 @@
-import { readFile, stat } from 'node:fs/promises'
-
-import { parseAndEnrich } from '../log_stream/log_stream_service.js'
+import {
+  wrapArray,
+  fromDashboardResult,
+  mapTraceListRow,
+  normalizeEmailRow,
+  buildPaginationArgs,
+  buildQueryFilters,
+  buildEventFilters,
+  buildEmailFilters,
+  buildTraceFilters,
+  buildLogFilters,
+  stripEmailForList,
+  stripTraceForList,
+  filterRoutes,
+  readLogFile,
+} from './data_access_helpers.js'
 
 import type {
+  ListOptions,
+  PaginatedResult,
   DashboardStore,
-  QueryFilters,
-  EventFilters,
-  EmailFilters,
-  TraceFilters,
-  LogFilters,
-} from '../dashboard/dashboard_store.js'
-import type { DebugStore } from '../debug/debug_store.js'
-import type { QueryRecord, EventRecord, TraceRecord, RouteRecord } from '../debug/types.js'
+  DebugStore,
+  QueryRecord,
+  EventRecord,
+  TraceRecord,
+  RouteRecord,
+} from './data_access_helpers.js'
 
-// ---------------------------------------------------------------------------
-// Public types
-// ---------------------------------------------------------------------------
-
-export interface ListOptions {
-  page?: number
-  perPage?: number
-  search?: string
-  sort?: string
-  sortDir?: 'asc' | 'desc'
-  filters?: Record<string, unknown>
-
-  /**
-   * Force the data source for this read.
-   *
-   * - `'memory'` — always read from ring buffers ({@link DebugStore}).
-   *   Use this for the debug panel, which expects camelCase field names
-   *   matching the {@link QueryRecord}/{@link EventRecord}/etc. interfaces.
-   * - `'auto'` (default) — use SQLite when available, fall back to memory.
-   */
-  source?: 'memory' | 'auto'
-}
-
-export interface PaginatedResult<T = Record<string, unknown>> {
-  data: T[]
-  meta: {
-    total: number
-    page: number
-    perPage: number
-    lastPage: number
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Wrap a plain array in the standard {@link PaginatedResult} envelope.
- *
- * Applies optional client-side search filtering and pagination so that
- * ring-buffer results match the same shape returned by the dashboard store.
- */
-function wrapArray<T>(
-  items: T[],
-  opts: ListOptions,
-  searchFn?: (item: T, term: string) => boolean
-): PaginatedResult<T> {
-  let filtered = items
-
-  // Client-side search
-  if (opts.search && searchFn) {
-    const term = opts.search.toLowerCase()
-    filtered = filtered.filter((item) => searchFn(item, term))
-  }
-
-  const total = filtered.length
-  const page = opts.page ?? 1
-  // When perPage is not specified, return all items (backward compat for debug panel)
-  const perPage = opts.perPage ?? (total || 1)
-  const lastPage = Math.max(1, Math.ceil(total / perPage))
-
-  const start = (page - 1) * perPage
-  const data = filtered.slice(start, start + perPage)
-
-  return {
-    data,
-    meta: { total, page, perPage, lastPage },
-  }
-}
-
-/**
- * Convert a flat {@link DashboardStore.PaginatedResult} to the nested
- * `{ data, meta }` shape used by the unified API.
- */
-function fromDashboardResult<T>(result: {
-  data: T[]
-  total: number
-  page: number
-  perPage: number
-  lastPage: number
-}): PaginatedResult<T> {
-  return {
-    data: result.data,
-    meta: {
-      total: result.total,
-      page: result.page,
-      perPage: result.perPage,
-      lastPage: result.lastPage,
-    },
-  }
-}
-
-function mapTraceListRow<T extends Record<string, unknown>>(row: T) {
-  return {
-    ...row,
-    requestId: row.request_id ?? row.requestId,
-    statusCode: row.status_code ?? row.statusCode,
-    totalDuration: row.total_duration ?? row.totalDuration,
-    spanCount: row.span_count ?? row.spanCount,
-    createdAt: row.created_at ?? row.createdAt,
-  }
-}
+export type { ListOptions, PaginatedResult }
 
 // ---------------------------------------------------------------------------
 // DataAccess
@@ -161,13 +72,8 @@ export class DataAccess {
 
   async getQueries(opts: ListOptions = {}): Promise<PaginatedResult<QueryRecord>> {
     if (this.hasPersistence && opts.source !== 'memory') {
-      const page = opts.page ?? 1
-      const perPage = opts.perPage ?? 50
-      const filters: QueryFilters = {
-        search: opts.search,
-        ...(opts.filters as Partial<QueryFilters>),
-      }
-      const result = await this.dashboardStore!.getQueries(page, perPage, filters)
+      const { page, perPage } = buildPaginationArgs(opts)
+      const result = await this.dashboardStore!.getQueries(page, perPage, buildQueryFilters(opts))
       return fromDashboardResult(result) as unknown as PaginatedResult<QueryRecord>
     }
 
@@ -191,13 +97,8 @@ export class DataAccess {
 
   async getEvents(opts: ListOptions = {}): Promise<PaginatedResult<EventRecord>> {
     if (this.hasPersistence && opts.source !== 'memory') {
-      const page = opts.page ?? 1
-      const perPage = opts.perPage ?? 50
-      const filters: EventFilters = {
-        search: opts.search,
-        ...(opts.filters as Partial<EventFilters>),
-      }
-      const result = await this.dashboardStore!.getEvents(page, perPage, filters)
+      const { page, perPage } = buildPaginationArgs(opts)
+      const result = await this.dashboardStore!.getEvents(page, perPage, buildEventFilters(opts))
       return fromDashboardResult(result) as unknown as PaginatedResult<EventRecord>
     }
 
@@ -219,43 +120,15 @@ export class DataAccess {
    */
   async getEmails(opts: ListOptions = {}): Promise<PaginatedResult> {
     if (this.hasPersistence && opts.source !== 'memory') {
-      const page = opts.page ?? 1
-      const perPage = opts.perPage ?? 50
-      const filters: EmailFilters = {
-        search: opts.search,
-        ...(opts.filters as Partial<EmailFilters>),
-      }
-      const result = await this.dashboardStore!.getEmails(page, perPage, filters, true)
+      const { page, perPage } = buildPaginationArgs(opts)
+      const result = await this.dashboardStore!.getEmails(page, perPage, buildEmailFilters(opts), true)
       const normalized = fromDashboardResult(result)
-      // Normalize SQLite column names to match the EmailRecord shape
-      // so both memory and SQLite paths return consistent field names
-      normalized.data = (normalized.data as Record<string, unknown>[]).map((row) => ({
-        ...row,
-        from: row.from_addr ?? row.from ?? '',
-        to: row.to_addr ?? row.to ?? '',
-        messageId: row.message_id ?? row.messageId ?? null,
-        attachmentCount: row.attachment_count ?? row.attachmentCount ?? 0,
-        timestamp: row.created_at ?? row.timestamp ?? null,
-      }))
+      normalized.data = (normalized.data as Record<string, unknown>[]).map(normalizeEmailRow)
       return normalized
     }
 
     const emails = this.debugStore.emails.getEmails()
-    // Strip html/text from list response — build lightweight objects
-    // without object-spread to avoid copying large HTML bodies
-    const stripped = emails.map((e) => ({
-      id: e.id,
-      from: e.from,
-      to: e.to,
-      cc: e.cc,
-      bcc: e.bcc,
-      subject: e.subject,
-      mailer: e.mailer,
-      status: e.status,
-      messageId: e.messageId,
-      attachmentCount: e.attachmentCount,
-      timestamp: e.timestamp,
-    }))
+    const stripped = emails.map(stripEmailForList)
     return wrapArray(stripped, opts, (e, term: string) => {
       return (
         e.from.toLowerCase().includes(term) ||
@@ -291,13 +164,8 @@ export class DataAccess {
    */
   async getTraces(opts: ListOptions = {}): Promise<PaginatedResult> {
     if (this.hasPersistence && opts.source !== 'memory') {
-      const page = opts.page ?? 1
-      const perPage = opts.perPage ?? 50
-      const filters: TraceFilters = {
-        search: opts.search,
-        ...(opts.filters as Partial<TraceFilters>),
-      }
-      const result = await this.dashboardStore!.getTraces(page, perPage, filters)
+      const { page, perPage } = buildPaginationArgs(opts)
+      const result = await this.dashboardStore!.getTraces(page, perPage, buildTraceFilters(opts))
       return {
         ...fromDashboardResult(result),
         data: result.data.map(mapTraceListRow),
@@ -309,18 +177,7 @@ export class DataAccess {
     }
 
     const traces = this.debugStore.traces.getTraces()
-    // Strip spans from list view, add warningCount — build lightweight
-    // objects without spread to avoid copying large span arrays
-    const list = traces.map((t) => ({
-      id: t.id,
-      method: t.method,
-      url: t.url,
-      statusCode: t.statusCode,
-      totalDuration: t.totalDuration,
-      spanCount: t.spanCount,
-      warningCount: t.warnings.length,
-      timestamp: t.timestamp,
-    }))
+    const list = traces.map(stripTraceForList)
 
     return wrapArray(list, opts, (t, term: string) => {
       return t.method.toLowerCase().includes(term) || t.url.toLowerCase().includes(term)
@@ -354,14 +211,10 @@ export class DataAccess {
 
   /**
    * Find log entries matching a specific request ID.
-   *
-   * Checks SQLite first (if available), then falls back to scanning
-   * the log file for entries with a matching `request_id` field.
    */
   private async getRelatedLogsByRequestId(
     requestId: string
   ): Promise<Record<string, unknown>[]> {
-    // Try SQLite first
     if (this.hasPersistence) {
       try {
         const result = await this.dashboardStore!.getLogs(1, 50, { requestId })
@@ -371,8 +224,7 @@ export class DataAccess {
       }
     }
 
-    // Fallback: scan log file
-    const entries = await this.readLogFile()
+    const entries = this.logPath ? await readLogFile(this.logPath) : []
     return entries.filter(
       (e) => e.request_id === requestId || e.requestId === requestId
     )
@@ -392,19 +244,7 @@ export class DataAccess {
     let routes = this.debugStore.routes.getRoutes()
 
     if (search) {
-      const term = search.toLowerCase()
-      routes = routes.filter((r) => {
-        const pattern = (r.pattern || '').toLowerCase()
-        const handler = (r.handler || '').toLowerCase()
-        const name = (r.name || '').toLowerCase()
-        const method = (r.method || '').toLowerCase()
-        return (
-          pattern.includes(term) ||
-          handler.includes(term) ||
-          name.includes(term) ||
-          method.includes(term)
-        )
-      })
+      routes = filterRoutes(routes, search)
     }
 
     const total = routes.length
@@ -427,70 +267,16 @@ export class DataAccess {
    */
   async getLogs(opts: ListOptions = {}): Promise<PaginatedResult> {
     if (this.hasPersistence && opts.source !== 'memory') {
-      const page = opts.page ?? 1
-      const perPage = opts.perPage ?? 50
-      const filters: LogFilters = {
-        search: opts.search,
-        ...(opts.filters as Partial<LogFilters>),
-      }
-      const result = await this.dashboardStore!.getLogs(page, perPage, filters)
+      const { page, perPage } = buildPaginationArgs(opts)
+      const result = await this.dashboardStore!.getLogs(page, perPage, buildLogFilters(opts))
       return fromDashboardResult(result)
     }
 
-    // Fallback: read from log file on disk (same approach as DebugController)
-    const entries = await this.readLogFile()
+    const entries = this.logPath ? await readLogFile(this.logPath) : []
     return wrapArray(entries, opts, (e: Record<string, unknown>, term: string) => {
       const msg = String(e.msg ?? e.message ?? '').toLowerCase()
       const levelName = String(e.levelName ?? '').toLowerCase()
       return msg.includes(term) || levelName.includes(term)
     })
-  }
-
-  // =========================================================================
-  // Private helpers
-  // =========================================================================
-
-  /**
-   * Read and parse the last 256 KB of the application log file.
-   *
-   * Returns an array of enriched log entry objects. If the log file
-   * does not exist or cannot be read, returns an empty array.
-   */
-  private async readLogFile(): Promise<Record<string, unknown>[]> {
-    if (!this.logPath) return []
-
-    try {
-      const stats = await stat(this.logPath)
-      const maxBytes = 256 * 1024
-      let content: string
-
-      if (stats.size > maxBytes) {
-        const { createReadStream } = await import('node:fs')
-        const stream = createReadStream(this.logPath, {
-          start: stats.size - maxBytes,
-          encoding: 'utf-8',
-        })
-        const chunks: string[] = []
-        for await (const chunk of stream) {
-          chunks.push(chunk as string)
-        }
-        content = chunks.join('')
-        // Skip first potentially incomplete line
-        const firstNewline = content.indexOf('\n')
-        if (firstNewline !== -1) content = content.slice(firstNewline + 1)
-      } else {
-        content = await readFile(this.logPath, 'utf-8')
-      }
-
-      return content
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => parseAndEnrich(line))
-        .filter((entry): entry is Record<string, unknown> => entry !== null)
-        .reverse()
-    } catch {
-      return []
-    }
   }
 }

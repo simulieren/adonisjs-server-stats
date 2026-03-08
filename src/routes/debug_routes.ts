@@ -3,7 +3,6 @@ import type DebugController from '../controller/debug_controller.js'
 import type { AdonisRouter } from './router_types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
-/** Bind a debug controller method with lazy init and 503 fallback. */
 function bindDebug(getController: () => DebugController | null, method: keyof DebugController) {
   return async (ctx: HttpContext) => {
     const controller = getController()
@@ -12,7 +11,6 @@ function bindDebug(getController: () => DebugController | null, method: keyof De
   }
 }
 
-/** Wrap an ApiController method as an HTTP handler with lazy init. */
 function bindApi(getApi: () => ApiController | null, fn: (api: ApiController, ctx: HttpContext) => Promise<unknown> | unknown) {
   return async (ctx: HttpContext) => {
     const api = getApi()
@@ -21,14 +19,17 @@ function bindApi(getApi: () => ApiController | null, fn: (api: ApiController, ct
   }
 }
 
-/** Register debug panel API routes. */
-export function registerDebugRoutes(
-  router: AdonisRouter,
-  debugEndpoint: string,
-  getDebugController: () => DebugController | null,
-  getApiController: () => ApiController | null,
+interface DebugRoutesOpts {
+  router: AdonisRouter
+  debugEndpoint: string
+  getDebugController: () => DebugController | null
+  getApiController: () => ApiController | null
   middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>
-) {
+}
+
+/** Register debug panel API routes. */
+export function registerDebugRoutes(opts: DebugRoutesOpts) {
+  const { router, debugEndpoint, getDebugController, getApiController, middleware } = opts
   const base = debugEndpoint.replace(/\/+$/, '')
 
   router

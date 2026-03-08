@@ -223,7 +223,7 @@ test.group('Stress | TraceCollector under load', (group) => {
     await collector.startTrace(async () => {
       // Add 300 spans
       for (let i = 0; i < 300; i++) {
-        collector.addSpan(`span-${i}`, 'custom', 0, 1)
+        collector.addSpan({ label: `span-${i}`, category: 'custom', startOffset: 0, duration: 1 })
       }
 
       const record = collector.finishTrace('GET', '/test', 200)
@@ -238,7 +238,7 @@ test.group('Stress | TraceCollector under load', (group) => {
 
     for (let i = 0; i < 1000; i++) {
       await collector.startTrace(async () => {
-        collector.addSpan(`span-${i}`, 'custom', 0, 1)
+        collector.addSpan({ label: `span-${i}`, category: 'custom', startOffset: 0, duration: 1 })
         collector.finishTrace('GET', `/test/${i}`, 200)
       })
     }
@@ -257,7 +257,7 @@ test.group('Stress | TraceCollector under load', (group) => {
 
     for (let i = 0; i < 10_000; i++) {
       await collector.startTrace(async () => {
-        collector.addSpan(`span-${i}`, 'custom', 0, 1)
+        collector.addSpan({ label: `span-${i}`, category: 'custom', startOffset: 0, duration: 1 })
         collector.finishTrace('GET', `/test/${i}`, 200)
       })
     }
@@ -280,7 +280,7 @@ test.group('Stress | TraceCollector under load', (group) => {
     // Start 50 traces sequentially (simulating concurrent requests)
     for (let i = 0; i < 50; i++) {
       await collector.startTrace(async () => {
-        collector.addSpan(`span-${i}`, 'custom', 0, 1)
+        collector.addSpan({ label: `span-${i}`, category: 'custom', startOffset: 0, duration: 1 })
         collector.finishTrace('GET', `/request/${i}`, 200)
       })
     }

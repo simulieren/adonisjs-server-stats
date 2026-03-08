@@ -56,6 +56,27 @@ export function isRedactedValue(val: ConfigValue): val is RedactedValue {
 }
 
 // ---------------------------------------------------------------------------
+// Plain config object type guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether a config value is a plain config object (not null, not an
+ * array, not a redacted value). This consolidates the repeated
+ * null/typeof/array/redacted checks into a single reusable guard.
+ */
+export function isPlainConfigObject(
+  val: ConfigValue
+): val is { [key: string]: ConfigValue } {
+  return (
+    val !== null &&
+    val !== undefined &&
+    typeof val === 'object' &&
+    !Array.isArray(val) &&
+    !isRedactedValue(val)
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Flatten config
 // ---------------------------------------------------------------------------
 
@@ -69,17 +90,14 @@ export function isRedactedValue(val: ConfigValue): val is RedactedValue {
  * @param prefix - Dot-path prefix for keys (default `''`).
  */
 export function flattenConfig(obj: ConfigValue, prefix: string = ''): FlatEntry[] {
-  if (typeof obj !== 'object' || obj === null || obj === undefined) {
-    return [{ path: prefix, value: obj }]
-  }
-  if (Array.isArray(obj) || isRedactedValue(obj)) {
+  if (!isPlainConfigObject(obj)) {
     return [{ path: prefix, value: obj }]
   }
   const results: FlatEntry[] = []
   for (const key of Object.keys(obj)) {
     const fullPath = prefix ? `${prefix}.${key}` : key
-    const val = (obj as Record<string, ConfigValue>)[key]
-    if (typeof val === 'object' && val !== null && !Array.isArray(val) && !isRedactedValue(val)) {
+    const val = obj[key]
+    if (isPlainConfigObject(val)) {
       results.push(...flattenConfig(val, fullPath))
     } else {
       results.push({ path: fullPath, value: val })

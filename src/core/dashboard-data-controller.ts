@@ -14,6 +14,8 @@ import { OVERVIEW_REFRESH_MS, SECTION_REFRESH_MS } from './constants.js'
 import { DashboardApi } from './dashboard-api.js'
 import { buildQueryParams } from './pagination.js'
 
+import { isPaginatedResult, isAbortedRequest } from './dashboard-data-helpers.js'
+
 import type { DashboardSection, PaginatedResponse } from './types.js'
 
 // ---------------------------------------------------------------------------
@@ -142,97 +144,31 @@ export class DashboardDataController {
    *   and loading state is not modified.
    */
   async fetch(silent: boolean = true): Promise<void> {
-    // Skip silent refreshes while an explicit fetch is pending to prevent
-    // a stale timer/SSE refresh from racing with a user-initiated change.
     if (silent && this.explicitFetchPending) return
 
-    // Cancel any previous in-flight fetch
     this.abortController?.abort()
     const controller = new AbortController()
     this.abortController = controller
-
     const myFetchId = ++this.fetchId
-    const currentSection = this.section
-    if (!currentSection) return
-
-    // Snapshot filters before any async work
-    const extraFilters = this.filters
-
-    // Convert camelCase column names to snake_case for the API
-    const sortParam = this.sort
-      ? this.sort.replace(/[A-Z]/g, (c: string) => '_' + c.toLowerCase())
-      : undefined
-
-    const qs = buildQueryParams({
-      page: this.page,
-      perPage: this.perPage,
-      search: this.search,
-      sort: sortParam,
-      sortDir: this.sort ? this.sortDir : undefined,
-      filters: extraFilters && Object.keys(extraFilters).length > 0 ? extraFilters : undefined,
-      timeRange: currentSection.startsWith('overview') ? this.timeRange : undefined,
-    })
-
+    if (!this.section) return
     if (!silent) {
       this.callbacks.onLoading(true)
       this.explicitFetchPending = true
     }
 
     try {
-      const result = await this.api.fetchSection(currentSection, qs || undefined, {
+      const qs = this.buildCurrentQueryString()
+      const result = await this.api.fetchSection(this.section, qs || undefined, {
         signal: controller.signal,
       })
-
-      // Discard stale responses
-      if (myFetchId !== this.fetchId) return
-      if (this.stopped) return
-
-      // Handle both paginated and non-paginated responses
-      if (
-        result &&
-        typeof result === 'object' &&
-        (result as Record<string, unknown>).data !== undefined &&
-        (result as Record<string, unknown>).meta !== undefined
-      ) {
-        const paginated = result as {
-          data: unknown
-          meta: PaginatedResponse<unknown>['meta']
-        }
-        this.callbacks.onData(paginated.data)
-        this.callbacks.onPagination(paginated.meta)
-      } else {
-        this.callbacks.onData(result)
-        this.callbacks.onPagination(null)
-      }
-
-      this.callbacks.onError(null)
-      this.callbacks.onLoading(false)
-      this.hasFetched = true
+      if (myFetchId !== this.fetchId || this.stopped) return
+      this.applyFetchResult(result)
     } catch (err) {
-      // Silently ignore aborted requests
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      if (controller.signal.aborted) return
-
-      if (myFetchId !== this.fetchId) return
-      if (this.stopped) return
-
-      if (err instanceof UnauthorizedError) {
-        this.callbacks.onError(err)
-        this.callbacks.onLoading(false)
-        this.stopRefreshTimer()
-        this.callbacks.onUnauthorized()
-        return
-      }
-
-      // On silent refresh failures, keep showing stale data
-      if (!silent) {
-        this.callbacks.onError(err instanceof Error ? err : new Error(String(err)))
-        this.callbacks.onLoading(false)
-      }
+      if (isAbortedRequest(err, controller.signal)) return
+      if (myFetchId !== this.fetchId || this.stopped) return
+      this.handleFetchError(err, silent)
     } finally {
-      if (!silent) {
-        this.explicitFetchPending = false
-      }
+      if (!silent) this.explicitFetchPending = false
     }
   }
 
@@ -384,6 +320,54 @@ export class DashboardDataController {
    */
   getClient(): ApiClient {
     return this.client
+  }
+
+  // -- Fetch helpers (private) -----------------------------------------------
+
+  /** Build query string from current controller state. */
+  private buildCurrentQueryString(): string {
+    const sortParam = this.sort
+      ? this.sort.replace(/[A-Z]/g, (c: string) => '_' + c.toLowerCase())
+      : undefined
+    const extraFilters = this.filters
+    return buildQueryParams({
+      page: this.page,
+      perPage: this.perPage,
+      search: this.search,
+      sort: sortParam,
+      sortDir: this.sort ? this.sortDir : undefined,
+      filters: extraFilters && Object.keys(extraFilters).length > 0 ? extraFilters : undefined,
+      timeRange: this.section.startsWith('overview') ? this.timeRange : undefined,
+    })
+  }
+
+  /** Apply a successful fetch result to the callbacks. */
+  private applyFetchResult(result: unknown): void {
+    if (isPaginatedResult(result)) {
+      this.callbacks.onData(result.data)
+      this.callbacks.onPagination(result.meta)
+    } else {
+      this.callbacks.onData(result)
+      this.callbacks.onPagination(null)
+    }
+    this.callbacks.onError(null)
+    this.callbacks.onLoading(false)
+    this.hasFetched = true
+  }
+
+  /** Handle a fetch error (unauthorized, network, etc.). */
+  private handleFetchError(err: unknown, silent: boolean): void {
+    if (err instanceof UnauthorizedError) {
+      this.callbacks.onError(err)
+      this.callbacks.onLoading(false)
+      this.stopRefreshTimer()
+      this.callbacks.onUnauthorized()
+      return
+    }
+    if (!silent) {
+      this.callbacks.onError(err instanceof Error ? err : new Error(String(err)))
+      this.callbacks.onLoading(false)
+    }
   }
 
   // -- Timer management (private) -------------------------------------------

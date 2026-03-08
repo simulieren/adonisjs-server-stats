@@ -8,24 +8,21 @@ import { DashboardDataController } from '../src/core/dashboard-data-controller.j
 
 const originalFetch = globalThis.fetch
 
-/**
- * Create a mock for `globalThis.fetch` that tracks active, completed,
- * and aborted fetches.  Simulates network latency with `delayMs` and
- * honours `AbortSignal` during the wait.
- */
-function createFetchTracker(delayMs: number = 50) {
-  let activeFetches = 0
-  let peakActiveFetches = 0
-  let completedFetches = 0
-  let abortedFetches = 0
+interface FetchCounters {
+  active: number
+  peak: number
+  completed: number
+  aborted: number
+}
 
-  globalThis.fetch = async (url: string | URL | Request, init?: RequestInit) => {
-    activeFetches++
-    peakActiveFetches = Math.max(peakActiveFetches, activeFetches)
+function createMockFetchHandler(delayMs: number, c: FetchCounters) {
+  return async (url: string | URL | Request, init?: RequestInit) => {
+    c.active++
+    c.peak = Math.max(c.peak, c.active)
 
     if (init?.signal?.aborted) {
-      activeFetches--
-      abortedFetches++
+      c.active--
+      c.aborted++
       throw new DOMException('The operation was aborted.', 'AbortError')
     }
 
@@ -37,42 +34,34 @@ function createFetchTracker(delayMs: number = 50) {
           reject(new DOMException('The operation was aborted.', 'AbortError'))
         })
       })
-      activeFetches--
-      completedFetches++
+      c.active--
+      c.completed++
       const urlStr = typeof url === 'string' ? url : url.toString()
       return new Response(JSON.stringify({ url: urlStr, ts: Date.now() }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
     } catch (err) {
-      activeFetches--
-      abortedFetches++
+      c.active--
+      c.aborted++
       throw err
     }
   }
+}
+
+function createFetchTracker(delayMs: number = 50) {
+  const c: FetchCounters = { active: 0, peak: 0, completed: 0, aborted: 0 }
+  globalThis.fetch = createMockFetchHandler(delayMs, c) as typeof fetch
 
   return {
-    get activeFetches() {
-      return activeFetches
-    },
-    get peakActiveFetches() {
-      return peakActiveFetches
-    },
-    get completedFetches() {
-      return completedFetches
-    },
-    get abortedFetches() {
-      return abortedFetches
-    },
-    get totalFetches() {
-      return completedFetches + abortedFetches
-    },
+    get activeFetches() { return c.active },
+    get peakActiveFetches() { return c.peak },
+    get completedFetches() { return c.completed },
+    get abortedFetches() { return c.aborted },
+    get totalFetches() { return c.completed + c.aborted },
   }
 }
 
-/**
- * Build a tracking object for all controller callbacks.
- */
 function createCallbacks() {
   const calls = {
     data: [] as unknown[],
@@ -89,187 +78,132 @@ function createCallbacks() {
   }
 }
 
-/**
- * Small async helper -- wait for `ms` milliseconds.
- */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-// Debug tabs to cycle through during stress tests
 const DEBUG_TABS = ['queries', 'events', 'logs', 'routes', 'emails', 'timeline'] as const
-
-// Dashboard sections to cycle through during stress tests
 const DASHBOARD_SECTIONS = [
-  'overview',
-  'requests',
-  'queries',
-  'events',
-  'emails',
-  'logs',
-  'timeline',
+  'overview', 'requests', 'queries', 'events', 'emails', 'logs', 'timeline',
 ] as const
+
+function createDebugCtrl(cbs: Omit<ReturnType<typeof createCallbacks>, 'calls'>) {
+  return new DebugDataController({
+    baseUrl: '',
+    ...cbs,
+    refreshInterval: 60_000,
+  })
+}
+
+function createDashboardCtrl(section = 'overview' as string) {
+  const calls = {
+    data: [] as unknown[],
+    loading: [] as boolean[],
+    errors: [] as (Error | null)[],
+    unauthorized: [] as unknown[],
+    pagination: [] as unknown[],
+  }
+  const ctrl = new DashboardDataController({
+    baseUrl: '',
+    endpoint: '/__stats/api',
+    section,
+    perPage: 50,
+    callbacks: {
+      onData: (d: unknown) => calls.data.push(d),
+      onPagination: (m: unknown) => calls.pagination.push(m),
+      onLoading: (l: boolean) => calls.loading.push(l),
+      onError: (e: Error | null) => calls.errors.push(e),
+      onUnauthorized: () => calls.unauthorized.push(true),
+    },
+  })
+  return { ctrl, calls }
+}
 
 // ---------------------------------------------------------------------------
 // Stress | DebugDataController rapid switching
 // ---------------------------------------------------------------------------
 
-test.group('Stress | DebugDataController rapid switching', (group) => {
+test.group('Stress | DebugDataController rapid switching (fetch)', (group) => {
   group.teardown(() => {
     globalThis.fetch = originalFetch
   })
 
   test('50 rapid tab switches -- only 1-2 fetches complete', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-    const { calls: _calls, ...cbs } = createCallbacks()
+    const { calls, ...cbs } = createCallbacks()
+    const ctrl = createDebugCtrl(cbs)
 
-    const ctrl = new DebugDataController({
-      baseUrl: '',
-      ...cbs,
-      refreshInterval: 60_000,
-    })
-
-    // Fire 50 start() calls in rapid succession alternating tabs
     for (let i = 0; i < 50; i++) {
       ctrl.start(DEBUG_TABS[i % DEBUG_TABS.length])
     }
-
-    // Wait for everything to settle
     await sleep(200)
 
-    assert.isAtMost(
-      tracker.completedFetches,
-      2,
-      `Expected at most 2 completed fetches but got ${tracker.completedFetches}`
-    )
-    assert.isAtLeast(
-      tracker.abortedFetches,
-      48,
-      `Expected at least 48 aborted fetches but got ${tracker.abortedFetches}`
-    )
+    assert.isAtMost(tracker.completedFetches, 2)
+    assert.isAtLeast(tracker.abortedFetches, 48)
 
-    // onData should only have been called with the LAST tab's data
-    // The last tab is DEBUG_TABS[49 % 6] = DEBUG_TABS[1] = 'events'
     const lastTabPath = '/admin/api/debug/events'
     const dataWithUrls = calls.data.filter(
       (d: unknown) => d !== null && typeof d === 'object' && 'url' in d
     ) as Array<{ url: string }>
-    assert.isTrue(
-      dataWithUrls.length >= 1,
-      'Expected at least one onData call with a URL'
-    )
+    assert.isTrue(dataWithUrls.length >= 1, 'Expected at least one onData call')
     assert.isTrue(
       dataWithUrls.every((d) => d.url === lastTabPath),
-      `Expected all onData calls to have URL ${lastTabPath} but got: ${dataWithUrls.map((d) => d.url).join(', ')}`
+      `Expected all URLs to be ${lastTabPath}`
     )
-
     ctrl.stop()
   })
 
   test('100 rapid switchTab calls -- server sees minimal load', async ({ assert }) => {
     const tracker = createFetchTracker(50)
     const { calls: _calls, ...cbs } = createCallbacks()
+    const ctrl = createDebugCtrl(cbs)
 
-    const ctrl = new DebugDataController({
-      baseUrl: '',
-      ...cbs,
-      refreshInterval: 60_000,
-    })
-
-    // Start on an initial tab
     ctrl.start('queries')
-
-    // Call switchTab() 100 times in a tight loop alternating between tabs
     for (let i = 0; i < 100; i++) {
       ctrl.switchTab(DEBUG_TABS[i % DEBUG_TABS.length])
     }
-
-    // Wait for settlement
     await sleep(200)
 
-    // All synchronous switchTab calls queue up globalThis.fetch entries
-    // before any abort handlers fire (microtask queue). The key invariant
-    // is that only the very last fetch actually completes -- the rest are
-    // aborted once the event loop processes abort signals.
-    assert.isAtMost(
-      tracker.completedFetches,
-      2,
-      `Expected at most 2 completed fetches but got ${tracker.completedFetches}`
-    )
-    assert.isAtLeast(
-      tracker.abortedFetches,
-      99,
-      `Expected at least 99 aborted fetches but got ${tracker.abortedFetches}`
-    )
-
+    assert.isAtMost(tracker.completedFetches, 2)
+    assert.isAtLeast(tracker.abortedFetches, 99)
     ctrl.stop()
+  })
+})
+
+test.group('Stress | DebugDataController lifecycle (fetch)', (group) => {
+  group.teardown(() => {
+    globalThis.fetch = originalFetch
   })
 
   test('start/stop/start/stop rapid cycle -- no leaked timers', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-    const { calls: _calls, ...cbs } = createCallbacks()
+    const { calls, ...cbs } = createCallbacks()
+    const ctrl = createDebugCtrl(cbs)
 
-    const ctrl = new DebugDataController({
-      baseUrl: '',
-      ...cbs,
-      refreshInterval: 60_000,
-    })
-
-    // Call start/stop 50 times in a loop
     for (let i = 0; i < 50; i++) {
       ctrl.start(DEBUG_TABS[i % DEBUG_TABS.length])
       ctrl.stop()
     }
-
-    // Wait to make sure no timers fire
     await sleep(500)
 
-    // Most fetches were aborted because stop() aborts the in-flight fetch
-    assert.isAtMost(
-      tracker.completedFetches,
-      2,
-      `Expected at most 2 completed fetches but got ${tracker.completedFetches}`
-    )
-
-    // No real errors should be reported (AbortErrors are silently swallowed)
+    assert.isAtMost(tracker.completedFetches, 2)
     const realErrors = calls.errors.filter((e) => e !== null)
-    assert.lengthOf(
-      realErrors,
-      0,
-      `Expected no errors but got: ${realErrors.map((e) => e?.message).join(', ')}`
-    )
-
+    assert.lengthOf(realErrors, 0)
     ctrl.stop()
   })
 
   test('rapid refresh() calls do not pile up', async ({ assert }) => {
     const tracker = createFetchTracker(50)
     const { calls: _calls, ...cbs } = createCallbacks()
+    const ctrl = createDebugCtrl(cbs)
 
-    const ctrl = new DebugDataController({
-      baseUrl: '',
-      ...cbs,
-      refreshInterval: 60_000,
-    })
-
-    // Start controller on a tab
     ctrl.start('queries')
-
-    // Call refresh() 30 times synchronously
     for (let i = 0; i < 30; i++) {
       ctrl.refresh()
     }
-
-    // Wait for settlement
     await sleep(200)
 
-    // Each refresh cancels the previous, so at most 2 should complete
-    assert.isAtMost(
-      tracker.completedFetches,
-      2,
-      `Expected at most 2 completed fetches but got ${tracker.completedFetches}`
-    )
-
+    assert.isAtMost(tracker.completedFetches, 2)
     ctrl.stop()
   })
 })
@@ -278,175 +212,70 @@ test.group('Stress | DebugDataController rapid switching', (group) => {
 // Stress | DashboardDataController rapid switching
 // ---------------------------------------------------------------------------
 
-test.group('Stress | DashboardDataController rapid switching', (group) => {
+test.group('Stress | DashboardDataController rapid switching (fetch)', (group) => {
   group.teardown(() => {
     globalThis.fetch = originalFetch
   })
 
   test('50 rapid setSection calls -- minimal server load', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-
-    const calls = {
-      data: [] as unknown[],
-      loading: [] as boolean[],
-      errors: [] as (Error | null)[],
-      unauthorized: [] as unknown[],
-      pagination: [] as unknown[],
-    }
-
-    const ctrl = new DashboardDataController({
-      baseUrl: '',
-      endpoint: '/__stats/api',
-      section: 'overview',
-      perPage: 50,
-      callbacks: {
-        onData: (d: unknown) => calls.data.push(d),
-        onPagination: (m: unknown) => calls.pagination.push(m),
-        onLoading: (l: boolean) => calls.loading.push(l),
-        onError: (e: Error | null) => calls.errors.push(e),
-        onUnauthorized: () => calls.unauthorized.push(true),
-      },
-    })
+    const { ctrl } = createDashboardCtrl()
 
     ctrl.start()
-
-    // Call setSection() 50 times with different sections
     for (let i = 0; i < 50; i++) {
       ctrl.setSection(DASHBOARD_SECTIONS[i % DASHBOARD_SECTIONS.length])
     }
-
-    // Wait for settlement
     await sleep(200)
 
-    // All synchronous setSection calls queue up globalThis.fetch entries
-    // before any abort handlers fire (microtask queue). The key invariant
-    // is that only the very last fetch actually completes -- the rest are
-    // aborted once the event loop processes abort signals.
-    assert.isAtMost(
-      tracker.completedFetches,
-      2,
-      `Expected at most 2 completed fetches but got ${tracker.completedFetches}`
-    )
-    assert.isAtLeast(
-      tracker.abortedFetches,
-      48,
-      `Expected at least 48 aborted fetches but got ${tracker.abortedFetches}`
-    )
-
+    assert.isAtMost(tracker.completedFetches, 2)
+    assert.isAtLeast(tracker.abortedFetches, 48)
     ctrl.stop()
   })
 
-  test('rapid setPage/setSearch/setSort -- each cancels previous', async ({ assert }) => {
+  test('rapid setPage calls -- each cancels previous', async ({ assert }) => {
     const tracker = createFetchTracker(50)
-
-    const calls = {
-      data: [] as unknown[],
-      loading: [] as boolean[],
-      errors: [] as (Error | null)[],
-      unauthorized: [] as unknown[],
-      pagination: [] as unknown[],
-    }
-
-    const ctrl = new DashboardDataController({
-      baseUrl: '',
-      endpoint: '/__stats/api',
-      section: 'requests',
-      perPage: 50,
-      callbacks: {
-        onData: (d: unknown) => calls.data.push(d),
-        onPagination: (m: unknown) => calls.pagination.push(m),
-        onLoading: (l: boolean) => calls.loading.push(l),
-        onError: (e: Error | null) => calls.errors.push(e),
-        onUnauthorized: () => calls.unauthorized.push(true),
-      },
-    })
+    const { ctrl } = createDashboardCtrl('requests')
 
     ctrl.start()
-
-    // Call setPage(1), setPage(2), ..., setPage(30) rapidly
     for (let i = 1; i <= 30; i++) {
       ctrl.setPage(i)
     }
-
-    // Wait for settlement
     await sleep(200)
 
-    assert.isAtMost(
-      tracker.completedFetches,
-      2,
-      `Expected at most 2 completed fetches but got ${tracker.completedFetches}`
-    )
-
+    assert.isAtMost(tracker.completedFetches, 2)
     ctrl.stop()
+  })
+})
+
+test.group('Stress | DashboardDataController mixed ops (fetch)', (group) => {
+  group.teardown(() => {
+    globalThis.fetch = originalFetch
   })
 
   test('mixed section changes + filters -- no stale data', async ({ assert }) => {
-    const _tracker = createFetchTracker(50)
-
-    const calls = {
-      data: [] as unknown[],
-      loading: [] as boolean[],
-      errors: [] as (Error | null)[],
-      unauthorized: [] as unknown[],
-      pagination: [] as unknown[],
-    }
-
-    const ctrl = new DashboardDataController({
-      baseUrl: '',
-      endpoint: '/__stats/api',
-      section: 'overview',
-      perPage: 50,
-      callbacks: {
-        onData: (d: unknown) => calls.data.push(d),
-        onPagination: (m: unknown) => calls.pagination.push(m),
-        onLoading: (l: boolean) => calls.loading.push(l),
-        onError: (e: Error | null) => calls.errors.push(e),
-        onUnauthorized: () => calls.unauthorized.push(true),
-      },
-    })
+    createFetchTracker(50)
+    const { ctrl, calls } = createDashboardCtrl()
 
     ctrl.start()
-
-    // Rapid mixed operations
     ctrl.setSection('overview')
     ctrl.setSection('requests')
     ctrl.setSearch('foo')
     ctrl.setPage(2)
-
-    // Wait for settlement
     await sleep(200)
 
-    // onData may have null entries from setSection resets -- filter those out
     const dataWithUrls = calls.data.filter(
       (d: unknown) => d !== null && typeof d === 'object' && 'url' in d
     ) as Array<{ url: string }>
 
-    // The final state should be: section=requests, page=2, search=foo
-    // The URL should be /__stats/api/requests?page=2&perPage=50&search=foo
     if (dataWithUrls.length > 0) {
       const lastUrl = dataWithUrls[dataWithUrls.length - 1].url
-      assert.isTrue(
-        lastUrl.includes('/requests'),
-        `Expected final URL to include /requests but got: ${lastUrl}`
-      )
-      assert.isTrue(
-        lastUrl.includes('search=foo'),
-        `Expected final URL to include search=foo but got: ${lastUrl}`
-      )
-      assert.isTrue(
-        lastUrl.includes('page=2'),
-        `Expected final URL to include page=2 but got: ${lastUrl}`
-      )
+      assert.isTrue(lastUrl.includes('/requests'))
+      assert.isTrue(lastUrl.includes('search=foo'))
+      assert.isTrue(lastUrl.includes('page=2'))
     }
 
-    // Verify no real errors
     const realErrors = calls.errors.filter((e) => e !== null)
-    assert.lengthOf(
-      realErrors,
-      0,
-      `Expected no errors but got: ${realErrors.map((e) => e?.message).join(', ')}`
-    )
-
+    assert.lengthOf(realErrors, 0)
     ctrl.stop()
   })
 })

@@ -640,6 +640,6 @@ test.group('DashboardStore | Email Pipeline (integration)', (group) => {
       })
     })
     // pendingEmails should remain empty since db was null
-    assert.lengthOf((unstarted as any).pendingEmails, 0)
+    assert.lengthOf((unstarted as unknown as Record<string, unknown[]>).pendingEmails, 0)
   })
 })

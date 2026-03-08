@@ -2,6 +2,8 @@
 // Wrapper for @adonisjs/transmit-client SSE subscriptions
 // ---------------------------------------------------------------------------
 
+import { buildTransmitOptions } from './transmit-helpers.js'
+
 /**
  * Configuration for creating a Transmit SSE subscription.
  */
@@ -86,63 +88,29 @@ export function createTransmitSubscription(
   const subscribe = async (): Promise<void> => {
     try {
       const Transmit = await resolveTransmitClass()
-
       if (!Transmit) {
         throw new Error(
           'Transmit client not available (neither window.Transmit nor @adonisjs/transmit-client)'
         )
       }
-
       if (disposed) return
-
-      transmit = new Transmit({
-        baseUrl: config.baseUrl || window.location.origin,
-        ...(config.authToken
-          ? {
-              beforeSubscribe(_request: RequestInit) {
-                return {
-                  headers: {
-                    Authorization: `Bearer ${config.authToken}`,
-                  },
-                }
-              },
-              beforeUnsubscribe(_request: RequestInit) {
-                return {
-                  headers: {
-                    Authorization: `Bearer ${config.authToken}`,
-                  },
-                }
-              },
-            }
-          : {}),
-      })
-
+      transmit = new Transmit(buildTransmitOptions(config.baseUrl, config.authToken))
       subscription = transmit.subscription(config.channelName)
-
       subscription.onMessage((data: unknown) => {
-        if (!disposed) {
-          config.onMessage(data)
-        }
+        if (!disposed) config.onMessage(data)
       })
-
       await subscription.create()
     } catch (error: unknown) {
-      if (config.onError) {
-        config.onError(error)
-      }
+      config.onError?.(error)
     }
   }
 
   const unsubscribe = async (): Promise<void> => {
     disposed = true
     try {
-      if (subscription) {
-        await subscription.delete()
-        subscription = null
-      }
-      if (transmit) {
-        transmit = null
-      }
+      await subscription?.delete()
+      subscription = null
+      transmit = null
     } catch {
       // Silently ignore cleanup errors
     }

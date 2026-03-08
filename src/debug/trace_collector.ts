@@ -30,7 +30,7 @@ interface TraceContext {
 /**
  * Module-level singleton reference for the `trace()` helper.
  */
-let globalTraceCollector: TraceCollector | null = null
+const globalRef: { current: TraceCollector | null } = { current: null }
 
 /**
  * Wrap an async function in a traced span.
@@ -48,8 +48,8 @@ let globalTraceCollector: TraceCollector | null = null
  * ```
  */
 export async function trace<T>(label: string, fn: () => Promise<T>): Promise<T> {
-  if (!globalTraceCollector) return fn()
-  return globalTraceCollector.span(label, 'custom', fn)
+  if (!globalRef.current) return fn()
+  return globalRef.current.span(label, 'custom', fn)
 }
 
 /**
@@ -68,7 +68,7 @@ export class TraceCollector {
 
   constructor(maxTraces: number = 200) {
     this.buffer = new RingBuffer<TraceRecord>(maxTraces)
-    globalTraceCollector = this
+    globalRef.current = this
   }
 
   /** Start a new trace context for an HTTP request. */
@@ -210,7 +210,7 @@ export class TraceCollector {
     this.dbHandler = null
     this.emitter = null
     this.originalConsoleWarn = null
-    globalTraceCollector = null
+    globalRef.current = null
   }
 
   getTraces(): TraceRecord[] {
