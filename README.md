@@ -7,7 +7,7 @@
 [![AdonisJS](https://img.shields.io/badge/AdonisJS-v6-5A45FF.svg)](https://adonisjs.com/)
 [![AdonisJS](https://img.shields.io/badge/AdonisJS-v7-5A45FF.svg)](https://adonisjs.com/)
 
-A Laravel Telescope-inspired dev toolbar and real-time server monitor for **AdonisJS v6**.
+A Laravel Telescope-inspired dev toolbar and real-time server monitor for **AdonisJS v6 & v7**.
 
 Drop a single Edge tag into your layout and get a live stats bar showing CPU, memory, requests/sec, database pool, Redis, queues, and logs -- plus a full debug toolbar with SQL query inspection, event tracing, route listing, live log tailing, and custom panels.
 
@@ -178,7 +178,7 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | Option               | Type       | Default                                           | Description                                     |
 | -------------------- | ---------- | ------------------------------------------------- | ----------------------------------------------- |
 | `slowQueryThreshold` | `number`   | `100`                                             | Slow query threshold (ms)                        |
-| `tracing`            | `boolean`  | `false`                                           | Enable per-request tracing with timeline         |
+| `tracing`            | `boolean`  | `true`                                            | Enable per-request tracing with timeline         |
 | `persist`            | `boolean`  | `false`                                           | Persist debug data to disk across restarts       |
 | `panes`              | `DebugPane[]` | --                                             | Custom debug panel tabs                          |
 | `excludeFromTracing` | `string[]` | `['/admin/api/debug', '/admin/api/server-stats']` | URL prefixes to exclude from tracing/persistence |
@@ -231,7 +231,7 @@ The following field names still work but will show deprecation warnings at boot.
 | `maxEmails`            | `number`            | `100`                                             | Max emails to buffer                                                                                                                                                                                         |
 | `slowQueryThresholdMs` | `number`            | `100`                                             | Slow query threshold (ms)                                                                                                                                                                                    |
 | `persistDebugData`     | `boolean \| string` | `false`                                           | Persist debug data to disk across restarts. `true` writes to `.adonisjs/server-stats/debug-data.json`, or pass a custom path.                                                                                |
-| `tracing`              | `boolean`           | `false`                                           | Enable per-request tracing with timeline visualization                                                                                                                                                       |
+| `tracing`              | `boolean`           | `true`                                            | Enable per-request tracing with timeline visualization                                                                                                                                                       |
 | `maxTraces`            | `number`            | `200`                                             | Max request traces to buffer                                                                                                                                                                                 |
 | `dashboard`            | `boolean`           | `false`                                           | Enable the full-page dashboard (requires `better-sqlite3`)                                                                                                                                                   |
 | `dashboardPath`        | `string`            | `'/__stats'`                                      | URL path for the dashboard page                                                                                                                                                                              |
@@ -381,16 +381,18 @@ Registered when `statsEndpoint` is a string (default: `/admin/api/server-stats`)
 
 Registered when `toolbar` is enabled. Base path configurable via `advanced.debugEndpoint` (default: `/admin/api/debug`).
 
-| Method | Path                  | Description                     |
-| ------ | --------------------- | ------------------------------- |
-| GET    | `/queries`            | SQL queries with summary stats  |
-| GET    | `/events`             | Application events              |
-| GET    | `/routes`             | Registered route table          |
-| GET    | `/logs`               | Log file entries (last 256KB)   |
-| GET    | `/emails`             | Captured emails (stripped HTML) |
-| GET    | `/emails/:id/preview` | Email HTML preview              |
-| GET    | `/traces`             | Request traces                  |
-| GET    | `/traces/:id`         | Trace detail with spans         |
+| Method | Path                  | Description                              |
+| ------ | --------------------- | ---------------------------------------- |
+| GET    | `/queries`            | SQL queries with summary stats           |
+| GET    | `/events`             | Application events                       |
+| GET    | `/routes`             | Registered route table                   |
+| GET    | `/logs`               | Paginated log entries (up to 200)        |
+| GET    | `/emails`             | Captured emails (stripped HTML)          |
+| GET    | `/emails/:id/preview` | Email HTML preview                       |
+| GET    | `/traces`             | Request traces with log correlation      |
+| GET    | `/traces/:id`         | Trace detail with spans and related logs |
+| GET    | `/config`             | Debug store configuration                |
+| GET    | `/diagnostics`        | Provider diagnostics and status          |
 
 ### Dashboard routes
 
@@ -415,6 +417,7 @@ Registered when `dashboard` is enabled. Base path configurable via `dashboard.pa
 | GET    | `/api/traces/:id`          | Trace detail with spans           |
 | GET    | `/api/cache`               | Cache stats and key listing       |
 | GET    | `/api/cache/:key`          | Cache key detail                  |
+| DELETE | `/api/cache/:key`          | Delete a cache key                |
 | GET    | `/api/jobs`                | Job queue overview                |
 | GET    | `/api/jobs/:id`            | Job detail                        |
 | POST   | `/api/jobs/:id/retry`      | Retry a failed job                |
@@ -582,7 +585,7 @@ The React and Vue components share the same theme system as Edge. Dark/light pre
 - The dashboard page is large — lazy-loading helps but initial bundle may be significant
 - Some edge cases in custom pane rendering may not be fully covered yet
 - Error boundaries are minimal — a bad API response may cause a blank panel
-- Only tested with React 18+ and Vue 3.3+
+- Only tested with React 18/19 and Vue 3.3+
 
 Found a bug? Have feedback? [Open an issue](https://github.com/simulieren/adonisjs-server-stats/issues) — it helps a lot.
 
@@ -713,6 +716,12 @@ const result = await trace('organization.fetchMembers', async () => {
 ```
 
 If tracing is disabled or no request is active, `trace()` executes the function directly with no overhead.
+
+#### Related Logs
+
+When viewing a trace detail (either in the debug panel Timeline tab or the dashboard), related log entries are automatically correlated using the HTTP request ID (`ctx.request.id()`). Any logs emitted during the request appear in a "Related Logs" section below the waterfall chart.
+
+This works with both SQLite persistence (joins on `http_request_id`) and in-memory mode (scans the log file for matching `request_id` entries). No configuration needed — if your app uses AdonisJS request IDs, correlation happens automatically.
 
 ### Full-Page Dashboard
 

@@ -404,39 +404,244 @@ export interface DevToolbarOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Toolbar settings (new simplified config).
- * Maps to the relevant fields in DevToolbarOptions.
+ * Debug toolbar configuration.
+ *
+ * Controls the debug panel overlay that shows SQL queries, events,
+ * emails, routes, logs, and per-request tracing. Pass `true` to
+ * `toolbar` to enable with all defaults, or an object to customize.
+ *
+ * @example
+ * ```ts
+ * export default defineConfig({
+ *   toolbar: {
+ *     slowQueryThreshold: 200,
+ *     tracing: true,
+ *     persist: true,
+ *   },
+ * })
+ * ```
  */
 export interface ToolbarConfig {
+  /**
+   * Queries slower than this threshold (in **milliseconds**) are
+   * highlighted in red in the debug panel.
+   *
+   * @default 100
+   */
   slowQueryThreshold?: number
+
+  /**
+   * Enable per-request tracing with timeline visualization.
+   *
+   * When enabled, each HTTP request is traced with a waterfall of all
+   * operations (DB queries, events, custom spans) that occurred during
+   * the request. Adds a "Timeline" tab to the debug panel.
+   *
+   * Uses `AsyncLocalStorage` to automatically correlate DB queries and
+   * `console.warn` calls to the request that triggered them.
+   *
+   * @default true
+   */
   tracing?: boolean
+
+  /**
+   * Persist debug data (queries, events, emails) to disk so it
+   * survives server restarts.
+   *
+   * Data is saved to `.adonisjs/server-stats/debug-data.json`
+   * (customizable via `advanced.persistPath`). Flushed every 30
+   * seconds and on graceful shutdown.
+   *
+   * @default false
+   */
   persist?: boolean
+
+  /**
+   * Custom tabs to add to the debug panel.
+   *
+   * Each pane fetches JSON from an endpoint you define and renders
+   * it as a table with configurable columns, search, and formatting.
+   *
+   * @see {@link DebugPane}
+   *
+   * @example
+   * ```ts
+   * panes: [{
+   *   id: 'webhooks',
+   *   label: 'Webhooks',
+   *   endpoint: '/admin/api/debug/webhooks',
+   *   columns: [
+   *     { key: 'event', label: 'Event', searchable: true },
+   *     { key: 'status', label: 'Status', format: 'badge',
+   *       badgeColorMap: { delivered: 'green', failed: 'red' } },
+   *   ],
+   * }]
+   * ```
+   */
   panes?: DebugPane[]
+
+  /**
+   * URL prefixes to exclude from tracing and dashboard persistence.
+   *
+   * Requests matching these prefixes still count toward HTTP metrics
+   * (req/s, latency) but won't appear in the timeline or be stored
+   * in the dashboard. The stats endpoint is always excluded automatically.
+   *
+   * @default ['/admin/api/debug', '/admin/api/server-stats']
+   */
   excludeFromTracing?: string[]
 }
 
 /**
- * Dashboard settings (new simplified config).
- * Maps to devToolbar.dashboard + devToolbar.dashboardPath + devToolbar.retentionDays.
+ * Full-page dashboard configuration.
+ *
+ * The dashboard provides historical data, charts, query analysis, and
+ * integration inspectors — all persisted to a local SQLite database.
+ * Pass `true` to `dashboard` to enable at `/__stats` with defaults,
+ * or an object to customize.
+ *
+ * Requires `better-sqlite3` as a peer dependency. If not installed,
+ * the dashboard disables itself gracefully.
+ *
+ * @example
+ * ```ts
+ * export default defineConfig({
+ *   dashboard: {
+ *     path: '/admin/dashboard',
+ *     retentionDays: 14,
+ *   },
+ * })
+ * ```
  */
 export interface DashboardConfig {
+  /**
+   * URL path where the dashboard page is served.
+   *
+   * Must start with `/`. All dashboard API routes are registered
+   * under `{path}/api/*`.
+   *
+   * @default '/__stats'
+   */
   path?: string
+
+  /**
+   * How many days of historical data to keep in SQLite.
+   *
+   * Records older than this are automatically pruned on startup
+   * and periodically during runtime.
+   *
+   * @default 7
+   */
   retentionDays?: number
 }
 
 /**
- * Advanced options that most users never need.
+ * Advanced options that most users never need to touch.
+ *
+ * These control internal behavior like buffer sizes, file paths,
+ * channel names, and the client-side rendering library for Edge.
+ *
+ * @example
+ * ```ts
+ * export default defineConfig({
+ *   advanced: {
+ *     maxQueries: 1000,
+ *     renderer: 'vue',
+ *     dbPath: 'tmp/stats.sqlite3',
+ *   },
+ * })
+ * ```
  */
 export interface AdvancedConfig {
+  /**
+   * Skip all metric collection during test runs.
+   *
+   * Prevents collectors from running database queries, connecting
+   * to Redis, or spawning timers during tests.
+   *
+   * @default true
+   */
   skipInTest?: boolean
+
+  /**
+   * Transmit channel name for SSE broadcasting.
+   *
+   * Clients subscribe to this channel to receive real-time stats
+   * updates. Only relevant when `realtime: true`.
+   *
+   * @default 'admin/server-stats'
+   */
   channelName?: string
+
+  /**
+   * Base URL path for the debug panel API endpoints.
+   *
+   * The debug panel fetches data from endpoints under this path
+   * (e.g. `{debugEndpoint}/queries`, `{debugEndpoint}/events`).
+   *
+   * @default '/admin/api/debug'
+   */
   debugEndpoint?: string
+
+  /**
+   * Client-side rendering library for the Edge tag integration.
+   *
+   * - `'preact'` — lightweight Preact + React-compat (smaller bundle)
+   * - `'vue'` — Vue 3 components (ideal if your app already uses Vue)
+   *
+   * Only affects the `@serverStats()` Edge tag. The standalone React
+   * and Vue npm imports are unaffected by this setting.
+   *
+   * @default 'preact'
+   */
   renderer?: 'preact' | 'vue'
+
+  /**
+   * Path to the SQLite database file for dashboard persistence.
+   *
+   * Relative to app root. The directory is created automatically
+   * if it doesn't exist. Add it to `.gitignore`.
+   *
+   * @default '.adonisjs/server-stats/dashboard.sqlite3'
+   */
   dbPath?: string
+
+  /**
+   * Path for persisted debug data (queries, events, emails).
+   *
+   * Relative to app root. Only used when `toolbar.persist` is enabled.
+   * Overrides the default path.
+   *
+   * @default '.adonisjs/server-stats/debug-data.json'
+   */
   persistPath?: string
+
+  /**
+   * Maximum SQL queries to keep in the debug panel ring buffer.
+   *
+   * @default 500
+   */
   maxQueries?: number
+
+  /**
+   * Maximum application events to keep in the debug panel ring buffer.
+   *
+   * @default 200
+   */
   maxEvents?: number
+
+  /**
+   * Maximum captured emails to keep in the debug panel ring buffer.
+   *
+   * @default 100
+   */
   maxEmails?: number
+
+  /**
+   * Maximum request traces to keep in the debug panel ring buffer.
+   *
+   * @default 200
+   */
   maxTraces?: number
 }
 
@@ -450,16 +655,29 @@ export interface AdvancedConfig {
  * Pass this to {@link defineConfig} in `config/server_stats.ts`.
  * All fields are optional — `defineConfig({})` works out of the box.
  *
+ * **Recommended fields** (use these):
+ * - `pollInterval`, `realtime`, `statsEndpoint`, `authorize`
+ * - `collectors`, `toolbar`, `dashboard`, `advanced`, `verbose`
+ *
+ * **Deprecated fields** (still work, but will be removed in v2):
+ * - `intervalMs` → `pollInterval`
+ * - `transport` → `realtime`
+ * - `endpoint` → `statsEndpoint`
+ * - `shouldShow` → `authorize`
+ * - `devToolbar` → `toolbar` + `dashboard` + `advanced`
+ * - `channelName` → `advanced.channelName`
+ * - `skipInTest` → `advanced.skipInTest`
+ *
  * @example
  * ```ts
- * // Minimal — zero config, auto-detects everything
+ * // Zero config — auto-detects everything
  * import { defineConfig } from 'adonisjs-server-stats'
  * export default defineConfig({})
  * ```
  *
  * @example
  * ```ts
- * // Common setup
+ * // Common production setup
  * import { defineConfig } from 'adonisjs-server-stats'
  * export default defineConfig({
  *   authorize: (ctx) => ctx.auth?.user?.role === 'admin',
@@ -606,22 +824,115 @@ export interface ServerStatsConfig {
   shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
 
   // ---------------------------------------------------------------------------
-  // New aliases (Phase 1 — non-breaking additions)
+  // Recommended options (new names — use these instead of the deprecated ones)
   // ---------------------------------------------------------------------------
 
-  /** Alias for `intervalMs`. New preferred name. */
+  /**
+   * How often (in **milliseconds**) to run all collectors and
+   * broadcast updated stats.
+   *
+   * Lower values give more responsive dashboards but increase
+   * CPU and network overhead.
+   *
+   * @default 3000
+   */
   pollInterval?: number
-  /** Alias for `transport`. `true` = 'transmit', `false` = 'none'. */
+
+  /**
+   * Enable real-time updates via Server-Sent Events (SSE).
+   *
+   * - `true` — broadcast stats via AdonisJS Transmit (requires
+   *   `@adonisjs/transmit` as a peer dependency)
+   * - `false` — disable SSE; clients poll the HTTP endpoint instead
+   *
+   * @default true
+   */
   realtime?: boolean
-  /** Alias for `endpoint`. New preferred name. */
+
+  /**
+   * HTTP endpoint path that returns the latest stats snapshot as JSON.
+   *
+   * The stats bar polls this endpoint at the configured interval.
+   * Set to `false` to disable the built-in endpoint entirely
+   * (e.g. if you provide your own controller).
+   *
+   * @default '/admin/api/server-stats'
+   */
   statsEndpoint?: string | false
-  /** Alias for `shouldShow`. New preferred name. */
+
+  /**
+   * Per-request access control callback.
+   *
+   * Gates **all** auto-registered routes (stats bar, debug panel,
+   * dashboard). Return `true` to allow access, `false` to deny (403).
+   *
+   * Runs after middleware, so `ctx.auth` is available.
+   *
+   * @example
+   * ```ts
+   * // Only admins
+   * authorize: (ctx) => ctx.auth?.user?.role === 'admin'
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Only in development
+   * authorize: () => process.env.NODE_ENV === 'development'
+   * ```
+   */
   authorize?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
-  /** Enable toolbar. Alias for `devToolbar`. `true` = enabled with defaults. */
+
+  /**
+   * Enable the debug panel (toolbar overlay).
+   *
+   * - `true` — enable with sensible defaults (tracing on, no persistence)
+   * - `false` — disable the debug panel
+   * - `ToolbarConfig` — enable with custom settings
+   *
+   * The debug panel adds tabs for SQL queries, events, emails, routes,
+   * logs, and per-request tracing. Only active in non-production.
+   *
+   * @see {@link ToolbarConfig}
+   *
+   * @example
+   * ```ts
+   * toolbar: true
+   * // or
+   * toolbar: { tracing: true, persist: true, slowQueryThreshold: 200 }
+   * ```
+   */
   toolbar?: boolean | ToolbarConfig
-  /** Enable dashboard. Top-level shortcut for `devToolbar.dashboard`. `true` = enabled at /__stats. */
+
+  /**
+   * Enable the full-page dashboard at `/__stats`.
+   *
+   * - `true` — enable at the default path (`/__stats`)
+   * - `false` — disable the dashboard
+   * - `DashboardConfig` — enable with custom path or retention
+   *
+   * The dashboard provides historical request data, charts, query
+   * analysis with EXPLAIN plans, cache/queue inspection, and more.
+   * Requires `better-sqlite3` for local SQLite storage.
+   *
+   * @see {@link DashboardConfig}
+   *
+   * @example
+   * ```ts
+   * dashboard: true
+   * // or
+   * dashboard: { path: '/admin/stats', retentionDays: 14 }
+   * ```
+   */
   dashboard?: boolean | DashboardConfig
-  /** Advanced options. */
+
+  /**
+   * Advanced options for fine-tuning internal behavior.
+   *
+   * Controls buffer sizes, file paths, channel names, and the
+   * Edge rendering library. Most users don't need to touch these.
+   *
+   * @see {@link AdvancedConfig}
+   */
   advanced?: AdvancedConfig
 
   /**

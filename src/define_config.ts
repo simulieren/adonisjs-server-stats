@@ -287,65 +287,63 @@ function logDeprecationWarnings(config: ServerStatsConfig): void {
 /**
  * Define the server stats configuration with full type safety.
  *
- * All top-level fields are optional. Sensible defaults are applied
- * for any omitted fields:
+ * All fields are optional. Sensible defaults are applied for anything
+ * you omit — `defineConfig({})` works out of the box with zero config.
  *
- * | Field         | Default                        |
- * |---------------|--------------------------------|
- * | `intervalMs`  | `3000`                         |
- * | `transport`   | `'transmit'`                   |
- * | `channelName` | `'admin/server-stats'`         |
- * | `endpoint`    | `'/admin/api/server-stats'`    |
- * | `collectors`  | `'auto'`                       |
- * | `skipInTest`  | `true`                         |
+ * | Option          | Default                     | Description                              |
+ * |-----------------|-----------------------------|------------------------------------------|
+ * | `pollInterval`  | `3000`                      | Collection + broadcast interval (ms)     |
+ * | `realtime`      | `true`                      | SSE via Transmit (`false` = poll-only)   |
+ * | `statsEndpoint` | `'/admin/api/server-stats'` | Stats bar polling endpoint               |
+ * | `collectors`    | `'auto'`                    | Auto-detect installed packages           |
+ * | `authorize`     | —                           | Per-request access control               |
+ * | `toolbar`       | —                           | Debug panel (queries, events, tracing)   |
+ * | `dashboard`     | —                           | Full-page dashboard at `/__stats`        |
+ * | `verbose`       | `false`                     | Log initialization details               |
  *
- * New simplified aliases (Phase 1) are also supported. When both the
- * old name and its alias are provided, the **new name takes precedence**.
- *
- * | Alias            | Resolves to      |
- * |------------------|------------------|
- * | `pollInterval`   | `intervalMs`     |
- * | `realtime`       | `transport`      |
- * | `statsEndpoint`  | `endpoint`       |
- * | `authorize`      | `shouldShow`     |
- * | `toolbar`        | `devToolbar`     |
- * | `dashboard`      | `devToolbar`     |
- * | `advanced`       | various          |
- *
- * This is the main entry point for configuring `adonisjs-server-stats`.
- * Call it in `config/server_stats.ts` and export the result as default.
+ * Call this in `config/server_stats.ts` and export the result as default.
  *
  * @example
  * ```ts
- * // config/server_stats.ts — minimal (all defaults)
+ * // Zero config — auto-detects everything
  * import { defineConfig } from 'adonisjs-server-stats'
- *
  * export default defineConfig({})
  * ```
  *
  * @example
  * ```ts
- * // config/server_stats.ts — explicit collectors
+ * // Common setup with auth and all features
  * import { defineConfig } from 'adonisjs-server-stats'
- * import { processCollector, httpCollector } from 'adonisjs-server-stats/collectors'
  *
  * export default defineConfig({
- *   intervalMs: 3000,
- *   transport: 'transmit',
- *   collectors: [processCollector(), httpCollector()],
+ *   authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+ *   toolbar: true,
+ *   dashboard: true,
  * })
  * ```
  *
  * @example
  * ```ts
- * // config/server_stats.ts — new simplified aliases
+ * // Full control with explicit collectors
  * import { defineConfig } from 'adonisjs-server-stats'
+ * import {
+ *   processCollector,
+ *   httpCollector,
+ *   dbPoolCollector,
+ *   redisCollector,
+ * } from 'adonisjs-server-stats/collectors'
  *
  * export default defineConfig({
- *   pollInterval: 3000,
- *   realtime: true,
- *   toolbar: true,
- *   dashboard: true,
+ *   pollInterval: 5000,
+ *   collectors: [
+ *     processCollector(),
+ *     httpCollector({ maxRecords: 10_000 }),
+ *     dbPoolCollector({ connectionName: 'postgres' }),
+ *     redisCollector(),
+ *   ],
+ *   authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+ *   toolbar: { tracing: true, persist: true, slowQueryThreshold: 200 },
+ *   dashboard: { retentionDays: 14 },
  * })
  * ```
  */
