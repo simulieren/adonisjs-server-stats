@@ -184,6 +184,8 @@ test.group('normalizeTraceFields', () => {
       spanCount: 3,
       spans: [],
       warnings: [],
+      logs: [],
+      httpRequestId: undefined,
     })
   })
 
@@ -206,6 +208,8 @@ test.group('normalizeTraceFields', () => {
       spanCount: 1,
       spans: [{ name: 'db' }],
       warnings: ['slow'],
+      logs: [],
+      httpRequestId: undefined,
     })
   })
 

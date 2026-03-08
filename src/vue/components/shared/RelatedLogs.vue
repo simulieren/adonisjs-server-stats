@@ -74,7 +74,8 @@ function toggleExpand(index: number, hasData: boolean) {
               `${classPrefix}-log-expand-icon`,
               expandedIndex === i ? `${classPrefix}-log-expand-icon-open` : '',
             ]"
-          >&#x25B6;</span>
+            >&#x25B6;</span
+          >
           <span v-else style="width: 14px" />
           <span :class="`${classPrefix}-log-msg`">{{ resolveLogMessage(log) }}</span>
         </div>

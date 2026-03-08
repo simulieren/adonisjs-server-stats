@@ -2,8 +2,8 @@
  * Email bridge helpers for cross-process email capture via Redis pub/sub.
  */
 
-import { buildEmailPayload, MAIL_STATUS_MAP } from './email_helpers.js'
 import { log } from '../utils/logger.js'
+import { buildEmailPayload, MAIL_STATUS_MAP } from './email_helpers.js'
 
 /** Minimal emitter interface. */
 interface BridgeEmitter {
@@ -71,9 +71,7 @@ export function registerMailEventPublisher(
   for (const [event, status] of MAIL_STATUS_MAP) {
     emitter.on(event, (data: unknown) => {
       try {
-        const payload = JSON.stringify(
-          buildEmailPayload(data, status, processTag)
-        )
+        const payload = JSON.stringify(buildEmailPayload(data, status, processTag))
         redis.publish(channel, payload).catch(() => {})
       } catch {
         // Silently ignore serialization errors
@@ -85,9 +83,7 @@ export function registerMailEventPublisher(
 /**
  * Subscribe to Redis channel for cross-process email capture.
  */
-async function subscribeToEmailBridge(
-  opts: SubscribeOptions
-): Promise<unknown> {
+async function subscribeToEmailBridge(opts: SubscribeOptions): Promise<unknown> {
   try {
     await opts.redis.subscribe(opts.channel, (message: string) => {
       ingestRemoteEmail(message, opts.processTag, opts.targets)

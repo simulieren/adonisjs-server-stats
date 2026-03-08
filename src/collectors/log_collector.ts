@@ -5,63 +5,43 @@ import { log, dim, bold } from '../utils/logger.js'
 
 import type { MetricCollector } from './collector.js'
 
-/**
- * Options for {@link logCollector}.
- */
 export interface LogCollectorOptions {
-  /**
-   * Path to the JSON log file to monitor.
-   *
-   * Relative to the application root. The file must contain
-   * newline-delimited JSON entries (one per line) with `level`
-   * and `time` fields (Pino format).
-   *
-   * @example `'logs/adonisjs.log'`
-   */
   logPath: string
 }
 
 let sharedLogStream: LogStreamService | null = null
 
-/**
- * Returns the shared {@link LogStreamService} instance created by
- * `logCollector()`, or `null` if the log collector is not configured.
- *
- * Useful for accessing the log stream outside of the collector
- * (e.g. in the LogStreamProvider for live broadcasting).
- */
 export function getLogStreamService(): LogStreamService | null {
   return sharedLogStream
 }
 
-/**
- * Monitors log entries and reports rolling error/warning counts.
- *
- * **Two modes:**
- * - **Zero-config (no args):** the provider auto-hooks into the AdonisJS
- *   Pino logger at boot. Entries arrive in real-time, no file path needed.
- * - **File-based (with `logPath`):** polls a JSON log file every 2 seconds.
- *   Use this as a fallback if the auto-hook doesn't work for your setup.
- *
- * **Metrics produced:**
- * - `logErrorsLast5m` -- error + fatal entries in the last 5 minutes
- * - `logWarningsLast5m` -- warning entries in the last 5 minutes
- * - `logEntriesLast5m` -- total entries in the last 5 minutes
- * - `logEntriesPerMinute` -- entries per minute (averaged over 5 min)
- *
- * **Peer dependencies:** none
- *
- * @example
- * ```ts
- * import { logCollector } from 'adonisjs-server-stats/collectors'
- *
- * // Zero-config — auto-hooks into AdonisJS logger (recommended)
- * logCollector()
- *
- * // File-based fallback
- * logCollector({ logPath: 'logs/adonisjs.log' })
- * ```
- */
+function warnMissingFile(logPath: string, alreadyWarned: boolean): boolean {
+  if (alreadyWarned) return true
+  log.warn(`Log file not found: ${bold(logPath)}`)
+  log.block(
+    'The log collector will keep retrying, but no metrics will appear until the file exists.',
+    [
+      dim('Make sure the path is correct and your app is writing logs there.'),
+      dim('The file must contain newline-delimited JSON with') +
+        ` ${bold('level')} ` +
+        dim('and') +
+        ` ${bold('time')} ` +
+        dim('fields (Pino format).'),
+    ]
+  )
+  return true
+}
+
+function warnStartFailure(error: unknown, logPath: string, alreadyWarned: boolean): boolean {
+  if (alreadyWarned) return true
+  log.warn(`Log collector failed to start: ${bold(String(error))}`)
+  log.block('The log collector will not produce metrics until this is resolved.', [
+    dim('Configured log path:') + ` ${bold(logPath)}`,
+    dim('Check file permissions and ensure the directory exists.'),
+  ])
+  return true
+}
+
 export function logCollector(opts?: LogCollectorOptions): MetricCollector {
   if (sharedLogStream) {
     console.warn(
@@ -73,8 +53,8 @@ export function logCollector(opts?: LogCollectorOptions): MetricCollector {
   const service = new LogStreamService(opts?.logPath)
   sharedLogStream = service
 
-  let warnedMissingFile = false
-  let warnedStartFailure = false
+  let warnedMissing = false
+  let warnedStart = false
 
   return {
     name: 'log',
@@ -88,38 +68,17 @@ export function logCollector(opts?: LogCollectorOptions): MetricCollector {
     },
 
     async start() {
-      if (opts?.logPath) {
-        // File-based mode
-        if (!existsSync(opts.logPath) && !warnedMissingFile) {
-          warnedMissingFile = true
-          log.warn(`Log file not found: ${bold(opts.logPath)}`)
-          log.block(
-            'The log collector will keep retrying, but no metrics will appear until the file exists.',
-            [
-              dim('Make sure the path is correct and your app is writing logs there.'),
-              dim('The file must contain newline-delimited JSON with') +
-                ` ${bold('level')} ` +
-                dim('and') +
-                ` ${bold('time')} ` +
-                dim('fields (Pino format).'),
-            ]
-          )
-        }
+      if (!opts?.logPath) return
 
-        try {
-          await service.start()
-        } catch (error) {
-          if (!warnedStartFailure) {
-            warnedStartFailure = true
-            log.warn(`Log collector failed to start: ${bold(String(error))}`)
-            log.block('The log collector will not produce metrics until this is resolved.', [
-              dim('Configured log path:') + ` ${bold(opts.logPath)}`,
-              dim('Check file permissions and ensure the directory exists.'),
-            ])
-          }
-        }
+      if (!existsSync(opts.logPath)) {
+        warnedMissing = warnMissingFile(opts.logPath, warnedMissing)
       }
-      // Stream mode: no startup needed — entries arrive via ingest()
+
+      try {
+        await service.start()
+      } catch (error) {
+        warnedStart = warnStartFailure(error, opts.logPath, warnedStart)
+      }
     },
 
     stop() {

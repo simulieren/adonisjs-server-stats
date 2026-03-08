@@ -3,15 +3,6 @@ import { log, dim, green, bold } from '../utils/logger.js'
 
 import type { MetricCollector } from './collector.js'
 
-/**
- * Probe whether a package is importable at runtime.
- *
- * Uses {@link appImport} which resolves from `process.cwd()` first,
- * handling the common case where adonisjs-server-stats is symlinked
- * (e.g. `file:../../adonisjs-server-stats` in package.json). Without
- * this, `import(pkg)` resolves from the symlink *target* directory,
- * which may have devDependency stubs instead of the real packages.
- */
 async function isInstalled(pkg: string): Promise<boolean> {
   try {
     await appImport(pkg)
@@ -21,57 +12,36 @@ async function isInstalled(pkg: string): Promise<boolean> {
   }
 }
 
-/**
- * Describes a single collector entry for the boot log.
- */
 interface CollectorEntry {
-  /** Short name shown in the log (e.g. "process", "db-pool"). */
   name: string
-  /** Brief description of what the collector tracks. */
   description: string
-  /** Whether the collector was enabled. */
   enabled: boolean
-  /**
-   * For optional collectors: the package that was found (when enabled)
-   * or the package to install (when skipped).
-   */
   reason?: string
 }
 
-/** Result returned by {@link autoDetectCollectors}. */
 export interface AutoDetectResult {
-  /** Collector instances ready for the {@link StatsEngine}. */
   collectors: MetricCollector[]
-  /** Total number of available collectors (enabled + skipped). */
   total: number
-  /** Number of collectors that were enabled. */
   active: number
 }
 
-/**
- * Auto-detect which metric collectors to enable based on installed packages.
- *
- * Always enables collectors with no external dependencies:
- * - `processCollector` -- Node.js process metrics
- * - `systemCollector` -- OS-level system metrics
- * - `httpCollector` -- HTTP request metrics
- * - `logCollector` -- log stream metrics
- *
- * Conditionally enables collectors when their peer dependency is importable:
- * - `dbPoolCollector` + `appCollector` -- when `@adonisjs/lucid` is installed
- * - `redisCollector` -- when `@adonisjs/redis` is installed
- * - `queueCollector` -- when `bullmq` is installed
- *
- * This function is meant to run at startup, so the async overhead of
- * probing packages is acceptable.
- *
- * @returns Resolved collectors and detection metadata for the boot summary.
- */
-export async function autoDetectCollectors(): Promise<AutoDetectResult> {
-  const collectors: MetricCollector[] = []
-  const entries: CollectorEntry[] = []
+/** Push an optional collector entry with auto-generated reason. */
+function pushOptionalEntry(
+  entries: CollectorEntry[],
+  opts: { name: string; description: string; enabled: boolean; pkg: string }
+): void {
+  entries.push({
+    name: opts.name,
+    description: opts.description,
+    enabled: opts.enabled,
+    reason: opts.enabled ? `found ${opts.pkg}` : `install ${opts.pkg} to enable`,
+  })
+}
 
-  // ── Always-on collectors (no external deps) ──────────────────────
+async function registerCoreCollectors(
+  collectors: MetricCollector[],
+  entries: CollectorEntry[]
+): Promise<void> {
   const { processCollector } = await import('./process_collector.js')
   const { systemCollector } = await import('./system_collector.js')
   const { httpCollector } = await import('./http_collector.js')
@@ -88,87 +58,80 @@ export async function autoDetectCollectors(): Promise<AutoDetectResult> {
 
   collectors.push(logCollector())
   entries.push({ name: 'log', description: 'error & warning counts', enabled: true })
+}
 
-  // ── Conditional: @adonisjs/lucid ─────────────────────────────────
+async function registerOptionalCollectors(
+  collectors: MetricCollector[],
+  entries: CollectorEntry[]
+): Promise<void> {
   const hasLucid = await isInstalled('@adonisjs/lucid')
-
   if (hasLucid) {
     const { dbPoolCollector } = await import('./db_pool_collector.js')
     const { appCollector } = await import('./app_collector.js')
-
     collectors.push(dbPoolCollector())
     collectors.push(appCollector())
   }
-
-  entries.push({
+  pushOptionalEntry(entries, {
     name: 'db-pool',
     description: 'connection pool stats',
     enabled: hasLucid,
-    reason: hasLucid ? 'found @adonisjs/lucid' : 'install @adonisjs/lucid to enable',
+    pkg: '@adonisjs/lucid',
   })
-
-  entries.push({
+  pushOptionalEntry(entries, {
     name: 'app',
     description: 'app-level DB metrics',
     enabled: hasLucid,
-    reason: hasLucid ? 'found @adonisjs/lucid' : 'install @adonisjs/lucid to enable',
+    pkg: '@adonisjs/lucid',
   })
 
-  // ── Conditional: @adonisjs/redis ─────────────────────────────────
   const hasRedis = await isInstalled('@adonisjs/redis')
-
   if (hasRedis) {
     const { redisCollector } = await import('./redis_collector.js')
     collectors.push(redisCollector())
   }
-
-  entries.push({
+  pushOptionalEntry(entries, {
     name: 'redis',
     description: 'connections, commands, memory',
     enabled: hasRedis,
-    reason: hasRedis ? 'found @adonisjs/redis' : 'install @adonisjs/redis to enable',
+    pkg: '@adonisjs/redis',
   })
 
-  // ── Conditional: bullmq ──────────────────────────────────────────
   const hasBullMQ = await isInstalled('bullmq')
-
   if (hasBullMQ) {
     const { queueCollector } = await import('./queue_collector.js')
     collectors.push(
-      queueCollector({
-        queueName: 'default',
-        connection: { host: '127.0.0.1', port: 6379 },
-      })
+      queueCollector({ queueName: 'default', connection: { host: '127.0.0.1', port: 6379 } })
     )
   }
-
-  entries.push({
+  pushOptionalEntry(entries, {
     name: 'queue',
     description: 'jobs, wait time, throughput',
     enabled: hasBullMQ,
-    reason: hasBullMQ ? 'found bullmq' : 'install bullmq to enable',
+    pkg: 'bullmq',
   })
+}
 
-  // ── Rich boot log ────────────────────────────────────────────────
-  const total = entries.length
-  const active = entries.filter((e) => e.enabled).length
+function printBootLog(entries: CollectorEntry[]): void {
   const maxNameLen = Math.max(...entries.map((e) => e.name.length))
-
   const lines = entries.map((entry) => {
     const paddedName = entry.name.padEnd(maxNameLen)
-
     if (entry.enabled) {
-      const mark = green('✔')
       const detail = entry.reason ? dim('— ' + entry.reason) : dim('— ' + entry.description)
-      return `  ${mark} ${bold(paddedName)}  ${detail}`
+      return `  ${green('✔')} ${bold(paddedName)}  ${detail}`
     }
-
-    const mark = dim('✗')
     const detail = dim('— ' + (entry.reason ?? entry.description))
-    return `  ${mark} ${dim(paddedName)}  ${detail}`
+    return `  ${dim('✗')} ${dim(paddedName)}  ${detail}`
   })
-
   log.block('collectors (auto-detected):', lines)
+}
 
-  return { collectors, total, active }
+export async function autoDetectCollectors(): Promise<AutoDetectResult> {
+  const collectors: MetricCollector[] = []
+  const entries: CollectorEntry[] = []
+
+  await registerCoreCollectors(collectors, entries)
+  await registerOptionalCollectors(collectors, entries)
+
+  printBootLog(entries)
+  return { collectors, total: entries.length, active: entries.filter((e) => e.enabled).length }
 }

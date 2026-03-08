@@ -121,15 +121,25 @@ export function mapTraceListRow<T extends Record<string, unknown>>(row: T) {
   }
 }
 
+/** Pick the first defined value from a row, trying snake_case then camelCase. */
+function pick(
+  row: Record<string, unknown>,
+  snake: string,
+  camel: string,
+  fallback: unknown = null
+) {
+  return row[snake] ?? row[camel] ?? fallback
+}
+
 /** Normalize SQLite email column names to match the EmailRecord shape. */
 export function normalizeEmailRow(row: Record<string, unknown>) {
   return {
     ...row,
-    from: row.from_addr ?? row.from ?? '',
-    to: row.to_addr ?? row.to ?? '',
-    messageId: row.message_id ?? row.messageId ?? null,
-    attachmentCount: row.attachment_count ?? row.attachmentCount ?? 0,
-    timestamp: row.created_at ?? row.timestamp ?? null,
+    from: pick(row, 'from_addr', 'from', ''),
+    to: pick(row, 'to_addr', 'to', ''),
+    messageId: pick(row, 'message_id', 'messageId'),
+    attachmentCount: pick(row, 'attachment_count', 'attachmentCount', 0),
+    timestamp: pick(row, 'created_at', 'timestamp'),
   }
 }
 
@@ -189,14 +199,14 @@ export function stripEmailForList(e: {
   id: number
   from: string
   to: string
-  cc?: string
-  bcc?: string
+  cc?: string | null
+  bcc?: string | null
   subject: string
   mailer: string
   status: string
   messageId?: string | null
   attachmentCount?: number
-  timestamp?: string | null
+  timestamp?: string | number | null
 }) {
   return {
     id: e.id,
@@ -225,8 +235,8 @@ export function stripTraceForList(t: {
   statusCode: number
   totalDuration: number
   spanCount: number
-  warnings: unknown[]
-  timestamp?: string | null
+  warnings: readonly unknown[]
+  timestamp?: string | number | null
 }) {
   return {
     id: t.id,
@@ -313,13 +323,6 @@ async function readLogContent(logPath: string, fileSize: number): Promise<string
 }
 
 // Re-export types that DataAccess needs
-export type {
-  DashboardStore,
-  QueryFilters,
-  EventFilters,
-  EmailFilters,
-  TraceFilters,
-  LogFilters,
-}
+export type { DashboardStore, QueryFilters, EventFilters, EmailFilters, TraceFilters, LogFilters }
 export type { DebugStore }
 export type { QueryRecord, EventRecord, TraceRecord, RouteRecord }

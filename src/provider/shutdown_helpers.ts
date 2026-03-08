@@ -2,12 +2,12 @@
  * Shutdown helper functions extracted from ServerStatsProvider.
  */
 
-import { log } from '../utils/logger.js'
 import {
   setOnRequestComplete,
   setDashboardPath,
   setExcludedPrefixes,
 } from '../middleware/request_tracking_middleware.js'
+import { log } from '../utils/logger.js'
 
 /** Timer references that need to be cleared on shutdown. */
 export interface TimerRefs {
@@ -19,8 +19,9 @@ export interface TimerRefs {
 
 /**
  * Clear all active timers and null out the references.
+ * Returns the (now-nulled) timer refs for convenience.
  */
-export function clearAllTimers(timers: TimerRefs): void {
+export function clearAllTimers(timers: TimerRefs): TimerRefs {
   if (timers.intervalId) {
     clearInterval(timers.intervalId)
     timers.intervalId = null
@@ -37,6 +38,7 @@ export function clearAllTimers(timers: TimerRefs): void {
     clearTimeout(timers.debugBroadcastTimer)
     timers.debugBroadcastTimer = null
   }
+  return timers
 }
 
 /** Minimal interface for debug store persistence. */
@@ -66,17 +68,16 @@ interface Unsubscribable {
 
 /**
  * Unsubscribe from the Redis email bridge channel.
+ * Returns null so callers can clear their reference in one step.
  */
-export function unsubscribeEmailBridge(
-  redis: unknown,
-  channel: string
-): void {
-  if (!redis) return
+export function unsubscribeEmailBridge(redis: unknown, channel: string): null {
+  if (!redis) return null
   try {
     ;(redis as Unsubscribable).unsubscribe(channel)
   } catch {
     // Ignore cleanup errors
   }
+  return null
 }
 
 /** Stoppable service interface. */

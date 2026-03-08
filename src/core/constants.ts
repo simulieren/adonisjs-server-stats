@@ -25,7 +25,6 @@ export const SLOW_DURATION_MS = 100
 /** Duration (ms) above which a query/request is considered very slow. */
 export const VERY_SLOW_DURATION_MS = 500
 
-
 // ---------------------------------------------------------------------------
 // History / stale detection
 // ---------------------------------------------------------------------------

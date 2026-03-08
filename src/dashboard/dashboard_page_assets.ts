@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { loadTransmitClient } from '../utils/transmit_client.js'
 import { log } from '../utils/logger.js'
+import { loadTransmitClient } from '../utils/transmit_client.js'
 
 const SRC_DIR = dirname(fileURLToPath(import.meta.url))
 const EDGE_DIR = join(SRC_DIR, '..', 'edge')

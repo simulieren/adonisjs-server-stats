@@ -17,6 +17,89 @@ interface DiagnosticsDeps {
   getApp?: () => ApplicationService
 }
 
+/** Maps collector name to feature key for data-driven feature detection. */
+const COLLECTOR_FEATURE_MAP: Array<[string, string]> = [
+  ['process', 'process'],
+  ['system', 'system'],
+  ['http', 'http'],
+  ['db_pool', 'db'],
+  ['redis', 'redis'],
+  ['queue', 'queues'],
+  ['redis', 'cache'],
+  ['app', 'app'],
+  ['log', 'log'],
+]
+
+/** Build collector-based feature flags from config. */
+function buildCollectorFeatures(
+  isAuto: boolean,
+  collectorNames: Set<string>
+): Record<string, boolean> {
+  const result: Record<string, boolean> = {}
+  for (const [collector, feature] of COLLECTOR_FEATURE_MAP) {
+    result[feature] = isAuto || collectorNames.has(collector)
+  }
+  return result
+}
+
+/** Build toolbar-related feature flags. */
+function buildToolbarFeatures(
+  config: ResolvedServerStatsConfig | undefined
+): Record<string, boolean> {
+  const enabled = !!config?.devToolbar?.enabled
+  return {
+    statsBar: true,
+    debugPanel: enabled,
+    dashboard: !!config?.devToolbar?.dashboard,
+    tracing: !!(config && (config.devToolbar?.tracing ?? true)),
+    emails: enabled,
+  }
+}
+
+/** Build combined features object from config. */
+function buildFeaturesFromConfig(
+  config: ResolvedServerStatsConfig | undefined
+): Record<string, boolean> {
+  const rawCollectors = config?.collectors
+  const isAuto = rawCollectors === 'auto'
+  const collectorNames = new Set(
+    Array.isArray(rawCollectors) ? rawCollectors.map((c) => c.name) : []
+  )
+  return {
+    ...buildToolbarFeatures(config),
+    ...buildCollectorFeatures(isAuto, collectorNames),
+  }
+}
+
+/** Build endpoint paths from config. */
+function buildEndpoints(config: ResolvedServerStatsConfig | undefined): Record<string, string> {
+  return {
+    stats: typeof config?.endpoint === 'string' ? config.endpoint : '/admin/api/server-stats',
+    debug: config?.devToolbar?.debugEndpoint ?? '/admin/api/debug',
+    dashboard: config?.devToolbar?.dashboardPath ?? '/__stats',
+  }
+}
+
+/** Build collector health + config info from engine. */
+function buildCollectorInfo(engine: StatsEngine | null | undefined): unknown[] {
+  const healthList = engine?.getCollectorHealth() ?? []
+  const configList = engine?.getCollectorConfigs() ?? []
+  const configMap = new Map(configList.map((c) => [c.name, c.config]))
+  return healthList.map((h) => ({ ...h, config: configMap.get(h.name) ?? {} }))
+}
+
+/** Fetch storage stats, returning null on error. */
+async function fetchStorageStats(
+  dashboardStore: DashboardStore | null | undefined
+): Promise<unknown> {
+  if (!dashboardStore) return null
+  try {
+    return await dashboardStore.getStorageStats()
+  } catch {
+    return null
+  }
+}
+
 export default class DebugController {
   private diagnosticsDeps: DiagnosticsDeps
   private configInspector: ConfigInspector | null = null
@@ -33,68 +116,17 @@ export default class DebugController {
 
   async config({ response }: HttpContext) {
     const cfg = this.serverConfig
-    const toolbarConfig = cfg?.devToolbar
-
-    // Derive feature flags from the actual config
-    const rawCollectors = cfg?.collectors
-    const isAuto = rawCollectors === 'auto'
-    const collectorNames = new Set(
-      Array.isArray(rawCollectors) ? rawCollectors.map((c) => c.name) : []
-    )
-
-    const features = {
-      statsBar: true,
-      debugPanel: !!toolbarConfig?.enabled,
-      dashboard: !!toolbarConfig?.dashboard,
-      tracing: toolbarConfig?.tracing ?? true,
-      process: isAuto || collectorNames.has('process'),
-      system: isAuto || collectorNames.has('system'),
-      http: isAuto || collectorNames.has('http'),
-      db: isAuto || collectorNames.has('db_pool'),
-      redis: isAuto || collectorNames.has('redis'),
-      queues: isAuto || collectorNames.has('queue'),
-      cache: isAuto || collectorNames.has('redis'),
-      app: isAuto || collectorNames.has('app'),
-      log: isAuto || collectorNames.has('log'),
-      emails: !!toolbarConfig?.enabled,
-    }
-
-    // Custom panes from config
-    const customPanes = toolbarConfig?.panes ?? []
-
-    // Endpoint paths
-    const debugEndpoint = toolbarConfig?.debugEndpoint ?? '/admin/api/debug'
-    const dashboardPath = toolbarConfig?.dashboardPath ?? '/__stats'
-    const statsEndpoint =
-      typeof cfg?.endpoint === 'string' ? cfg.endpoint : '/admin/api/server-stats'
-
-    const endpoints = {
-      stats: statsEndpoint,
-      debug: debugEndpoint,
-      dashboard: dashboardPath,
-    }
-
-    // Transmit config
-    const transmit = {
-      channelName: cfg?.channelName ?? 'admin/server-stats',
-    }
-
-    // App config + env vars (for the Config tab's APP CONFIG / ENV view)
     const inspector = this.getConfigInspector()
-    const appConfig = inspector ? inspector.getConfig().config : {}
-    const envVars = inspector ? inspector.getEnvVars().env : {}
-
     return response.json({
-      features,
-      customPanes,
-      endpoints,
-      transmit,
-      app: appConfig,
-      env: envVars,
+      features: buildFeaturesFromConfig(cfg),
+      customPanes: cfg?.devToolbar?.panes ?? [],
+      endpoints: buildEndpoints(cfg),
+      transmit: { channelName: cfg?.channelName ?? 'admin/server-stats' },
+      app: inspector ? inspector.getConfig().config : {},
+      env: inspector ? inspector.getEnvVars().env : {},
     })
   }
 
-  /** Lazily create a ConfigInspector from the app reference. */
   private getConfigInspector(): ConfigInspector | null {
     if (this.configInspector) return this.configInspector
     const app = this.diagnosticsDeps.getApp?.()
@@ -103,13 +135,7 @@ export default class DebugController {
     return this.configInspector
   }
 
-  async diagnostics({ response }: HttpContext) {
-    const engine = this.diagnosticsDeps.getEngine?.()
-    const dashboardStore = this.diagnosticsDeps.getDashboardStore?.()
-    const providerDiag = this.diagnosticsDeps.getProviderDiagnostics?.() ?? {}
-
-    // Cache package versions on first call — avoids readFile + JSON.parse
-    // and createRequire + require on every 3s poll from the Internals tab.
+  private async cacheVersions(): Promise<void> {
     if (!this.cachedPackageVersion) {
       try {
         const pkgPath = fileURLToPath(new URL('../../../package.json', import.meta.url))
@@ -122,50 +148,31 @@ export default class DebugController {
     if (!this.cachedAdonisVersion) {
       try {
         const { createRequire } = await import('node:module')
-        const require = createRequire(import.meta.url)
-        const adonisPkg = require('@adonisjs/core/package.json')
+        const req = createRequire(import.meta.url)
+        const adonisPkg = req('@adonisjs/core/package.json')
         this.cachedAdonisVersion = adonisPkg.version
       } catch {
         this.cachedAdonisVersion = 'unknown'
       }
     }
-    const packageVersion = this.cachedPackageVersion
-    const adonisVersion = this.cachedAdonisVersion
+  }
 
-    // Collector health + configs
-    const healthList = engine?.getCollectorHealth() ?? []
-    const configList = engine?.getCollectorConfigs() ?? []
-    const configMap = new Map(configList.map((c) => [c.name, c.config]))
-
-    const collectors = healthList.map((h) => ({
-      ...h,
-      config: configMap.get(h.name) ?? {},
-    }))
-
-    // Buffer stats
-    const buffers = this.store.getBufferStats()
-
-    // Storage stats (if dashboard is active)
-    let storage = null
-    if (dashboardStore) {
-      try {
-        storage = await dashboardStore.getStorageStats()
-      } catch {
-        // Dashboard store not ready
-      }
-    }
-
+  async diagnostics({ response }: HttpContext) {
+    await this.cacheVersions()
+    const engine = this.diagnosticsDeps.getEngine?.()
+    const dashboardStore = this.diagnosticsDeps.getDashboardStore?.()
+    const providerDiag = this.diagnosticsDeps.getProviderDiagnostics?.() ?? {}
     return response.json({
       package: {
-        version: packageVersion,
+        version: this.cachedPackageVersion,
         nodeVersion: process.version,
-        adonisVersion,
+        adonisVersion: this.cachedAdonisVersion,
         uptime: process.uptime(),
       },
       ...providerDiag,
-      collectors,
-      buffers,
-      storage,
+      collectors: buildCollectorInfo(engine),
+      buffers: this.store.getBufferStats(),
+      storage: await fetchStorageStats(dashboardStore),
     })
   }
 }

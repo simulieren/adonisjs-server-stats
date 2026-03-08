@@ -256,10 +256,18 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
                     <span
                       className="ss-dash-log-reqid"
                       title={reqId}
-                      onClick={(e) => { e.stopPropagation(); handleReqIdClick(reqId) }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleReqIdClick(reqId)
+                      }}
                       role="button"
                       tabIndex={0}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleReqIdClick(reqId) } }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.stopPropagation()
+                          handleReqIdClick(reqId)
+                        }
+                      }}
                     >
                       {reqId.slice(0, 8)}
                     </span>
@@ -267,7 +275,11 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
                     <span className="ss-dash-log-reqid-empty">--</span>
                   )}
                   {structured ? (
-                    <span className={`ss-dash-log-expand-icon${expandedIndex === i ? ' ss-dash-log-expand-icon-open' : ''}`}>▶</span>
+                    <span
+                      className={`ss-dash-log-expand-icon${expandedIndex === i ? ' ss-dash-log-expand-icon-open' : ''}`}
+                    >
+                      ▶
+                    </span>
                   ) : (
                     <span style={{ width: 14 }} />
                   )}

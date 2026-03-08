@@ -65,11 +65,60 @@ function getOrCreateDebugContainer(): HTMLElement {
   return container
 }
 
+/** Mount the debug panel into the deferred container. */
+function mountDebugPanel(
+  debugConfig: EdgeDebugConfig,
+  isLiveRef: { current: boolean },
+  debugLoadedRef: { current: boolean }
+) {
+  if (!debugLoadedRef.current) {
+    debugLoadedRef.current = loadDeferredDebugPanel()
+  }
+  if (!window.__ssDebugPanel) return
+  const container = getOrCreateDebugContainer()
+  try {
+    window.__ssDebugPanel.mount(container, debugConfig, isLiveRef.current)
+  } catch (error) {
+    console.error('[server-stats] Debug panel mount failed:', error)
+  }
+}
+
+/** Unmount the debug panel from its container. */
+function unmountDebugPanel() {
+  const container = document.getElementById('ss-dbg-deferred')
+  if (window.__ssDebugPanel && container) {
+    try {
+      window.__ssDebugPanel.unmount(container)
+    } catch (error) {
+      console.error('[server-stats] Debug panel unmount failed:', error)
+    }
+  }
+}
+
+/** Custom hook: manage debug panel mount/unmount lifecycle. */
+function useDebugPanelEffect(
+  debugOpen: boolean,
+  debugConfig: EdgeDebugConfig | undefined,
+  isLiveRef: { current: boolean }
+) {
+  const debugLoadedRef = useRef(false)
+  useEffect(() => {
+    if (!config.showDebug) return
+    if (debugOpen && debugConfig) {
+      mountDebugPanel(debugConfig, isLiveRef, debugLoadedRef)
+    } else {
+      unmountDebugPanel()
+    }
+  }, [debugOpen, debugConfig, isLiveRef])
+}
+
 /** Wrapper component to manage shared debug panel open state. */
 function StatsBarApp() {
   const [debugOpen, setDebugOpen] = useState(false)
-  const [isLive, setIsLive] = useState(false)
-  const debugLoadedRef = useRef(false)
+  const isLiveRef = useRef(false)
+  const handleConnectionChange = useCallback((connected: boolean) => {
+    isLiveRef.current = connected
+  }, [])
 
   const debugConfig = useMemo<EdgeDebugConfig | undefined>(
     () =>
@@ -94,66 +143,20 @@ function StatsBarApp() {
   const handleToggleDebug = useCallback(() => {
     setDebugOpen((prev) => !prev)
   }, [])
-
-  // Mount / unmount the deferred debug panel in response to open state changes.
-  // This runs as an effect (after render) so the DOM is fully committed,
-  // avoiding issues with calling render() inside a state updater.
-  // The container lives outside the Preact VDOM tree to prevent the parent
-  // from clearing it during re-renders.
-  useEffect(() => {
-    if (!config.showDebug) return
-
-    if (debugOpen) {
-      // Load the deferred debug panel script on first open
-      if (!debugLoadedRef.current) {
-        debugLoadedRef.current = loadDeferredDebugPanel()
-      }
-
-      if (!window.__ssDebugPanel) {
-        console.error('[server-stats] Debug panel not available after load attempt')
-        return
-      }
-
-      if (!debugConfig) {
-        console.error('[server-stats] Debug config is undefined')
-        return
-      }
-
-      const container = getOrCreateDebugContainer()
-
-      try {
-        window.__ssDebugPanel.mount(container, debugConfig, isLive)
-      } catch (error) {
-        console.error('[server-stats] Debug panel mount failed:', error)
-      }
-    } else {
-      // Unmount the debug panel
-      const container = document.getElementById('ss-dbg-deferred')
-      if (window.__ssDebugPanel && container) {
-        try {
-          window.__ssDebugPanel.unmount(container)
-        } catch (error) {
-          console.error('[server-stats] Debug panel unmount failed:', error)
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debugOpen, debugConfig])
+  useDebugPanelEffect(debugOpen, debugConfig, isLiveRef)
 
   return (
-    <>
-      <StatsBar
-        endpoint={config.endpoint}
-        pollInterval={config.pollInterval}
-        channelName={config.channelName}
-        authToken={config.authToken}
-        featureOptions={debugOptions}
-        autoHideOnUnauthorized={false}
-        onOpenDebugPanel={config.showDebug ? handleToggleDebug : undefined}
-        debugPanelOpen={debugOpen}
-        onConnectionChange={setIsLive}
-      />
-    </>
+    <StatsBar
+      endpoint={config.endpoint}
+      pollInterval={config.pollInterval}
+      channelName={config.channelName}
+      authToken={config.authToken}
+      featureOptions={debugOptions}
+      autoHideOnUnauthorized={false}
+      onOpenDebugPanel={config.showDebug ? handleToggleDebug : undefined}
+      debugPanelOpen={debugOpen}
+      onConnectionChange={handleConnectionChange}
+    />
   )
 }
 

@@ -250,7 +250,6 @@ const sectionComponents: Record<string, ReturnType<typeof defineAsyncComponent>>
 }
 
 const activeSectionComponent = computed(() => sectionComponents[activeSection.value] || null)
-
 </script>
 
 <template>
@@ -308,9 +307,7 @@ const activeSectionComponent = computed(() => sectionComponents[activeSection.va
                 stroke-width="2"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-                v-html="
-                  (TAB_ICONS[section.id] || TAB_ICONS.config).elements.join('')
-                "
+                v-html="(TAB_ICONS[section.id] || TAB_ICONS.config).elements.join('')"
               ></svg>
             </span>
             <span class="ss-dash-nav-label">{{ section.label }}</span>

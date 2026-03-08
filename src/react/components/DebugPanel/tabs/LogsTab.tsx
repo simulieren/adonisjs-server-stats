@@ -103,56 +103,66 @@ export function LogsTab({ options }: LogsTabProps) {
         {logs.length === 0 ? (
           <div className="ss-dbg-empty">No log entries</div>
         ) : (
-          logs
-            .slice(0, 200)
-            .map((log, i) => {
-              const level = resolveLogLevel(log)
-              const msg = resolveLogMessage(log)
-              const ts = resolveLogTimestamp(log)
-              const reqId = resolveLogRequestId(log)
-              const structured = getStructuredData(log)
+          logs.slice(0, 200).map((log, i) => {
+            const level = resolveLogLevel(log)
+            const msg = resolveLogMessage(log)
+            const ts = resolveLogTimestamp(log)
+            const reqId = resolveLogRequestId(log)
+            const structured = getStructuredData(log)
 
-              return (
-                <React.Fragment key={i}>
-                  <div
-                    className={`ss-dbg-log-entry${structured ? ' ss-dbg-log-entry-expandable' : ''}`}
-                    onClick={() => structured && setExpandedIndex(expandedIndex === i ? null : i)}
-                  >
-                    <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
-                      {level.toUpperCase()}
+            return (
+              <React.Fragment key={i}>
+                <div
+                  className={`ss-dbg-log-entry${structured ? ' ss-dbg-log-entry-expandable' : ''}`}
+                  onClick={() => structured && setExpandedIndex(expandedIndex === i ? null : i)}
+                >
+                  <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
+                    {level.toUpperCase()}
+                  </span>
+                  <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>
+                    {ts ? timeAgo(ts) : '-'}
+                  </span>
+                  {reqId ? (
+                    <span
+                      className="ss-dbg-log-reqid"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleReqIdClick(reqId)
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title={reqId}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.stopPropagation()
+                          handleReqIdClick(reqId)
+                        }
+                      }}
+                    >
+                      {reqId.slice(0, 8)}
                     </span>
-                    <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>
-                      {ts ? timeAgo(ts) : '-'}
-                    </span>
-                    {reqId ? (
-                      <span
-                        className="ss-dbg-log-reqid"
-                        onClick={(e) => { e.stopPropagation(); handleReqIdClick(reqId) }}
-                        role="button"
-                        tabIndex={0}
-                        title={reqId}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleReqIdClick(reqId) } }}
-                      >
-                        {reqId.slice(0, 8)}
-                      </span>
-                    ) : (
-                      <span className="ss-dbg-log-reqid-empty">-</span>
-                    )}
-                    {structured ? (
-                      <span className={`ss-dbg-log-expand-icon${expandedIndex === i ? ' ss-dbg-log-expand-icon-open' : ''}`}>▶</span>
-                    ) : (
-                      <span style={{ width: 14 }} />
-                    )}
-                    <span className="ss-dbg-log-msg">{msg}</span>
-                  </div>
-                  {expandedIndex === i && structured && (
-                    <div className="ss-dbg-log-detail">
-                      <JsonViewer data={structured} classPrefix="ss-dbg" defaultExpanded />
-                    </div>
+                  ) : (
+                    <span className="ss-dbg-log-reqid-empty">-</span>
                   )}
-                </React.Fragment>
-              )
-            })
+                  {structured ? (
+                    <span
+                      className={`ss-dbg-log-expand-icon${expandedIndex === i ? ' ss-dbg-log-expand-icon-open' : ''}`}
+                    >
+                      ▶
+                    </span>
+                  ) : (
+                    <span style={{ width: 14 }} />
+                  )}
+                  <span className="ss-dbg-log-msg">{msg}</span>
+                </div>
+                {expandedIndex === i && structured && (
+                  <div className="ss-dbg-log-detail">
+                    <JsonViewer data={structured} classPrefix="ss-dbg" defaultExpanded />
+                  </div>
+                )}
+              </React.Fragment>
+            )
+          })
         )}
       </div>
     </div>

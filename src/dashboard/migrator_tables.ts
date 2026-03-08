@@ -39,7 +39,9 @@ export async function migrateRequests(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_requests_status ON server_stats_requests(status_code)`
   )
-  try { await db.raw('ALTER TABLE server_stats_requests ADD COLUMN http_request_id TEXT') } catch {}
+  try {
+    await db.raw('ALTER TABLE server_stats_requests ADD COLUMN http_request_id TEXT')
+  } catch {}
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_requests_http_req ON server_stats_requests(http_request_id)`
   )

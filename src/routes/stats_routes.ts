@@ -12,7 +12,10 @@ export function registerStatsRoute(
   router
     .get(endpoint, async (ctx: HttpContext) => {
       const controller = getController()
-      if (!controller) return ctx.response.serviceUnavailable({ error: 'Stats engine is starting up, please retry' })
+      if (!controller)
+        return ctx.response.serviceUnavailable({
+          error: 'Stats engine is starting up, please retry',
+        })
       return controller.index(ctx)
     })
     .as('server-stats.api')

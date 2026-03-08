@@ -55,7 +55,7 @@ test.group('isRedactedValue', () => {
 // flattenConfig
 // ---------------------------------------------------------------------------
 
-test.group('flattenConfig', () => {
+test.group('flattenConfig | primitives', () => {
   test('returns a single entry for a primitive string value', ({ assert }) => {
     const result = flattenConfig('hello', 'key')
     assert.deepEqual(result, [{ path: 'key', value: 'hello' }])
@@ -80,7 +80,9 @@ test.group('flattenConfig', () => {
     const result = flattenConfig(undefined, 'key')
     assert.deepEqual(result, [{ path: 'key', value: undefined }])
   })
+})
 
+test.group('flattenConfig | objects', () => {
   test('flattens a flat object into entries', ({ assert }) => {
     const result = flattenConfig({ a: 1, b: 'two' })
     assert.deepEqual(result, [
@@ -137,7 +139,7 @@ test.group('flattenConfig', () => {
 // formatFlatValue
 // ---------------------------------------------------------------------------
 
-test.group('formatFlatValue', () => {
+test.group('formatFlatValue | null, booleans, numbers', () => {
   test('formats null as "null" with dim color', ({ assert }) => {
     const result = formatFlatValue(null)
     assert.equal(result.text, 'null')
@@ -168,6 +170,14 @@ test.group('formatFlatValue', () => {
     assert.equal(result.color, 'var(--ss-amber-fg)')
   })
 
+  test('formats number 0 with amber color', ({ assert }) => {
+    const result = formatFlatValue(0)
+    assert.equal(result.text, '0')
+    assert.equal(result.color, 'var(--ss-amber-fg)')
+  })
+})
+
+test.group('formatFlatValue | arrays, objects, strings', () => {
   test('formats an array with items in brackets with purple color', ({ assert }) => {
     const result = formatFlatValue([1, 'two', 3])
     assert.equal(result.text, '[1, two, 3]')
@@ -206,12 +216,6 @@ test.group('formatFlatValue', () => {
     const result = formatFlatValue('')
     assert.equal(result.text, '')
     assert.isUndefined(result.color)
-  })
-
-  test('formats number 0 with amber color', ({ assert }) => {
-    const result = formatFlatValue(0)
-    assert.equal(result.text, '0')
-    assert.equal(result.color, 'var(--ss-amber-fg)')
   })
 })
 
@@ -270,7 +274,7 @@ test.group('countLeaves', () => {
 // collectTopLevelObjectKeys
 // ---------------------------------------------------------------------------
 
-test.group('collectTopLevelObjectKeys', () => {
+test.group('collectTopLevelObjectKeys | filtering', () => {
   test('returns keys whose values are plain objects', ({ assert }) => {
     const config = {
       app: { name: 'test' },
@@ -310,7 +314,9 @@ test.group('collectTopLevelObjectKeys', () => {
     const result = collectTopLevelObjectKeys(config)
     assert.deepEqual(result, [])
   })
+})
 
+test.group('collectTopLevelObjectKeys | non-object inputs', () => {
   test('returns empty array for null', ({ assert }) => {
     assert.deepEqual(collectTopLevelObjectKeys(null), [])
   })

@@ -4,6 +4,8 @@
 
 import { stat as fsStat } from 'node:fs/promises'
 
+import { CoalesceCache } from './coalesce_cache.js'
+
 import type { Knex } from 'knex'
 
 // ---------------------------------------------------------------------------
@@ -49,9 +51,7 @@ const TABLE_NAMES = [
 /**
  * Count rows in all dashboard tables within a single transaction.
  */
-export async function countAllTables(
-  db: Knex
-): Promise<Array<{ name: string; rowCount: number }>> {
+export async function countAllTables(db: Knex): Promise<Array<{ name: string; rowCount: number }>> {
   return db.transaction(async (trx) => {
     const result: Array<{ name: string; rowCount: number }> = []
     for (const name of TABLE_NAMES) {
@@ -63,5 +63,51 @@ export async function countAllTables(
       }
     }
     return result
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Storage stats result type and query
+// ---------------------------------------------------------------------------
+
+export interface StorageStatsResult {
+  ready: boolean
+  dbPath: string
+  fileSizeMb: number
+  walSizeMb: number
+  retentionDays: number
+  tables: Array<{ name: string; rowCount: number }>
+  lastCleanupAt: number | null
+}
+
+export interface StorageStatsOpts {
+  db: Knex
+  cache: CoalesceCache
+  dbFilePath: string
+  dbPath: string
+  retentionDays: number
+  lastCleanupAt: number | null
+  onResult: (stats: StorageStatsResult) => void
+}
+
+/**
+ * Build storage stats by querying file sizes and table row counts.
+ */
+export function fetchStorageStats(opts: StorageStatsOpts): Promise<StorageStatsResult> {
+  const { db, cache, dbFilePath, dbPath, retentionDays, lastCleanupAt, onResult } = opts
+  return cache.coalesce('storageStats', async () => {
+    const [fileSizeMb, walSizeMb] = await getFileSizes(dbFilePath)
+    const tables = await countAllTables(db)
+    const stats: StorageStatsResult = {
+      ready: true,
+      dbPath,
+      fileSizeMb,
+      walSizeMb,
+      retentionDays,
+      tables,
+      lastCleanupAt,
+    }
+    onResult(stats)
+    return stats
   })
 }

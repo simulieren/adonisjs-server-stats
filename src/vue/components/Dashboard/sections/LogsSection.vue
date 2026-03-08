@@ -284,7 +284,10 @@ function selectValue(e: Event): string {
       <div class="ss-dash-log-entries">
         <template v-for="(log, i) in logs" :key="String(log.id || i)">
           <div
-            :class="['ss-dash-log-entry', { 'ss-dash-log-entry-expandable': !!getStructuredData(log) }]"
+            :class="[
+              'ss-dash-log-entry',
+              { 'ss-dash-log-entry-expandable': !!getStructuredData(log) },
+            ]"
             @click="toggleExpand(i, !!getStructuredData(log))"
           >
             <span
@@ -312,8 +315,12 @@ function selectValue(e: Event): string {
             <span v-else class="ss-dash-log-reqid-empty">--</span>
             <span
               v-if="getStructuredData(log)"
-              :class="['ss-dash-log-expand-icon', { 'ss-dash-log-expand-icon-open': expandedIndex === i }]"
-            >&#x25B6;</span>
+              :class="[
+                'ss-dash-log-expand-icon',
+                { 'ss-dash-log-expand-icon-open': expandedIndex === i },
+              ]"
+              >&#x25B6;</span
+            >
             <span v-else style="width: 14px" />
             <span class="ss-dash-log-msg">{{ resolveLogMessage(log) }}</span>
           </div>

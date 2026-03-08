@@ -353,15 +353,18 @@ export class QueueInspector {
     return raw
   }
 
-  /**
-   * Format a Bull job into our summary shape.
-   */
-  private formatJobSummary(job: BullMQJob, status: JobStatus): QueueJobSummary {
+  /** Extract timing fields from a BullMQ job. */
+  private static extractTimings(job: BullMQJob) {
     const processedAt = job.processedOn ?? null
     const finishedAt = job.finishedOn ?? null
-    const duration = processedAt !== null && finishedAt !== null ? finishedAt - processedAt : null
     const createdAt = job.timestamp ?? 0
+    const duration = processedAt !== null && finishedAt !== null ? finishedAt - processedAt : null
+    return { processedAt, finishedAt, createdAt, duration }
+  }
 
+  /** Format a Bull job into our summary shape. */
+  private formatJobSummary(job: BullMQJob, status: JobStatus): QueueJobSummary {
+    const timings = QueueInspector.extractTimings(job)
     const data = job.data ?? null
 
     return {
@@ -374,11 +377,11 @@ export class QueueInspector {
       maxAttempts: (job.opts?.attempts as number) ?? 1,
       progress: job.progress ?? 0,
       failedReason: job.failedReason ?? null,
-      createdAt,
-      timestamp: createdAt,
-      processedAt,
-      finishedAt,
-      duration,
+      createdAt: timings.createdAt,
+      timestamp: timings.createdAt,
+      processedAt: timings.processedAt,
+      finishedAt: timings.finishedAt,
+      duration: timings.duration,
     }
   }
 }

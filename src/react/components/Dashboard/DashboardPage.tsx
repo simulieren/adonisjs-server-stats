@@ -289,9 +289,7 @@ export function DashboardPage(props: DashboardPageProps) {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       dangerouslySetInnerHTML={{
-                        __html: (
-                          TAB_ICONS[section.id] || TAB_ICONS.config
-                        ).elements.join(''),
+                        __html: (TAB_ICONS[section.id] || TAB_ICONS.config).elements.join(''),
                       }}
                     />
                   </span>

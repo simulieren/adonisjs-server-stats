@@ -107,7 +107,12 @@ watch([() => selectedTrace.value, () => traceDetail.value], async () => {
   splitCleanup = null
   if (traceDetail.value && detailLogs.value.length > 0) {
     await nextTick()
-    if (splitContainerRef.value && splitHandleRef.value && splitTopRef.value && splitBottomRef.value) {
+    if (
+      splitContainerRef.value &&
+      splitHandleRef.value &&
+      splitTopRef.value &&
+      splitBottomRef.value
+    ) {
       splitCleanup = initSplitPane({
         container: splitContainerRef.value,
         handle: splitHandleRef.value,

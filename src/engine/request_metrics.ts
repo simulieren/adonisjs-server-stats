@@ -6,6 +6,18 @@ interface RequestRecord {
   statusCode: number
 }
 
+interface WindowAccumulator {
+  validCount: number
+  totalDuration: number
+  errorCount: number
+}
+
+function accumulateRecord(acc: WindowAccumulator, r: RequestRecord): void {
+  acc.validCount++
+  acc.totalDuration += r.durationMs
+  if (r.statusCode >= 500) acc.errorCount++
+}
+
 export class RequestMetrics {
   private records: RequestRecord[] = []
   private writeIndex = 0
@@ -45,58 +57,42 @@ export class RequestMetrics {
   getMetrics() {
     const now = performance.now()
     const cutoff = now - this.windowMs
+    const acc: WindowAccumulator = { validCount: 0, totalDuration: 0, errorCount: 0 }
 
-    let totalDuration = 0
-    let errorCount = 0
-    let validCount = 0
-
-    // When the buffer is full (ring buffer mode), scan from the oldest
-    // entry (writeIndex) forward. Records are in chronological order
-    // within each wrap, so once we find one >= cutoff, all subsequent
-    // records in that direction are also valid — but since they wrap,
-    // we still need to check all slots. The key optimization is that
-    // we can skip already-overwritten (stale) slots efficiently.
     if (this.count === this.maxRecords) {
-      // Full ring buffer — scan from writeIndex (oldest) to writeIndex-1 (newest)
-      for (let j = 0; j < this.maxRecords; j++) {
-        const idx = (this.writeIndex + j) % this.maxRecords
-        const r = this.records[idx]
-        if (r.timestamp >= cutoff) {
-          validCount++
-          totalDuration += r.durationMs
-          if (r.statusCode >= 500) {
-            errorCount++
-          }
-        }
-      }
+      this.#scanFullBuffer(cutoff, acc)
     } else {
-      // Buffer not yet full — records are in order 0..count-1
-      // Scan backwards from newest to find the cutoff point, then
-      // aggregate only the valid tail.
-      let startIdx = 0
-      for (let i = this.count - 1; i >= 0; i--) {
-        if (this.records[i].timestamp < cutoff) {
-          startIdx = i + 1
-          break
-        }
-      }
-      for (let i = startIdx; i < this.count; i++) {
-        const r = this.records[i]
-        validCount++
-        totalDuration += r.durationMs
-        if (r.statusCode >= 500) {
-          errorCount++
-        }
-      }
+      this.#scanPartialBuffer(cutoff, acc)
     }
 
     const windowSeconds = this.windowMs / 1000
 
     return {
-      requestsPerSecond: validCount / windowSeconds,
-      averageResponseTimeMs: validCount > 0 ? totalDuration / validCount : 0,
-      errorRate: validCount > 0 ? (errorCount / validCount) * 100 : 0,
+      requestsPerSecond: acc.validCount / windowSeconds,
+      averageResponseTimeMs: acc.validCount > 0 ? acc.totalDuration / acc.validCount : 0,
+      errorRate: acc.validCount > 0 ? (acc.errorCount / acc.validCount) * 100 : 0,
       activeConnections: this.activeConnections,
+    }
+  }
+
+  #scanFullBuffer(cutoff: number, acc: WindowAccumulator): void {
+    for (let j = 0; j < this.maxRecords; j++) {
+      const idx = (this.writeIndex + j) % this.maxRecords
+      const r = this.records[idx]
+      if (r.timestamp >= cutoff) accumulateRecord(acc, r)
+    }
+  }
+
+  #scanPartialBuffer(cutoff: number, acc: WindowAccumulator): void {
+    let startIdx = 0
+    for (let i = this.count - 1; i >= 0; i--) {
+      if (this.records[i].timestamp < cutoff) {
+        startIdx = i + 1
+        break
+      }
+    }
+    for (let i = startIdx; i < this.count; i++) {
+      accumulateRecord(acc, this.records[i])
     }
   }
 }

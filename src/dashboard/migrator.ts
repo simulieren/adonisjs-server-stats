@@ -1,5 +1,3 @@
-import type { Knex } from 'knex'
-
 import {
   yieldToEventLoop,
   migrateRequests,
@@ -11,6 +9,8 @@ import {
   migrateMetrics,
   migrateSavedFilters,
 } from './migrator_tables.js'
+
+import type { Knex } from 'knex'
 
 /**
  * Auto-migrate all dashboard SQLite tables.

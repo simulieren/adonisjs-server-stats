@@ -13,7 +13,7 @@ import {
 // buildQueryString
 // ---------------------------------------------------------------------------
 
-test.group('buildQueryString', () => {
+test.group('buildQueryString | basic', () => {
   test('pagination only', ({ assert }) => {
     const result = buildQueryString({ page: 2, perPage: 25 })
     const params = new URLSearchParams(result)
@@ -42,7 +42,9 @@ test.group('buildQueryString', () => {
     assert.equal(params.get('method'), 'GET')
     assert.isNull(params.get('search'))
   })
+})
 
+test.group('buildQueryString | sort and combined', () => {
   test('with sort', ({ assert }) => {
     const result = buildQueryString(
       { page: 1, perPage: 10 },
@@ -85,7 +87,7 @@ test.group('buildQueryString', () => {
 // parsePaginatedResponse
 // ---------------------------------------------------------------------------
 
-test.group('parsePaginatedResponse', () => {
+test.group('parsePaginatedResponse | parsing', () => {
   test('parses data array format', ({ assert }) => {
     const response = { data: [1, 2, 3], total: 100, page: 2, perPage: 10, totalPages: 10 }
     const result = parsePaginatedResponse<number>(response)
@@ -120,7 +122,9 @@ test.group('parsePaginatedResponse', () => {
     const result = parsePaginatedResponse(response)
     assert.equal(result.pagination.page, 1)
   })
+})
 
+test.group('parsePaginatedResponse | defaults and computation', () => {
   test('limit is used as perPage fallback', ({ assert }) => {
     const response = { data: [1], total: 100, page: 1, limit: 25 }
     const result = parsePaginatedResponse(response)
@@ -216,7 +220,7 @@ test.group('createSortState', () => {
 // buildQueryParams
 // ---------------------------------------------------------------------------
 
-test.group('buildQueryParams', () => {
+test.group('buildQueryParams | full and empty', () => {
   test('includes all fields when provided', ({ assert }) => {
     const result = buildQueryParams({
       page: 2,
@@ -257,7 +261,9 @@ test.group('buildQueryParams', () => {
     assert.isNull(params.get('method'))
     assert.isNull(params.get('level'))
   })
+})
 
+test.group('buildQueryParams | edge cases', () => {
   test('timeRange is mapped to "range" param', ({ assert }) => {
     const result = buildQueryParams({ timeRange: '24h' })
     const params = new URLSearchParams(result)

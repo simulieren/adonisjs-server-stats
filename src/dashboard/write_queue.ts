@@ -8,8 +8,8 @@
 
 import { round } from '../utils/math_helpers.js'
 
-import type { PersistRequestInput } from './dashboard_types.js'
 import type { EventRecord, EmailRecord } from '../debug/types.js'
+import type { PersistRequestInput } from './dashboard_types.js'
 import type { Knex } from 'knex'
 
 // ---------------------------------------------------------------------------
@@ -73,6 +73,7 @@ export interface PreparedRequest {
 }
 
 export interface PreparedLog {
+  [key: string]: unknown
   level: string
   message: string
   request_id: string | null
@@ -80,6 +81,7 @@ export interface PreparedLog {
 }
 
 export interface EmailRow {
+  [key: string]: unknown
   from_addr: string
   to_addr: string
   cc: string | null
@@ -94,6 +96,7 @@ export interface EmailRow {
 }
 
 export interface EventRow {
+  [key: string]: unknown
   request_id: null
   event_name: string
   data: string | null
@@ -131,10 +134,7 @@ export function prepareRequestRows(requests: PersistRequestInput[]): PreparedReq
           total_duration: round(input.trace.totalDuration),
           span_count: input.trace.spanCount,
           spans: JSON.stringify(input.trace.spans),
-          warnings:
-            input.trace.warnings.length > 0
-              ? JSON.stringify(input.trace.warnings)
-              : null,
+          warnings: input.trace.warnings.length > 0 ? JSON.stringify(input.trace.warnings) : null,
         }
       : null,
   }))
@@ -146,9 +146,7 @@ export function prepareRequestRows(requests: PersistRequestInput[]): PreparedReq
 export function prepareLogRows(logs: Record<string, unknown>[]): PreparedLog[] {
   return logs.map((entry) => {
     const levelName =
-      typeof entry.levelName === 'string'
-        ? entry.levelName
-        : String(entry.level || 'unknown')
+      typeof entry.levelName === 'string' ? entry.levelName : String(entry.level || 'unknown')
     return {
       level: levelName,
       message: String(entry.msg || entry.message || ''),
@@ -232,10 +230,7 @@ function buildRequestRow(input: PersistRequestInput): Record<string, unknown> {
 }
 
 /** Insert a single prepared request with its queries and trace. */
-async function insertOneRequest(
-  trx: Knex.Transaction,
-  prepared: PreparedRequest
-): Promise<void> {
+async function insertOneRequest(trx: Knex.Transaction, prepared: PreparedRequest): Promise<void> {
   const { input, filteredQueries, traceRow } = prepared
   const row = buildRequestRow(input)
   const [requestId] = await trx('server_stats_requests').insert(row)
@@ -291,10 +286,7 @@ export async function flushEvents(
 /**
  * Flush pending emails into the database.
  */
-export async function flushEmails(
-  trx: Knex.Transaction,
-  emails: EmailRecord[]
-): Promise<void> {
+export async function flushEmails(trx: Knex.Transaction, emails: EmailRecord[]): Promise<void> {
   if (emails.length === 0) return
   try {
     const rows = emails.map((record) => buildEmailRow(record))
@@ -311,10 +303,7 @@ export async function flushEmails(
 /**
  * Flush prepared logs into the database.
  */
-export async function flushLogs(
-  trx: Knex.Transaction,
-  preparedLogs: PreparedLog[]
-): Promise<void> {
+export async function flushLogs(trx: Knex.Transaction, preparedLogs: PreparedLog[]): Promise<void> {
   if (preparedLogs.length === 0) return
   try {
     await batchInsert(trx, 'server_stats_logs', preparedLogs)

@@ -81,14 +81,14 @@ function makeSentData(overrides: Record<string, unknown> = {}) {
 /** Flush the DashboardStore write queue by calling the private method. */
 async function flush(store: DashboardStore): Promise<void> {
   // Clear any pending timer so we can flush manually
-  const timer = (store as unknown as Record<string, unknown>).flushTimer
+  const timer = (store as any).flushTimer
   if (timer) {
     clearTimeout(timer)
-    ;(store as unknown as Record<string, unknown>).flushTimer = null
+    ;(store as any).flushTimer = null
   }
-  await (store as unknown as Record<string, (...args: unknown[]) => Promise<void>>).flushWriteQueue()
+  await (store as any).flushWriteQueue()
   // Clear the paginate result cache so subsequent reads see fresh data
-  ;((store as unknown as Record<string, Record<string, () => void>>).resultCache).clear()
+  ;(store as any).cache.clearCache()
 }
 
 // ---------------------------------------------------------------------------
@@ -109,7 +109,7 @@ test.group('DashboardStore | Email Pipeline (integration)', (group) => {
 
     // start() sets up the knex connection, runs migrations, and wires event listeners.
     // appRoot is the project root so that appImportWithPath can find knex/better-sqlite3.
-    await store.start(null, emitter as unknown as import('../src/debug/types.js').Emitter, tmpDir)
+    await store.start(null, emitter as any, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -433,7 +433,7 @@ test.group('DashboardStore | Email Pipeline (integration)', (group) => {
     // Re-start so teardown doesn't fail
     emitter = createMockEmitter()
     store = new DashboardStore(makeConfig('test.sqlite'))
-    await store.start(null, emitter as unknown as import('../src/debug/types.js').Emitter, tmpDir)
+    await store.start(null, emitter as any, tmpDir)
   })
 
   // -------------------------------------------------------------------------
@@ -624,7 +624,7 @@ test.group('DashboardStore | Email Pipeline (integration)', (group) => {
     const unstarted = new DashboardStore(makeConfig('/tmp/nonexistent.sqlite'))
     // Should not throw
     assert.doesNotThrow(() => {
-      ;(unstarted as unknown as Record<string, (...args: unknown[]) => void>).recordEmail({
+      ;(unstarted as any).recordEmail({
         from: 'x@y.com',
         to: 'a@b.com',
         cc: null,
@@ -640,6 +640,6 @@ test.group('DashboardStore | Email Pipeline (integration)', (group) => {
       })
     })
     // pendingEmails should remain empty since db was null
-    assert.lengthOf((unstarted as unknown as Record<string, unknown[]>).pendingEmails, 0)
+    assert.lengthOf((unstarted as any).flushMgr.pendingEmails, 0)
   })
 })

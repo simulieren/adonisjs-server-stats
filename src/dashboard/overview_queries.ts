@@ -16,36 +16,44 @@ import { rangeToMinutes, roundBucket } from '../utils/time_helpers.js'
  * Build the overview metrics response from raw aggregated data.
  * Pure function — no database access.
  */
-export function buildOverviewResult(
-  total: number,
-  stats: Record<string, unknown> | null | undefined,
-  range: string,
-  slowestEndpoints: Record<string, unknown>[],
-  queryStats: Record<string, unknown> | null | undefined,
+interface OverviewInput {
+  total: number
+  stats: Record<string, unknown> | null | undefined
+  range: string
+  slowestEndpoints: Record<string, unknown>[]
+  queryStats: Record<string, unknown> | null | undefined
   recentErrors: Record<string, unknown>[]
-): Record<string, unknown> {
-  if (total === 0) {
-    return {
-      avgResponseTime: 0,
-      p95ResponseTime: 0,
-      requestsPerMinute: 0,
-      errorRate: 0,
-      totalRequests: 0,
-      slowestEndpoints: [],
-      queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
-      recentErrors: [],
-    }
-  }
+}
 
-  const avgResponseTime = (stats?.avg_duration as number) ?? 0
-  const errorCount = Number(stats?.error_count ?? 0)
-  const rangeMin = rangeToMinutes(range)
-  const requestsPerMin = total / rangeMin
+const EMPTY_OVERVIEW = {
+  avgResponseTime: 0,
+  p95ResponseTime: 0,
+  requestsPerMinute: 0,
+  errorRate: 0,
+  totalRequests: 0,
+  slowestEndpoints: [],
+  queryStats: { total: 0, avgDuration: 0, perRequest: 0 },
+  recentErrors: [],
+}
 
+function mapQueryStats(queryStats: Record<string, unknown> | null | undefined, total: number) {
+  const qTotal = (queryStats?.total as number) ?? 0
   return {
-    avgResponseTime: round(avgResponseTime),
-    p95ResponseTime: 0, // p95 is set by caller after offset query
-    requestsPerMinute: round(requestsPerMin),
+    total: qTotal,
+    avgDuration: (queryStats?.avg_duration as number) ?? 0,
+    perRequest: total > 0 ? round(qTotal / total) : 0,
+  }
+}
+
+export function buildOverviewResult(input: OverviewInput): Record<string, unknown> {
+  const { total, stats, range, slowestEndpoints, queryStats, recentErrors } = input
+  if (total === 0) return EMPTY_OVERVIEW
+
+  const errorCount = Number(stats?.error_count ?? 0)
+  return {
+    avgResponseTime: round((stats?.avg_duration as number) ?? 0),
+    p95ResponseTime: 0,
+    requestsPerMinute: round(total / rangeToMinutes(range)),
     errorRate: round((errorCount / total) * 100),
     totalRequests: total,
     slowestEndpoints: slowestEndpoints.map((s) => ({
@@ -53,13 +61,7 @@ export function buildOverviewResult(
       count: s.count,
       avgDuration: s.avg_duration,
     })),
-    queryStats: {
-      total: (queryStats?.total as number) ?? 0,
-      avgDuration: (queryStats?.avg_duration as number) ?? 0,
-      perRequest: total > 0
-        ? round(((queryStats?.total as number) ?? 0) / total)
-        : 0,
-    },
+    queryStats: mapQueryStats(queryStats, total),
     recentErrors: recentErrors.map((e) => ({
       id: e.id,
       message: e.message,
@@ -87,9 +89,11 @@ export function mapTopEvents(
 /**
  * Aggregate email status rows into sent/queued/failed counts.
  */
-export function mapEmailActivity(
-  raw: Record<string, unknown>[] | null | undefined
-): { sent: number; queued: number; failed: number } {
+export function mapEmailActivity(raw: Record<string, unknown>[] | null | undefined): {
+  sent: number
+  queued: number
+  failed: number
+} {
   const activity = { sent: 0, queued: 0, failed: 0 }
   for (const row of raw || []) {
     const status = row.status as string
@@ -104,9 +108,12 @@ export function mapEmailActivity(
 /**
  * Map log level rows to the breakdown shape.
  */
-export function mapLogLevelBreakdown(
-  raw: Record<string, unknown>[] | null | undefined
-): { error: number; warn: number; info: number; debug: number } {
+export function mapLogLevelBreakdown(raw: Record<string, unknown>[] | null | undefined): {
+  error: number
+  warn: number
+  info: number
+  debug: number
+} {
   const breakdown = { error: 0, warn: 0, info: 0, debug: 0 }
   for (const row of raw || []) {
     const level = row.level as string
@@ -120,9 +127,12 @@ export function mapLogLevelBreakdown(
 /**
  * Map status distribution row to the widget shape.
  */
-export function mapStatusDistribution(
-  row: Record<string, unknown> | null | undefined
-): { '2xx': number; '3xx': number; '4xx': number; '5xx': number } {
+export function mapStatusDistribution(row: Record<string, unknown> | null | undefined): {
+  '2xx': number
+  '3xx': number
+  '4xx': number
+  '5xx': number
+} {
   return {
     '2xx': (row?.s2xx as number) ?? 0,
     '3xx': (row?.s3xx as number) ?? 0,

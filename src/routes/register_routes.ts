@@ -1,7 +1,7 @@
-import { registerStatsRoute } from './stats_routes.js'
-import { registerDebugRoutes } from './debug_routes.js'
-import { registerDashboardRoutes } from './dashboard_routes.js'
 import { createAccessMiddleware } from './access_middleware.js'
+import { registerDashboardRoutes } from './dashboard_routes.js'
+import { registerDebugRoutes } from './debug_routes.js'
+import { registerStatsRoute } from './stats_routes.js'
 
 import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
@@ -32,7 +32,12 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
   const middleware = options.shouldShow ? [createAccessMiddleware(options.shouldShow)] : []
 
   if (typeof options.statsEndpoint === 'string') {
-    registerStatsRoute(options.router, options.statsEndpoint, options.getStatsController, middleware)
+    registerStatsRoute(
+      options.router,
+      options.statsEndpoint,
+      options.getStatsController,
+      middleware
+    )
   }
 
   if (options.debugEndpoint) {

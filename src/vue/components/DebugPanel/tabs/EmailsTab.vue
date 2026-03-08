@@ -105,11 +105,7 @@ const { tableRef } = useResizableTable(() => emails.value)
         <button type="button" class="ss-dbg-btn-clear" @click="closePreview">&times;</button>
       </div>
       <div v-if="loadingPreview" class="ss-dbg-empty">Loading preview...</div>
-      <iframe
-        v-else-if="previewHtml"
-        class="ss-dbg-email-iframe"
-        :srcdoc="previewHtml"
-      ></iframe>
+      <iframe v-else-if="previewHtml" class="ss-dbg-email-iframe" :srcdoc="previewHtml"></iframe>
       <div v-else class="ss-dbg-empty">No HTML content</div>
     </div>
 

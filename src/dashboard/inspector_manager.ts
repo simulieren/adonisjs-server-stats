@@ -1,6 +1,6 @@
+import { log } from '../utils/logger.js'
 import { CacheInspector } from './integrations/cache_inspector.js'
 import { QueueInspector } from './integrations/queue_inspector.js'
-import { log } from '../utils/logger.js'
 
 import type { ApplicationService } from '@adonisjs/core/types'
 

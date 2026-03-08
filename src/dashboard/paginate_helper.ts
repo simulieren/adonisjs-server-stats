@@ -5,8 +5,8 @@
  * is acquired only once instead of two separate acquire/release cycles.
  */
 
-import type { Knex } from 'knex'
 import type { PaginatedResult, PaginateOptions } from './dashboard_types.js'
+import type { Knex } from 'knex'
 
 /**
  * Execute a paginated query within a transaction.

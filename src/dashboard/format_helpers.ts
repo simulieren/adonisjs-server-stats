@@ -15,7 +15,10 @@ export interface ChartBucket {
 }
 
 export function paginatedResponse<T>(
-  data: T[], total: number, page: number, perPage: number
+  data: T[],
+  total: number,
+  page: number,
+  perPage: number
 ): PaginatedResponse<T> {
   return {
     data,
@@ -156,7 +159,11 @@ export async function runExplain(
 ) {
   let bindings: unknown[] = []
   if (query.bindings) {
-    try { bindings = JSON.parse(query.bindings as string) } catch { /* skip */ }
+    try {
+      bindings = JSON.parse(query.bindings as string)
+    } catch {
+      /* skip */
+    }
   }
   const explainResult = await appDb.raw(`EXPLAIN (FORMAT JSON) ${query.sql_text}`, bindings)
   const rawRows =

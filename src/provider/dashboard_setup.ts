@@ -4,12 +4,7 @@
 
 import type { DevToolbarConfig } from '../debug/types.js'
 
-const MISSING_DEP_MARKERS = [
-  'better-sqlite3',
-  'knex',
-  'Cannot find module',
-  'Cannot find package',
-]
+const MISSING_DEP_MARKERS = ['better-sqlite3', 'knex', 'Cannot find module', 'Cannot find package']
 
 const MISSING_DEP_CODES = new Set(['ERR_MODULE_NOT_FOUND', 'MODULE_NOT_FOUND'])
 
@@ -21,9 +16,7 @@ function isMissingDependencyError(msg: string, code: string): boolean {
 /**
  * Classify a dashboard start() error into a category.
  */
-export function classifyDashboardError(
-  err: unknown
-): 'missing-dep' | 'timeout' | 'unknown' {
+export function classifyDashboardError(err: unknown): 'missing-dep' | 'timeout' | 'unknown' {
   if (!err) return 'unknown'
   const errObj = err as Record<string, unknown>
   const msg = typeof errObj.message === 'string' ? errObj.message : ''
@@ -36,13 +29,11 @@ export function classifyDashboardError(
 /**
  * Race a promise against a timeout.
  */
-export function createStartTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number
-): Promise<T> {
+export function createStartTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(
-      () => reject(new Error(`Dashboard SQLite initialization timed out after ${timeoutMs / 1000}s`)),
+      () =>
+        reject(new Error(`Dashboard SQLite initialization timed out after ${timeoutMs / 1000}s`)),
       timeoutMs
     )
   })
@@ -63,9 +54,7 @@ export function buildExcludedPrefixes(
   const defaultExcludes = [debugEndpoint, statsEndpoint].filter(
     (p): p is string => typeof p === 'string'
   )
-  const prefixes: string[] = [
-    ...(toolbarConfig.excludeFromTracing ?? defaultExcludes),
-  ]
+  const prefixes: string[] = [...(toolbarConfig.excludeFromTracing ?? defaultExcludes)]
   if (typeof statsEndpoint === 'string' && !prefixes.includes(statsEndpoint)) {
     prefixes.push(statsEndpoint)
   }
@@ -87,9 +76,7 @@ const TOOLBAR_DEFAULTS: Omit<DevToolbarConfig, 'enabled'> = {
   debugEndpoint: '/admin/api/debug',
 }
 
-function stripUndefined<T extends Record<string, unknown>>(
-  obj: T
-): Partial<T> {
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(obj)) {
     if (value !== undefined) result[key] = value
@@ -106,5 +93,6 @@ export function resolveToolbarConfig(
   return {
     ...TOOLBAR_DEFAULTS,
     ...stripUndefined(partial),
+    enabled: partial.enabled,
   }
 }

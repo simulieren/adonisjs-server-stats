@@ -13,11 +13,25 @@ async function safeTableCount(
   where?: { column: string; value: string }
 ): Promise<number> {
   try {
-    let query = (db as { from(t: string): { where(c: string, v: string): unknown; count(c: string): { first(): Promise<{ total?: number | string } | undefined> } } }).from(table)
+    let query = (
+      db as {
+        from(t: string): {
+          where(c: string, v: string): unknown
+          count(c: string): { first(): Promise<{ total?: number | string } | undefined> }
+        }
+      }
+    ).from(table)
     if (where) {
-      query = (query as { where(c: string, v: string): typeof query }).where(where.column, where.value) as typeof query
+      query = (query as { where(c: string, v: string): typeof query }).where(
+        where.column,
+        where.value
+      ) as typeof query
     }
-    const row = await (query as { count(c: string): { first(): Promise<{ total?: number | string } | undefined> } }).count('* as total').first()
+    const row = await (
+      query as { count(c: string): { first(): Promise<{ total?: number | string } | undefined> } }
+    )
+      .count('* as total')
+      .first()
     return Number(row?.total ?? 0)
   } catch {
     return 0

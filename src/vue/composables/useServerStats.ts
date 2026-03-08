@@ -38,21 +38,73 @@ function createControllerCallbacks(refs: {
   pollActive: ReturnType<typeof ref<boolean>>
 }) {
   return {
-    onStatsUpdate: (data: ServerStats) => { refs.stats.value = data },
-    onConnectionChange: (connected: boolean) => { refs.isConnected.value = connected },
-    onStaleChange: (stale: boolean) => { refs.isStale.value = stale },
-    onError: (err: Error | null) => { refs.error.value = err },
-    onUnauthorizedChange: (val: boolean) => { refs.isUnauthorized.value = val },
-    onHistoryChange: (all: Record<string, number[]>) => {
-      for (const key of Object.keys(all)) { refs.history[key] = all[key] }
+    onStatsUpdate: (data: ServerStats) => {
+      refs.stats.value = data
     },
-    onSseActiveChange: (active: boolean) => { refs.sseActive.value = active },
-    onPollActiveChange: (active: boolean) => { refs.pollActive.value = active },
+    onConnectionChange: (connected: boolean) => {
+      refs.isConnected.value = connected
+    },
+    onStaleChange: (stale: boolean) => {
+      refs.isStale.value = stale
+    },
+    onError: (err: Error | null) => {
+      refs.error.value = err
+    },
+    onUnauthorizedChange: (val: boolean) => {
+      refs.isUnauthorized.value = val
+    },
+    onHistoryChange: (all: Record<string, number[]>) => {
+      for (const key of Object.keys(all)) {
+        refs.history[key] = all[key]
+      }
+    },
+    onSseActiveChange: (active: boolean) => {
+      refs.sseActive.value = active
+    },
+    onPollActiveChange: (active: boolean) => {
+      refs.pollActive.value = active
+    },
   }
 }
 
+/** Reactive refs used by the composable. */
+interface StatsRefs {
+  stats: ReturnType<typeof ref<ServerStats | null>>
+  history: Record<string, number[]>
+  isConnected: ReturnType<typeof ref<boolean>>
+  isStale: ReturnType<typeof ref<boolean>>
+  error: ReturnType<typeof ref<Error | null>>
+  isUnauthorized: ReturnType<typeof ref<boolean>>
+  sseActive: ReturnType<typeof ref<boolean>>
+  pollActive: ReturnType<typeof ref<boolean>>
+}
+
+/** Create and start the controller, returning it for later cleanup. */
+function initController(
+  refs: StatsRefs,
+  config: {
+    baseUrl: string
+    endpoint: string
+    channelName: string
+    authToken?: string
+    pollInterval: number
+  }
+): ServerStatsController | null {
+  if (refs.isUnauthorized.value) return null
+  const callbacks = createControllerCallbacks(refs)
+  const ctrl = new ServerStatsController({ ...config, ...callbacks })
+  ctrl.start()
+  return ctrl
+}
+
 export function useServerStats(options: UseServerStatsOptions = {}) {
-  const { baseUrl = '', endpoint = '/admin/api/server-stats', channelName = 'admin/server-stats', authToken, pollInterval = 3000 } = options
+  const {
+    baseUrl = '',
+    endpoint = '/admin/api/server-stats',
+    channelName = 'admin/server-stats',
+    authToken,
+    pollInterval = 3000,
+  } = options
 
   const stats = ref<ServerStats | null>(null)
   const history = reactive<Record<string, number[]>>({})
@@ -63,6 +115,16 @@ export function useServerStats(options: UseServerStatsOptions = {}) {
   const sseActive = ref(false)
   const pollActive = ref(false)
 
+  const refs: StatsRefs = {
+    stats,
+    history,
+    isConnected,
+    isStale,
+    error,
+    isUnauthorized,
+    sseActive,
+    pollActive,
+  }
   let controller: ServerStatsController | null = null
 
   const connectionMode = computed<ConnectionMode>(() => {
@@ -73,13 +135,13 @@ export function useServerStats(options: UseServerStatsOptions = {}) {
   })
 
   onMounted(() => {
-    if (isUnauthorized.value) return
-    const callbacks = createControllerCallbacks({ stats, history, isConnected, isStale, error, isUnauthorized, sseActive, pollActive })
-    controller = new ServerStatsController({ baseUrl, endpoint, channelName, authToken, pollInterval, ...callbacks })
-    controller.start()
+    controller = initController(refs, { baseUrl, endpoint, channelName, authToken, pollInterval })
   })
 
-  onUnmounted(() => { controller?.stop(); controller = null })
+  onUnmounted(() => {
+    controller?.stop()
+    controller = null
+  })
 
   return { stats, history, isConnected, isStale, isUnauthorized, error, connectionMode }
 }

@@ -16,6 +16,24 @@ import type { EmailRecord } from '../debug/types.js'
  * 1. Standard: `{ message: { from, to, ... }, mailerName, response }`
  * 2. Flat: `{ from, to, subject, ... }` (data IS the message)
  */
+function extractAddressFields(msg: Record<string, unknown> | undefined) {
+  return {
+    from: extractAddresses(msg?.from) || 'unknown',
+    to: extractAddresses(msg?.to) || 'unknown',
+    cc: extractAddresses(msg?.cc) || null,
+    bcc: extractAddresses(msg?.bcc) || null,
+  }
+}
+
+function extractContentFields(msg: Record<string, unknown> | undefined) {
+  return {
+    subject: extractSubject(msg),
+    html: extractString(msg?.html),
+    text: extractString(msg?.text),
+    attachmentCount: countAttachments(msg),
+  }
+}
+
 export function buildEmailRecordFromEvent(
   data: unknown,
   status: EmailRecord['status']
@@ -24,17 +42,11 @@ export function buildEmailRecordFromEvent(
   const msg = extractMessage(d)
 
   return {
-    from: extractAddresses(msg?.from) || 'unknown',
-    to: extractAddresses(msg?.to) || 'unknown',
-    cc: extractAddresses(msg?.cc) || null,
-    bcc: extractAddresses(msg?.bcc) || null,
-    subject: extractSubject(msg),
-    html: extractString(msg?.html),
-    text: extractString(msg?.text),
+    ...extractAddressFields(msg),
+    ...extractContentFields(msg),
     mailer: extractMailer(d),
     status,
     messageId: extractMessageId(d),
-    attachmentCount: countAttachments(msg),
     timestamp: Date.now(),
   } as EmailRecord
 }

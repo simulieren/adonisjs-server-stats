@@ -51,13 +51,13 @@ function makeConfig(dbPath: string): DevToolbarConfig {
 
 /** Flush the DashboardStore write queue by calling the private method. */
 async function flush(store: DashboardStore): Promise<void> {
-  const timer = (store as unknown as Record<string, unknown>).flushTimer
+  const timer = (store as any).flushTimer
   if (timer) {
     clearTimeout(timer)
-    ;(store as unknown as Record<string, unknown>).flushTimer = null
+    ;(store as any).flushTimer = null
   }
-  await (store as unknown as Record<string, (...args: unknown[]) => Promise<void>>).flushWriteQueue()
-  ;((store as unknown as Record<string, Record<string, () => void>>).resultCache).clear()
+  await (store as any).flushWriteQueue()
+  ;(store as any).cache.clearCache()
 }
 
 // ============================================================================
@@ -73,7 +73,7 @@ test.group('flush deadlock recovery', (group) => {
     tmpDir = await mkdtemp(join(tmpdir(), 'ss-flush-deadlock-test-'))
     store = new DashboardStore(makeConfig('test.sqlite'))
     emitter = createMockEmitter()
-    await store.start(null, emitter as unknown as import('../src/debug/types.js').Emitter, tmpDir)
+    await store.start(null, emitter as any, tmpDir)
   })
 
   group.each.teardown(async () => {
@@ -91,7 +91,7 @@ test.group('flush deadlock recovery', (group) => {
     await flush(store)
 
     // The flushing flag should have been reset by the finally block
-    assert.isFalse((store as unknown as Record<string, unknown>).flushing)
+    assert.isFalse((store as any).flushMgr.flushing)
 
     // Now record a normal log entry
     store.recordLog({ level: 30, msg: 'good entry after error' })
@@ -132,7 +132,7 @@ test.group('flush deadlock recovery', (group) => {
     store.recordLog({ level: 30, msg: 'normal log' })
     await flush(store)
 
-    assert.isFalse((store as unknown as Record<string, unknown>).flushing)
+    assert.isFalse((store as any).flushMgr.flushing)
 
     const db = store.getDb()!
     const result = await db('server_stats_logs').count('* as cnt').first()
@@ -145,12 +145,12 @@ test.group('flush deadlock recovery', (group) => {
     store.recordLog({ level: 30, msg: 'bad2', b: BigInt(2) })
 
     await flush(store)
-    assert.isFalse((store as unknown as Record<string, unknown>).flushing)
+    assert.isFalse((store as any).flushMgr.flushing)
 
     // Queue more bad entries
     store.recordLog({ level: 30, msg: 'bad3', c: BigInt(3) })
     await flush(store)
-    assert.isFalse((store as unknown as Record<string, unknown>).flushing)
+    assert.isFalse((store as any).flushMgr.flushing)
 
     // Now queue a good entry — should still work
     store.recordLog({ level: 30, msg: 'finally good' })

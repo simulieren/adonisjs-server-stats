@@ -6,7 +6,6 @@
  * Extracting these from DashboardStore reduces per-function complexity.
  */
 
-import type { Knex } from 'knex'
 import type {
   RequestFilters,
   QueryFilters,
@@ -15,6 +14,7 @@ import type {
   LogFilters,
   TraceFilters,
 } from './dashboard_types.js'
+import type { Knex } from 'knex'
 
 // ---------------------------------------------------------------------------
 // Request filters
@@ -143,10 +143,7 @@ function applyStructuredFilter(
   query.whereRaw(`json_extract(data, ?) ${op} ?`, [jsonPath, patternFn(sf.value)])
 }
 
-export function applyLogFilters(
-  query: Knex.QueryBuilder,
-  filters: LogFilters | undefined
-): void {
+export function applyLogFilters(query: Knex.QueryBuilder, filters: LogFilters | undefined): void {
   if (!filters) return
   if (filters.level) query.where('level', filters.level)
   if (filters.requestId) query.where('request_id', filters.requestId)

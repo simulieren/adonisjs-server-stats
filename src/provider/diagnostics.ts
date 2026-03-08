@@ -3,6 +3,11 @@
  * Extracted from ServerStatsProvider to reduce complexity.
  */
 
+/** Minimal collector shape for diagnostics. */
+interface CollectorRef {
+  name: string
+}
+
 /** Input data for building diagnostics. */
 export interface DiagnosticsInput {
   intervalId: ReturnType<typeof setInterval> | null
@@ -16,8 +21,9 @@ export interface DiagnosticsInput {
   pinoHookActive: boolean
   edgePluginActive: boolean
   emailBridgeActive: boolean
-  hasCacheCollector: boolean
-  hasQueueCollector: boolean
+  hasCacheCollector?: boolean
+  hasQueueCollector?: boolean
+  resolvedCollectors?: CollectorRef[]
   config: DiagnosticsConfig | null
 }
 
@@ -77,6 +83,9 @@ function buildTimersDiagnostics(input: DiagnosticsInput) {
 }
 
 function buildIntegrationsDiagnostics(input: DiagnosticsInput) {
+  const collectors = input.resolvedCollectors ?? []
+  const hasCache = input.hasCacheCollector ?? collectors.some((c) => c.name === 'redis')
+  const hasQueue = input.hasQueueCollector ?? collectors.some((c) => c.name === 'queue')
   return {
     prometheus: { active: input.prometheusActive },
     pinoHook: {
@@ -85,8 +94,8 @@ function buildIntegrationsDiagnostics(input: DiagnosticsInput) {
     },
     edgePlugin: { active: input.edgePluginActive },
     emailBridge: { active: input.emailBridgeActive },
-    cacheInspector: { available: input.hasCacheCollector },
-    queueInspector: { available: input.hasQueueCollector },
+    cacheInspector: { available: hasCache },
+    queueInspector: { available: hasQueue },
   }
 }
 

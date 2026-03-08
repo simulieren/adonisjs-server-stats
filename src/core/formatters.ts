@@ -377,7 +377,8 @@ export function compactPreview(value: unknown, maxLen: number = 100): string {
   if (typeof value === 'string') return previewString(value)
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return previewArray(value, maxLen, compactPreview)
-  if (typeof value === 'object') return previewObject(value as Record<string, unknown>, maxLen, compactPreview)
+  if (typeof value === 'object')
+    return previewObject(value as Record<string, unknown>, maxLen, compactPreview)
   return String(value)
 }
 

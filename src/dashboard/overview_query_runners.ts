@@ -47,7 +47,14 @@ export async function queryOverviewMetrics(
     .orderBy('created_at', 'desc')
     .limit(5)
 
-  const result = buildOverviewResult(total, stats, range, slowestEndpoints, queryStats, recentErrors)
+  const result = buildOverviewResult({
+    total,
+    stats,
+    range,
+    slowestEndpoints,
+    queryStats,
+    recentErrors,
+  })
 
   if (total > 0) {
     const p95Offset = Math.floor(total * 0.95)
@@ -99,10 +106,18 @@ export async function queryWidgetData(db: Knex, cutoff: string): Promise<WidgetD
 
     statusRaw: await trx('server_stats_requests')
       .select(
-        trx.raw(`SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`),
-        trx.raw(`SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`),
-        trx.raw(`SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`),
-        trx.raw(`SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`)
+        trx.raw(
+          `SUM(CASE WHEN status_code >= 200 AND status_code < 300 THEN 1 ELSE 0 END) as "s2xx"`
+        ),
+        trx.raw(
+          `SUM(CASE WHEN status_code >= 300 AND status_code < 400 THEN 1 ELSE 0 END) as "s3xx"`
+        ),
+        trx.raw(
+          `SUM(CASE WHEN status_code >= 400 AND status_code < 500 THEN 1 ELSE 0 END) as "s4xx"`
+        ),
+        trx.raw(
+          `SUM(CASE WHEN status_code >= 500 AND status_code < 600 THEN 1 ELSE 0 END) as "s5xx"`
+        )
       )
       .where('created_at', '>=', cutoff)
       .first(),

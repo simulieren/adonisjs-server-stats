@@ -116,11 +116,7 @@ export function redisCollector(): MetricCollector {
           redis.dbsize() as Promise<number>,
         ])
 
-        return computeRedisMetrics(
-          parseRedisInfo(memoryInfo),
-          parseRedisInfo(statsInfo),
-          dbSize
-        )
+        return computeRedisMetrics(parseRedisInfo(memoryInfo), parseRedisInfo(statsInfo), dbSize)
       } catch (error) {
         if (!warnedConnectionError) {
           warnedConnectionError = true

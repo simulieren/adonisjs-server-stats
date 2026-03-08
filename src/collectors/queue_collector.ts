@@ -119,7 +119,11 @@ function handleQueueError(
  */
 export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
   const queueName = opts.queueName ?? 'default'
-  const warned: WarnState = { missingBullmq: false, connectionError: false, missingConnection: false }
+  const warned: WarnState = {
+    missingBullmq: false,
+    connectionError: false,
+    missingConnection: false,
+  }
 
   return {
     name: 'queue',

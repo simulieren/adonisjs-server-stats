@@ -168,11 +168,7 @@ export function EmailsTab({ options }: EmailsTabProps) {
           </thead>
           <tbody>
             {emails.map((email) => (
-              <tr
-                key={email.id}
-                className="ss-dbg-email-row"
-                onClick={() => openPreview(email)}
-              >
+              <tr key={email.id} className="ss-dbg-email-row" onClick={() => openPreview(email)}>
                 <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>
                   {email.id}
                 </td>

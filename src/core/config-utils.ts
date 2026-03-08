@@ -64,9 +64,7 @@ export function isRedactedValue(val: ConfigValue): val is RedactedValue {
  * array, not a redacted value). This consolidates the repeated
  * null/typeof/array/redacted checks into a single reusable guard.
  */
-export function isPlainConfigObject(
-  val: ConfigValue
-): val is { [key: string]: ConfigValue } {
+export function isPlainConfigObject(val: ConfigValue): val is { [key: string]: ConfigValue } {
   return (
     val !== null &&
     val !== undefined &&

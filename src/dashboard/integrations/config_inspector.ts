@@ -164,17 +164,24 @@ function isSensitiveValue(value: string): boolean {
   return false
 }
 
+/** Sanitize a single key-value pair, redacting sensitive strings. */
+function sanitizeValue(key: string, value: unknown, seen: WeakSet<object>): unknown {
+  if (typeof value === 'string' && (isSensitiveKey(key) || isSensitiveValue(value))) {
+    return redact(value)
+  }
+  if (typeof value === 'object' && value !== null) {
+    return sanitizeObject(value, seen)
+  }
+  return value
+}
+
 /**
  * Recursively sanitize an object, redacting string values whose keys
  * match sensitive patterns. Booleans and numbers are never redacted.
  */
 function sanitizeObject(obj: unknown, seen = new WeakSet<object>()): unknown {
   if (obj === null || obj === undefined) return obj
-
-  // Primitive types pass through
   if (typeof obj !== 'object') return obj
-
-  // Avoid circular references
   if (seen.has(obj)) return '[Circular]'
   seen.add(obj)
 
@@ -185,16 +192,7 @@ function sanitizeObject(obj: unknown, seen = new WeakSet<object>()): unknown {
   const record = obj as Record<string, unknown>
   const result: Record<string, unknown> = {}
   for (const key of Object.keys(record)) {
-    const value = record[key]
-
-    if (typeof value === 'string' && (isSensitiveKey(key) || isSensitiveValue(value))) {
-      result[key] = redact(value)
-    } else if (typeof value === 'object' && value !== null) {
-      result[key] = sanitizeObject(value, seen)
-    } else {
-      // Booleans, numbers, and non-sensitive strings pass through
-      result[key] = value
-    }
+    result[key] = sanitizeValue(key, record[key], seen)
   }
   return result
 }

@@ -118,6 +118,7 @@ export function normalizeTraceFields(trace: Record<string, unknown>): Normalized
     spans: parseTraceSpans(trace.spans),
     warnings: parseTraceWarnings(trace.warnings),
     logs: (trace.logs as LogEntry[]) || [],
-    httpRequestId: (trace.httpRequestId as string) || (trace.http_request_id as string) || undefined,
+    httpRequestId:
+      (trace.httpRequestId as string) || (trace.http_request_id as string) || undefined,
   }
 }

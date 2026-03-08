@@ -4,7 +4,6 @@ import { RingBuffer } from './ring_buffer.js'
 
 import type { QueryRecord, Emitter, DbQueryEvent } from './types.js'
 
-
 /** Parse duration from DbQueryEvent (may be number, hrtime tuple, or absent). */
 function parseDuration(duration: unknown): number {
   if (typeof duration === 'number') return duration
@@ -61,13 +60,13 @@ export class QueryCollector {
     }
 
     if (emitter && typeof emitter.on === 'function') {
-      emitter.on('db:query', this.handler)
+      emitter.on('db:query', this.handler as (...args: unknown[]) => void)
     }
   }
 
   stop(): void {
     if (this.emitter && this.handler && typeof this.emitter.off === 'function') {
-      this.emitter.off('db:query', this.handler)
+      this.emitter.off('db:query', this.handler as (...args: unknown[]) => void)
     }
     this.handler = null
     this.emitter = null

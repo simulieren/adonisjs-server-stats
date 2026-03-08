@@ -121,7 +121,12 @@ export class DataAccess {
   async getEmails(opts: ListOptions = {}): Promise<PaginatedResult> {
     if (this.hasPersistence && opts.source !== 'memory') {
       const { page, perPage } = buildPaginationArgs(opts)
-      const result = await this.dashboardStore!.getEmails(page, perPage, buildEmailFilters(opts), true)
+      const result = await this.dashboardStore!.getEmails(
+        page,
+        perPage,
+        buildEmailFilters(opts),
+        true
+      )
       const normalized = fromDashboardResult(result)
       normalized.data = (normalized.data as Record<string, unknown>[]).map(normalizeEmailRow)
       return normalized
@@ -212,9 +217,7 @@ export class DataAccess {
   /**
    * Find log entries matching a specific request ID.
    */
-  private async getRelatedLogsByRequestId(
-    requestId: string
-  ): Promise<Record<string, unknown>[]> {
+  private async getRelatedLogsByRequestId(requestId: string): Promise<Record<string, unknown>[]> {
     if (this.hasPersistence) {
       try {
         const result = await this.dashboardStore!.getLogs(1, 50, { requestId })
@@ -225,9 +228,7 @@ export class DataAccess {
     }
 
     const entries = this.logPath ? await readLogFile(this.logPath) : []
-    return entries.filter(
-      (e) => e.request_id === requestId || e.requestId === requestId
-    )
+    return entries.filter((e) => e.request_id === requestId || e.requestId === requestId)
   }
 
   // =========================================================================

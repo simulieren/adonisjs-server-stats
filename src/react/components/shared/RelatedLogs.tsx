@@ -43,7 +43,9 @@ export function RelatedLogs({ logs, classPrefix = 'ss-dash' }: RelatedLogsProps)
                 className={`${classPrefix}-log-entry${structured ? ` ${classPrefix}-log-entry-expandable` : ''}`}
                 onClick={() => structured && setExpandedIndex(expandedIndex === i ? null : i)}
               >
-                <span className={`${classPrefix}-log-level ${getLogLevelCssClass(level, `${classPrefix}-log-level`)}`}>
+                <span
+                  className={`${classPrefix}-log-level ${getLogLevelCssClass(level, `${classPrefix}-log-level`)}`}
+                >
                   {level.toUpperCase()}
                 </span>
                 <span className={`${classPrefix}-log-time`} title={ts ? formatTime(ts) : ''}>
@@ -57,7 +59,9 @@ export function RelatedLogs({ logs, classPrefix = 'ss-dash' }: RelatedLogsProps)
                   <span className={`${classPrefix}-log-reqid-empty`}>--</span>
                 )}
                 {structured ? (
-                  <span className={`${classPrefix}-log-expand-icon${expandedIndex === i ? ` ${classPrefix}-log-expand-icon-open` : ''}`}>
+                  <span
+                    className={`${classPrefix}-log-expand-icon${expandedIndex === i ? ` ${classPrefix}-log-expand-icon-open` : ''}`}
+                  >
                     ▶
                   </span>
                 ) : (

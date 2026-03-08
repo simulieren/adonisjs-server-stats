@@ -15,7 +15,7 @@ import {
 
 test.group('buildOverviewResult', () => {
   test('returns zero metrics when total is 0', ({ assert }) => {
-    const result = buildOverviewResult(0, null, '1h', [], null, [])
+    const result = buildOverviewResult({ total: 0, stats: null, range: '1h', slowestEndpoints: [], queryStats: null, recentErrors: [] })
     assert.equal(result.avgResponseTime, 0)
     assert.equal(result.p95ResponseTime, 0)
     assert.equal(result.requestsPerMinute, 0)
@@ -39,7 +39,7 @@ test.group('buildOverviewResult', () => {
       { id: 1, message: 'Error occurred', created_at: '2024-01-01' },
     ]
 
-    const result = buildOverviewResult(200, stats, '1h', slowest, queryStats, recentErrors)
+    const result = buildOverviewResult({ total: 200, stats, range: '1h', slowestEndpoints: slowest, queryStats, recentErrors })
 
     assert.equal(result.avgResponseTime, 50.57)
     assert.equal(result.totalRequests, 200)

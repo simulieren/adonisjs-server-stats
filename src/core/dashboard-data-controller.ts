@@ -12,9 +12,8 @@
 import { ApiClient, UnauthorizedError } from './api-client.js'
 import { OVERVIEW_REFRESH_MS, SECTION_REFRESH_MS } from './constants.js'
 import { DashboardApi } from './dashboard-api.js'
-import { buildQueryParams } from './pagination.js'
-
 import { isPaginatedResult, isAbortedRequest } from './dashboard-data-helpers.js'
+import { buildQueryParams } from './pagination.js'
 
 import type { DashboardSection, PaginatedResponse } from './types.js'
 

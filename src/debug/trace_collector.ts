@@ -185,7 +185,7 @@ export class TraceCollector {
           },
         })
       }
-      emitter.on('db:query', this.dbHandler)
+      emitter.on('db:query', this.dbHandler as (...args: unknown[]) => void)
     }
 
     // Intercept console.warn to capture warnings per-request
@@ -202,7 +202,7 @@ export class TraceCollector {
   /** Unhook event listeners and restore console.warn. */
   stop(): void {
     if (this.emitter && this.dbHandler) {
-      this.emitter.off('db:query', this.dbHandler)
+      this.emitter.off('db:query', this.dbHandler as (...args: unknown[]) => void)
     }
     if (this.originalConsoleWarn) {
       console.warn = this.originalConsoleWarn

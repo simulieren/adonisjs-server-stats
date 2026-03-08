@@ -30,6 +30,267 @@ export interface UseDashboardDataOptions {
   refreshKey?: Ref<number> | WatchSource<number>
 }
 
+/** Reactive refs used by the composable. */
+interface DashboardRefs {
+  data: Ref<unknown>
+  loading: Ref<boolean>
+  error: Ref<Error | null>
+  isUnauthorized: Ref<boolean>
+  timeRange: Ref<TimeRange>
+  pagination: PaginationState
+  filter: { search: string; [key: string]: string | number | boolean }
+  sort: { column: string; direction: 'asc' | 'desc' }
+}
+
+/** Build controller callbacks from reactive refs. */
+function buildCallbacks(refs: DashboardRefs): import('../../core/index.js').DashboardDataCallbacks {
+  let pendingData: unknown = null
+
+  return {
+    onData: (d) => {
+      pendingData = d
+    },
+    onPagination: (meta) => {
+      if (meta) {
+        refs.pagination.total = meta.total
+        refs.pagination.totalPages =
+          meta.lastPage ?? (Math.ceil(meta.total / refs.pagination.perPage) || 1)
+        refs.data.value = { data: pendingData, meta }
+      } else {
+        refs.data.value = pendingData
+      }
+    },
+    onLoading: (l) => {
+      refs.loading.value = l
+    },
+    onError: (e) => {
+      refs.error.value = e
+    },
+    onUnauthorized: () => {
+      refs.isUnauthorized.value = true
+    },
+  }
+}
+
+/** Build the current extra filters record from the reactive filter state. */
+function buildFilters(filter: DashboardRefs['filter']): Record<string, string> {
+  const result: Record<string, string> = {}
+  for (const [key, value] of Object.entries(filter)) {
+    if (key !== 'search' && value !== '' && value !== undefined && value !== null) {
+      result[key] = String(value)
+    }
+  }
+  return result
+}
+
+/** Wrap a DashboardApi method with try/catch returning null on error. */
+async function safeApiCall<T>(fn: () => Promise<T>): Promise<T | null> {
+  try {
+    return await fn()
+  } catch {
+    return null
+  }
+}
+
+/** Create read-only API helper methods. */
+function createReadApiHelpers(api: import('../../core/index.js').DashboardApi) {
+  return {
+    fetchGroupedQueries: () => safeApiCall(() => api.fetchGroupedQueries()),
+    explainQuery: (queryId: number) => safeApiCall(() => api.explainQuery(queryId)),
+    fetchEmailPreview: async (emailId: number): Promise<string | null> => {
+      const result = await safeApiCall(() => api.fetchEmailPreview(emailId))
+      return (result as { html?: string })?.html || null
+    },
+  }
+}
+
+/** Create mutation API helper methods. */
+function createMutationApiHelpers(api: import('../../core/index.js').DashboardApi) {
+  return {
+    retryJob: async (jobId: string): Promise<boolean> => {
+      try {
+        await api.retryJob(jobId)
+        return true
+      } catch {
+        return false
+      }
+    },
+    deleteCacheKey: async (key: string): Promise<boolean> => {
+      try {
+        await api.deleteCacheKey(key)
+        return true
+      } catch {
+        return false
+      }
+    },
+  }
+}
+
+/** Create chart API helper with UnauthorizedError handling. */
+function createChartHelper(
+  api: import('../../core/index.js').DashboardApi,
+  isUnauthorized: Ref<boolean>
+) {
+  return {
+    fetchChart: async (range: TimeRange): Promise<unknown> => {
+      try {
+        return await api.fetchChart(range)
+      } catch (err) {
+        if (err instanceof UnauthorizedError) isUnauthorized.value = true
+        return null
+      }
+    },
+  }
+}
+
+/** Push current reactive state into the controller without fetching. */
+function syncControllerParams(
+  controller: DashboardDataController,
+  section: () => DashboardSection | string,
+  refs: DashboardRefs
+): void {
+  const currentSection = section()
+  const extraFilters = buildFilters(refs.filter)
+  controller.configure({
+    page: refs.pagination.page,
+    perPage: refs.pagination.perPage,
+    search: refs.filter.search || undefined,
+    sort: refs.sort.column || undefined,
+    sortDir: refs.sort.column ? refs.sort.direction : undefined,
+    filters: Object.keys(extraFilters).length > 0 ? extraFilters : undefined,
+    timeRange: currentSection.startsWith('overview') ? refs.timeRange.value : undefined,
+  })
+}
+
+/** Build page/search/filter navigation methods. */
+function buildNavigationMethods(refs: DashboardRefs, syncAndFetch: () => void) {
+  return {
+    goToPage(page: number) {
+      refs.pagination.page = page
+      syncAndFetch()
+    },
+    setSearch(search: string) {
+      refs.filter.search = search
+      refs.pagination.page = 1
+      syncAndFetch()
+    },
+    setFilter(key: string, value: string | number | boolean) {
+      ;(refs.filter as Record<string, string | number | boolean>)[key] = value
+      refs.pagination.page = 1
+      syncAndFetch()
+    },
+    setSort(column: string, direction?: 'asc' | 'desc') {
+      if (refs.sort.column === column && !direction) {
+        refs.sort.direction = refs.sort.direction === 'asc' ? 'desc' : 'asc'
+      } else {
+        refs.sort.column = column
+        refs.sort.direction = direction || 'desc'
+      }
+      syncAndFetch()
+    },
+    setTimeRange(range: TimeRange) {
+      refs.timeRange.value = range
+      syncAndFetch()
+    },
+  }
+}
+
+/** Build controller lifecycle methods. */
+function buildLifecycleMethods(
+  controller: DashboardDataController,
+  section: () => DashboardSection | string,
+  refs: DashboardRefs
+) {
+  return {
+    async mutate(
+      path: string,
+      method: 'post' | 'delete' = 'post',
+      body?: unknown
+    ): Promise<unknown> {
+      return controller.mutate(path, method, body)
+    },
+    refresh() {
+      syncControllerParams(controller, section, refs)
+      controller.fetch(true)
+    },
+    startRefresh() {
+      controller.start()
+    },
+    stopRefresh() {
+      controller.stop()
+    },
+  }
+}
+
+/** Set up watchers for section changes and refreshKey. */
+function setupWatchers(
+  controller: DashboardDataController,
+  section: () => DashboardSection | string,
+  refs: DashboardRefs,
+  refreshKey: Ref<number> | WatchSource<number> | undefined
+): void {
+  watch(section, () => {
+    refs.pagination.page = 1
+    for (const key of Object.keys(refs.filter)) {
+      if (key === 'search') {
+        refs.filter.search = ''
+      } else {
+        delete (refs.filter as Record<string, unknown>)[key]
+      }
+    }
+    refs.sort.column = ''
+    refs.data.value = null
+    controller.setSection(section() as DashboardSection)
+    syncControllerParams(controller, section, refs)
+  })
+
+  if (refreshKey) {
+    watch(refreshKey, () => {
+      syncControllerParams(controller, section, refs)
+      controller.handleRefreshSignal()
+    })
+  }
+}
+
+/** Create the reactive state refs for the composable. */
+function createReactiveState(perPage: number): DashboardRefs {
+  return {
+    data: ref<unknown>(null),
+    loading: ref(false),
+    error: ref<Error | null>(null),
+    isUnauthorized: ref(false),
+    timeRange: ref<TimeRange>('1h'),
+    pagination: reactive<PaginationState>({ page: 1, perPage, total: 0, totalPages: 1 }),
+    filter: reactive<{ search: string; [key: string]: string | number | boolean }>({ search: '' }),
+    sort: reactive<{ column: string; direction: 'asc' | 'desc' }>({
+      column: '',
+      direction: 'desc',
+    }),
+  }
+}
+
+/** Build the return value of the composable. */
+function buildReturnValue(
+  refs: DashboardRefs,
+  navMethods: ReturnType<typeof buildNavigationMethods>,
+  lifecycleMethods: ReturnType<typeof buildLifecycleMethods>,
+  apiHelpers: Record<string, unknown>
+) {
+  return {
+    data: refs.data,
+    loading: refs.loading,
+    error: refs.error,
+    isUnauthorized: refs.isUnauthorized,
+    pagination: refs.pagination,
+    filter: refs.filter,
+    sort: refs.sort,
+    timeRange: refs.timeRange,
+    ...navMethods,
+    ...lifecycleMethods,
+    ...apiHelpers,
+  }
+}
+
 export function useDashboardData(
   section: () => DashboardSection | string,
   options: UseDashboardDataOptions = {}
@@ -42,280 +303,38 @@ export function useDashboardData(
     refreshKey,
   } = options
 
-  const data = ref<unknown>(null)
-  const loading = ref(false)
-  const error = ref<Error | null>(null)
-  const isUnauthorized = ref(false)
-  const timeRange = ref<TimeRange>('1h')
-
-  const pagination = reactive<PaginationState>({
-    page: 1,
-    perPage,
-    total: 0,
-    totalPages: 1,
-  })
-
-  const filter = reactive<{ search: string; [key: string]: string | number | boolean }>({
-    search: '',
-  })
-
-  const sort = reactive<{ column: string; direction: 'asc' | 'desc' }>({
-    column: '',
-    direction: 'desc',
-  })
-
-  // -- Controller setup -----------------------------------------------------
-
+  const refs = createReactiveState(perPage)
   const controller = new DashboardDataController({
     baseUrl,
     endpoint: dashboardEndpoint,
     authToken,
     section: section() as DashboardSection,
     perPage,
-    callbacks: {
-      onData: (d) => {
-        // For paginated responses the controller splits data/meta for us.
-        // However Vue components expect `data.value` to be the full response
-        // object when paginated ({ data, meta }), so we store the raw result.
-        // The controller calls onData with just the data portion and onPagination
-        // with the meta. We reconstruct the full shape here if meta is present.
-        pendingData = d
-      },
-      onPagination: (meta) => {
-        if (meta) {
-          pagination.total = meta.total
-          pagination.totalPages = meta.lastPage ?? (Math.ceil(meta.total / pagination.perPage) || 1)
-          // Store the full { data, meta } shape that Vue components expect
-          data.value = { data: pendingData, meta }
-        } else {
-          data.value = pendingData
-        }
-      },
-      onLoading: (l) => {
-        loading.value = l
-      },
-      onError: (e) => {
-        error.value = e
-      },
-      onUnauthorized: () => {
-        isUnauthorized.value = true
-      },
-    },
+    callbacks: buildCallbacks(refs),
   })
 
-  /** Temporary storage for data between onData and onPagination calls. */
-  let pendingData: unknown = null
-
-  // -- Convenience methods wrapping DashboardApi directly -------------------
-
   const api = controller.getApi()
-
-  async function fetchChart(range: TimeRange): Promise<unknown> {
-    try {
-      return await api.fetchChart(range)
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        isUnauthorized.value = true
-      }
-      return null
-    }
-  }
-
-  async function fetchGroupedQueries(): Promise<unknown> {
-    try {
-      return await api.fetchGroupedQueries()
-    } catch {
-      return null
-    }
-  }
-
-  async function explainQuery(queryId: number): Promise<unknown> {
-    try {
-      return await api.explainQuery(queryId)
-    } catch {
-      return null
-    }
-  }
-
-  async function retryJob(jobId: string): Promise<boolean> {
-    try {
-      await api.retryJob(jobId)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  async function deleteCacheKey(key: string): Promise<boolean> {
-    try {
-      await api.deleteCacheKey(key)
-      return true
-    } catch {
-      return false
-    }
-  }
-
-  async function fetchEmailPreview(emailId: number): Promise<string | null> {
-    try {
-      const result = await api.fetchEmailPreview(emailId)
-      return (result as { html?: string })?.html || null
-    } catch {
-      return null
-    }
-  }
-
-  // -- Delegation methods ---------------------------------------------------
-
-  function goToPage(page: number) {
-    pagination.page = page
-    syncAndFetch()
-  }
-
-  function setSearch(search: string) {
-    filter.search = search
-    pagination.page = 1
-    syncAndFetch()
-  }
-
-  function setFilter(key: string, value: string | number | boolean) {
-    ;(filter as Record<string, string | number | boolean>)[key] = value
-    pagination.page = 1
-    syncAndFetch()
-  }
-
-  function setSort(column: string, direction?: 'asc' | 'desc') {
-    if (sort.column === column && !direction) {
-      sort.direction = sort.direction === 'asc' ? 'desc' : 'asc'
-    } else {
-      sort.column = column
-      sort.direction = direction || 'desc'
-    }
-    syncAndFetch()
-  }
-
-  function setTimeRange(range: TimeRange) {
-    timeRange.value = range
-    syncAndFetch()
-  }
-
-  async function mutate(
-    path: string,
-    method: 'post' | 'delete' = 'post',
-    body?: unknown
-  ): Promise<unknown> {
-    return controller.mutate(path, method, body)
-  }
-
-  function refresh() {
-    syncParams()
-    controller.fetch(true)
-  }
-
-  function startRefresh() {
-    controller.start()
-  }
-
-  function stopRefresh() {
-    controller.stop()
-  }
-
-  // -- Param synchronisation ------------------------------------------------
-
-  /** Build the current extra filters record from the reactive filter state. */
-  function buildFilters(): Record<string, string> {
-    const result: Record<string, string> = {}
-    for (const [key, value] of Object.entries(filter)) {
-      if (key !== 'search' && value !== '' && value !== undefined && value !== null) {
-        result[key] = String(value)
-      }
-    }
-    return result
-  }
-
-  /** Push current reactive state into the controller without fetching. */
-  function syncParams() {
-    const currentSection = section()
-    const extraFilters = buildFilters()
-    controller.configure({
-      page: pagination.page,
-      perPage: pagination.perPage,
-      search: filter.search || undefined,
-      sort: sort.column || undefined,
-      sortDir: sort.column ? sort.direction : undefined,
-      filters: Object.keys(extraFilters).length > 0 ? extraFilters : undefined,
-      timeRange: currentSection.startsWith('overview') ? timeRange.value : undefined,
-    })
-  }
-
-  /** Sync params then trigger a non-silent fetch. */
-  function syncAndFetch() {
-    syncParams()
+  const syncAndFetch = () => {
+    syncControllerParams(controller, section, refs)
     controller.fetch(false)
   }
 
-  // -- Watchers -------------------------------------------------------------
-
-  // Watch for section changes - reset state and do a full (non-silent) load
-  watch(section, () => {
-    pagination.page = 1
-    // Clear all filter keys so stale filters from the previous section
-    // don't leak into the new one.
-    for (const key of Object.keys(filter)) {
-      if (key === 'search') {
-        filter.search = ''
-      } else {
-        delete (filter as Record<string, unknown>)[key]
-      }
-    }
-    sort.column = ''
-    data.value = null
-
-    controller.setSection(section() as DashboardSection)
-    syncParams()
-  })
-
-  // Watch refreshKey for SSE-triggered silent refreshes
-  if (refreshKey) {
-    watch(refreshKey, () => {
-      syncParams()
-      controller.handleRefreshSignal()
-    })
+  const navMethods = buildNavigationMethods(refs, syncAndFetch)
+  const lifecycleMethods = buildLifecycleMethods(controller, section, refs)
+  const apiHelpers = {
+    ...createChartHelper(api, refs.isUnauthorized),
+    ...createReadApiHelpers(api),
+    ...createMutationApiHelpers(api),
   }
 
-  // -- Lifecycle ------------------------------------------------------------
-
+  setupWatchers(controller, section, refs, refreshKey)
   onMounted(() => {
-    syncParams()
+    syncControllerParams(controller, section, refs)
     controller.start()
   })
-
   onUnmounted(() => {
     controller.stop()
   })
 
-  return {
-    data,
-    loading,
-    error,
-    isUnauthorized,
-    pagination,
-    filter,
-    sort,
-    timeRange,
-    goToPage,
-    setSearch,
-    setFilter,
-    setSort,
-    setTimeRange,
-    refresh,
-    startRefresh,
-    stopRefresh,
-    mutate,
-    fetchChart,
-    fetchGroupedQueries,
-    explainQuery,
-    retryJob,
-    deleteCacheKey,
-    fetchEmailPreview,
-  }
+  return buildReturnValue(refs, navMethods, lifecycleMethods, apiHelpers)
 }

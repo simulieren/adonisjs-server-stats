@@ -7,9 +7,7 @@
  * Pino uses a local Symbol('pino.stream'), not a global registry symbol.
  */
 export function findPinoStreamSymbol(obj: object): symbol | undefined {
-  return Object.getOwnPropertySymbols(obj).find(
-    (s) => s.description === 'pino.stream'
-  )
+  return Object.getOwnPropertySymbols(obj).find((s) => s.description === 'pino.stream')
 }
 
 /**
@@ -22,10 +20,7 @@ export function wrapWriteMethod(
   ingest: (entry: Record<string, unknown>) => void
 ): void {
   const originalWrite = stream.write.bind(stream)
-  stream.write = function wrappedWrite(
-    chunk: string | Uint8Array,
-    ...args: unknown[]
-  ) {
+  stream.write = function wrappedWrite(chunk: string | Uint8Array, ...args: unknown[]) {
     try {
       const str =
         typeof chunk === 'string'

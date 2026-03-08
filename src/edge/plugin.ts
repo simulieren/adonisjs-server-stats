@@ -46,81 +46,78 @@ interface EdgeToken {
 const DIR = dirname(fileURLToPath(import.meta.url))
 const read = (rel: string) => readFileSync(join(DIR, rel), 'utf-8')
 
+/** Build concatenated CSS from component, utility, and stats-bar stylesheets. */
+function buildCss(): string {
+  const componentsCss = read('../styles/components.css')
+  const utilitiesCss = read('../styles/utilities.css')
+  return componentsCss + '\n' + utilitiesCss + '\n' + read('../styles/stats-bar.css')
+}
+
+/** Resolve the client asset directory based on renderer config. */
+function resolveClientDir(config: ResolvedServerStatsConfig): string {
+  const renderer = config.devToolbar?.renderer || 'preact'
+  return renderer === 'vue' ? 'client-vue' : 'client'
+}
+
+/** Build the bar configuration object for the stats bar client. */
+function buildBarConfig(config: ResolvedServerStatsConfig): Record<string, unknown> {
+  const endpoint = typeof config.endpoint === 'string' ? config.endpoint : '/admin/api/server-stats'
+  const showDebug = !!config.devToolbar?.enabled
+  const result: Record<string, unknown> = {
+    endpoint,
+    pollInterval: config.intervalMs || 3000,
+    channelName: config.channelName || 'admin/server-stats',
+    showDebug,
+  }
+  if (showDebug) {
+    addDebugBarConfig(config, result)
+  }
+  return result
+}
+
+/** Add debug-specific fields to bar config. */
+function addDebugBarConfig(
+  config: ResolvedServerStatsConfig,
+  result: Record<string, unknown>
+): void {
+  result.debugEndpoint = config.devToolbar?.debugEndpoint || '/admin/api/debug'
+  result.dashboardPath = config.devToolbar?.dashboard
+    ? config.devToolbar.dashboardPath || '/__stats'
+    : null
+}
+
+/** Build template state for the Edge stats-bar partial. */
+function buildTemplateState(
+  config: ResolvedServerStatsConfig,
+  clientDir: string
+): Record<string, unknown> {
+  const showDebug = !!config.devToolbar?.enabled
+  const transmitClient = loadTransmitClient(join(process.cwd(), 'package.json'))
+  if (!transmitClient) {
+    log.info('@adonisjs/transmit-client not found — will use polling')
+  }
+  const state: Record<string, unknown> = {
+    css: buildCss(),
+    js: read(clientDir + '/stats-bar.js'),
+    barConfig: buildBarConfig(config),
+    showDebug,
+    transmitClient,
+  }
+  if (showDebug) {
+    state.debugCss = read('../styles/debug-panel.css')
+    state.debugDeferredJs = read(clientDir + '/debug-panel-deferred.js')
+  }
+  return state
+}
+
 /**
  * Edge plugin that registers the `@serverStats()` tag.
- *
- * - Mounts `views/` as the `ss` Edge disk for partials
- * - Reads CSS/JS client assets from `client/`
- * - Pre-renders the stats-bar template once at boot (via `Template` directly
- *   to avoid the `#executePlugins` recursion from `edge.renderSync`)
- * - Registers `@serverStats()` tag that outputs the pre-rendered HTML
- *
- * Usage in the provider's `boot()` method:
- * ```ts
- * edge.use(edgePluginServerStats(config))
- * ```
- *
- * Usage in Edge templates:
- * ```edge
- * @serverStats()
- * ```
  */
 export function edgePluginServerStats(config: ResolvedServerStatsConfig) {
   return (edge: EdgeEngine) => {
-    // Mount Edge views under the `ss` disk (needed for @include resolution)
     edge.mount('ss', join(DIR, 'views'))
-
-    // Read client assets once at boot
-    const componentsCss = read('../styles/components.css')
-    const utilitiesCss = read('../styles/utilities.css')
-    const css = componentsCss + '\n' + utilitiesCss + '\n' + read('../styles/stats-bar.css')
-
-    const renderer = config.devToolbar?.renderer || 'preact'
-    const clientDir = renderer === 'vue' ? 'client-vue' : 'client'
-    const js = read(clientDir + '/stats-bar.js')
-
-    const endpoint =
-      typeof config.endpoint === 'string' ? config.endpoint : '/admin/api/server-stats'
-    const intervalMs = config.intervalMs || 3000
-    const showDebug = !!config.devToolbar?.enabled
-
-    const channelName = config.channelName || 'admin/server-stats'
-
-    const barConfig: Record<string, unknown> = {
-      endpoint,
-      pollInterval: intervalMs,
-      channelName,
-      showDebug,
-      ...(showDebug && {
-        debugEndpoint: config.devToolbar?.debugEndpoint || '/admin/api/debug',
-        dashboardPath: config.devToolbar?.dashboard
-          ? config.devToolbar.dashboardPath || '/__stats'
-          : null,
-      }),
-    }
-
-    // Always try to load the Transmit client — both the stats bar and the
-    // debug panel use it for live (SSE) updates.
-    const transmitClient = loadTransmitClient(join(process.cwd(), 'package.json'))
-    if (!transmitClient) {
-      log.info('@adonisjs/transmit-client not found — will use polling')
-    }
-
-    const state: Record<string, unknown> = {
-      css,
-      js,
-      barConfig,
-      showDebug,
-      transmitClient,
-    }
-
-    if (showDebug) {
-      state.debugCss = read('../styles/debug-panel.css')
-      state.debugDeferredJs = read(clientDir + '/debug-panel-deferred.js')
-    }
-
-    // Pre-render via Template directly — bypasses edge.createRenderer() which
-    // would re-run #executePlugins and cause infinite recursion.
+    const clientDir = resolveClientDir(config)
+    const state = buildTemplateState(config, clientDir)
     const template = new Template(
       edge.compiler as ConstructorParameters<typeof Template>[0],
       edge.globals,
@@ -129,8 +126,6 @@ export function edgePluginServerStats(config: ResolvedServerStatsConfig) {
     )
     const html = template.render<string>('ss::stats-bar', state)
     const escaped = JSON.stringify(html)
-
-    // Track whether shouldShow is configured (controls render-time guard)
     const hasShouldShow = !!config.shouldShow
 
     edge.registerTag({
@@ -139,16 +134,14 @@ export function edgePluginServerStats(config: ResolvedServerStatsConfig) {
       seekable: true,
       compile(_parser: EdgeParser, buffer: EdgeBuffer, token: EdgeToken) {
         if (hasShouldShow) {
-          // Guard: call the lazy __ssShowFn at render time (after auth middleware has run)
           buffer.writeStatement(
-            `if (typeof state.__ssShowFn === 'function' ? state.__ssShowFn() : false) {`,
+            "if (typeof state.__ssShowFn === 'function' ? state.__ssShowFn() : false) {",
             token.filename,
             token.loc.start.line
           )
           buffer.outputExpression(escaped, token.filename, token.loc.start.line, false)
-          buffer.writeStatement(`}`, token.filename, -1)
+          buffer.writeStatement('}', token.filename, -1)
         } else {
-          // No shouldShow configured — always render
           buffer.outputExpression(escaped, token.filename, token.loc.start.line, false)
         }
       },

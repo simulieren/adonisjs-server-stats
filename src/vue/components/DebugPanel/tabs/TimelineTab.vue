@@ -142,7 +142,12 @@ watch([selectedTraceId, traceDetail], async () => {
   splitCleanup = null
   if (traceDetail.value && detailLogs.value.length > 0) {
     await nextTick()
-    if (splitContainerRef.value && splitHandleRef.value && splitTopRef.value && splitBottomRef.value) {
+    if (
+      splitContainerRef.value &&
+      splitHandleRef.value &&
+      splitTopRef.value &&
+      splitBottomRef.value
+    ) {
       splitCleanup = initSplitPane({
         container: splitContainerRef.value,
         handle: splitHandleRef.value,
@@ -206,7 +211,11 @@ function dbgDurationClass(ms: number): string {
           <div ref="splitContainerRef" class="ss-dbg-split-container">
             <div ref="splitTopRef" class="ss-dbg-split-top">
               <div class="ss-dbg-tl-legend">
-                <span v-for="(color, cat) in CATEGORY_COLORS" :key="cat" class="ss-dbg-tl-legend-item">
+                <span
+                  v-for="(color, cat) in CATEGORY_COLORS"
+                  :key="cat"
+                  class="ss-dbg-tl-legend-item"
+                >
                   <span class="ss-dbg-tl-legend-dot" :style="{ background: color }"></span>
                   {{ CATEGORY_LABELS[cat] || cat }}
                 </span>

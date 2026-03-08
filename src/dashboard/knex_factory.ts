@@ -102,16 +102,11 @@ async function importWithError(
   try {
     return await appImportWithPath(moduleName)
   } catch (err) {
-    throw new Error(
-      `Could not load ${moduleName}: ${(err as Error)?.message}. ${installHint}`
-    )
+    throw new Error(`Could not load ${moduleName}: ${(err as Error)?.message}. ${installHint}`)
   }
 }
 
-function afterCreateHandler(
-  conn: unknown,
-  done: (err: Error | null, conn: unknown) => void
-): void {
+function afterCreateHandler(conn: unknown, done: (err: Error | null, conn: unknown) => void): void {
   const raw = conn as { pragma: (stmt: string) => void }
   try {
     for (const pragma of PRAGMA_STATEMENTS_FOR_POOL) {

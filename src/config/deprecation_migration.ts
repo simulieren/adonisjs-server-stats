@@ -117,25 +117,22 @@ function buildBeforeParts(dt: DevToolbarOptions): string[] {
   return parts
 }
 
+const TOOLBAR_AFTER_FIELDS: Array<{
+  key: keyof DevToolbarOptions
+  format: (v: unknown) => string
+}> = [
+  { key: 'slowQueryThresholdMs', format: (v) => `  slowQueryThreshold: ${v},` },
+  { key: 'tracing', format: (v) => `  tracing: ${v},` },
+  { key: 'persistDebugData', format: (v) => `  persist: ${JSON.stringify(v)},` },
+  { key: 'panes', format: () => `  panes: [...],` },
+  { key: 'excludeFromTracing', format: () => `  excludeFromTracing: [...],` },
+]
+
 function buildToolbarAfter(dt: DevToolbarOptions): string[] {
-  const hasDetails =
-    dt.slowQueryThresholdMs !== undefined ||
-    dt.tracing !== undefined ||
-    dt.persistDebugData !== undefined ||
-    dt.panes !== undefined ||
-    dt.excludeFromTracing !== undefined
-
   if (!dt.enabled) return []
-  if (!hasDetails) return ['toolbar: true']
-
-  const parts: string[] = ['toolbar: {']
-  if (dt.slowQueryThresholdMs !== undefined) parts.push(`  slowQueryThreshold: ${dt.slowQueryThresholdMs},`)
-  if (dt.tracing !== undefined) parts.push(`  tracing: ${dt.tracing},`)
-  if (dt.persistDebugData !== undefined) parts.push(`  persist: ${JSON.stringify(dt.persistDebugData)},`)
-  if (dt.panes !== undefined) parts.push(`  panes: [...],`)
-  if (dt.excludeFromTracing !== undefined) parts.push(`  excludeFromTracing: [...],`)
-  parts.push('}')
-  return parts
+  const details = TOOLBAR_AFTER_FIELDS.filter(({ key }) => dt[key] !== undefined)
+  if (details.length === 0) return ['toolbar: true']
+  return ['toolbar: {', ...details.map(({ key, format }) => format(dt[key])), '}']
 }
 
 function buildDashboardAfter(dt: DevToolbarOptions): string[] {
@@ -171,13 +168,14 @@ function buildDevToolbarMigration(dt: DevToolbarOptions): DeprecationEntry {
   ]
 
   const advancedPresent = buildAdvancedAfter(dt).length > 0
-  const newLabel = [
-    dt.enabled !== undefined ? 'toolbar' : '',
-    dt.dashboard ? 'dashboard' : '',
-    advancedPresent ? 'advanced' : '',
-  ]
-    .filter(Boolean)
-    .join(' + ') || 'toolbar + dashboard + advanced'
+  const newLabel =
+    [
+      dt.enabled !== undefined ? 'toolbar' : '',
+      dt.dashboard ? 'dashboard' : '',
+      advancedPresent ? 'advanced' : '',
+    ]
+      .filter(Boolean)
+      .join(' + ') || 'toolbar + dashboard + advanced'
 
   return {
     old: 'devToolbar',

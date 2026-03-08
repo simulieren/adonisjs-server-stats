@@ -38,7 +38,9 @@ async function getAppDbClient(
     const lucid: unknown = await app.container.make('lucid.db')
     return (lucid as { connection: () => { getWriteClient: () => unknown } })
       .connection()
-      .getWriteClient() as { raw: (sql: string, bindings: unknown[]) => Promise<Record<string, unknown>> }
+      .getWriteClient() as {
+      raw: (sql: string, bindings: unknown[]) => Promise<Record<string, unknown>>
+    }
   } catch {
     return null
   }

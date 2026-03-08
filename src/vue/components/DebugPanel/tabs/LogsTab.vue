@@ -141,8 +141,12 @@ function filterByReqId(reqId: string) {
           <span v-else class="ss-dbg-log-reqid-empty">-</span>
           <span
             v-if="getStructuredData(log)"
-            :class="['ss-dbg-log-expand-icon', { 'ss-dbg-log-expand-icon-open': expandedIndex === i }]"
-          >&#x25B6;</span>
+            :class="[
+              'ss-dbg-log-expand-icon',
+              { 'ss-dbg-log-expand-icon-open': expandedIndex === i },
+            ]"
+            >&#x25B6;</span
+          >
           <span v-else style="width: 14px" />
           <span class="ss-dbg-log-msg">{{ resolveLogMessage(log) }}</span>
           <a

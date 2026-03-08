@@ -70,7 +70,10 @@ export interface StatsGroupRule {
 
 export const STATS_GROUP_RULES: StatsGroupRule[] = [
   { group: 'process', fields: ['cpuPercent', 'uptime', 'nodeVersion'] },
-  { group: 'memory', fields: ['memHeapUsed', 'memRss', 'systemMemoryTotalMb', 'systemMemoryFreeMb'] },
+  {
+    group: 'memory',
+    fields: ['memHeapUsed', 'memRss', 'systemMemoryTotalMb', 'systemMemoryFreeMb'],
+  },
   {
     group: 'http',
     fields: ['requestsPerSecond', 'avgResponseTimeMs', 'errorRate', 'activeHttpConnections'],

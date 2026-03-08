@@ -103,7 +103,11 @@ export async function fetchRequestDetail(
     }
 
     if (logs.length === 0 && request.created_at) {
-      logs = await queryLogsByTimeWindow(trx as unknown as Knex, request.created_at, request.duration || 0)
+      logs = await queryLogsByTimeWindow(
+        trx as unknown as Knex,
+        request.created_at,
+        request.duration || 0
+      )
     }
 
     return {

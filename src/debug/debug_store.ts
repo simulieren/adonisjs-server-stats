@@ -10,7 +10,6 @@ import { TraceCollector } from './trace_collector.js'
 
 import type { DevToolbarConfig, Emitter, Router } from './types.js'
 
-
 /** Read and parse persisted debug data from disk. Returns null on failure. */
 async function readPersistedData(filePath: string): Promise<Record<string, unknown> | null> {
   let raw: string

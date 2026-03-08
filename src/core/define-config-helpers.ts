@@ -35,11 +35,13 @@ export function applyToolbarSetting(
   if (toolbar === true) return
 
   // toolbar is ToolbarConfig
-  if (toolbar.slowQueryThreshold !== undefined) result.slowQueryThresholdMs = toolbar.slowQueryThreshold
+  if (toolbar.slowQueryThreshold !== undefined)
+    result.slowQueryThresholdMs = toolbar.slowQueryThreshold
   if (toolbar.tracing !== undefined) result.tracing = toolbar.tracing
   if (toolbar.persist !== undefined) result.persistDebugData = toolbar.persist
   if (toolbar.panes !== undefined) result.panes = toolbar.panes
-  if (toolbar.excludeFromTracing !== undefined) result.excludeFromTracing = toolbar.excludeFromTracing
+  if (toolbar.excludeFromTracing !== undefined)
+    result.excludeFromTracing = toolbar.excludeFromTracing
 }
 
 /**
@@ -54,7 +56,8 @@ export function applyDashboardSetting(
   if (dashboard === true) return
   if (!isPlainObject(dashboard)) return
   if (dashboard.path !== undefined) result.dashboardPath = dashboard.path as string
-  if (dashboard.retentionDays !== undefined) result.retentionDays = dashboard.retentionDays as number
+  if (dashboard.retentionDays !== undefined)
+    result.retentionDays = dashboard.retentionDays as number
 }
 
 /** Field mapping for advanced config -> DevToolbarOptions. */

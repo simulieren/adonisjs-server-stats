@@ -1,5 +1,5 @@
-import { setVerbose } from './utils/logger.js'
 import { logDeprecationWarnings } from './config/deprecation_migration.js'
+import { setVerbose } from './utils/logger.js'
 
 import type { DevToolbarOptions, ResolvedServerStatsConfig, ServerStatsConfig } from './types.js'
 
@@ -109,9 +109,7 @@ function resolveTransport(config: ServerStatsConfig): 'transmit' | 'none' {
 /** Resolve devToolbar from aliases. */
 function resolveDevToolbar(config: ServerStatsConfig): DevToolbarOptions | undefined {
   const hasAliases =
-    config.toolbar !== undefined ||
-    config.dashboard !== undefined ||
-    config.advanced !== undefined
+    config.toolbar !== undefined || config.dashboard !== undefined || config.advanced !== undefined
   if (hasAliases) return resolveToolbarAliases(config, config.devToolbar)
   return config.devToolbar
 }

@@ -80,7 +80,7 @@ export class EmailCollector {
     ]
 
     for (const h of this.handlers) {
-      emitter.on(h.event, h.fn)
+      emitter.on(h.event, h.fn as (...args: unknown[]) => void)
     }
   }
 
@@ -115,11 +115,7 @@ export class EmailCollector {
     this.buffer.push(record)
   }
 
-  #buildRecord(
-    msg: MailMessage,
-    status: EmailRecord['status'],
-    data: MailEventData
-  ): EmailRecord {
+  #buildRecord(msg: MailMessage, status: EmailRecord['status'], data: MailEventData): EmailRecord {
     return {
       id: this.buffer.getNextId(),
       ...buildRecordFields(msg, data),
@@ -132,7 +128,7 @@ export class EmailCollector {
   stop(): void {
     if (this.emitter && typeof this.emitter.off === 'function') {
       for (const h of this.handlers) {
-        this.emitter.off(h.event, h.fn)
+        this.emitter.off(h.event, h.fn as (...args: unknown[]) => void)
       }
     }
     this.handlers = []

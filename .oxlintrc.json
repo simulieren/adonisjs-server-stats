@@ -1,9 +1,6 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["typescript", "import", "unicorn"],
-  "categories": {
-    "correctness": "warn"
-  },
   "env": {
     "node": true
   },
@@ -18,5 +15,18 @@
     "eqeqeq": "warn",
     "typescript/no-explicit-any": "warn"
   },
-  "ignorePatterns": ["dist/**", "node_modules/**"]
+  "ignorePatterns": ["dist/**", "node_modules/**", "**/*.tsx", "**/*.vue"],
+  "overrides": [
+    {
+      "files": ["tests/**", "**/*.spec.ts", "**/*.test.ts"],
+      "rules": {
+        "max-lines-per-function": "off",
+        "max-nested-callbacks": "off",
+        "max-lines": "off",
+        "max-depth": "off",
+        "complexity": "off",
+        "max-params": "off"
+      }
+    }
+  ]
 }

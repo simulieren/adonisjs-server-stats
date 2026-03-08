@@ -8,12 +8,8 @@
  * When an authToken is provided, adds `beforeSubscribe` and
  * `beforeUnsubscribe` hooks that attach a Bearer token header.
  */
-export function buildTransmitOptions(
-  baseUrl: string,
-  authToken?: string
-): Record<string, unknown> {
-  const resolvedBaseUrl =
-    baseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
+export function buildTransmitOptions(baseUrl: string, authToken?: string): Record<string, unknown> {
+  const resolvedBaseUrl = baseUrl || (typeof window !== 'undefined' ? window.location.origin : '')
 
   if (!authToken) {
     return { baseUrl: resolvedBaseUrl }
