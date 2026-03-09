@@ -1,12 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React from 'react'
 
-import { UnauthorizedError } from '../../../../core/api-client.js'
-import { useApiClient } from '../../../hooks/useApiClient.js'
+import { useDiagnosticsData } from '../../../hooks/useDiagnosticsData.js'
 import { InternalsContent } from '../../shared/InternalsContent.js'
 
-import type { DebugPanelProps, DiagnosticsResponse } from '../../../../core/types.js'
-
-const REFRESH_INTERVAL = 3000
+import type { DebugPanelProps } from '../../../../core/types.js'
 
 interface InternalsTabProps {
   options?: DebugPanelProps
@@ -18,52 +15,11 @@ interface InternalsTabProps {
  * Fetches from {debugEndpoint}/diagnostics.
  */
 export function InternalsTab({ options }: InternalsTabProps) {
-  const { baseUrl = '', debugEndpoint = '/admin/api/debug', authToken } = options || {}
-
-  const [data, setData] = useState<DiagnosticsResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  const getClient = useApiClient(baseUrl, authToken)
-
-  const fetchData = useCallback(async () => {
-    try {
-      const client = getClient()
-      const result = await client.get<DiagnosticsResponse>(`${debugEndpoint}/diagnostics`)
-      setData(result)
-      setError(null)
-      setIsLoading(false)
-    } catch (err) {
-      if (err instanceof UnauthorizedError) {
-        setError(err)
-        setIsLoading(false)
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
-        }
-        return
-      }
-      setError(err instanceof Error ? err : new Error(String(err)))
-      setIsLoading(false)
-    }
-  }, [debugEndpoint, getClient])
-
-  useEffect(() => {
-    setIsLoading(true)
-    setError(null)
-    fetchData()
-
-    timerRef.current = setInterval(fetchData, REFRESH_INTERVAL)
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-    }
-  }, [fetchData])
+  const { data, isLoading, error } = useDiagnosticsData({
+    baseUrl: options?.baseUrl,
+    debugEndpoint: options?.debugEndpoint,
+    authToken: options?.authToken,
+  })
 
   if (isLoading && !data) {
     return <div className="ss-dbg-empty">Loading diagnostics...</div>
