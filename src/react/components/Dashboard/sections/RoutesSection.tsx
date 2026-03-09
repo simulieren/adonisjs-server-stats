@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge } from '../../shared/Badge.js'
 import { DataTable } from '../shared/DataTable.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
 

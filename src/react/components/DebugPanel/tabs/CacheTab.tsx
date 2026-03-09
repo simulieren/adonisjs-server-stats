@@ -4,6 +4,7 @@ import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
 import { useDashboardApiBase } from '../../../hooks/useDashboardApiBase.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
 import type { CacheStats, CacheEntry, DebugPanelProps } from '../../../../core/types.js'
@@ -103,16 +104,12 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
       </div>
 
       {/* Search */}
-      <div className="ss-dbg-search-bar">
-        <input
-          type="text"
-          className="ss-dbg-search"
-          placeholder="Filter keys..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <span className="ss-dbg-summary">{keys.length} keys</span>
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter keys..."
+        summary={`${keys.length} keys`}
+      />
 
       {/* Key detail overlay */}
       {selectedKey && !!keyValue && (

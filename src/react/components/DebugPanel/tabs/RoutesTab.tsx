@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { RouteRecord, DebugPanelProps } from '../../../../core/types.js'
 
@@ -39,16 +40,12 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
 
   return (
     <div>
-      <div className="ss-dbg-search-bar">
-        <input
-          type="text"
-          className="ss-dbg-search"
-          placeholder="Filter routes..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <span className="ss-dbg-summary">{routes.length} routes</span>
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter routes..."
+        summary={`${routes.length} routes`}
+      />
 
       {routes.length === 0 ? (
         <div className="ss-dbg-empty">No routes found</div>

@@ -10,6 +10,7 @@ import {
 import { useDashboardApiBase } from '../../../hooks/useDashboardApiBase.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
 import type { JobRecord, JobsApiResponse, DebugPanelProps } from '../../../../core/types.js'
@@ -23,15 +24,18 @@ interface JobsTabProps {
 export function JobsTab({ options, dashboardPath }: JobsTabProps) {
   const { dashApiBase, resolvedOptions } = useDashboardApiBase(dashboardPath, options)
   const { data, isLoading, error } = useDebugData<JobsApiResponse>('jobs', resolvedOptions)
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [retrying, setRetrying] = useState<string | null>(null)
 
   // Extract jobs from the response (server may use `data` or `jobs` key)
   const jobs = useMemo(() => {
     const items = extractJobsFromData(data) as unknown as JobRecord[]
-    if (statusFilter === 'all') return items
-    return items.filter((j) => j.status === statusFilter)
-  }, [data, statusFilter])
+    const filtered = statusFilter === 'all' ? items : items.filter((j) => j.status === statusFilter)
+    if (!search) return filtered
+    const q = search.toLowerCase()
+    return filtered.filter((j) => j.name?.toLowerCase().includes(q) || j.id?.toString().includes(q))
+  }, [data, statusFilter, search])
 
   const handleRetry = useCallback(
     async (jobId: string) => {
@@ -80,6 +84,12 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
 
   return (
     <div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter jobs..."
+        summary={`${jobs.length} jobs`}
+      />
       {/* Stats */}
       <div className="ss-dbg-job-stats-area">
         <div className="ss-dbg-job-stats">

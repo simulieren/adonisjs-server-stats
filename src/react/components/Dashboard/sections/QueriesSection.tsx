@@ -4,7 +4,7 @@ import { SLOW_DURATION_MS } from '../../../../core/constants.js'
 import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { DataTable } from '../shared/DataTable.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'

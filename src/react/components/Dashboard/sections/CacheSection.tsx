@@ -4,7 +4,7 @@ import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { DashboardHookOptions, DashboardCacheResponse } from '../../../../core/types.js'
 

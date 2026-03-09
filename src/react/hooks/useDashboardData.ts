@@ -59,7 +59,10 @@ function syncAndFetch(ctx: SyncContext, params: DashboardHookOptions): boolean {
     return true
   }
 
-  ctx.ctrl.fetch(true)
+  // useEffect cleanup calls ctrl.stop() which sets stopped=true.
+  // We must call start() to clear the stopped flag before fetching,
+  // otherwise isStaleResponse() discards the result.
+  ctx.ctrl.start()
   return ctx.hasFetched
 }
 

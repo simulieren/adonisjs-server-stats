@@ -8,7 +8,7 @@ import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
 import { RelatedLogs } from '../../shared/RelatedLogs.js'
 import { DataTable } from '../shared/DataTable.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 import { WaterfallChart } from '../shared/WaterfallChart.js'
 

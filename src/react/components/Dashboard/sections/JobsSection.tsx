@@ -11,7 +11,7 @@ import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Badge } from '../../shared/Badge.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
-import { FilterBar } from '../shared/FilterBar.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
 
 import type { BadgeColor, DashboardHookOptions } from '../../../../core/types.js'

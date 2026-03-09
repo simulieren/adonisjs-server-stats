@@ -305,95 +305,12 @@ body {
   flex-direction: column;
 }
 
-/* ── Search bar ────────────────────────────────────────────────── */
-.ss-dash-search-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.ss-dash-search {
-  flex: 1;
-  min-width: 200px;
-  padding: 5px 10px;
-  padding-left: 28px;
-  padding-right: 24px;
-  font-size: 11px;
-  color: var(--ss-text);
-  background: var(--ss-input-bg);
-  border: 1px solid var(--ss-border);
-  border-radius: 4px;
-  outline: none;
-}
-.ss-dash-search:focus {
-  border-color: var(--ss-accent);
-}
-.ss-dash-search::placeholder {
-  color: var(--ss-dim);
-}
-
-.ss-dash-filter-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  flex-shrink: 0;
-  flex-wrap: wrap;
-}
-
-.ss-dash-search-wrapper {
-  position: relative;
-  flex: 1;
-  min-width: 180px;
-  max-width: 400px;
-}
-
-.ss-dash-search-icon {
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 14px;
-  height: 14px;
-  color: var(--ss-dim);
-  pointer-events: none;
-}
-
-.ss-dash-search-clear {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: var(--ss-dim);
-  cursor: pointer;
-  font-size: 14px;
-  padding: 2px 4px;
-  line-height: 1;
-}
-.ss-dash-search-clear:hover {
-  color: var(--ss-text);
-}
-
-.ss-dash-filter-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-}
-
-.ss-dash-summary {
-  font-size: 12px;
-  color: var(--ss-dim);
-  white-space: nowrap;
+/* ── Search bar → base styles in components.css ───────────────── */
+/* Dashboard overrides: wider padding and input sizing */
+.ss-dash {
+  --ss-filter-px: 16px;
+  --ss-search-py: 5px;
+  --ss-search-px: 10px;
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
@@ -619,7 +536,8 @@ body {
 }
 
 /* When log filters are inside the shared FilterBar, strip redundant chrome */
-.ss-dash-filter-controls .ss-dash-log-filters {
+.ss-dash-filter-controls .ss-dash-log-filters,
+.ss-dbg-filter-controls .ss-dash-log-filters {
   padding: 0;
   border-bottom: none;
   background: none;

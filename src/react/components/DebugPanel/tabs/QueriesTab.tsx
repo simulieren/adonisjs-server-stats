@@ -13,6 +13,7 @@ import {
 } from '../../../../core/query-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { QueryRecord, DebugPanelProps } from '../../../../core/types.js'
 
@@ -49,21 +50,19 @@ export function QueriesTab({ options }: QueriesTabProps) {
 
   return (
     <div>
-      <div className="ss-dbg-search-bar">
-        <input
-          type="text"
-          className="ss-dbg-search"
-          placeholder="Filter queries..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <span className="ss-dbg-summary">
-          {queries.length} queries
-          {summaryStats.slowCount > 0 && ` | ${summaryStats.slowCount} slow`}
-          {summaryStats.dupCount > 0 && ` | ${summaryStats.dupCount} dup`}
-          {queries.length > 0 && ` | avg ${formatDuration(summaryStats.avgDuration)}`}
-        </span>
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter queries..."
+        summary={
+          <>
+            {queries.length} queries
+            {summaryStats.slowCount > 0 && ` | ${summaryStats.slowCount} slow`}
+            {summaryStats.dupCount > 0 && ` | ${summaryStats.dupCount} dup`}
+            {queries.length > 0 && ` | avg ${formatDuration(summaryStats.avgDuration)}`}
+          </>
+        }
+      />
 
       {queries.length === 0 ? (
         <div className="ss-dbg-empty">No queries captured</div>

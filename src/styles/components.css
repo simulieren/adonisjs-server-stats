@@ -309,6 +309,102 @@
   color: var(--ss-border);
 }
 
+/* ── Filter / Search Bar ─────────────────────────────────────── */
+/* Padding can be overridden via --ss-filter-px (debug: 12px, dashboard: 16px). */
+.ss-filter-bar,
+.ss-dash-filter-bar,
+.ss-dash-search-bar,
+.ss-dbg-filter-bar,
+.ss-dbg-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px var(--ss-filter-px, 12px);
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ss-search-wrapper,
+.ss-dash-search-wrapper,
+.ss-dbg-search-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+}
+.ss-search-icon,
+.ss-dash-search-icon,
+.ss-dbg-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--ss-dim);
+  pointer-events: none;
+}
+.ss-search,
+.ss-dash-search,
+.ss-dbg-search {
+  flex: 1;
+  width: 100%;
+  padding: var(--ss-search-py, 4px) var(--ss-search-px, 8px);
+  padding-left: 28px;
+  padding-right: 24px;
+  font-size: 11px;
+  color: var(--ss-text);
+  background: var(--ss-input-bg);
+  border: 1px solid var(--ss-border);
+  border-radius: 4px;
+  outline: none;
+}
+.ss-search:focus,
+.ss-dash-search:focus,
+.ss-dbg-search:focus {
+  border-color: var(--ss-accent);
+}
+.ss-search::placeholder,
+.ss-dash-search::placeholder,
+.ss-dbg-search::placeholder {
+  color: var(--ss-dim);
+}
+.ss-search-clear,
+.ss-dash-search-clear,
+.ss-dbg-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--ss-dim);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+  line-height: 1;
+}
+.ss-search-clear:hover,
+.ss-dash-search-clear:hover,
+.ss-dbg-search-clear:hover {
+  color: var(--ss-text);
+}
+.ss-filter-controls,
+.ss-dash-filter-controls,
+.ss-dbg-filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.ss-summary,
+.ss-dash-summary,
+.ss-dbg-summary {
+  font-size: 11px;
+  color: var(--ss-muted);
+  white-space: nowrap;
+}
+
 /* ═══════════════════════════════════════════════════════════════
  * Phase 4: Full Component Unification
  * ═══════════════════════════════════════════════════════════════ */

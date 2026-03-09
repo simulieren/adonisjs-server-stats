@@ -252,37 +252,7 @@
   display: block;
 }
 
-/* Search */
-.ss-dbg-search-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-}
-.ss-dbg-search {
-  flex: 1;
-  padding: 4px 8px;
-  font-size: 11px;
-  color: var(--ss-text);
-  background: var(--ss-input-bg);
-  border: 1px solid var(--ss-border);
-  border-radius: 4px;
-  outline: none;
-}
-.ss-dbg-search:focus {
-  border-color: var(--ss-accent);
-}
-.ss-dbg-search::placeholder {
-  color: var(--ss-dim);
-}
-.ss-dbg-summary {
-  font-size: 11px;
-  color: var(--ss-muted);
-  white-space: nowrap;
-  padding: 0 4px;
-}
+/* Search / Filter Bar → moved to components.css */
 .ss-dbg-btn-clear {
   padding: 3px 8px;
   font-size: 10px;

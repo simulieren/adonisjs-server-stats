@@ -9,6 +9,7 @@ import {
 } from '../../../../core/formatters.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { DebugPane, DebugPanelProps, DebugTab } from '../../../../core/types.js'
 
@@ -137,21 +138,18 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     <div>
       {/* Search bar */}
       {pane.search && (
-        <div className="ss-dbg-search-bar">
-          <input
-            type="text"
-            className="ss-dbg-search"
-            placeholder={pane.search.placeholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <span className="ss-dbg-summary">{filteredRows.length} items</span>
+        <FilterBar
+          search={search}
+          onSearchChange={setSearch}
+          placeholder={pane.search.placeholder}
+          summary={`${filteredRows.length} items`}
+        >
           {pane.clearable && (
             <button type="button" className="ss-dbg-btn-clear" onClick={clearData}>
               Clear
             </button>
           )}
-        </div>
+        </FilterBar>
       )}
 
       {/* Table */}

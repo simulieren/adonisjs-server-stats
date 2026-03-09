@@ -3,6 +3,7 @@ import React, { useState, useMemo, useCallback } from 'react'
 import { timeAgo, formatTime } from '../../../../core/formatters.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { EmailRecord, DebugPanelProps } from '../../../../core/types.js'
 
@@ -129,16 +130,12 @@ export function EmailsTab({ options }: EmailsTabProps) {
 
   return (
     <div>
-      <div className="ss-dbg-search-bar">
-        <input
-          type="text"
-          className="ss-dbg-search"
-          placeholder="Filter emails..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <span className="ss-dbg-summary">{emails.length} emails</span>
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter emails..."
+        summary={`${emails.length} emails`}
+      />
 
       {emails.length === 0 ? (
         <div className="ss-dbg-empty">No emails captured</div>

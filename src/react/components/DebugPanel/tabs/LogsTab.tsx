@@ -12,6 +12,7 @@ import {
   filterLogsByLevel,
 } from '../../../../core/log-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
 import type { LogEntry } from '../../../../core/log-utils.js'
@@ -88,15 +89,11 @@ export function LogsTab({ options }: LogsTabProps) {
       </div>
 
       {/* Search bar */}
-      <div className="ss-dbg-search-bar">
-        <input
-          type="text"
-          className="ss-dbg-search"
-          placeholder="Filter log messages..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter log messages..."
+      />
 
       {/* Log entries */}
       <div style={{ overflow: 'auto', flex: 1 }}>

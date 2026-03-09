@@ -10,6 +10,7 @@ import { initSplitPane } from '../../../../core/split-pane.js'
 import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { RelatedLogs } from '../../shared/RelatedLogs.js'
 
 import type { TraceRecord, TraceSpan, DebugPanelProps } from '../../../../core/types.js'
@@ -281,16 +282,12 @@ export function TimelineTab({ options }: TimelineTabProps) {
   // Trace list view
   return (
     <div>
-      <div className="ss-dbg-search-bar">
-        <input
-          type="text"
-          className="ss-dbg-search"
-          placeholder="Filter traces..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <span className="ss-dbg-summary">{traces.length} traces</span>
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter traces..."
+        summary={`${traces.length} traces`}
+      />
 
       {traces.length === 0 ? (
         <div className="ss-dbg-empty">No traces captured. Enable tracing in config.</div>

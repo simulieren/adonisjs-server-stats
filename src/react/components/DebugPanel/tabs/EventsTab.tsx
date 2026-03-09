@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react'
 import { timeAgo, formatTime } from '../../../../core/formatters.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
 import type { EventRecord, DebugPanelProps } from '../../../../core/types.js'
@@ -38,16 +39,12 @@ export function EventsTab({ options }: EventsTabProps) {
 
   return (
     <div>
-      <div className="ss-dbg-search-bar">
-        <input
-          type="text"
-          className="ss-dbg-search"
-          placeholder="Filter events..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <span className="ss-dbg-summary">{events.length} events</span>
-      </div>
+      <FilterBar
+        search={search}
+        onSearchChange={setSearch}
+        placeholder="Filter events..."
+        summary={`${events.length} events`}
+      />
 
       {events.length === 0 ? (
         <div className="ss-dbg-empty">No events captured</div>
