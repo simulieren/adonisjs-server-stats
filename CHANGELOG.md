@@ -4,6 +4,19 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-03-09
+
+### Bug Fixes
+
+- Fix EXPLAIN button returning 404 — route handler was registered as POST but the client sent a GET request (`ac80512`)
+
+### Refactoring
+
+- Deduplicate 7 shared patterns between Dashboard and DebugPanel: `JobStatsBar`, `CacheStatsBar`, `durationClassName`, `Badge` reuse, `EmailPreviewOverlay`, `TimeAgoCell`, and field-resolvers (`eb2f840`)
+- Extract shared `SplitPaneWrapper` component from `RequestsSection` and `TimelineTab` to eliminate structural duplication (`d2b54f4`)
+- Extract `useDiagnosticsData` hook from `InternalsSection` and `InternalsTab`, consolidating repeated data-fetching logic into a single shared hook (`c415583`)
+- Extract shared `LogEntryRow` component used by Dashboard, DebugPanel, and RelatedLogs, removing three near-identical inline implementations (`808bf27`)
+
 ## [1.10.3] - 2026-03-09
 
 ### Bug Fixes
