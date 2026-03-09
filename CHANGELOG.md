@@ -4,6 +4,12 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.3] - 2026-03-09
+
+### Bug Fixes
+
+- Fix TS2352 type error in `applyAdvancedConfig`: use double-cast (`as unknown as Record<string, unknown>`) for dynamic property assignment on `DevToolbarOptions`
+
 ## [1.10.2] - 2026-03-09
 
 ### Bug Fixes
