@@ -8,7 +8,7 @@ import {
   formatTime,
   statusColor,
   timeAgo,
-  durationSeverity,
+  durationClassName,
 } from '../../../../core/index.js'
 import { useApiClient } from '../../../composables/useApiClient.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
@@ -165,10 +165,7 @@ onBeforeUnmount(() => {
 })
 
 function dbgDurationClass(ms: number): string {
-  const sev = durationSeverity(ms)
-  if (sev === 'very-slow') return 'ss-dbg-very-slow'
-  if (sev === 'slow') return 'ss-dbg-slow'
-  return ''
+  return durationClassName(ms, 'ss-dbg')
 }
 </script>
 

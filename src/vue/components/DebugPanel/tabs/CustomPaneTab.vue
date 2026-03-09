@@ -11,7 +11,7 @@ import {
   formatTime,
   timeAgo,
   formatDuration,
-  durationSeverity,
+  durationClassName,
 } from '../../../../core/index.js'
 import { useApiClient } from '../../../composables/useApiClient.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
@@ -107,10 +107,8 @@ function isNullish(value: unknown): boolean {
 function durationClass(value: unknown): string {
   const ms = typeof value === 'number' ? value : parseFloat(String(value))
   if (isNaN(ms)) return 'ss-dbg-duration'
-  const sev = durationSeverity(ms)
-  if (sev === 'very-slow') return 'ss-dbg-duration ss-dbg-very-slow'
-  if (sev === 'slow') return 'ss-dbg-duration ss-dbg-slow'
-  return 'ss-dbg-duration'
+  const cls = durationClassName(ms, 'ss-dbg')
+  return cls ? `ss-dbg-duration ${cls}` : 'ss-dbg-duration'
 }
 
 function badgeColor(value: unknown, col: DebugPaneColumn): string {

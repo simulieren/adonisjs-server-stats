@@ -113,6 +113,7 @@ export {
   compactPreview,
   statusColor,
   durationSeverity,
+  durationClassName,
   shortReqId,
   THRESHOLD_CSS_CLASS,
   THRESHOLD_HEX_FALLBACK,

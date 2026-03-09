@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { MethodBadge } from '../../shared/Badge.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { RouteRecord, DebugPanelProps } from '../../../../core/types.js'
@@ -81,9 +82,7 @@ export function RoutesTab({ options, currentPath }: RoutesTabProps) {
                   className={isCurrentRoute ? 'ss-dbg-current-route' : ''}
                 >
                   <td>
-                    <span className={`ss-dbg-method ss-dbg-method-${route.method.toLowerCase()}`}>
-                      {route.method}
-                    </span>
+                    <MethodBadge method={route.method} classPrefix="ss-dbg" />
                   </td>
                   <td className="ss-dbg-c-text">{route.pattern}</td>
                   <td className="ss-dbg-c-muted">{route.name || '-'}</td>

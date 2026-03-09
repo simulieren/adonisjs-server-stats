@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
+import { resolveEventName, resolveMetric, resolveNormalizedSql } from '../../../../core/field-resolvers.js'
 import {
-  durationSeverity,
+  durationClassName,
   formatDuration,
-  formatTime,
-  timeAgo,
 } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Sparkline } from '../../StatsBar/Sparkline.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { TimeRangeSelector } from '../shared/TimeRangeSelector.js'
 
 import type {
@@ -69,13 +69,6 @@ function smoothPath(points: { x: number; y: number }[]): string {
   return d
 }
 
-/** Compute a CSS class for a duration value */
-function durationClass(ms: number): string {
-  const sev = durationSeverity(ms)
-  if (sev === 'very-slow') return 'ss-dash-very-slow'
-  if (sev === 'slow') return 'ss-dash-slow'
-  return ''
-}
 
 /* ── OverviewChart (area chart matching old Edge style) ───────────── */
 
@@ -112,12 +105,12 @@ function OverviewChart({ chartPoints }: OverviewChartProps) {
   // Handle both camelCase and snake_case field names from different API versions
   const totals = chartPoints.map((p) => {
     const raw = p as unknown as Record<string, unknown>
-    const rc = (p.requestCount ?? 0) + (Number(raw.request_count) || 0)
+    const rc = resolveMetric(raw, 'requestCount', 'request_count')
     return rc || p.total || 0
   })
   const errors = chartPoints.map((p) => {
     const raw = p as unknown as Record<string, unknown>
-    return (p.errorCount ?? 0) + (Number(raw.error_count) || 0)
+    return resolveMetric(raw, 'errorCount', 'error_count')
   })
   const maxCount = Math.max(...totals, 1)
   const maxVal = Math.ceil(maxCount * 1.1)
@@ -377,11 +370,11 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
 
   // Support both camelCase and snake_case API field names
   const raw = metrics as unknown as Record<string, unknown>
-  const avgResponseTime = metrics.avgResponseTime || Number(raw.avg_response_time) || 0
-  const p95ResponseTime = metrics.p95ResponseTime || Number(raw.p95_response_time) || 0
-  const requestsPerMinute = metrics.requestsPerMinute || Number(raw.requests_per_minute) || 0
-  const errorRate = metrics.errorRate || Number(raw.error_rate) || 0
-  const totalRequests = metrics.totalRequests || Number(raw.total_requests) || 0
+  const avgResponseTime = resolveMetric(raw, 'avgResponseTime', 'avg_response_time')
+  const p95ResponseTime = resolveMetric(raw, 'p95ResponseTime', 'p95_response_time')
+  const requestsPerMinute = resolveMetric(raw, 'requestsPerMinute', 'requests_per_minute')
+  const errorRate = resolveMetric(raw, 'errorRate', 'error_rate')
+  const totalRequests = resolveMetric(raw, 'totalRequests', 'total_requests')
 
   const hasData = totalRequests > 0
 
@@ -497,7 +490,7 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
                     >
                       <span title={epUrl}>{epUrl}</span>
                       <span
-                        className={`ss-dash-secondary-list-value ss-dash-duration ${durationClass(ep.avgDuration)}`}
+                        className={`ss-dash-secondary-list-value ss-dash-duration ${durationClassName(ep.avgDuration)}`}
                       >
                         {formatDuration(ep.avgDuration)}
                       </span>
@@ -556,13 +549,11 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
                       {err.message}
                     </span>
                     {err.timestamp && (
-                      <span
+                      <TimeAgoCell
+                        ts={err.timestamp}
                         className="ss-dash-secondary-list-value"
                         style={{ color: 'var(--ss-dim)' }}
-                        title={formatTime(err.timestamp)}
-                      >
-                        {timeAgo(err.timestamp)}
-                      </span>
+                      />
                     )}
                   </a>
                 </li>
@@ -585,7 +576,7 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
           ) : (
             <ul className="ss-dash-secondary-list">
               {metrics.topEvents.slice(0, 5).map((ev, i) => {
-                const evName = ev.name || ev.eventName || ev.event_name || ev.event || ''
+                const evName = resolveEventName(ev as unknown as Record<string, unknown>)
                 return (
                   <li key={i}>
                     <a
@@ -825,7 +816,7 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
           ) : (
             <ul className="ss-dash-secondary-list">
               {metrics.slowestQueries.slice(0, 5).map((q, i) => {
-                const qSql = q.sqlNormalized || q.normalizedSql || q.sql_normalized || q.sql || '-'
+                const qSql = resolveNormalizedSql(q as unknown as Record<string, unknown>) || '-'
                 return (
                   <li key={i}>
                     <a
@@ -834,7 +825,7 @@ export function OverviewSection({ options = {} }: OverviewSectionProps) {
                     >
                       <span title={qSql}>{qSql}</span>
                       <span
-                        className={`ss-dash-secondary-list-value ss-dash-duration ${durationClass(q.avgDuration)}`}
+                        className={`ss-dash-secondary-list-value ss-dash-duration ${durationClassName(q.avgDuration)}`}
                       >
                         {formatDuration(q.avgDuration)}
                       </span>

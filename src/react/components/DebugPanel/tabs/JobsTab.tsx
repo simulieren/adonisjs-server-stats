@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react'
 
-import { timeAgo, formatDuration, formatTime } from '../../../../core/formatters.js'
+import { resolveJobTimestamp } from '../../../../core/field-resolvers.js'
+import { formatDuration } from '../../../../core/formatters.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import {
   JOB_STATUS_FILTERS,
   getJobStatusCssClass,
@@ -11,6 +13,7 @@ import { useDashboardApiBase } from '../../../hooks/useDashboardApiBase.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
+import { JobStatsBar } from '../../shared/JobStatsBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
 import type { JobRecord, JobsApiResponse, DebugPanelProps } from '../../../../core/types.js'
@@ -92,28 +95,7 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
       />
       {/* Stats */}
       <div className="ss-dbg-job-stats-area">
-        <div className="ss-dbg-job-stats">
-          <div className="ss-dbg-job-stat">
-            <span className="ss-dbg-job-stat-label">Active:</span>
-            <span className="ss-dbg-job-stat-value">{stats?.active ?? 0}</span>
-          </div>
-          <div className="ss-dbg-job-stat">
-            <span className="ss-dbg-job-stat-label">Waiting:</span>
-            <span className="ss-dbg-job-stat-value">{stats?.waiting ?? 0}</span>
-          </div>
-          <div className="ss-dbg-job-stat">
-            <span className="ss-dbg-job-stat-label">Delayed:</span>
-            <span className="ss-dbg-job-stat-value">{stats?.delayed ?? 0}</span>
-          </div>
-          <div className="ss-dbg-job-stat">
-            <span className="ss-dbg-job-stat-label">Completed:</span>
-            <span className="ss-dbg-job-stat-value">{stats?.completed ?? 0}</span>
-          </div>
-          <div className="ss-dbg-job-stat">
-            <span className="ss-dbg-job-stat-label">Failed:</span>
-            <span className="ss-dbg-job-stat-value ss-dbg-c-red">{stats?.failed ?? 0}</span>
-          </div>
-        </div>
+        <JobStatsBar stats={stats} classPrefix="ss-dbg" />
 
         {/* Status filter */}
         <div className="ss-dbg-log-filters">
@@ -184,21 +166,11 @@ export function JobsTab({ options, dashboardPath }: JobsTabProps) {
                   <td className="ss-dbg-duration">
                     {job.duration !== null ? formatDuration(job.duration) : '-'}
                   </td>
-                  <td
-                    className="ss-dbg-event-time"
-                    title={formatTime(
-                      job.timestamp ||
-                        job.createdAt ||
-                        (jobAny.processedAt as string | number) ||
-                        (jobAny.created_at as string | number)
-                    )}
-                  >
-                    {timeAgo(
-                      job.timestamp ||
-                        job.createdAt ||
-                        (jobAny.processedAt as string | number) ||
-                        (jobAny.created_at as string | number)
-                    )}
+                  <td>
+                    <TimeAgoCell
+                      ts={resolveJobTimestamp(jobAny)}
+                      className="ss-dbg-event-time"
+                    />
                   </td>
                   <td>
                     {job.status === 'failed' && (

@@ -524,28 +524,7 @@
   color: var(--ss-red-fg);
 }
 
-/* Cache tab */
-.ss-dbg-cache-stats {
-  display: flex;
-  gap: 16px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  background: var(--ss-surface-alt);
-  font-size: 11px;
-}
-.ss-dbg-cache-stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-.ss-dbg-cache-stat-label {
-  color: var(--ss-muted);
-}
-.ss-dbg-cache-stat-value {
-  color: var(--ss-text);
-  font-weight: 600;
-  /* tabular-nums → utilities.css */
-}
+/* Cache tab — base stats bar → components.css */
 
 /* Cache detail overlay */
 .ss-dbg-cache-detail {

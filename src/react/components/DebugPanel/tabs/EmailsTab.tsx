@@ -1,9 +1,11 @@
 import React, { useState, useMemo, useCallback } from 'react'
 
-import { timeAgo, formatTime } from '../../../../core/formatters.js'
+import { resolveTimestamp } from '../../../../core/field-resolvers.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
+import { EmailPreviewOverlay } from '../../shared/EmailPreviewOverlay.js'
 
 import type { EmailRecord, DebugPanelProps } from '../../../../core/types.js'
 
@@ -88,43 +90,13 @@ export function EmailsTab({ options }: EmailsTabProps) {
   // Email preview overlay
   if (previewEmail) {
     return (
-      <div className="ss-dbg-email-preview">
-        <div className="ss-dbg-email-preview-header">
-          <div className="ss-dbg-email-preview-meta">
-            <div>
-              <strong>Subject:</strong> {previewEmail.subject}
-            </div>
-            <div>
-              <strong>From:</strong> {previewEmail.from}
-            </div>
-            <div>
-              <strong>To:</strong> {previewEmail.to}
-            </div>
-            {previewEmail.cc && (
-              <div>
-                <strong>CC:</strong> {previewEmail.cc}
-              </div>
-            )}
-          </div>
-          <button className="ss-dbg-btn-clear" onClick={closePreview} type="button">
-            {'\u00D7'}
-          </button>
-        </div>
-        {loadingPreview ? (
-          <div className="ss-dbg-empty">Loading preview...</div>
-        ) : previewHtml ? (
-          <iframe
-            className="ss-dbg-email-iframe"
-            srcDoc={previewHtml}
-            title="Email preview"
-            sandbox=""
-          />
-        ) : (
-          <div style={{ padding: '12px', whiteSpace: 'pre-wrap' }}>
-            {previewEmail.text || 'No content'}
-          </div>
-        )}
-      </div>
+      <EmailPreviewOverlay
+        email={previewEmail}
+        previewHtml={previewHtml}
+        isLoading={loadingPreview}
+        onClose={closePreview}
+        className="ss-dbg-email-preview"
+      />
     )
   }
 
@@ -185,19 +157,11 @@ export function EmailsTab({ options }: EmailsTabProps) {
                 <td className="ss-dbg-c-dim" style={{ textAlign: 'center' }}>
                   {email.attachmentCount > 0 ? email.attachmentCount : '-'}
                 </td>
-                <td
-                  className="ss-dbg-event-time"
-                  title={formatTime(
-                    email.timestamp ||
-                      (email as unknown as Record<string, number>).created_at ||
-                      (email as unknown as Record<string, number>).createdAt
-                  )}
-                >
-                  {timeAgo(
-                    email.timestamp ||
-                      (email as unknown as Record<string, number>).created_at ||
-                      (email as unknown as Record<string, number>).createdAt
-                  )}
+                <td>
+                  <TimeAgoCell
+                    ts={resolveTimestamp(email as unknown as Record<string, unknown>)}
+                    className="ss-dbg-event-time"
+                  />
                 </td>
               </tr>
             ))}

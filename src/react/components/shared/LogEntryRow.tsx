@@ -1,6 +1,6 @@
 import React from 'react'
 
-import { formatTime, timeAgo } from '../../../core/formatters.js'
+import { TimeAgoCell } from './TimeAgoCell.js'
 import {
   resolveLogLevel,
   resolveLogMessage,
@@ -37,9 +37,7 @@ export function LogEntryRow({ log, index, expanded, onToggleExpand, onReqIdClick
         <span className={`ss-log-level ${getLogLevelCssClass(level, 'ss-log-level')}`}>
           {level.toUpperCase()}
         </span>
-        <span className="ss-log-time" title={ts ? formatTime(ts) : ''}>
-          {ts ? timeAgo(ts) : '-'}
-        </span>
+        <TimeAgoCell ts={ts} className="ss-log-time" />
         {reqId ? (
           <span
             className="ss-log-reqid"

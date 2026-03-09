@@ -60,6 +60,7 @@
 .ss-dash-event-time,
 .ss-dash-card-value,
 .ss-dash-secondary-list-value,
+.ss-cache-stat-value,
 .ss-dash-cache-stat-value,
 .ss-dash-job-stat-value,
 .ss-dash-widget-stat-value,
@@ -70,6 +71,7 @@
 .ss-dbg-event-time,
 .ss-dbg-mini-stat-value,
 .ss-dbg-cache-stat-value,
-.ss-dbg-job-stat-value {
+.ss-dbg-job-stat-value,
+.ss-job-stat-value {
   font-variant-numeric: tabular-nums;
 }

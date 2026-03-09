@@ -1,14 +1,14 @@
 import React, { useState, useMemo } from 'react'
 
 import {
-  formatTime,
-  timeAgo,
   formatDuration,
   compactPreview,
-  durationSeverity,
+  durationClassName,
 } from '../../../../core/formatters.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { Badge, MethodBadge } from '../../shared/Badge.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { DebugPane, DebugPanelProps, DebugTab } from '../../../../core/types.js'
@@ -74,34 +74,26 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
     const fmt = col.format || 'text'
     switch (fmt) {
       case 'time':
-        return (
-          <span className="ss-dbg-event-time" title={formatTime(value as number)}>
-            {typeof value === 'number' ? timeAgo(value) : String(value)}
-          </span>
+        return typeof value === 'number' ? (
+          <TimeAgoCell ts={value} className="ss-dbg-event-time" />
+        ) : (
+          <span className="ss-dbg-event-time">{String(value)}</span>
         )
       case 'timeAgo':
-        return (
-          <span className="ss-dbg-event-time" title={formatTime(value as string)}>
-            {timeAgo(value as string)}
-          </span>
-        )
+        return <TimeAgoCell ts={value as string} className="ss-dbg-event-time" />
       case 'duration': {
         const ms = typeof value === 'number' ? value : parseFloat(String(value))
         if (isNaN(ms)) return String(value)
         return (
           <span
-            className={`ss-dbg-duration ${durationSeverity(ms) === 'very-slow' ? 'ss-dbg-very-slow' : durationSeverity(ms) === 'slow' ? 'ss-dbg-slow' : ''}`}
+            className={`ss-dbg-duration ${durationClassName(ms, 'ss-dbg')}`}
           >
             {formatDuration(ms)}
           </span>
         )
       }
       case 'method':
-        return (
-          <span className={`ss-dbg-method ss-dbg-method-${String(value).toLowerCase()}`}>
-            {String(value)}
-          </span>
-        )
+        return <MethodBadge method={String(value)} classPrefix="ss-dbg" />
       case 'json': {
         let parsed = value
         if (typeof value === 'string') {
@@ -117,7 +109,11 @@ export function CustomPaneTab({ pane, options }: CustomPaneTabProps) {
         const sv = String(value).toLowerCase()
         const colorMap = col.badgeColorMap || {}
         const color = colorMap[sv] || 'muted'
-        return <span className={`ss-dbg-badge ss-dbg-badge-${color}`}>{String(value)}</span>
+        return (
+          <Badge color={color} classPrefix="ss-dbg">
+            {String(value)}
+          </Badge>
+        )
       }
       default:
         return String(value)

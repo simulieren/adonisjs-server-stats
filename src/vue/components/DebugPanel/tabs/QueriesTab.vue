@@ -3,7 +3,7 @@
  * SQL queries table tab for the debug panel.
  */
 import { ref, computed } from 'vue'
-import { formatDuration, durationSeverity, formatTime, timeAgo } from '../../../../core/index.js'
+import { formatDuration, durationClassName, formatTime, timeAgo } from '../../../../core/index.js'
 import {
   filterQueries,
   countDuplicateQueries,
@@ -51,10 +51,7 @@ function isExpanded(id: number) {
 }
 
 function durationClass(ms: number): string {
-  const sev = durationSeverity(ms)
-  if (sev === 'very-slow') return 'ss-dbg-very-slow'
-  if (sev === 'slow') return 'ss-dbg-slow'
-  return ''
+  return durationClassName(ms, 'ss-dbg')
 }
 
 const { tableRef } = useResizableTable(() => queries.value)

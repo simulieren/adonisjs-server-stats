@@ -88,7 +88,7 @@ export default { components: { ExplainPlanNode } }
  * CSS classes match the React QueriesSection.
  */
 import { ref, computed, inject, watch, type Ref } from 'vue'
-import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js'
+import { timeAgo, formatTime, durationClassName } from '../../../../core/index.js'
 import { SLOW_DURATION_MS } from '../../../../core/constants.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
@@ -272,10 +272,7 @@ async function handleExplain(queryId: number) {
 }
 
 function dashDurationClass(ms: number): string {
-  const sev = durationSeverity(ms)
-  if (sev === 'very-slow') return 'ss-dash-very-slow'
-  if (sev === 'slow') return 'ss-dash-slow'
-  return ''
+  return durationClassName(ms, 'ss-dash')
 }
 
 /** Get column keys from the first explain plan row (avoids `as Record<...>` in template). */

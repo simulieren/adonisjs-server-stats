@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 
 import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
+import { CacheStatsBar } from '../../shared/CacheStatsBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
@@ -80,28 +81,12 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
     <div>
       {/* Stats */}
       {cacheData?.available && cacheData?.stats && (
-        <div className="ss-dash-cache-stats">
-          <div className="ss-dash-cache-stat">
-            <span className="ss-dash-cache-stat-label">Hit Rate:</span>
-            <span className="ss-dash-cache-stat-value">
-              {(cacheData.stats.hitRate ?? 0).toFixed(1)}%
-            </span>
-          </div>
-          <div className="ss-dash-cache-stat">
-            <span className="ss-dash-cache-stat-label">Hits:</span>
-            <span className="ss-dash-cache-stat-value">{cacheData.stats.hits ?? 0}</span>
-          </div>
-          <div className="ss-dash-cache-stat">
-            <span className="ss-dash-cache-stat-label">Misses:</span>
-            <span className="ss-dash-cache-stat-value">{cacheData.stats.misses ?? 0}</span>
-          </div>
-          <div className="ss-dash-cache-stat">
-            <span className="ss-dash-cache-stat-label">Keys:</span>
-            <span className="ss-dash-cache-stat-value">
-              {cacheData.stats.totalKeys || cacheData.stats.keyCount || cacheData.keys?.length || 0}
-            </span>
-          </div>
-        </div>
+        <CacheStatsBar
+          hitRate={cacheData.stats.hitRate ?? 0}
+          hits={cacheData.stats.hits ?? 0}
+          misses={cacheData.stats.misses ?? 0}
+          keys={cacheData.stats.totalKeys || cacheData.stats.keyCount || cacheData.keys?.length || 0}
+        />
       )}
 
       <FilterBar

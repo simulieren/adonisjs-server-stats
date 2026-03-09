@@ -1,6 +1,14 @@
 import React, { useState, useCallback, useEffect } from 'react'
 
-import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
+import {
+  resolveDuration,
+  resolveSpanCount,
+  resolveStatusCode,
+  resolveTimestamp,
+  resolveWarningCount,
+} from '../../../../core/field-resolvers.js'
+import { durationClassName } from '../../../../core/formatters.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { normalizeTraceFields } from '../../../../core/trace-utils.js'
 import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
@@ -188,10 +196,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   width: '60px',
                   sortable: true,
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const code =
-                      (row as Record<string, unknown>).status_code ||
-                      (row as Record<string, unknown>).statusCode ||
-                      row.statusCode
+                    const code = resolveStatusCode(row)
                     return <StatusBadge code={code as number} />
                   },
                 },
@@ -201,13 +206,10 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   width: '80px',
                   sortable: true,
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const dur = ((row as Record<string, unknown>).total_duration ||
-                      (row as Record<string, unknown>).totalDuration ||
-                      (row as Record<string, unknown>).duration ||
-                      0) as number
+                    const dur = resolveDuration(row)
                     return (
                       <span
-                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
+                        className={`ss-dash-duration ${durationClassName(dur)}`}
                       >
                         {dur.toFixed(1)}ms
                       </span>
@@ -219,9 +221,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   label: 'Spans',
                   width: '50px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const count = ((row as Record<string, unknown>).span_count ||
-                      (row as Record<string, unknown>).spanCount ||
-                      0) as number
+                    const count = resolveSpanCount(row)
                     return (
                       <span style={{ color: 'var(--ss-muted)', textAlign: 'center' }}>{count}</span>
                     )
@@ -232,9 +232,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   label: '\u26A0',
                   width: '40px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const count = ((row as Record<string, unknown>).warning_count ||
-                      (row as Record<string, unknown>).warningCount ||
-                      0) as number
+                    const count = resolveWarningCount(row)
                     return count > 0 ? (
                       <span
                         style={{
@@ -260,15 +258,8 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
                   width: '80px',
                   sortable: true,
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const val = ((row as Record<string, unknown>).createdAt ||
-                      (row as Record<string, unknown>).created_at ||
-                      (row as Record<string, unknown>).timestamp ||
-                      '') as string
-                    return (
-                      <span className="ss-dash-event-time" title={formatTime(val)}>
-                        {timeAgo(val)}
-                      </span>
-                    )
+                    const val = (resolveTimestamp(row) ?? '') as string
+                    return <TimeAgoCell ts={val} className="ss-dash-event-time" />
                   },
                 },
               ]}

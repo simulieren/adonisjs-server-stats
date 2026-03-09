@@ -1,10 +1,12 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react'
 
 import { SLOW_DURATION_MS } from '../../../../core/constants.js'
-import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
+import { resolveField, resolveNormalizedSql, resolveSqlMethod, resolveTimestamp } from '../../../../core/field-resolvers.js'
+import { durationClassName } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { Pagination } from '../shared/Pagination.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
@@ -308,57 +310,17 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
       const normalized = { ...g }
 
       // Pattern / SQL text
-      if (normalized.sqlNormalized === null || normalized.sqlNormalized === undefined) {
-        if (g.sql_normalized || g.pattern) {
-          normalized.sqlNormalized = (g.sql_normalized as string) || (g.pattern as string) || ''
-        }
-      }
+      normalized.sqlNormalized ??= resolveField<string>(g, 'sql_normalized', 'pattern') ?? undefined
 
       // Numeric aggregation fields
-      if (
-        (normalized.count === null || normalized.count === undefined) &&
-        g.total_count !== null &&
-        g.total_count !== undefined
-      ) {
-        normalized.count = g.total_count
-      }
-      if (
-        (normalized.avgDuration === null || normalized.avgDuration === undefined) &&
-        g.avg_duration !== null &&
-        g.avg_duration !== undefined
-      ) {
-        normalized.avgDuration = g.avg_duration
-      }
-      if (
-        (normalized.maxDuration === null || normalized.maxDuration === undefined) &&
-        g.max_duration !== null &&
-        g.max_duration !== undefined
-      ) {
-        normalized.maxDuration = g.max_duration
-      }
-      if (
-        (normalized.minDuration === null || normalized.minDuration === undefined) &&
-        g.min_duration !== null &&
-        g.min_duration !== undefined
-      ) {
-        normalized.minDuration = g.min_duration
-      }
-      if (
-        (normalized.totalDuration === null || normalized.totalDuration === undefined) &&
-        g.total_duration !== null &&
-        g.total_duration !== undefined
-      ) {
-        normalized.totalDuration = g.total_duration
-      }
+      normalized.count ??= resolveField<number>(g, 'total_count')
+      normalized.avgDuration ??= resolveField<number>(g, 'avg_duration')
+      normalized.maxDuration ??= resolveField<number>(g, 'max_duration')
+      normalized.minDuration ??= resolveField<number>(g, 'min_duration')
+      normalized.totalDuration ??= resolveField<number>(g, 'total_duration')
 
       // Percent of total time: API may return percentOfTotal or pct_time
-      if (
-        (normalized.percentOfTotal === null || normalized.percentOfTotal === undefined) &&
-        g.pct_time !== null &&
-        g.pct_time !== undefined
-      ) {
-        normalized.percentOfTotal = g.pct_time
-      }
+      normalized.percentOfTotal ??= resolveField<number>(g, 'pct_time')
 
       return normalized
     })
@@ -379,7 +341,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
     // Count duplicates from sqlCounts
     const counts = new Map<string, number>()
     for (const q of queries) {
-      const sql = (q.sqlNormalized as string) || (q.sql as string) || (q.sql_text as string) || ''
+      const sql = resolveNormalizedSql(q)
       counts.set(sql, (counts.get(sql) || 0) + 1)
     }
     for (const c of counts.values()) {
@@ -396,7 +358,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
   const sqlCounts = useMemo(() => {
     const counts = new Map<string, number>()
     for (const q of queries) {
-      const sql = (q.sqlNormalized as string) || (q.sql as string) || (q.sql_text as string) || ''
+      const sql = resolveNormalizedSql(q)
       counts.set(sql, (counts.get(sql) || 0) + 1)
     }
     return counts
@@ -502,7 +464,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                     const dur = (v as number) || 0
                     return (
                       <span
-                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
+                        className={`ss-dash-duration ${durationClassName(dur)}`}
                       >
                         {dur.toFixed(2) + 'ms'}
                       </span>
@@ -527,7 +489,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                     const dur = (v as number) || 0
                     return (
                       <span
-                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
+                        className={`ss-dash-duration ${durationClassName(dur)}`}
                       >
                         {dur.toFixed(2) + 'ms'}
                       </span>
@@ -607,20 +569,10 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                         >
                           {sqlText}
                         </span>
-                        {(sqlCounts.get(
-                          ((row.sqlNormalized as string) ||
-                            (row.sql as string) ||
-                            (row.sql_text as string)) ??
-                            ''
-                        ) ?? 0) > 1 && (
+                        {(sqlCounts.get(resolveNormalizedSql(row)) ?? 0) > 1 && (
                           <span className="ss-dash-dup">
                             &times;
-                            {sqlCounts.get(
-                              ((row.sqlNormalized as string) ||
-                                (row.sql as string) ||
-                                (row.sql_text as string)) ??
-                                ''
-                            )}
+                            {sqlCounts.get(resolveNormalizedSql(row))}
                           </span>
                         )}
                       </div>
@@ -636,7 +588,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                     const dur = (v as number) || 0
                     return (
                       <span
-                        className={`ss-dash-duration ${durationSeverity(dur) === 'very-slow' ? 'ss-dash-very-slow' : durationSeverity(dur) === 'slow' ? 'ss-dash-slow' : ''}`}
+                        className={`ss-dash-duration ${durationClassName(dur)}`}
                       >
                         {dur.toFixed(2) + 'ms'}
                       </span>
@@ -648,7 +600,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   label: 'Method',
                   width: '60px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const method = (row.method as string) || (row.sql_method as string) || ''
+                    const method = resolveSqlMethod(row)
                     return (
                       <span className={`ss-dash-method ss-dash-method-${method.toLowerCase()}`}>
                         {method}
@@ -697,13 +649,8 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   width: '90px',
                   sortable: true,
                   render: (v: unknown, row: Record<string, unknown>) => {
-                    const ts =
-                      (v as string) || (row.created_at as string) || (row.timestamp as string) || ''
-                    return (
-                      <span className="ss-dash-event-time" title={formatTime(ts)}>
-                        {timeAgo(ts)}
-                      </span>
-                    )
+                    const ts = ((v as string) || (resolveTimestamp(row) ?? '')) as string
+                    return <TimeAgoCell ts={ts} className="ss-dash-event-time" />
                   },
                 },
                 {
@@ -711,7 +658,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
                   label: '',
                   width: '70px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const method = (row.method as string) || (row.sql_method as string) || ''
+                    const method = resolveSqlMethod(row)
                     if (method !== 'select') return null
                     const isActive =
                       explainData?.queryId === (row.id as number) && !explainData?.error

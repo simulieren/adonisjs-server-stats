@@ -1,14 +1,14 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 
 import {
-  timeAgo,
   formatDuration,
-  formatTime,
-  durationSeverity,
+  durationClassName,
 } from '../../../../core/formatters.js'
 import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 import { RelatedLogs } from '../../shared/RelatedLogs.js'
 import { SplitPaneWrapper } from '../../shared/SplitPaneWrapper.js'
@@ -96,13 +96,6 @@ export function TimelineTab({ options }: TimelineTabProps) {
 
   const handleSelectTrace = useCallback((id: number) => {
     setSelectedTraceId((prev) => (prev === id ? null : id))
-  }, [])
-
-  const statusClass = useCallback((code: number) => {
-    if (code >= 500) return 'ss-dbg-status-5xx'
-    if (code >= 400) return 'ss-dbg-status-4xx'
-    if (code >= 300) return 'ss-dbg-status-3xx'
-    return 'ss-dbg-status-2xx'
   }, [])
 
   const tableRef = useResizableTable([traces])
@@ -216,13 +209,9 @@ export function TimelineTab({ options }: TimelineTabProps) {
           >
             &larr; Back
           </button>
-          <span className={`ss-dbg-method ss-dbg-method-${traceDetail.method.toLowerCase()}`}>
-            {traceDetail.method}
-          </span>
+          <MethodBadge method={traceDetail.method} classPrefix="ss-dbg" />
           <span className="ss-dbg-tl-detail-url">{traceDetail.url}</span>
-          <span className={`ss-dbg-status ${statusClass(traceDetail.statusCode)}`}>
-            {traceDetail.statusCode}
-          </span>
+          <StatusBadge code={traceDetail.statusCode} classPrefix="ss-dbg" />
           <span className="ss-dbg-tl-meta">
             {formatDuration(traceDetail.totalDuration)} &middot; {traceDetail.spanCount} spans
           </span>
@@ -285,26 +274,22 @@ export function TimelineTab({ options }: TimelineTabProps) {
                   {trace.id}
                 </td>
                 <td>
-                  <span className={`ss-dbg-method ss-dbg-method-${trace.method.toLowerCase()}`}>
-                    {trace.method}
-                  </span>
+                  <MethodBadge method={trace.method} classPrefix="ss-dbg" />
                 </td>
                 <td title={trace.url}>{trace.url}</td>
                 <td>
-                  <span className={`ss-dbg-status ${statusClass(trace.statusCode)}`}>
-                    {trace.statusCode}
-                  </span>
+                  <StatusBadge code={trace.statusCode} classPrefix="ss-dbg" />
                 </td>
                 <td
-                  className={`ss-dbg-duration ${durationSeverity(trace.totalDuration) === 'very-slow' ? 'ss-dbg-very-slow' : durationSeverity(trace.totalDuration) === 'slow' ? 'ss-dbg-slow' : ''}`}
+                  className={`ss-dbg-duration ${durationClassName(trace.totalDuration, 'ss-dbg')}`}
                 >
                   {formatDuration(trace.totalDuration)}
                 </td>
                 <td className="ss-dbg-c-muted" style={{ textAlign: 'center' }}>
                   {trace.spanCount}
                 </td>
-                <td className="ss-dbg-event-time" title={formatTime(trace.timestamp)}>
-                  {timeAgo(trace.timestamp)}
+                <td>
+                  <TimeAgoCell ts={trace.timestamp} className="ss-dbg-event-time" />
                 </td>
               </tr>
             ))}

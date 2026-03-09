@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 
-import { timeAgo, formatTime } from '../../../../core/formatters.js'
+import { resolveEventName, resolveTimestamp } from '../../../../core/field-resolvers.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
@@ -49,7 +50,7 @@ export function EventsSection({ options = {} }: EventsSectionProps) {
                   key: 'eventName',
                   label: 'Event',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const name = (row.event_name || row.eventName || row.event || '') as string
+                    const name = resolveEventName(row)
                     return (
                       <span
                         className="ss-dash-event-name"
@@ -78,12 +79,8 @@ export function EventsSection({ options = {} }: EventsSectionProps) {
                   label: 'Time',
                   width: '80px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const ts = (row.createdAt || row.created_at || row.timestamp) as string
-                    return (
-                      <span className="ss-dash-event-time" title={formatTime(ts)}>
-                        {timeAgo(ts)}
-                      </span>
-                    )
+                    const ts = resolveTimestamp(row) as string
+                    return <TimeAgoCell ts={ts} className="ss-dash-event-time" />
                   },
                 },
               ]}

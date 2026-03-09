@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 
-import { timeAgo, formatTime } from '../../../../core/formatters.js'
+import { resolveTimestamp } from '../../../../core/field-resolvers.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
@@ -66,10 +67,7 @@ export function EventsTab({ options }: EventsTabProps) {
           </thead>
           <tbody>
             {events.map((evt) => {
-              const ts =
-                evt.timestamp ||
-                (evt as unknown as Record<string, number>).created_at ||
-                (evt as unknown as Record<string, number>).createdAt
+              const ts = resolveTimestamp(evt as unknown as Record<string, unknown>)
               return (
                 <tr key={evt.id}>
                   <td className="ss-dbg-c-dim" style={{ whiteSpace: 'nowrap' }}>
@@ -79,8 +77,8 @@ export function EventsTab({ options }: EventsTabProps) {
                   <td className="ss-dbg-event-data">
                     <JsonViewer data={evt.data} maxPreviewLength={80} classPrefix="ss-dbg" />
                   </td>
-                  <td className="ss-dbg-event-time" title={formatTime(ts)}>
-                    {timeAgo(ts)}
+                  <td>
+                    <TimeAgoCell ts={ts} className="ss-dbg-event-time" />
                   </td>
                 </tr>
               )

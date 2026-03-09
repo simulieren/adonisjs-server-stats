@@ -336,6 +336,27 @@ export function durationSeverity(ms: number): 'normal' | 'slow' | 'very-slow' {
   return 'normal'
 }
 
+/**
+ * Return a CSS severity class for a duration value.
+ *
+ * Combines {@link durationSeverity} with a CSS-prefix to produce the
+ * appropriate class name.  Returns an empty string for normal durations.
+ *
+ * Examples (with default prefix `'ss-dash'`):
+ * - `> 500ms` -> `'ss-dash-very-slow'`
+ * - `> 100ms` -> `'ss-dash-slow'`
+ * - Otherwise -> `''`
+ *
+ * @param ms     - Duration in milliseconds.
+ * @param prefix - CSS class prefix (default `'ss-dash'`).
+ */
+export function durationClassName(ms: number, prefix: string = 'ss-dash'): string {
+  const sev = durationSeverity(ms)
+  if (sev === 'very-slow') return `${prefix}-very-slow`
+  if (sev === 'slow') return `${prefix}-slow`
+  return ''
+}
+
 // ---------------------------------------------------------------------------
 // Short request ID
 // ---------------------------------------------------------------------------

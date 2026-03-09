@@ -6,7 +6,7 @@
  */
 import { ref, computed, watch, inject, onUnmounted, type Ref } from 'vue'
 import {
-  durationSeverity,
+  durationClassName,
   formatDuration,
   formatTime,
   timeAgo,
@@ -171,10 +171,7 @@ function smoothPath(points: { x: number; y: number }[]): string {
 
 /** Compute a CSS class for a duration value */
 function durationClass(ms: number): string {
-  const sev = durationSeverity(ms)
-  if (sev === 'very-slow') return 'ss-dash-very-slow'
-  if (sev === 'slow') return 'ss-dash-slow'
-  return ''
+  return durationClassName(ms, 'ss-dash')
 }
 
 /* ── Chart reactive state (ResizeObserver + tooltip) ─────────────────── */

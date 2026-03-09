@@ -1168,27 +1168,17 @@ body {
 }
 
 /* ── Cache ─────────────────────────────────────────────────────── */
+/* Base cache stats bar → components.css; dashboard overrides: */
 .ss-dash-cache-stats {
-  display: flex;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--ss-border-dim);
-  flex-shrink: 0;
-}
-
-.ss-dash-cache-stat {
-  font-size: 11px;
+  --ss-cache-stats-gap: 12px;
+  --ss-cache-stats-py: 12px;
+  --ss-cache-stats-px: 16px;
+  background: none;
 }
 .ss-dash-cache-stat-label {
   font-size: 10px;
-  color: var(--ss-muted);
   text-transform: uppercase;
   margin-right: 4px;
-}
-.ss-dash-cache-stat-value {
-  font-weight: 600;
-  /* tabular-nums → utilities.css */
-  color: var(--ss-text);
 }
 
 .ss-dash-cache-detail {

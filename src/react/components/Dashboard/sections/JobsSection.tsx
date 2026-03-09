@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react'
 
-import { timeAgo, formatDuration, formatTime } from '../../../../core/formatters.js'
+import { resolveJobTimestamp } from '../../../../core/field-resolvers.js'
+import { formatDuration } from '../../../../core/formatters.js'
 import {
   JOB_STATUS_FILTERS,
   getJobStatusBadgeColor,
@@ -9,7 +10,9 @@ import {
 } from '../../../../core/job-utils.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { Badge } from '../../shared/Badge.js'
+import { JobStatsBar } from '../../shared/JobStatsBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
@@ -69,32 +72,7 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
   return (
     <div>
       {/* Stats row */}
-      {stats && (
-        <div className="ss-dash-job-stats">
-          <div className="ss-dash-job-stat">
-            <span className="ss-dash-job-stat-label">Active:</span>
-            <span className="ss-dash-job-stat-value">{stats.active ?? 0}</span>
-          </div>
-          <div className="ss-dash-job-stat">
-            <span className="ss-dash-job-stat-label">Waiting:</span>
-            <span className="ss-dash-job-stat-value">{stats.waiting ?? 0}</span>
-          </div>
-          <div className="ss-dash-job-stat">
-            <span className="ss-dash-job-stat-label">Delayed:</span>
-            <span className="ss-dash-job-stat-value">{stats.delayed ?? 0}</span>
-          </div>
-          <div className="ss-dash-job-stat">
-            <span className="ss-dash-job-stat-label">Completed:</span>
-            <span className="ss-dash-job-stat-value">{stats.completed ?? 0}</span>
-          </div>
-          <div className="ss-dash-job-stat">
-            <span className="ss-dash-job-stat-label">Failed:</span>
-            <span className="ss-dash-job-stat-value" style={{ color: 'var(--ss-red-fg)' }}>
-              {stats.failed ?? 0}
-            </span>
-          </div>
-        </div>
-      )}
+      <JobStatsBar stats={stats} classPrefix="ss-dash" />
 
       <FilterBar
         search={search}
@@ -187,18 +165,13 @@ export function JobsSection({ options = {} }: JobsSectionProps) {
                   label: 'Time',
                   width: '70px',
                   render: (v: unknown, row: Record<string, unknown>) => {
-                    const ts = (v ||
-                      row?.createdAt ||
-                      row?.processedAt ||
-                      row?.created_at) as string
+                    const ts = (v || resolveJobTimestamp(row)) as string
                     return (
-                      <span
+                      <TimeAgoCell
+                        ts={ts}
                         className="ss-dash-event-time"
                         style={{ whiteSpace: 'nowrap' }}
-                        title={formatTime(ts)}
-                      >
-                        {timeAgo(ts)}
-                      </span>
+                      />
                     )
                   },
                 },

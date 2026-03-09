@@ -1307,3 +1307,70 @@ tr:hover .ss-dbg-copy-row-btn,
   font-weight: 400;
   color: var(--ss-dim);
 }
+
+/* ── Cache stats bar ─────────────────────────────────────────── */
+/* Shared between Dashboard CacheSection and DebugPanel CacheTab.
+ * Gap/padding differ slightly — override via --ss-cache-stats-gap
+ * and --ss-cache-stats-px / --ss-cache-stats-py. */
+.ss-cache-stats,
+.ss-dash-cache-stats,
+.ss-dbg-cache-stats {
+  display: flex;
+  gap: var(--ss-cache-stats-gap, 16px);
+  padding: var(--ss-cache-stats-py, 8px) var(--ss-cache-stats-px, 12px);
+  border-bottom: 1px solid var(--ss-border-dim);
+  background: var(--ss-surface-alt);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.ss-cache-stat,
+.ss-dash-cache-stat,
+.ss-dbg-cache-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ss-cache-stat-label,
+.ss-dash-cache-stat-label,
+.ss-dbg-cache-stat-label {
+  color: var(--ss-muted);
+}
+.ss-cache-stat-value,
+.ss-dash-cache-stat-value,
+.ss-dbg-cache-stat-value {
+  color: var(--ss-text);
+  font-weight: 600;
+}
+
+/* ── Job stats bar ──────────────────────────────────────────── */
+/* Shared between Dashboard JobsSection and DebugPanel JobsTab.
+ * Gap/padding differ slightly — override via --ss-job-stats-gap
+ * and --ss-job-stats-px / --ss-job-stats-py. */
+.ss-job-stats,
+.ss-dash-job-stats,
+.ss-dbg-job-stats {
+  display: flex;
+  gap: var(--ss-job-stats-gap, 16px);
+  padding: var(--ss-job-stats-py, 8px) var(--ss-job-stats-px, 12px);
+  background: var(--ss-surface-alt);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.ss-job-stat,
+.ss-dash-job-stat,
+.ss-dbg-job-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ss-job-stat-label,
+.ss-dash-job-stat-label,
+.ss-dbg-job-stat-label {
+  color: var(--ss-muted);
+}
+.ss-job-stat-value,
+.ss-dash-job-stat-value,
+.ss-dbg-job-stat-value {
+  color: var(--ss-text);
+  font-weight: 600;
+}

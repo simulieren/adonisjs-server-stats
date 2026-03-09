@@ -4,6 +4,7 @@ import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
 import { useDashboardApiBase } from '../../../hooks/useDashboardApiBase.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { CacheStatsBar } from '../../shared/CacheStatsBar.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 
@@ -77,31 +78,12 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
   return (
     <div>
       {/* Stats row */}
-      <div className="ss-dbg-cache-stats">
-        <div className="ss-dbg-cache-stat">
-          <span className="ss-dbg-cache-stat-label">Hit Rate:</span>
-          <span className="ss-dbg-cache-stat-value">
-            {resolved.hitRate !== null && resolved.hitRate !== undefined
-              ? resolved.hitRate.toFixed(1)
-              : '0'}
-            %
-          </span>
-        </div>
-        <div className="ss-dbg-cache-stat">
-          <span className="ss-dbg-cache-stat-label">Hits:</span>
-          <span className="ss-dbg-cache-stat-value">{resolved.totalHits ?? 0}</span>
-        </div>
-        <div className="ss-dbg-cache-stat">
-          <span className="ss-dbg-cache-stat-label">Misses:</span>
-          <span className="ss-dbg-cache-stat-value">{resolved.totalMisses ?? 0}</span>
-        </div>
-        <div className="ss-dbg-cache-stat">
-          <span className="ss-dbg-cache-stat-label">Keys:</span>
-          <span className="ss-dbg-cache-stat-value">
-            {(resolved as CacheStats & { keyCount?: number }).keyCount ?? '-'}
-          </span>
-        </div>
-      </div>
+      <CacheStatsBar
+        hitRate={resolved.hitRate ?? 0}
+        hits={resolved.totalHits ?? 0}
+        misses={resolved.totalMisses ?? 0}
+        keys={(resolved as CacheStats & { keyCount?: number }).keyCount ?? 0}
+      />
 
       {/* Search */}
       <FilterBar

@@ -6,7 +6,7 @@
  * via useDashboardData. CSS classes match the React RequestsSection.
  */
 import { ref, computed, inject, type Ref, watch, nextTick, onUnmounted } from 'vue'
-import { timeAgo, formatTime, durationSeverity } from '../../../../core/index.js'
+import { timeAgo, formatTime, durationClassName } from '../../../../core/index.js'
 import { useApiClient } from '../../../composables/useApiClient.js'
 import { normalizeTraceFields } from '../../../../core/trace-utils.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
@@ -83,10 +83,7 @@ function handleSort(key: string) {
 }
 
 function dashDurationClass(ms: number): string {
-  const sev = durationSeverity(ms)
-  if (sev === 'very-slow') return 'ss-dash-very-slow'
-  if (sev === 'slow') return 'ss-dash-slow'
-  return ''
+  return durationClassName(ms, 'ss-dash')
 }
 
 const { tableRef } = useResizableTable(() => requests.value)

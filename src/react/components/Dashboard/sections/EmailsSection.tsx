@@ -1,9 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react'
 
-import { timeAgo, formatTime } from '../../../../core/formatters.js'
+import {
+  resolveFromAddr,
+  resolveToAddr,
+  resolveCcAddr,
+  resolveAttachmentCount,
+  resolveTimestamp,
+} from '../../../../core/field-resolvers.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
+import { EmailPreviewOverlay } from '../../shared/EmailPreviewOverlay.js'
 import { Pagination } from '../shared/Pagination.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
@@ -49,55 +57,26 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
 
   if (previewId && previewHtml) {
     const email = emails.find((e) => e.id === previewId)
+    const previewData = email
+      ? {
+          subject: email.subject as string,
+          from: resolveFromAddr(email),
+          to: resolveToAddr(email),
+          cc: resolveCcAddr(email) || null,
+          status: email.status as string,
+          mailer: email.mailer as string,
+        }
+      : null
     return (
-      <div className="ss-dash-email-preview" id="ss-dash-email-preview">
-        <div className="ss-dash-email-preview-header">
-          <div className="ss-dash-email-preview-meta" id="ss-dash-email-preview-meta">
-            {email && (
-              <>
-                <strong>Subject:</strong> {email.subject as string}
-                &nbsp;&nbsp;|&nbsp;&nbsp;<strong>From:</strong>{' '}
-                {(email.from_addr || email.from) as string}
-                &nbsp;&nbsp;|&nbsp;&nbsp;<strong>To:</strong>{' '}
-                {(email.to_addr || email.to) as string}
-                {(email.cc || email.cc_addr) && (
-                  <>
-                    &nbsp;&nbsp;|&nbsp;&nbsp;<strong>CC:</strong>{' '}
-                    {(email.cc || email.cc_addr) as string}
-                  </>
-                )}
-                &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Status:</strong>{' '}
-                <span className={`ss-dash-badge ss-dash-email-status-${email.status as string}`}>
-                  {email.status as string}
-                </span>
-                {(email.mailer as string) && (
-                  <>
-                    &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Mailer:</strong> {email.mailer as string}
-                  </>
-                )}
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            className="ss-dash-btn"
-            id="ss-dash-email-preview-close"
-            onClick={() => {
-              setPreviewId(null)
-              setPreviewHtml(null)
-            }}
-          >
-            Close
-          </button>
-        </div>
-        <iframe
-          className="ss-dash-email-iframe"
-          id="ss-dash-email-iframe"
-          srcDoc={previewHtml}
-          title="Email preview"
-          sandbox=""
-        />
-      </div>
+      <EmailPreviewOverlay
+        email={previewData}
+        previewHtml={previewHtml}
+        onClose={() => {
+          setPreviewId(null)
+          setPreviewHtml(null)
+        }}
+        className="ss-dash-email-preview"
+      />
     )
   }
 
@@ -129,7 +108,7 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                   label: 'From',
                   width: '150px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const from = (row.from_addr || row.from || '') as string
+                    const from = resolveFromAddr(row)
                     return (
                       <span
                         title={from}
@@ -151,7 +130,7 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                   label: 'To',
                   width: '150px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const to = (row.to_addr || row.to || '') as string
+                    const to = resolveToAddr(row)
                     return (
                       <span
                         title={to}
@@ -207,7 +186,7 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                   label: 'ATT',
                   width: '40px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const count = (row.attachment_count || row.attachmentCount || 0) as number
+                    const count = resolveAttachmentCount(row)
                     return count > 0 ? (
                       <span
                         style={{ color: 'var(--ss-dim)', textAlign: 'center', display: 'block' }}
@@ -250,15 +229,13 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
                   label: 'Time',
                   width: '80px',
                   render: (_v: unknown, row: Record<string, unknown>) => {
-                    const ts = (row.createdAt || row.created_at || row.timestamp) as string
+                    const ts = resolveTimestamp(row) as string
                     return (
-                      <span
+                      <TimeAgoCell
+                        ts={ts}
                         className="ss-dash-event-time"
                         style={{ whiteSpace: 'nowrap' }}
-                        title={formatTime(ts)}
-                      >
-                        {timeAgo(ts)}
-                      </span>
+                      />
                     )
                   },
                 },

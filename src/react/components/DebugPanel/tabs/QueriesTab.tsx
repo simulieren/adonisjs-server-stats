@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react'
 
 import {
-  formatTime,
   formatDuration,
-  timeAgo,
-  durationSeverity,
+  durationClassName,
 } from '../../../../core/formatters.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import {
   filterQueries,
   countDuplicateQueries,
@@ -13,6 +12,7 @@ import {
 } from '../../../../core/query-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
+import { MethodBadge } from '../../shared/Badge.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { QueryRecord, DebugPanelProps } from '../../../../core/types.js'
@@ -106,18 +106,16 @@ export function QueriesTab({ options }: QueriesTabProps) {
                   {q.inTransaction && <span className="ss-dbg-dup"> TXN</span>}
                 </td>
                 <td
-                  className={`ss-dbg-duration ${durationSeverity(q.duration) === 'very-slow' ? 'ss-dbg-very-slow' : durationSeverity(q.duration) === 'slow' ? 'ss-dbg-slow' : ''}`}
+                  className={`ss-dbg-duration ${durationClassName(q.duration, 'ss-dbg')}`}
                 >
                   {formatDuration(q.duration)}
                 </td>
                 <td>
-                  <span className={`ss-dbg-method ss-dbg-method-${q.method.toLowerCase()}`}>
-                    {q.method}
-                  </span>
+                  <MethodBadge method={q.method} classPrefix="ss-dbg" />
                 </td>
                 <td className="ss-dbg-c-muted">{q.model || '-'}</td>
-                <td className="ss-dbg-event-time" title={formatTime(q.timestamp)}>
-                  {timeAgo(q.timestamp)}
+                <td>
+                  <TimeAgoCell ts={q.timestamp} className="ss-dbg-event-time" />
                 </td>
               </tr>
             ))}
