@@ -4,6 +4,35 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-03-09
+
+### Refactoring
+
+- Unify `FilterBar` component between Dashboard and DebugPanel — canonical DebugPanel version moved to shared location, unified CSS via variables, `JobsTab` in DebugPanel gains search field
+- Fix Dashboard search lifecycle bug: `useEffect` cleanup set `stopped=true` but `syncAndFetch` called `fetch(true)` which never reset it, causing `isStaleResponse()` to silently discard all responses after param changes; fixed by calling `start()` instead
+- Eliminate all oxlint warnings (214 → 0) across the entire codebase via TDD decomposition:
+  - Extract `DashboardStore` (1575 → 340 lines) into 10 focused modules: `flush_manager`, `read_queries`, `overview_store_queries`, `saved_filter_queries`, `explain_query`, `cache_handlers`, `jobs_handlers`, `filter_handlers`, and more
+  - Extract `ServerStatsProvider` (1178 → 268 lines) into `boot_helpers`, `provider_helpers_extra`, `toolbar_setup`, `dashboard_init`, `dashboard_setup`
+  - Extract `DashboardController` (423 → 245 lines) into focused cache/jobs/filter handlers
+  - Split route registration into smaller focused functions
+  - Refactor Vue composables to stay under 50-line function limit
+- Further decompose `DashboardDataController.fetch()` — extract `shouldSkipFetch`, `prepareFetch`, `executeFetch`, `isStaleResponse`, and `shouldIgnoreError` private methods to reduce cyclomatic complexity below 10
+- Extract helpers across 11 additional core files: `config-utils`, `transmit-adapter`, `dashboard-data-controller`, `define_config`, `feature-detect`, `formatters`, `log-utils`, `pagination`, `server-stats-controller`
+- Move `MAX_HISTORY`/`STALE_MS` constants to `constants.ts` with re-exports
+- Fix emitter passthrough for dashboard email collection
+
+### Documentation
+
+- Add comprehensive JSDoc with `@default`, examples, and descriptions to `ToolbarConfig`, `DashboardConfig`, `AdvancedConfig`, and all recommended `ServerStatsConfig` fields (`pollInterval`, `realtime`, `authorize`, etc.)
+- Update `defineConfig()` JSDoc with clean defaults table and progressive examples
+- Fix `tracing` default in README: `false` → `true` (both `ToolbarConfig` and legacy tables)
+- Add missing debug panel routes to README: `/config`, `/diagnostics`
+- Fix stale `/logs` description: "last 256KB" → paginated entries
+- Add missing `DELETE /api/cache/:key` to dashboard routes table
+- Document log-request correlation feature (Related Logs in traces)
+- Update intro to mention AdonisJS v7 support
+- Update React version note to include React 19
+
 ## [1.6.10] - 2026-03-06
 
 ### Bug Fixes
