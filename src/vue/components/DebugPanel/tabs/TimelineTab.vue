@@ -249,7 +249,7 @@ function dbgDurationClass(ms: number): string {
             </div>
             <div ref="splitHandleRef" class="ss-dbg-split-handle" />
             <div ref="splitBottomRef" class="ss-dbg-split-bottom">
-              <RelatedLogs :logs="detailLogs" class-prefix="ss-dbg" />
+              <RelatedLogs :logs="detailLogs" />
             </div>
           </div>
         </template>

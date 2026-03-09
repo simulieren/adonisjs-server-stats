@@ -162,7 +162,7 @@ onUnmounted(() => {
           </div>
           <div ref="splitHandleRef" class="ss-dash-split-handle" />
           <div ref="splitBottomRef" class="ss-dash-split-bottom">
-            <RelatedLogs :logs="detailLogs" class-prefix="ss-dash" />
+            <RelatedLogs :logs="detailLogs" />
           </div>
         </div>
       </template>

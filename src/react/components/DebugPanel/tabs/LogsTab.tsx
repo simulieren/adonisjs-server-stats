@@ -1,19 +1,14 @@
 import React, { useState, useMemo, useCallback } from 'react'
 
-import { formatTime, timeAgo } from '../../../../core/formatters.js'
 import {
   LOG_LEVELS,
-  resolveLogLevel,
-  resolveLogMessage,
-  resolveLogTimestamp,
   resolveLogRequestId,
-  getLogLevelCssClass,
-  getStructuredData,
+  resolveLogMessage,
   filterLogsByLevel,
 } from '../../../../core/log-utils.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { FilterBar } from '../../shared/FilterBar.js'
-import { JsonViewer } from '../../shared/JsonViewer.js'
+import { LogEntryRow } from '../../shared/LogEntryRow.js'
 
 import type { LogEntry } from '../../../../core/log-utils.js'
 import type { DebugPanelProps } from '../../../../core/types.js'
@@ -100,66 +95,16 @@ export function LogsTab({ options }: LogsTabProps) {
         {logs.length === 0 ? (
           <div className="ss-dbg-empty">No log entries</div>
         ) : (
-          logs.slice(0, 200).map((log, i) => {
-            const level = resolveLogLevel(log)
-            const msg = resolveLogMessage(log)
-            const ts = resolveLogTimestamp(log)
-            const reqId = resolveLogRequestId(log)
-            const structured = getStructuredData(log)
-
-            return (
-              <React.Fragment key={i}>
-                <div
-                  className={`ss-dbg-log-entry${structured ? ' ss-dbg-log-entry-expandable' : ''}`}
-                  onClick={() => structured && setExpandedIndex(expandedIndex === i ? null : i)}
-                >
-                  <span className={`ss-dbg-log-level ${getLogLevelCssClass(level)}`}>
-                    {level.toUpperCase()}
-                  </span>
-                  <span className="ss-dbg-log-time" title={ts ? formatTime(ts) : ''}>
-                    {ts ? timeAgo(ts) : '-'}
-                  </span>
-                  {reqId ? (
-                    <span
-                      className="ss-dbg-log-reqid"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleReqIdClick(reqId)
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      title={reqId}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.stopPropagation()
-                          handleReqIdClick(reqId)
-                        }
-                      }}
-                    >
-                      {reqId.slice(0, 8)}
-                    </span>
-                  ) : (
-                    <span className="ss-dbg-log-reqid-empty">-</span>
-                  )}
-                  {structured ? (
-                    <span
-                      className={`ss-dbg-log-expand-icon${expandedIndex === i ? ' ss-dbg-log-expand-icon-open' : ''}`}
-                    >
-                      ▶
-                    </span>
-                  ) : (
-                    <span style={{ width: 14 }} />
-                  )}
-                  <span className="ss-dbg-log-msg">{msg}</span>
-                </div>
-                {expandedIndex === i && structured && (
-                  <div className="ss-dbg-log-detail">
-                    <JsonViewer data={structured} classPrefix="ss-dbg" defaultExpanded />
-                  </div>
-                )}
-              </React.Fragment>
-            )
-          })
+          logs.slice(0, 200).map((log, i) => (
+            <LogEntryRow
+              key={i}
+              log={log}
+              index={i}
+              expanded={expandedIndex === i}
+              onToggleExpand={(idx) => setExpandedIndex(expandedIndex === idx ? null : idx)}
+              onReqIdClick={handleReqIdClick}
+            />
+          ))
         )}
       </div>
     </div>

@@ -270,7 +270,7 @@ export function TimelineTab({ options }: TimelineTabProps) {
         {hasLogs ? (
           <SplitPaneWrapper classPrefix="ss-dbg" storageKey="ss-dbg-timeline-split">
             {waterfallContent}
-            <RelatedLogs logs={detailLogs} classPrefix="ss-dbg" />
+            <RelatedLogs logs={detailLogs} />
           </SplitPaneWrapper>
         ) : (
           waterfallContent

@@ -13,15 +13,9 @@ import JsonViewer from './JsonViewer.vue'
 
 import type { LogEntry } from '../../../core/log-utils.js'
 
-const props = withDefaults(
-  defineProps<{
-    logs: LogEntry[]
-    classPrefix?: 'ss-dash' | 'ss-dbg'
-  }>(),
-  {
-    classPrefix: 'ss-dash',
-  }
-)
+defineProps<{
+  logs: LogEntry[]
+}>()
 
 const expandedIndex = ref<number | null>(null)
 
@@ -33,59 +27,59 @@ function toggleExpand(index: number, hasData: boolean) {
 
 <template>
   <div v-if="logs.length > 0">
-    <div :class="`${classPrefix}-related-logs-title`">
+    <div class="ss-related-logs-title">
       Related Logs
-      <span :class="`${classPrefix}-related-logs-count`">({{ logs.length }})</span>
+      <span class="ss-related-logs-count">({{ logs.length }})</span>
     </div>
     <div style="overflow: auto">
       <template v-for="(log, i) in logs" :key="(log.id as string) || i">
         <div
           :class="[
-            `${classPrefix}-log-entry`,
-            getStructuredData(log) ? `${classPrefix}-log-entry-expandable` : '',
+            'ss-log-entry',
+            getStructuredData(log) ? 'ss-log-entry-expandable' : '',
           ]"
           @click="toggleExpand(i, !!getStructuredData(log))"
         >
           <span
             :class="[
-              `${classPrefix}-log-level`,
-              getLogLevelCssClass(resolveLogLevel(log), `${classPrefix}-log-level`),
+              'ss-log-level',
+              getLogLevelCssClass(resolveLogLevel(log), 'ss-log-level'),
             ]"
           >
             {{ resolveLogLevel(log).toUpperCase() }}
           </span>
           <span
-            :class="`${classPrefix}-log-time`"
+            class="ss-log-time"
             :title="resolveLogTimestamp(log) ? formatTime(resolveLogTimestamp(log)) : ''"
           >
             {{ resolveLogTimestamp(log) ? timeAgo(resolveLogTimestamp(log)) : '-' }}
           </span>
           <span
             v-if="resolveLogRequestId(log)"
-            :class="`${classPrefix}-log-reqid`"
+            class="ss-log-reqid"
             :title="resolveLogRequestId(log)"
           >
             {{ resolveLogRequestId(log).slice(0, 8) }}
           </span>
-          <span v-else :class="`${classPrefix}-log-reqid-empty`">--</span>
+          <span v-else class="ss-log-reqid-empty">--</span>
           <span
             v-if="getStructuredData(log)"
             :class="[
-              `${classPrefix}-log-expand-icon`,
-              expandedIndex === i ? `${classPrefix}-log-expand-icon-open` : '',
+              'ss-log-expand-icon',
+              expandedIndex === i ? 'ss-log-expand-icon-open' : '',
             ]"
             >&#x25B6;</span
           >
           <span v-else style="width: 14px" />
-          <span :class="`${classPrefix}-log-msg`">{{ resolveLogMessage(log) }}</span>
+          <span class="ss-log-msg">{{ resolveLogMessage(log) }}</span>
         </div>
         <div
           v-if="expandedIndex === i && getStructuredData(log)"
-          :class="`${classPrefix}-log-detail`"
+          class="ss-log-detail"
         >
           <JsonViewer
             :value="getStructuredData(log)"
-            :class-prefix="classPrefix"
+            class-prefix="ss-dbg"
             :default-expanded="true"
           />
         </div>

@@ -1,18 +1,9 @@
 import React, { useState, useCallback } from 'react'
 
-import { formatTime, timeAgo } from '../../../../core/formatters.js'
-import {
-  LOG_LEVELS,
-  resolveLogLevel,
-  resolveLogMessage,
-  resolveLogTimestamp,
-  resolveLogRequestId,
-  getLogLevelCssClass,
-  getStructuredData,
-} from '../../../../core/log-utils.js'
+import { LOG_LEVELS } from '../../../../core/log-utils.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
-import { JsonViewer } from '../../shared/JsonViewer.js'
 import { FilterBar } from '../../shared/FilterBar.js'
+import { LogEntryRow } from '../../shared/LogEntryRow.js'
 import { Pagination } from '../shared/Pagination.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
@@ -231,68 +222,16 @@ export function LogsSection({ options = {} }: LogsSectionProps) {
         </div>
       ) : (
         <div className="ss-dash-log-entries">
-          {logs.map((log, i) => {
-            const level = resolveLogLevel(log)
-            const message = resolveLogMessage(log)
-            const reqId = resolveLogRequestId(log)
-            const ts = resolveLogTimestamp(log)
-            const structured = getStructuredData(log)
-
-            return (
-              <React.Fragment key={(log.id as string) || i}>
-                <div
-                  className={`ss-dash-log-entry${structured ? ' ss-dash-log-entry-expandable' : ''}`}
-                  onClick={() => structured && setExpandedIndex(expandedIndex === i ? null : i)}
-                >
-                  <span
-                    className={`ss-dash-log-level ${getLogLevelCssClass(level, 'ss-dash-log-level')}`}
-                  >
-                    {level.toUpperCase()}
-                  </span>
-                  <span className="ss-dash-log-time" title={ts ? formatTime(ts) : ''}>
-                    {ts ? timeAgo(ts) : '-'}
-                  </span>
-                  {reqId ? (
-                    <span
-                      className="ss-dash-log-reqid"
-                      title={reqId}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleReqIdClick(reqId)
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.stopPropagation()
-                          handleReqIdClick(reqId)
-                        }
-                      }}
-                    >
-                      {reqId.slice(0, 8)}
-                    </span>
-                  ) : (
-                    <span className="ss-dash-log-reqid-empty">--</span>
-                  )}
-                  {structured ? (
-                    <span
-                      className={`ss-dash-log-expand-icon${expandedIndex === i ? ' ss-dash-log-expand-icon-open' : ''}`}
-                    >
-                      ▶
-                    </span>
-                  ) : (
-                    <span style={{ width: 14 }} />
-                  )}
-                  <span className="ss-dash-log-msg">{message}</span>
-                </div>
-                {expandedIndex === i && structured && (
-                  <div className="ss-dash-log-detail">
-                    <JsonViewer data={structured} classPrefix="ss-dash" defaultExpanded />
-                  </div>
-                )}
-              </React.Fragment>
-            )
-          })}
+          {logs.map((log, i) => (
+            <LogEntryRow
+              key={(log.id as string) || i}
+              log={log}
+              index={i}
+              expanded={expandedIndex === i}
+              onToggleExpand={(idx) => setExpandedIndex(expandedIndex === idx ? null : idx)}
+              onReqIdClick={handleReqIdClick}
+            />
+          ))}
         </div>
       )}
 

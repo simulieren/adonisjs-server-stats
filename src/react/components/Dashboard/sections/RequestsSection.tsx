@@ -144,7 +144,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
               totalDuration={normalized.totalDuration}
               warnings={normalized.warnings}
             />
-            <RelatedLogs logs={normalized.logs} classPrefix="ss-dash" />
+            <RelatedLogs logs={normalized.logs} />
           </SplitPaneWrapper>
         ) : (
           <WaterfallChart
