@@ -86,7 +86,7 @@ export function applyAdvancedConfig(
   for (const { from, to } of ADVANCED_FIELD_MAP) {
     const value = advanced[from]
     if (value !== undefined) {
-      ;(result as Record<string, unknown>)[to] = value
+      ;(result as unknown as Record<string, unknown>)[to] = value
     }
   }
   if (advanced.persistPath !== undefined) {
