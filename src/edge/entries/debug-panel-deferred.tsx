@@ -22,7 +22,7 @@ window.__ssDebugPanel = {
         debugEndpoint={config.debugEndpoint}
         authToken={config.authToken}
         dashboardPath={config.dashboardPath || undefined}
-        isOpen={true}
+        defaultOpen={true}
         isLive={isLive}
       />,
       container
