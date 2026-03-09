@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 
 import {
   timeAgo,
@@ -6,53 +6,14 @@ import {
   formatTime,
   durationSeverity,
 } from '../../../../core/formatters.js'
-import { initSplitPane } from '../../../../core/split-pane.js'
 import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDebugData } from '../../../hooks/useDebugData.js'
 import { useResizableTable } from '../../../hooks/useResizableTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 import { RelatedLogs } from '../../shared/RelatedLogs.js'
+import { SplitPaneWrapper } from '../../shared/SplitPaneWrapper.js'
 
 import type { TraceRecord, TraceSpan, DebugPanelProps } from '../../../../core/types.js'
-
-function SplitPaneWrapper({
-  children,
-  classPrefix = 'ss-dbg',
-  storageKey,
-}: {
-  children: [React.ReactNode, React.ReactNode]
-  classPrefix?: string
-  storageKey?: string
-}) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const handleRef = useRef<HTMLDivElement>(null)
-  const topRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (containerRef.current && handleRef.current && topRef.current && bottomRef.current) {
-      return initSplitPane({
-        container: containerRef.current,
-        handle: handleRef.current,
-        topPane: topRef.current,
-        bottomPane: bottomRef.current,
-        storageKey,
-      })
-    }
-  }, [storageKey])
-
-  return (
-    <div ref={containerRef} className={`${classPrefix}-split-container`}>
-      <div ref={topRef} className={`${classPrefix}-split-top`}>
-        {children[0]}
-      </div>
-      <div ref={handleRef} className={`${classPrefix}-split-handle`} />
-      <div ref={bottomRef} className={`${classPrefix}-split-bottom`}>
-        {children[1]}
-      </div>
-    </div>
-  )
-}
 
 interface TimelineTabProps {
   options?: DebugPanelProps
@@ -268,7 +229,7 @@ export function TimelineTab({ options }: TimelineTabProps) {
         </div>
 
         {hasLogs ? (
-          <SplitPaneWrapper classPrefix="ss-dbg" storageKey="ss-dbg-timeline-split">
+          <SplitPaneWrapper storageKey="ss-dbg-timeline-split">
             {waterfallContent}
             <RelatedLogs logs={detailLogs} />
           </SplitPaneWrapper>

@@ -1,12 +1,12 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 
 import { timeAgo, formatTime, durationSeverity } from '../../../../core/formatters.js'
-import { initSplitPane } from '../../../../core/split-pane.js'
 import { normalizeTraceFields } from '../../../../core/trace-utils.js'
 import { useApiClient } from '../../../hooks/useApiClient.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { MethodBadge, StatusBadge } from '../../shared/Badge.js'
 import { RelatedLogs } from '../../shared/RelatedLogs.js'
+import { SplitPaneWrapper } from '../../shared/SplitPaneWrapper.js'
 import { DataTable } from '../shared/DataTable.js'
 import { FilterBar } from '../../shared/FilterBar.js'
 import { Pagination } from '../shared/Pagination.js'
@@ -14,45 +14,6 @@ import { WaterfallChart } from '../shared/WaterfallChart.js'
 
 import type { TraceDetail } from '../../../../core/trace-utils.js'
 import type { DashboardHookOptions, TraceSpan } from '../../../../core/types.js'
-
-function SplitPaneWrapper({
-  children,
-  classPrefix = 'ss-dash',
-  storageKey,
-}: {
-  children: [React.ReactNode, React.ReactNode]
-  classPrefix?: string
-  storageKey?: string
-}) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const handleRef = useRef<HTMLDivElement>(null)
-  const topRef = useRef<HTMLDivElement>(null)
-  const bottomRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (containerRef.current && handleRef.current && topRef.current && bottomRef.current) {
-      return initSplitPane({
-        container: containerRef.current,
-        handle: handleRef.current,
-        topPane: topRef.current,
-        bottomPane: bottomRef.current,
-        storageKey,
-      })
-    }
-  }, [storageKey])
-
-  return (
-    <div ref={containerRef} className={`${classPrefix}-split-container`}>
-      <div ref={topRef} className={`${classPrefix}-split-top`}>
-        {children[0]}
-      </div>
-      <div ref={handleRef} className={`${classPrefix}-split-handle`} />
-      <div ref={bottomRef} className={`${classPrefix}-split-bottom`}>
-        {children[1]}
-      </div>
-    </div>
-  )
-}
 
 interface RequestsSectionProps {
   options?: DashboardHookOptions
@@ -138,7 +99,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
           </span>
         </div>
         {hasLogs ? (
-          <SplitPaneWrapper classPrefix="ss-dash" storageKey="ss-requests-split">
+          <SplitPaneWrapper storageKey="ss-requests-split">
             <WaterfallChart
               spans={normalized.spans as TraceSpan[]}
               totalDuration={normalized.totalDuration}
