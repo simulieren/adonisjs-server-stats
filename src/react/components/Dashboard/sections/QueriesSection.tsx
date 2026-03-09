@@ -187,7 +187,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
   useEffect(() => setPage(1), [search])
 
   const endpoint = viewMode === 'grouped' ? 'queries/grouped' : 'queries'
-  const { data, meta, isLoading, mutate } = useDashboardData(endpoint, {
+  const { data, meta, isLoading, getApi } = useDashboardData(endpoint, {
     ...options,
     page,
     search,
@@ -217,7 +217,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
 
       setExplainLoading(queryId)
       try {
-        const result = (await mutate(`queries/${queryId}/explain`)) as {
+        const result = (await getApi().explainQuery(queryId)) as {
           plan?: unknown[]
           rows?: unknown[]
           error?: string
@@ -248,7 +248,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
         setExplainLoading(null)
       }
     },
-    [mutate, explainData]
+    [getApi, explainData]
   )
 
   const renderExplainRow = useCallback(
