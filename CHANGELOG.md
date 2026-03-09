@@ -4,6 +4,12 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2026-03-09
+
+### Bug Fixes
+
+- Fix debug panel close button not working in the Preact deferred entry: changed `isOpen={true}` to `defaultOpen={true}` so the panel can be dismissed (PR #6 by @eduwass)
+
 ## [1.10.1] - 2026-03-09
 
 ### Refactoring
