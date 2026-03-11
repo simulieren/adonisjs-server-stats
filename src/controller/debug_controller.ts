@@ -147,9 +147,8 @@ export default class DebugController {
     }
     if (!this.cachedAdonisVersion) {
       try {
-        const { createRequire } = await import('node:module')
-        const req = createRequire(import.meta.url)
-        const adonisPkg = req('@adonisjs/core/package.json')
+        const { appImport } = await import('../utils/app_import.js')
+        const adonisPkg = await appImport<{ version: string }>('@adonisjs/core/package.json')
         this.cachedAdonisVersion = adonisPkg.version
       } catch {
         this.cachedAdonisVersion = 'unknown'
