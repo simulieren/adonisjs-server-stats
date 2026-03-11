@@ -86,6 +86,9 @@ export default class ServerStatsProvider {
     }
     setVerbose(config.verbose)
     log.info('booting...')
+    // Register app root for module resolution (critical in monorepos)
+    const { setAppRoot } = await import('../utils/app_import.js')
+    setAppRoot(this.app.makePath(''))
     if (config.shouldShow) setShouldShow(config.shouldShow)
     await this.registerRoutes(config)
     this.edgePluginActive = await registerEdgePluginHelper(this.app, config)
@@ -187,12 +190,16 @@ export default class ServerStatsProvider {
     }
     const pfx = buildExcludedPrefixes(tc, config.endpoint as string | false)
     if (pfx.length > 0) setExcludedPrefixes(pfx)
-    if (!this.debugStore) return
+    if (!this.debugStore) {
+      log.warn('debugStore is null after toolbar setup — apiController will not be created')
+      return
+    }
     const { DataAccess: DA } = await import('../data/data_access.js')
     const { ApiController: AC } = await import('../controller/api_controller.js')
     this.apiController = new AC(
       new DA(this.debugStore, () => this.dashboardStore, this.app.makePath('logs', 'adonisjs.log'))
     )
+    log.info('apiController created')
   }
 
   private async setupLogBroadcast() {
@@ -212,7 +219,8 @@ export default class ServerStatsProvider {
   private async resolve(binding: string) {
     try {
       return await this.app.container.make(binding)
-    } catch {
+    } catch (err) {
+      log.info(`resolve('${binding}') failed: ${(err as Error)?.message ?? err}`)
       return null
     }
   }

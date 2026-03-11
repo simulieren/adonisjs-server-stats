@@ -56,6 +56,18 @@ export async function initDashboardStore(opts: DashboardStoreOptions): Promise<v
     )
     log.info('dashboard: SQLite store ready')
   } catch (err) {
+    const errMsg = (err as Error)?.message ?? String(err)
+    const errStack = (err as Error)?.stack ?? '(no stack)'
+    // Write to file since console.error may be swallowed by AdonisJS watcher
+    try {
+      const { writeFileSync } = await import('node:fs')
+      writeFileSync(
+        app.makePath('server-stats-dashboard-error.log'),
+        `${new Date().toISOString()}\nError: ${errMsg}\nStack: ${errStack}\n`
+      )
+    } catch {}
+    console.error('[server-stats] dashboard start error:', errMsg)
+    console.error('[server-stats] dashboard start stack:', errStack)
     logDashboardStartError(err)
     onResult({
       dashboardStore: null,
@@ -159,6 +171,7 @@ function pipeDashRequests(debugStore: DebugStore, dashboardStore: DashboardStore
 }
 
 function logDashboardStartError(err: unknown): void {
+  const errMsg = (err as Error)?.message ?? String(err)
   const c = classifyDashboardError(err)
   if (c === 'missing-dep') {
     log.block('Dashboard could not start — missing dependencies. Install with:', [
@@ -167,7 +180,10 @@ function logDashboardStartError(err: unknown): void {
       '',
       dim('Dashboard has been disabled for this session.'),
       dim('Everything else (stats bar, debug panel) works without it.'),
+      '',
+      dim(`Error: ${errMsg}`),
     ])
+    if ((err as Error)?.stack) console.error((err as Error).stack)
     return
   }
   if (c === 'timeout') {

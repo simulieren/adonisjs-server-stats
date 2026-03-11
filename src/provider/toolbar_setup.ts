@@ -207,7 +207,15 @@ export function applyToolbarResult(
     if (!provider.transmitChannels.includes(ch)) provider.transmitChannels.push(ch)
   }
   provider.emailBridgeRedis = result.emailBridgeRedis
-  if (!tc.dashboard || !provider.dashboardDepsAvailable) return
+  if (!tc.dashboard) {
+    log.info('dashboard: skipped — dashboard is disabled in config')
+    return
+  }
+  if (!provider.dashboardDepsAvailable) {
+    log.info('dashboard: skipped — dependencies (knex/better-sqlite3) not available')
+    return
+  }
+  log.info('dashboard: scheduling async initialization...')
   setImmediate(() => {
     initDashboardStore({
       tc,
@@ -222,9 +230,15 @@ export function applyToolbarResult(
         provider.dashboardController = r.dashboardController
         provider.dashboardLogStream = r.dashboardLogStream
         provider.dashboardBroadcastTimer = r.dashboardBroadcastTimer
+        if (r.dashboardController) {
+          log.info('dashboard: controller ready — API endpoints are now live')
+        } else {
+          log.warn('dashboard: init completed but controller is null — dashboard API will return 503')
+        }
       },
     }).catch((e) => {
-      log.warn(`dashboard setup failed: ${(e as Error)?.message ?? e}`)
+      log.warn(`dashboard: setup failed: ${(e as Error)?.message ?? e}`)
+      if ((e as Error)?.stack) log.warn((e as Error).stack!)
     })
   })
 }

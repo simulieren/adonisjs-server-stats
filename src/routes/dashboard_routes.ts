@@ -1,3 +1,5 @@
+import { log } from '../utils/logger.js'
+
 import type { ApiController } from '../controller/api_controller.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { AdonisRouter } from './router_types.js'
@@ -9,8 +11,15 @@ function bindDash(
 ) {
   return async (ctx: HttpContext) => {
     const controller = getController()
-    if (!controller)
-      return ctx.response.serviceUnavailable({ error: 'Dashboard is starting up, please retry' })
+    if (!controller) {
+      log.warn(
+        `503 on ${ctx.request.url()} — dashboardController is null (method: ${method}). ` +
+          'Dashboard may still be initializing or failed to start. Check for earlier errors.'
+      )
+      return ctx.response.serviceUnavailable({
+        error: 'Dashboard is not available. Check server logs for initialization errors.',
+      })
+    }
     return (controller[method] as (ctx: HttpContext) => Promise<unknown>).call(controller, ctx)
   }
 }
@@ -21,8 +30,15 @@ function bindApi(
 ) {
   return async (ctx: HttpContext) => {
     const api = getApi()
-    if (!api)
-      return ctx.response.serviceUnavailable({ error: 'Dashboard is starting up, please retry' })
+    if (!api) {
+      log.warn(
+        `503 on ${ctx.request.url()} — apiController is null. ` +
+          'Dashboard may still be initializing or failed to start. Check for earlier errors.'
+      )
+      return ctx.response.serviceUnavailable({
+        error: 'Dashboard is not available. Check server logs for initialization errors.',
+      })
+    }
     return fn(api, ctx)
   }
 }

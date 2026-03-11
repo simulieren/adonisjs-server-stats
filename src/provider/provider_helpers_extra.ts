@@ -103,28 +103,57 @@ export function setupLogStreamBroadcast(
 /** Check if dashboard dependencies are available. Returns true if available, false if missing. */
 export async function checkDashboardDepsHelper(
   config: ResolvedServerStatsConfig,
-  _app: ApplicationService
+  app: ApplicationService
 ): Promise<boolean> {
   if (!config.devToolbar?.enabled || !config.devToolbar.dashboard) return true
-  const { appImport } = await import('../utils/app_import.js')
+  const { createRequire } = await import('node:module')
+  const { join } = await import('node:path')
+  const { pathToFileURL } = await import('node:url')
   const missing: string[] = []
-  try {
-    await appImport('knex')
-  } catch {
-    missing.push('knex')
+  const errors: string[] = []
+
+  // Try multiple resolution strategies for monorepo compatibility
+  const tryImport = async (specifier: string): Promise<boolean> => {
+    // Strategy 1: resolve from app root (handles monorepo hoisting)
+    const appRoot = app.makePath('')
+    try {
+      const appRequire = createRequire(join(appRoot, 'package.json'))
+      const resolved = appRequire.resolve(specifier)
+      await import(pathToFileURL(resolved).href)
+      return true
+    } catch {}
+
+    // Strategy 2: resolve from cwd (original approach)
+    try {
+      const cwdRequire = createRequire(join(process.cwd(), 'package.json'))
+      const resolved = cwdRequire.resolve(specifier)
+      await import(pathToFileURL(resolved).href)
+      return true
+    } catch {}
+
+    // Strategy 3: bare import (works when installed normally)
+    try {
+      await import(specifier)
+      return true
+    } catch (err) {
+      errors.push(`${specifier}: ${(err as Error)?.message ?? err}`)
+      return false
+    }
   }
-  try {
-    await appImport('better-sqlite3')
-  } catch {
-    missing.push('better-sqlite3')
-  }
+
+  if (!(await tryImport('knex'))) missing.push('knex')
+  if (!(await tryImport('better-sqlite3'))) missing.push('better-sqlite3')
+
   if (missing.length === 0) return true
   log.block(`Dashboard requires ${missing.join(' and ')}. Install with:`, [
     '',
     bold(`npm install ${missing.join(' ')}`),
     '',
-    dim('Dashboard routes have been skipped for now.'),
+    dim('Dashboard has been disabled for this session.'),
     dim('Everything else (stats bar, debug panel) works without it.'),
+    ...(errors.length > 0
+      ? ['', dim('Resolution errors:'), ...errors.map((e) => dim(`  ${e}`))]
+      : []),
   ])
   return false
 }
