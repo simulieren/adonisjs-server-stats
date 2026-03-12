@@ -23,6 +23,8 @@ export interface RegisterRoutesOptions {
   debugEndpoint?: string
   dashboardPath?: string
   shouldShow?: (ctx: HttpContext) => boolean
+  /** Optional promise that resolves when controllers are initialized. */
+  whenReady?: () => Promise<void>
 }
 
 /**
@@ -47,6 +49,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       getDebugController: options.getDebugController,
       getApiController: options.getApiController,
       middleware,
+      whenReady: options.whenReady,
     })
   }
 
@@ -57,6 +60,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       getDashboardController: options.getDashboardController,
       getApiController: options.getApiController,
       middleware,
+      whenReady: options.whenReady,
     })
   }
 }

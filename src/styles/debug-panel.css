@@ -99,6 +99,7 @@
 .ss-dbg-panel textarea,
 .ss-dbg-panel pre {
   font-family: inherit;
+  width: auto;
 }
 
 /* ── Theme: Light (manual override) ───────────────────────────── */
@@ -196,6 +197,7 @@
   text-transform: uppercase;
   white-space: nowrap;
   flex-shrink: 0;
+  width: auto;
 }
 .ss-dbg-tab-icon {
   width: 12px;

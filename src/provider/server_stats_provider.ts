@@ -64,7 +64,19 @@ export default class ServerStatsProvider {
   private resolvedConfig: ResolvedServerStatsConfig | null = null
   private resolvedCollectors: MetricCollector[] = []
 
+  /** Resolves when initStats completes (or rejects). Null if not yet scheduled. */
+  private initPromise: Promise<void> | null = null
+
   constructor(protected app: ApplicationService) {}
+
+  /**
+   * Returns a promise that resolves when the provider has finished initializing.
+   * Route handlers can await this to avoid 503s during startup.
+   * Resolves immediately if init already completed or was never scheduled.
+   */
+  whenReady(): Promise<void> {
+    return this.initPromise ?? Promise.resolve()
+  }
 
   async boot() {
     if (this.app.getEnvironment() !== 'web') return
@@ -110,6 +122,7 @@ export default class ServerStatsProvider {
       debugEndpoint,
       dashboardPath,
       shouldShow: config.shouldShow,
+      whenReady: () => this.whenReady(),
     })
     const paths = collectRegisteredPaths(statsEndpoint, debugEndpoint, dashboardPath)
     if (paths.length === 0) return
@@ -125,14 +138,13 @@ export default class ServerStatsProvider {
       await setupNonWebBridgeHelper(em, this.emailBridgeChannel)
       return
     }
-    setImmediate(() => {
-      this.initStats(config).catch((err) => {
-        log.warn(
-          `failed to initialize: ${(err as Error)?.message ?? err}\n  ${dim('The server will continue without server-stats.')}`
-        )
-        if ((err as Error)?.stack) console.error((err as Error).stack)
-      })
+    this.initPromise = this.initStats(config).catch((err) => {
+      log.warn(
+        `failed to initialize: ${(err as Error)?.message ?? err}\n  ${dim('The server will continue without server-stats.')}`
+      )
+      if ((err as Error)?.stack) console.error((err as Error).stack)
     })
+    await this.initPromise
   }
 
   private async initStats(config: ResolvedServerStatsConfig) {

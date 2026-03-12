@@ -222,6 +222,7 @@
   transition:
     border-color 0.15s,
     color 0.15s;
+  width: auto;
 }
 .ss-toggle:hover {
   border-color: var(--ss-dim);

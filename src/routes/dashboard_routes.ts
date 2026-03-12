@@ -5,11 +5,14 @@ import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { AdonisRouter } from './router_types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
+let _whenReady: (() => Promise<void>) | undefined
+
 function bindDash(
   getController: () => DashboardController | null,
   method: keyof DashboardController
 ) {
   return async (ctx: HttpContext) => {
+    if (_whenReady) await _whenReady()
     const controller = getController()
     if (!controller) {
       log.warn(
@@ -29,6 +32,7 @@ function bindApi(
   fn: (api: ApiController, ctx: HttpContext) => Promise<unknown> | unknown
 ) {
   return async (ctx: HttpContext) => {
+    if (_whenReady) await _whenReady()
     const api = getApi()
     if (!api) {
       log.warn(
@@ -269,11 +273,13 @@ interface DashboardRoutesOpts {
   getDashboardController: () => DashboardController | null
   getApiController: () => ApiController | null
   middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>
+  whenReady?: () => Promise<void>
 }
 
 /** Register dashboard routes. */
 export function registerDashboardRoutes(opts: DashboardRoutesOpts) {
   const { router, dashboardPath, getDashboardController, getApiController, middleware } = opts
+  if (opts.whenReady) _whenReady = opts.whenReady
   const base = dashboardPath.replace(/\/+$/, '')
 
   router
