@@ -268,3 +268,22 @@ export {
   shouldRedact,
 } from './config-utils.js'
 export type { RedactedValue, ConfigValue, FlatEntry, FormattedValue } from './config-utils.js'
+
+// -- Field resolvers --------------------------------------------------------
+export {
+  resolveField,
+  resolveTimestamp,
+  resolveJobTimestamp,
+  resolveStatusCode,
+  resolveDuration,
+  resolveSpanCount,
+  resolveWarningCount,
+  resolveFromAddr,
+  resolveToAddr,
+  resolveCcAddr,
+  resolveAttachmentCount,
+  resolveEventName,
+  resolveSqlMethod,
+  resolveNormalizedSql,
+  resolveMetric,
+} from './field-resolvers.js'

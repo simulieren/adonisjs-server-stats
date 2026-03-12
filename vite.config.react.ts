@@ -13,7 +13,7 @@ export default defineConfig({
     dts({
       tsconfigPath: './tsconfig.react.json',
       outDir: 'dist/react',
-      entryRoot: 'src',
+      entryRoot: 'src/react',
     }),
   ],
 
