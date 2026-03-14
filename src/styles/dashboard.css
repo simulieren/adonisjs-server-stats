@@ -4,32 +4,26 @@
  */
 
 /* ── Reset & base ──────────────────────────────────────────────── */
-*,
-*::before,
-*::after {
+#ss-dash,
+#ss-dash *,
+#ss-dash *::before,
+#ss-dash *::after {
   box-sizing: border-box;
+}
+
+#ss-dash *,
+#ss-dash *::before,
+#ss-dash *::after {
   margin: 0;
   padding: 0;
 }
 
-button,
-input,
-select,
-textarea,
-pre {
+#ss-dash button,
+#ss-dash input,
+#ss-dash select,
+#ss-dash textarea,
+#ss-dash pre {
   font-family: inherit;
-}
-
-html,
-body {
-  height: 100%;
-  overflow: hidden;
-  background: var(--ss-bg);
-  color: var(--ss-text);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
 }
 
 /* ── Page layout ───────────────────────────────────────────────── */
@@ -37,6 +31,13 @@ body {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  overflow: hidden;
+  background: var(--ss-bg);
+  color: var(--ss-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
 .ss-dash-header {

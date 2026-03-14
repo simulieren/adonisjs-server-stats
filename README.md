@@ -495,13 +495,13 @@ import { ServerStatsBar, DebugPanel, DashboardPage } from 'adonisjs-server-stats
 import 'adonisjs-server-stats/react/css'
 
 // Stats bar — drop into your layout
-<ServerStatsBar endpoint="/admin/api/server-stats" intervalMs={3000} />
+<ServerStatsBar endpoint="/admin/api/server-stats" pollInterval={3000} />
 
 // Debug panel — same layout, add below the stats bar
-<DebugPanel endpoint="/admin/api/debug" />
+<DebugPanel debugEndpoint="/admin/api/debug" />
 
 // Dashboard — use as a full Inertia page
-<DashboardPage endpoint="/__stats/api" />
+<DashboardPage dashboardEndpoint="/__stats/api" />
 ```
 
 Available hooks:
@@ -526,13 +526,13 @@ import 'adonisjs-server-stats/vue/css'
 
 <template>
   <!-- Stats bar — drop into your layout -->
-  <ServerStatsBar endpoint="/admin/api/server-stats" :interval-ms="3000" />
+  <ServerStatsBar endpoint="/admin/api/server-stats" :poll-interval="3000" />
 
   <!-- Debug panel -->
-  <DebugPanel endpoint="/admin/api/debug" />
+  <DebugPanel debug-endpoint="/admin/api/debug" />
 
   <!-- Dashboard — use as a full Inertia page -->
-  <DashboardPage endpoint="/__stats/api" />
+  <DashboardPage dashboard-endpoint="/__stats/api" />
 </template>
 ```
 

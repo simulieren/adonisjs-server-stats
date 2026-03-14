@@ -195,6 +195,7 @@ export type { TabIconDef } from './icons.js'
 
 // -- Resizable columns ------------------------------------------------------
 export { initResizableColumns } from './resizable-columns.js'
+export { initSplitPane } from './split-pane.js'
 
 // -- Debug data controller --------------------------------------------------
 export { DebugDataController } from './debug-data-controller.js'
@@ -212,6 +213,7 @@ export {
   resolveLogRequestId,
   getLogLevelCssClass,
   filterLogsByLevel,
+  getStructuredData,
 } from './log-utils.js'
 export type { LogEntry } from './log-utils.js'
 
