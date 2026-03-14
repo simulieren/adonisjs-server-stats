@@ -97,11 +97,10 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
         }
 
         if (result && result.error) {
-          controllerRef.current.completeExplain(queryId, {
-            rows: [],
-            error: result.error,
-            message: result.message,
-          } as ExplainResult)
+          const errorMsg = result.message
+            ? `${result.error}: ${result.message}`
+            : result.error
+          controllerRef.current.failExplain(queryId, errorMsg)
         } else {
           controllerRef.current.completeExplain(queryId, {
             plan: (result?.plan || undefined) as ExplainResult['plan'],
@@ -110,10 +109,17 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
         }
       } catch (err) {
         console.warn('[ss] Query explain failed:', err)
-        controllerRef.current.failExplain(
-          queryId,
-          err instanceof Error ? err.message : String(err)
-        )
+        let errorMsg = err instanceof Error ? err.message : String(err)
+        // Extract the real error message from ApiError body if available
+        const body = (err as { body?: string })?.body
+        if (body) {
+          try {
+            const parsed = JSON.parse(body)
+            if (parsed.message) errorMsg = parsed.error ? `${parsed.error}: ${parsed.message}` : parsed.message
+            else if (parsed.error) errorMsg = parsed.error
+          } catch { /* use original message */ }
+        }
+        controllerRef.current.failExplain(queryId, errorMsg)
       }
       sync()
     },

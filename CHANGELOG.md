@@ -4,6 +4,18 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-03-14
+
+### Bug Fixes
+
+- Fix EXPLAIN error display in debug panel: errors were showing "No plan data returned" instead of the actual error message. Root cause: `completeExplain()` stored errors in `entry.result.error` but the renderer checked `entry.error`. Fixed by using `failExplain()` for server errors (`src/react/components/DebugPanel/tabs/QueriesTab.tsx`)
+- Fix EXPLAIN error display in dashboard (React): was showing generic "API error (HTTP 500)" instead of the actual error message. Now parses `ApiError.body` to extract the real server error (`src/react/components/Dashboard/sections/QueriesSection.tsx`)
+- Fix EXPLAIN error display in dashboard (Vue): same fix applied to the Vue dashboard component (`src/vue/components/Dashboard/sections/QueriesSection.vue`)
+
+### Tests
+
+- Add comprehensive TDD tests for EXPLAIN feature covering `buildExplainSql`, `extractPlan`, dialect detection via `getAppDbClient`, `QueryCollector.getQueryById`, and round-trip tests for all supported database dialects (`tests/query_explain_server.spec.ts`)
+
 ## [1.11.0] - 2026-03-09
 
 ### Bug Fixes

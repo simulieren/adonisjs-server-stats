@@ -211,7 +211,8 @@ async function handleExplain(queryId: number) {
   try {
     const result = (await explainQuery(queryId)) as ExplainResult | null
     if (result && result.error) {
-      ctrl.completeExplain(queryId, { rows: [], error: result.error, message: result.message })
+      const errorMsg = result.message ? `${result.error}: ${result.message}` : result.error
+      ctrl.failExplain(queryId, errorMsg as string)
     } else {
       ctrl.completeExplain(queryId, {
         plan: result?.plan as PlanNode[] | undefined,
@@ -219,7 +220,16 @@ async function handleExplain(queryId: number) {
       })
     }
   } catch (err) {
-    ctrl.failExplain(queryId, err instanceof Error ? err.message : String(err))
+    let errorMsg = err instanceof Error ? err.message : String(err)
+    const body = (err as { body?: string })?.body
+    if (body) {
+      try {
+        const parsed = JSON.parse(body)
+        if (parsed.message) errorMsg = parsed.error ? `${parsed.error}: ${parsed.message}` : parsed.message
+        else if (parsed.error) errorMsg = parsed.error
+      } catch { /* use original */ }
+    }
+    ctrl.failExplain(queryId, errorMsg)
   }
   bumpState()
 }

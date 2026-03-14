@@ -72,11 +72,10 @@ export function QueriesTab({ options }: QueriesTabProps) {
         }
 
         if (result && result.error) {
-          controllerRef.current.completeExplain(queryId, {
-            rows: [],
-            error: result.error,
-            message: result.message,
-          } as ExplainResult)
+          const errorMsg = result.message
+            ? `${result.error}: ${result.message}`
+            : result.error
+          controllerRef.current.failExplain(queryId, errorMsg)
         } else {
           controllerRef.current.completeExplain(queryId, {
             plan: (result?.plan || undefined) as ExplainResult['plan'],
