@@ -451,6 +451,7 @@
   background: var(--ss-surface);
   border-bottom: 1px solid var(--ss-border);
   white-space: nowrap;
+  z-index: 2;
 }
 .ss-table td,
 .ss-dash-table td,
@@ -462,6 +463,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ss-text);
+  max-width: 0;
 }
 .ss-table tr:hover td,
 .ss-dash-table tr:hover td,
@@ -532,6 +534,242 @@
 .ss-dbg-method-delete {
   background: var(--ss-red-bg);
   color: var(--ss-red-fg);
+}
+/* SQL method variants (query tables) */
+.ss-method-select,
+.ss-dash-method-select,
+.ss-dbg-method-select {
+  background: var(--ss-green-bg);
+  color: var(--ss-green-fg);
+}
+.ss-method-insert,
+.ss-dash-method-insert,
+.ss-dbg-method-insert {
+  background: var(--ss-blue-bg);
+  color: var(--ss-blue-fg);
+}
+.ss-method-update,
+.ss-dash-method-update,
+.ss-dbg-method-update {
+  background: var(--ss-amber-bg);
+  color: var(--ss-amber-fg);
+}
+.ss-method-head,
+.ss-method-options,
+.ss-method-raw,
+.ss-dash-method-head,
+.ss-dash-method-options,
+.ss-dash-method-raw,
+.ss-dbg-method-head,
+.ss-dbg-method-options,
+.ss-dbg-method-raw {
+  background: var(--ss-surface);
+  color: var(--ss-dim);
+}
+
+/* ── SQL cell text ───────────────────────────────────────────── */
+.ss-sql,
+.ss-dash-sql,
+.ss-dbg-sql {
+  font-size: 11px;
+  color: var(--ss-sql-color);
+  word-break: break-all;
+  cursor: pointer;
+  max-width: 600px;
+  display: inline-block;
+}
+.ss-sql.ss-expanded,
+.ss-dash-sql.ss-dash-expanded,
+.ss-dbg-sql.ss-dbg-expanded {
+  white-space: pre-wrap;
+  max-width: none;
+}
+
+/* ── Duplicate query badge ───────────────────────────────────── */
+.ss-dup,
+.ss-dash-dup,
+.ss-dbg-dup {
+  color: var(--ss-purple-fg);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ── Scrollable table container ──────────────────────────────── */
+.ss-table-wrap,
+.ss-dash-table-wrap,
+.ss-dbg-table-wrap {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: visible;
+  margin: 0 -2px;
+  padding: 0 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ss-border) transparent;
+}
+
+/* ── Sortable column headers ─────────────────────────────────── */
+.ss-sortable,
+.ss-dash-sortable,
+.ss-dbg-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.ss-sortable:hover,
+.ss-dash-sortable:hover,
+.ss-dbg-sortable:hover {
+  color: var(--ss-accent);
+}
+.ss-sort-arrow,
+.ss-dash-sort-arrow,
+.ss-dbg-sort-arrow {
+  font-size: 10px;
+  color: var(--ss-accent);
+  margin-left: 2px;
+}
+
+/* ── Clickable table rows ────────────────────────────────────── */
+.ss-table tr.ss-clickable,
+.ss-dash-table tr.ss-dash-clickable,
+.ss-dbg-table tr.ss-dbg-clickable {
+  cursor: pointer;
+}
+.ss-table tr.ss-clickable:hover td,
+.ss-dash-table tr.ss-dash-clickable:hover td,
+.ss-dbg-table tr.ss-dbg-clickable:hover td {
+  background: var(--ss-hover-accent);
+}
+
+/* ── Event time ──────────────────────────────────────────────── */
+.ss-event-time,
+.ss-dash-event-time,
+.ss-dbg-event-time {
+  color: var(--ss-dim);
+  font-size: 10px;
+}
+
+/* ── EXPLAIN panel ───────────────────────────────────────────── */
+.ss-explain-row td,
+.ss-dash-explain-row td,
+.ss-dbg-explain-row td {
+  white-space: normal;
+  overflow: visible;
+  max-width: none;
+}
+.ss-table tr.ss-explain-row:hover td,
+.ss-dash-table tr.ss-dash-explain-row:hover td,
+.ss-dbg-table tr.ss-dbg-explain-row:hover td {
+  background: var(--ss-surface-alt);
+}
+.ss-explain,
+.ss-dash-explain,
+.ss-dbg-explain {
+  padding: 12px 16px;
+  background: var(--ss-surface-alt);
+  border-top: 1px solid var(--ss-border-dim);
+  font-size: 11px;
+  overflow: hidden;
+  word-break: break-word;
+}
+.ss-explain-btn,
+.ss-dash-explain-btn,
+.ss-dbg-explain-btn {
+  padding: 2px 8px;
+  font-size: 9px;
+  color: var(--ss-purple-fg);
+  background: var(--ss-purple-bg);
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+}
+.ss-explain-btn:hover,
+.ss-dash-explain-btn:hover,
+.ss-dbg-explain-btn:hover {
+  opacity: 0.8;
+}
+.ss-explain-btn-active,
+.ss-dash-explain-btn-active,
+.ss-dbg-explain-btn-active {
+  background: var(--ss-purple-fg);
+  color: #fff;
+}
+.ss-explain-result,
+.ss-dash-explain-result,
+.ss-dbg-explain-result {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ss-text-secondary);
+}
+.ss-explain-error,
+.ss-dash-explain-error,
+.ss-dbg-explain-error {
+  color: var(--ss-red-fg);
+  padding: 8px;
+  background: var(--ss-red-bg);
+  border-radius: 4px;
+}
+.ss-explain-node,
+.ss-dash-explain-node,
+.ss-dbg-explain-node {
+  padding: 4px 0;
+  border-left: 2px solid var(--ss-border-dim);
+  padding-left: 10px;
+  margin-top: 2px;
+}
+.ss-explain-node:first-child,
+.ss-dash-explain-node:first-child,
+.ss-dbg-explain-node:first-child {
+  border-left: 2px solid var(--ss-purple-fg);
+}
+.ss-explain-node-header,
+.ss-dash-explain-node-header,
+.ss-dbg-explain-node-header {
+  font-weight: 600;
+  color: var(--ss-text-primary);
+  font-size: 11px;
+}
+.ss-explain-node-type,
+.ss-dash-explain-node-type,
+.ss-dbg-explain-node-type {
+  color: var(--ss-purple-fg);
+  font-weight: 700;
+}
+.ss-explain-metrics,
+.ss-dash-explain-metrics,
+.ss-dbg-explain-metrics {
+  font-size: 10px;
+  color: var(--ss-dim);
+  margin-top: 1px;
+  font-family: var(--ss-font-mono);
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+.ss-explain-result table,
+.ss-dash-explain-result table,
+.ss-dbg-explain-result table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 4px;
+}
+.ss-explain-result th,
+.ss-dash-explain-result th,
+.ss-dbg-explain-result th {
+  padding: 3px 8px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ss-muted);
+  border-bottom: 1px solid var(--ss-border);
+  font-size: 9px;
+  text-transform: uppercase;
+}
+.ss-explain-result td,
+.ss-dash-explain-result td,
+.ss-dbg-explain-result td {
+  padding: 3px 8px;
+  border-bottom: 1px solid var(--ss-border-faint);
+  color: var(--ss-text-secondary);
 }
 
 /* ── 3. Log system ───────────────────────────────────────────── */

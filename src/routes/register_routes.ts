@@ -5,10 +5,12 @@ import { registerStatsRoute } from './stats_routes.js'
 
 import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
+import type { DebugStore } from '../debug/debug_store.js'
 import type ServerStatsController from '../controller/server_stats_controller.js'
 import type DashboardController from '../dashboard/dashboard_controller.js'
 import type { AdonisRouter } from './router_types.js'
 import type { HttpContext } from '@adonisjs/core/http'
+import type { ApplicationService } from '@adonisjs/core/types'
 
 /**
  * Options for the unified route registration function.
@@ -19,6 +21,8 @@ export interface RegisterRoutesOptions {
   getStatsController: () => ServerStatsController | null
   getDebugController: () => DebugController | null
   getDashboardController: () => DashboardController | null
+  getDebugStore?: () => DebugStore | null
+  getApp?: () => ApplicationService | null
   statsEndpoint?: string | false
   debugEndpoint?: string
   dashboardPath?: string
@@ -48,6 +52,8 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       debugEndpoint: options.debugEndpoint,
       getDebugController: options.getDebugController,
       getApiController: options.getApiController,
+      getDebugStore: options.getDebugStore,
+      getApp: options.getApp,
       middleware,
       whenReady: options.whenReady,
     })

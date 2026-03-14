@@ -218,8 +218,41 @@ export {
 export type { LogEntry } from './log-utils.js'
 
 // -- Query utilities --------------------------------------------------------
-export { filterQueries, countDuplicateQueries, computeQuerySummary } from './query-utils.js'
-export type { QuerySummary } from './query-utils.js'
+export {
+  filterQueries,
+  countDuplicateQueries,
+  computeQuerySummary,
+  computeDashboardQuerySummary,
+  normalizeDashboardQuery,
+  buildSqlCounts,
+} from './query-utils.js'
+export type { QuerySummary, NormalizedQuery } from './query-utils.js'
+
+// -- Explain plan utilities -------------------------------------------------
+export {
+  formatPlanNodeMetrics,
+  flattenPlanTree,
+  hasNestedPlan,
+  getExplainColumns,
+  formatCellValue,
+} from './explain-utils.js'
+export type { PlanNode, FlatPlanNode } from './explain-utils.js'
+
+// -- Query column definitions -----------------------------------------------
+export {
+  getDebugPaneColumns,
+  getDashboardListColumns,
+  getDashboardGroupedColumns,
+} from './queries-columns.js'
+export type { QueriesColumnDef } from './queries-columns.js'
+
+// -- Queries controller -----------------------------------------------------
+export { QueriesController } from './queries-controller.js'
+export type {
+  QueriesControllerState,
+  ExplainResult,
+  ExplainEntry,
+} from './queries-controller.js'
 
 // -- Job utilities ----------------------------------------------------------
 export {

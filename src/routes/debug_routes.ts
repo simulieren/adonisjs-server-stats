@@ -1,7 +1,11 @@
+import { getAppDbClient, buildExplainSql, extractPlan } from '../dashboard/query_explain_handler.js'
+
 import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
+import type { DebugStore } from '../debug/debug_store.js'
 import type { AdonisRouter } from './router_types.js'
 import type { HttpContext } from '@adonisjs/core/http'
+import type { ApplicationService } from '@adonisjs/core/types'
 
 let _whenReady: (() => Promise<void>) | undefined
 
@@ -145,8 +149,54 @@ interface DebugRoutesOpts {
   debugEndpoint: string
   getDebugController: () => DebugController | null
   getApiController: () => ApiController | null
+  getDebugStore?: () => DebugStore | null
+  getApp?: () => ApplicationService | null
   middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>
   whenReady?: () => Promise<void>
+}
+
+function registerDebugExplainRoute(
+  router: AdonisRouter,
+  getDebugStore?: () => DebugStore | null,
+  getApp?: () => ApplicationService | null
+) {
+  if (!getDebugStore || !getApp) return
+  router
+    .get('/queries/:id/explain', async (ctx: HttpContext) => {
+      if (_whenReady) await _whenReady()
+      const store = getDebugStore()
+      const app = getApp()
+      if (!store || !app) {
+        return ctx.response.serviceUnavailable({ error: 'Debug store not ready' })
+      }
+      const query = store.queries.getQueryById(Number(ctx.params.id))
+      if (!query) return ctx.response.notFound({ error: 'Query not found' })
+      if (!query.sql.trim().toUpperCase().startsWith('SELECT')) {
+        return ctx.response.badRequest({ error: 'EXPLAIN is only supported for SELECT queries' })
+      }
+      try {
+        const appDb = await getAppDbClient(app, query.connection || undefined)
+        if (!appDb) {
+          return ctx.response.serviceUnavailable({ error: 'App database connection not available' })
+        }
+        const bindings = Array.isArray(query.bindings) ? query.bindings : []
+        const explainSql = buildExplainSql(query.sql, appDb.dialect)
+        if (!explainSql) {
+          return ctx.response.badRequest({
+            error: `EXPLAIN is not supported for ${appDb.dialect} databases`,
+          })
+        }
+        const explainResult = await appDb.raw(explainSql, bindings)
+        const plan = extractPlan(explainResult, appDb.dialect)
+        return ctx.response.json({ queryId: query.id, sql: query.sql, plan })
+      } catch (error) {
+        return ctx.response.internalServerError({
+          error: 'EXPLAIN failed',
+          message: (error as Error)?.message ?? 'Unknown error',
+        })
+      }
+    })
+    .as('server-stats.debug.queryExplain')
 }
 
 /** Register debug panel API routes. */
@@ -159,6 +209,7 @@ export function registerDebugRoutes(opts: DebugRoutesOpts) {
     .group(() => {
       registerDebugConfigRoutes(router, getDebugController)
       registerDebugQueryAndEventRoutes(router, getApiController)
+      registerDebugExplainRoute(router, opts.getDebugStore, opts.getApp)
       registerDebugLogRoutes(router, getApiController)
       registerDebugEmailRoutes(router, getApiController)
       registerDebugTraceRoutes(router, getApiController)

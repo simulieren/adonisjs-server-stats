@@ -1,6 +1,10 @@
 <script setup lang="ts">
 /**
  * SQL queries table tab for the debug panel.
+ *
+ * Refactored to use shared core utilities:
+ * - queries-columns for column definitions
+ * - queries-controller for expand state management
  */
 import { ref, computed } from 'vue'
 import { formatDuration, durationClassName, formatTime, timeAgo } from '../../../../core/index.js'
@@ -9,6 +13,8 @@ import {
   countDuplicateQueries,
   computeQuerySummary,
 } from '../../../../core/query-utils.js'
+import { getDebugPaneColumns } from '../../../../core/queries-columns.js'
+import { QueriesController } from '../../../../core/queries-controller.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
 import type { QueryRecord } from '../../../../core/index.js'
 
@@ -18,7 +24,23 @@ const props = defineProps<{
 }>()
 
 const search = ref('')
-const expandedIds = new Set<number>()
+
+// Use QueriesController for expand state
+const ctrl = new QueriesController()
+const stateVersion = ref(0)
+
+function toggleExpand(id: number) {
+  ctrl.toggleExpand(id)
+  stateVersion.value++
+}
+
+function isExpanded(id: number): boolean {
+  void stateVersion.value
+  return ctrl.isExpanded(id)
+}
+
+// Column definitions from shared queries-columns
+const columns = computed(() => getDebugPaneColumns())
 
 const allQueries = computed<QueryRecord[]>(() => {
   if (!props.data) return []
@@ -37,18 +59,6 @@ const summary = computed(() => {
   if (queries.value.length > 0) s += ` | avg ${formatDuration(summaryStats.value.avgDuration)}`
   return s
 })
-
-function toggleExpand(id: number) {
-  if (expandedIds.has(id)) {
-    expandedIds.delete(id)
-  } else {
-    expandedIds.add(id)
-  }
-}
-
-function isExpanded(id: number) {
-  return expandedIds.has(id)
-}
 
 function durationClass(ms: number): string {
   return durationClassName(ms, 'ss-dbg')
@@ -75,12 +85,7 @@ const { tableRef } = useResizableTable(() => queries.value)
     <table v-else ref="tableRef" class="ss-dbg-table">
       <thead>
         <tr>
-          <th>#</th>
-          <th>SQL</th>
-          <th>Duration</th>
-          <th>Method</th>
-          <th>Model</th>
-          <th>Time</th>
+          <th v-for="col in columns" :key="col.key + col.type">{{ col.label }}</th>
         </tr>
       </thead>
       <tbody>

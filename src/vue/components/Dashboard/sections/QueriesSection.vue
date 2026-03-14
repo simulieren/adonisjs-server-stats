@@ -1,84 +1,3 @@
-<script lang="ts">
-import { defineComponent, h, type PropType, type VNode } from 'vue'
-
-interface PlanNode {
-  'Node Type'?: string
-  'Relation Name'?: string
-  Alias?: string
-  'Index Name'?: string
-  'Startup Cost'?: number | null
-  'Total Cost'?: number | null
-  'Plan Rows'?: number | null
-  'Plan Width'?: number | null
-  Filter?: string
-  'Index Cond'?: string
-  'Hash Cond'?: string
-  'Join Type'?: string
-  'Sort Key'?: string | string[]
-  Plans?: PlanNode[]
-  [key: string]: unknown
-}
-
-function renderPlanNode(node: PlanNode, depth: number): VNode | null {
-  if (!node) return null
-
-  const indent = depth * 20
-  const nodeType = node['Node Type'] || 'Unknown'
-  const relation = node['Relation Name'] || ''
-  const alias =
-    node['Alias'] && node['Alias'] !== node['Relation Name'] ? ` (${node['Alias']})` : ''
-  const indexName = node['Index Name'] || ''
-
-  const metrics: string[] = []
-  if (node['Startup Cost'] !== null && node['Startup Cost'] !== undefined)
-    metrics.push(`cost=${node['Startup Cost']}..${node['Total Cost']}`)
-  if (node['Plan Rows'] !== null && node['Plan Rows'] !== undefined)
-    metrics.push(`rows=${node['Plan Rows']}`)
-  if (node['Plan Width'] !== null && node['Plan Width'] !== undefined)
-    metrics.push(`width=${node['Plan Width']}`)
-  if (node['Filter']) metrics.push(`filter: ${node['Filter']}`)
-  if (node['Index Cond']) metrics.push(`cond: ${node['Index Cond']}`)
-  if (node['Hash Cond']) metrics.push(`hash: ${node['Hash Cond']}`)
-  if (node['Join Type']) metrics.push(`join: ${node['Join Type']}`)
-  if (node['Sort Key']) {
-    const sortKey = Array.isArray(node['Sort Key']) ? node['Sort Key'].join(', ') : node['Sort Key']
-    metrics.push(`sort: ${sortKey}`)
-  }
-
-  const childPlans = node['Plans'] || []
-
-  return h('div', { class: 'ss-dash-explain-node', style: { marginLeft: `${indent}px` } }, [
-    h('div', { class: 'ss-dash-explain-node-header' }, [
-      h('span', { class: 'ss-dash-explain-node-type' }, nodeType),
-      relation ? [' on ', h('strong', null, relation)] : null,
-      alias || null,
-      indexName ? [' using ', h('em', null, indexName)] : null,
-    ]),
-    metrics.length > 0
-      ? h('div', { class: 'ss-dash-explain-metrics' }, metrics.join(' \u00B7 '))
-      : null,
-    ...childPlans.map((child: PlanNode, i: number) => renderPlanNode(child, depth + 1)),
-  ])
-}
-
-/**
- * Recursive component for rendering a single EXPLAIN plan node.
- * Defined outside <script setup> so Vue can resolve the self-reference by name.
- */
-const ExplainPlanNode = defineComponent({
-  name: 'ExplainPlanNode',
-  props: {
-    node: { type: Object as PropType<PlanNode>, required: true },
-    depth: { type: Number, default: 0 },
-  },
-  setup(props) {
-    return (): VNode | null => renderPlanNode(props.node, props.depth)
-  },
-})
-
-export default { components: { ExplainPlanNode } }
-</script>
-
 <script setup lang="ts">
 /**
  * Query analysis section for the dashboard.
@@ -86,10 +5,42 @@ export default { components: { ExplainPlanNode } }
  * Supports list view, grouped view, and EXPLAIN.
  * Self-contained: injects dependencies and fetches its own data.
  * CSS classes match the React QueriesSection.
+ *
+ * Refactored to use shared core utilities:
+ * - explain-utils for EXPLAIN plan rendering
+ * - queries-columns for column definitions
+ * - queries-controller for state management
+ * - query-utils for normalization, summary, duplicate counting
+ * - field-resolvers for snake_case/camelCase field resolution
  */
-import { ref, computed, inject, watch, type Ref } from 'vue'
+import { computed, inject, watch, ref, type Ref } from 'vue'
 import { timeAgo, formatTime, durationClassName } from '../../../../core/index.js'
-import { SLOW_DURATION_MS } from '../../../../core/constants.js'
+import {
+  flattenPlanTree,
+  hasNestedPlan,
+  getExplainColumns,
+  formatCellValue,
+} from '../../../../core/explain-utils.js'
+import type { PlanNode, FlatPlanNode } from '../../../../core/explain-utils.js'
+import {
+  getDashboardListColumns,
+  getDashboardGroupedColumns,
+} from '../../../../core/queries-columns.js'
+import type { QueriesColumnDef } from '../../../../core/queries-columns.js'
+import { QueriesController } from '../../../../core/queries-controller.js'
+import type { ExplainEntry, ExplainResult } from '../../../../core/queries-controller.js'
+import {
+  buildSqlCounts,
+  computeDashboardQuerySummary,
+  normalizeDashboardQuery,
+} from '../../../../core/query-utils.js'
+import type { NormalizedQuery } from '../../../../core/query-utils.js'
+import {
+  resolveField,
+  resolveSqlMethod,
+  resolveNormalizedSql,
+  resolveTimestamp,
+} from '../../../../core/field-resolvers.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
 import FilterBar from '../shared/FilterBar.vue'
@@ -100,18 +51,44 @@ const dashboardEndpoint = inject<string>('ss-dashboard-endpoint', '/__stats/api'
 const authToken = inject<string | undefined>('ss-auth-token', undefined)
 const baseUrl = inject<string>('ss-base-url', '')
 
-const viewMode = ref<'list' | 'grouped'>('list')
-const expandedSql = ref<string | number | null>(null)
+// ---------------------------------------------------------------------------
+// State controller (headless, framework-agnostic)
+// ---------------------------------------------------------------------------
 
-interface ExplainData {
-  queryId: number
-  plan: unknown[]
-  error?: string
-  message?: string
+const ctrl = new QueriesController('list')
+
+// We need reactive wrappers for template reactivity since QueriesController
+// mutates plain objects — Vue cannot track in-place mutations on non-reactive
+// objects. We keep a reactive "version" counter that we bump after each
+// controller mutation to force recomputation.
+const stateVersion = ref(0)
+
+function bumpState() {
+  stateVersion.value++
 }
 
-const explainData = ref<ExplainData | null>(null)
-const explainLoading = ref<number | null>(null)
+// Reactive accessors that read from the controller but depend on stateVersion
+const viewMode = computed(() => {
+  void stateVersion.value
+  return ctrl.state.viewMode
+})
+
+const expandedIds = computed(() => {
+  void stateVersion.value
+  return ctrl.state.expandedIds
+})
+
+const explainData = computed(() => {
+  void stateVersion.value
+  return ctrl.state.explainData
+})
+
+// ---------------------------------------------------------------------------
+// Column definitions from shared queries-columns
+// ---------------------------------------------------------------------------
+
+const listColumns = computed<QueriesColumnDef[]>(() => getDashboardListColumns())
+const groupedColumns = computed<QueriesColumnDef[]>(() => getDashboardGroupedColumns())
 
 // Use different endpoints for list/grouped views
 const endpoint = computed(() => (viewMode.value === 'grouped' ? 'queries/grouped' : 'queries'))
@@ -136,91 +113,60 @@ const rawQueries = computed<Record<string, unknown>[]>(() => {
   return (d.data || data.value || []) as Record<string, unknown>[]
 })
 
-// Normalize grouped query fields to match column keys
+// Normalize grouped query fields to match column keys using resolveField
 const queries = computed<Record<string, unknown>[]>(() => {
   if (viewMode.value !== 'grouped') return rawQueries.value
 
   return rawQueries.value.map((g) => {
     const normalized = { ...g }
-    if (
-      normalized.sqlNormalized === null ||
-      (normalized.sqlNormalized === undefined && (g.sql_normalized || g.pattern))
-    ) {
-      normalized.sqlNormalized = (g.sql_normalized as string) || (g.pattern as string) || ''
+    if (normalized.sqlNormalized === null || normalized.sqlNormalized === undefined) {
+      normalized.sqlNormalized = resolveField<string>(g, 'sql_normalized', 'pattern') ?? ''
     }
-    if (
-      (normalized.count === null || normalized.count === undefined) &&
-      g.total_count !== null &&
-      g.total_count !== undefined
-    )
-      normalized.count = g.total_count
-    if (
-      (normalized.avgDuration === null || normalized.avgDuration === undefined) &&
-      g.avg_duration !== null &&
-      g.avg_duration !== undefined
-    )
-      normalized.avgDuration = g.avg_duration
-    if (
-      (normalized.maxDuration === null || normalized.maxDuration === undefined) &&
-      g.max_duration !== null &&
-      g.max_duration !== undefined
-    )
-      normalized.maxDuration = g.max_duration
-    if (
-      (normalized.minDuration === null || normalized.minDuration === undefined) &&
-      g.min_duration !== null &&
-      g.min_duration !== undefined
-    )
-      normalized.minDuration = g.min_duration
-    if (
-      (normalized.totalDuration === null || normalized.totalDuration === undefined) &&
-      g.total_duration !== null &&
-      g.total_duration !== undefined
-    )
-      normalized.totalDuration = g.total_duration
-    if (
-      (normalized.percentOfTotal === null || normalized.percentOfTotal === undefined) &&
-      g.pct_time !== null &&
-      g.pct_time !== undefined
-    )
-      normalized.percentOfTotal = g.pct_time
+    if (normalized.count === null || normalized.count === undefined) {
+      normalized.count = resolveField<number>(g, 'total_count') ?? undefined
+    }
+    if (normalized.avgDuration === null || normalized.avgDuration === undefined) {
+      normalized.avgDuration = resolveField<number>(g, 'avg_duration') ?? undefined
+    }
+    if (normalized.maxDuration === null || normalized.maxDuration === undefined) {
+      normalized.maxDuration = resolveField<number>(g, 'max_duration') ?? undefined
+    }
+    if (normalized.minDuration === null || normalized.minDuration === undefined) {
+      normalized.minDuration = resolveField<number>(g, 'min_duration') ?? undefined
+    }
+    if (normalized.totalDuration === null || normalized.totalDuration === undefined) {
+      normalized.totalDuration = resolveField<number>(g, 'total_duration') ?? undefined
+    }
+    if (normalized.percentOfTotal === null || normalized.percentOfTotal === undefined) {
+      normalized.percentOfTotal = resolveField<number>(g, 'pct_time') ?? undefined
+    }
     return normalized
   })
 })
 
-// Duplicate counts for list view
-const sqlCounts = computed(() => {
-  const counts = new Map<string, number>()
-  for (const q of queries.value) {
-    const sql = (q.sqlNormalized as string) || (q.sql as string) || (q.sql_text as string) || ''
-    counts.set(sql, (counts.get(sql) || 0) + 1)
-  }
-  return counts
+// Normalized list queries using normalizeDashboardQuery
+const normalizedListQueries = computed<NormalizedQuery[]>(() => {
+  if (viewMode.value !== 'list') return []
+  return rawQueries.value.map((row) => normalizeDashboardQuery(row))
 })
 
+// Duplicate counts for list view using buildSqlCounts
+const sqlCounts = computed(() => {
+  return buildSqlCounts(rawQueries.value)
+})
+
+// Summary using computeDashboardQuerySummary
 const summary = computed(() => {
-  const total = pagination.total ?? queries.value.length
-  let slow = 0
-  let duplicates = 0
-  let totalDur = 0
-  let count = 0
-  for (const q of queries.value) {
-    const dur = (q.duration as number) || 0
-    totalDur += dur
-    count++
-    if (dur > SLOW_DURATION_MS) slow++
-  }
-  for (const c of sqlCounts.value.values()) {
-    if (c > 1) duplicates += c
-  }
-  return { total, slow, duplicates, avgDuration: count > 0 ? totalDur / count : 0 }
+  return computeDashboardQuerySummary(rawQueries.value, {
+    total: pagination.total,
+  })
 })
 
 const queriesSummaryText = computed(() => {
   if (viewMode.value === 'grouped') return `${queries.value.length} query patterns`
-  const parts = [`${summary.value.total} queries`]
-  if (summary.value.slow > 0) parts.push(`${summary.value.slow} slow`)
-  if (summary.value.duplicates > 0) parts.push(`${summary.value.duplicates} dup`)
+  const parts = [`${summary.value.totalCount} queries`]
+  if (summary.value.slowCount > 0) parts.push(`${summary.value.slowCount} slow`)
+  if (summary.value.dupCount > 0) parts.push(`${summary.value.dupCount} dup`)
   parts.push(`avg ${(summary.value.avgDuration || 0).toFixed(1)}ms`)
   return parts.join(', ')
 })
@@ -232,75 +178,139 @@ function handleSearch(term: string) {
 
 function handleViewModeChange(mode: 'list' | 'grouped') {
   if (mode === viewMode.value) return
-  viewMode.value = mode
-  expandedSql.value = null
-  explainData.value = null
-  explainLoading.value = null
+  ctrl.setViewMode(mode)
+  bumpState()
 }
 
 function handleSort(key: string) {
   setSort(key)
 }
 
+function isRowExpanded(id: number | string): boolean {
+  void stateVersion.value
+  return ctrl.isExpanded(id)
+}
+
+function toggleRowExpand(id: number | string) {
+  ctrl.toggleExpand(id)
+  bumpState()
+}
+
 async function handleExplain(queryId: number) {
-  if (explainData.value && explainData.value.queryId === queryId) {
-    explainData.value = null
+  // Toggle off if already showing
+  const existing = ctrl.getExplainState(queryId)
+  if (existing && !existing.loading) {
+    ctrl.state.explainData.delete(queryId)
+    bumpState()
     return
   }
-  explainLoading.value = queryId
+
+  ctrl.startExplain(queryId)
+  bumpState()
+
   try {
-    const result = (await explainQuery(queryId)) as {
-      plan?: unknown[]
-      rows?: unknown[]
-      error?: string
-      message?: string
-    }
+    const result = (await explainQuery(queryId)) as ExplainResult | null
     if (result && result.error) {
-      explainData.value = { queryId, plan: [], error: result.error, message: result.message }
+      ctrl.completeExplain(queryId, { rows: [], error: result.error, message: result.message })
     } else {
-      explainData.value = { queryId, plan: (result?.plan || result?.rows || []) as unknown[] }
+      ctrl.completeExplain(queryId, {
+        plan: result?.plan as PlanNode[] | undefined,
+        rows: result?.rows,
+      })
     }
   } catch (err) {
-    explainData.value = {
-      queryId,
-      plan: [],
-      error: err instanceof Error ? err.message : String(err),
-    }
-  } finally {
-    explainLoading.value = null
+    ctrl.failExplain(queryId, err instanceof Error ? err.message : String(err))
   }
+  bumpState()
+}
+
+function getExplainEntry(queryId: number): ExplainEntry | undefined {
+  void stateVersion.value
+  return ctrl.getExplainState(queryId)
+}
+
+function isExplainLoading(queryId: number): boolean {
+  void stateVersion.value
+  const entry = ctrl.getExplainState(queryId)
+  return entry?.loading ?? false
+}
+
+function isExplainActive(queryId: number): boolean {
+  void stateVersion.value
+  const entry = ctrl.getExplainState(queryId)
+  return !!entry && !entry.loading && !entry.error && !!entry.result
+}
+
+function closeExplain(queryId: number) {
+  ctrl.state.explainData.delete(queryId)
+  bumpState()
+}
+
+// ---------------------------------------------------------------------------
+// EXPLAIN plan rendering helpers using shared explain-utils
+// ---------------------------------------------------------------------------
+
+function getExplainPlanNodes(queryId: number): FlatPlanNode[] {
+  const entry = getExplainEntry(queryId)
+  if (!entry?.result) return []
+  const plan = entry.result.plan || entry.result.rows
+  if (!plan || plan.length === 0) return []
+  const first = plan[0] as Record<string, unknown>
+  if (!first || typeof first !== 'object') return []
+  if ('Plan' in first) {
+    return flattenPlanTree(first['Plan'] as PlanNode)
+  }
+  return []
+}
+
+function getExplainTableCols(queryId: number): string[] {
+  const entry = getExplainEntry(queryId)
+  if (!entry?.result) return []
+  const rows = entry.result.plan || entry.result.rows
+  if (!rows || rows.length === 0) return []
+  return getExplainColumns(rows as Record<string, unknown>[])
+}
+
+function getExplainRows(queryId: number): Record<string, unknown>[] {
+  const entry = getExplainEntry(queryId)
+  if (!entry?.result) return []
+  return (entry.result.plan || entry.result.rows || []) as Record<string, unknown>[]
+}
+
+function explainHasNestedPlanForQuery(queryId: number): boolean {
+  const entry = getExplainEntry(queryId)
+  if (!entry?.result) return false
+  const plan = entry.result.plan || entry.result.rows
+  if (!plan || plan.length === 0) return false
+  return hasNestedPlan(plan[0])
+}
+
+function explainHasRows(queryId: number): boolean {
+  const entry = getExplainEntry(queryId)
+  if (!entry?.result) return false
+  const rows = entry.result.plan || entry.result.rows
+  return !!rows && rows.length > 0 && typeof rows[0] === 'object'
 }
 
 function dashDurationClass(ms: number): string {
   return durationClassName(ms, 'ss-dash')
 }
 
-/** Get column keys from the first explain plan row (avoids `as Record<...>` in template). */
-function explainPlanCols(): string[] {
-  const plan = explainData.value?.plan
-  if (!plan || plan.length === 0 || typeof plan[0] !== 'object' || !plan[0]) return []
-  return Object.keys(plan[0] as Record<string, unknown>)
+// Field resolver helpers for template
+function getQuerySql(q: Record<string, unknown>): string {
+  return resolveField<string>(q, 'sql', 'sql_text') ?? ''
 }
 
-/** Get a cell value from an explain plan row (avoids `as Record<...>` in template). */
-function planCellValue(row: unknown, col: string): string {
-  if (!row || typeof row !== 'object') return '-'
-  const val = (row as Record<string, unknown>)[col]
-  return val !== null && val !== undefined ? String(val) : '-'
+function getQueryNormalizedSql(q: Record<string, unknown>): string {
+  return resolveNormalizedSql(q)
 }
 
-/** Check if explain plan has nested Plan node. */
-function explainHasNestedPlan(): boolean {
-  const plan = explainData.value?.plan
-  if (!plan || plan.length === 0 || typeof plan[0] !== 'object' || !plan[0]) return false
-  return 'Plan' in (plan[0] as Record<string, unknown>)
+function getQueryMethod(q: Record<string, unknown>): string {
+  return resolveSqlMethod(q)
 }
 
-/** Get nested Plan node for tree rendering. */
-function explainNestedPlan(): Record<string, unknown> {
-  const plan = explainData.value?.plan
-  if (!plan || plan.length === 0 || typeof plan[0] !== 'object' || !plan[0]) return {}
-  return (plan[0] as Record<string, unknown>)['Plan'] as Record<string, unknown>
+function getQueryTimestamp(q: Record<string, unknown>): string {
+  return String(resolveTimestamp(q) ?? '')
 }
 
 const { tableRef } = useResizableTable(() => queries.value)
@@ -340,50 +350,30 @@ const { tableRef } = useResizableTable(() => queries.value)
         <table v-if="queries.length > 0" ref="tableRef" class="ss-dash-table">
           <thead>
             <tr>
-              <th>Pattern</th>
-              <th class="ss-dash-sortable" @click="handleSort('count')">
-                Count
-                <span v-if="sort.column === 'count'" class="ss-dash-sort-arrow">{{
-                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
-                }}</span>
+              <th
+                v-for="col in groupedColumns"
+                :key="col.key"
+                :class="col.sortable ? 'ss-dash-sortable' : ''"
+                @click="col.sortable ? handleSort(col.key) : undefined"
+              >
+                {{ col.label }}
+                <span
+                  v-if="col.sortable && sort.column === col.key"
+                  class="ss-dash-sort-arrow"
+                >{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
               </th>
-              <th class="ss-dash-sortable" @click="handleSort('avgDuration')">
-                Avg
-                <span v-if="sort.column === 'avgDuration'" class="ss-dash-sort-arrow">{{
-                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
-                }}</span>
-              </th>
-              <th>Min</th>
-              <th>Max</th>
-              <th class="ss-dash-sortable" @click="handleSort('totalDuration')">
-                Total
-                <span v-if="sort.column === 'totalDuration'" class="ss-dash-sort-arrow">{{
-                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
-                }}</span>
-              </th>
-              <th>% Time</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(g, i) in queries" :key="i">
               <td>
                 <span
-                  :class="`ss-dash-sql ${expandedSql === (g.sqlNormalized as string) ? 'ss-dash-expanded' : ''}`"
+                  :class="`ss-dash-sql ${isRowExpanded(g.sqlNormalized as string) ? 'ss-dash-expanded' : ''}`"
                   title="Click to expand"
                   role="button"
                   tabindex="0"
-                  @click.stop="
-                    expandedSql =
-                      expandedSql === (g.sqlNormalized as string)
-                        ? null
-                        : (g.sqlNormalized as string)
-                  "
-                  @keydown.enter="
-                    expandedSql =
-                      expandedSql === (g.sqlNormalized as string)
-                        ? null
-                        : (g.sqlNormalized as string)
-                  "
+                  @click.stop="toggleRowExpand(g.sqlNormalized as string)"
+                  @keydown.enter="toggleRowExpand(g.sqlNormalized as string)"
                 >
                   {{ g.sqlNormalized }}
                 </span>
@@ -439,41 +429,34 @@ const { tableRef } = useResizableTable(() => queries.value)
     <!-- List view -->
     <template v-else>
       <div class="ss-dash-table-wrap">
-        <table v-if="queries.length > 0" ref="tableRef" class="ss-dash-table">
+        <table v-if="normalizedListQueries.length > 0" ref="tableRef" class="ss-dash-table">
           <colgroup>
-            <col style="width: 40px" />
-            <col />
-            <col style="width: 70px" />
-            <col style="width: 60px" />
-            <col style="width: 90px" />
-            <col style="width: 80px" />
-            <col style="width: 90px" />
-            <col style="width: 70px" />
+            <col
+              v-for="col in listColumns"
+              :key="col.key + col.type"
+              :style="col.width ? { width: col.width } : {}"
+            />
           </colgroup>
           <thead>
             <tr>
-              <th>#</th>
-              <th>SQL</th>
-              <th class="ss-dash-sortable" @click="handleSort('duration')">
-                Duration
-                <span v-if="sort.column === 'duration'" class="ss-dash-sort-arrow">{{
-                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
-                }}</span>
-              </th>
-              <th>Method</th>
-              <th>Model</th>
-              <th>Connection</th>
-              <th class="ss-dash-sortable" @click="handleSort('createdAt')">
-                Time
-                <span v-if="sort.column === 'createdAt'" class="ss-dash-sort-arrow">{{
-                  sort.direction === 'asc' ? ' \u25B2' : ' \u25BC'
-                }}</span>
-              </th>
-              <th></th>
+              <template v-for="col in listColumns" :key="col.key + col.type">
+                <th
+                  v-if="col.sortable"
+                  class="ss-dash-sortable"
+                  @click="handleSort(col.key)"
+                >
+                  {{ col.label }}
+                  <span
+                    v-if="sort.column === col.key"
+                    class="ss-dash-sort-arrow"
+                  >{{ sort.direction === 'asc' ? ' \u25B2' : ' \u25BC' }}</span>
+                </th>
+                <th v-else>{{ col.label }}</th>
+              </template>
             </tr>
           </thead>
           <tbody>
-            <template v-for="q in queries" :key="q.id as number">
+            <template v-for="(q, idx) in normalizedListQueries" :key="q.id">
               <tr>
                 <td>
                   <span style="color: var(--ss-dim)">{{ q.id }}</span>
@@ -481,53 +464,35 @@ const { tableRef } = useResizableTable(() => queries.value)
                 <td>
                   <div>
                     <span
-                      :class="`ss-dash-sql ${expandedSql === (q.id as number) ? 'ss-dash-expanded' : ''}`"
+                      :class="`ss-dash-sql ${isRowExpanded(q.id) ? 'ss-dash-expanded' : ''}`"
                       title="Click to expand"
                       role="button"
                       tabindex="0"
-                      @click.stop="
-                        expandedSql = expandedSql === (q.id as number) ? null : (q.id as number)
-                      "
-                      @keydown.enter="
-                        expandedSql = expandedSql === (q.id as number) ? null : (q.id as number)
-                      "
+                      @click.stop="toggleRowExpand(q.id)"
+                      @keydown.enter="toggleRowExpand(q.id)"
                     >
-                      {{ (q.sql as string) || (q.sql_text as string) || '' }}
+                      {{ q.sql }}
                     </span>
                     <span
-                      v-if="
-                        (sqlCounts.get(
-                          ((q.sqlNormalized as string) ||
-                            (q.sql as string) ||
-                            (q.sql_text as string)) ??
-                            ''
-                        ) ?? 0) > 1
-                      "
+                      v-if="(sqlCounts.get(q.sqlNormalized) ?? 0) > 1"
                       class="ss-dash-dup"
                     >
-                      &times;{{
-                        sqlCounts.get(
-                          ((q.sqlNormalized as string) ||
-                            (q.sql as string) ||
-                            (q.sql_text as string)) ??
-                            ''
-                        )
-                      }}
+                      &times;{{ sqlCounts.get(q.sqlNormalized) }}
                     </span>
                   </div>
                 </td>
                 <td>
                   <span
-                    :class="`ss-dash-duration ${dashDurationClass((q.duration as number) || 0)}`"
+                    :class="`ss-dash-duration ${dashDurationClass(q.duration)}`"
                   >
-                    {{ ((q.duration as number) || 0).toFixed(2) }}ms
+                    {{ q.duration.toFixed(2) }}ms
                   </span>
                 </td>
                 <td>
                   <span
-                    :class="`ss-dash-method ss-dash-method-${((q.method as string) || (q.sql_method as string) || '').toLowerCase()}`"
+                    :class="`ss-dash-method ss-dash-method-${q.method.toLowerCase()}`"
                   >
-                    {{ (q.method as string) || (q.sql_method as string) || '' }}
+                    {{ q.method }}
                   </span>
                 </td>
                 <td>
@@ -538,9 +503,9 @@ const { tableRef } = useResizableTable(() => queries.value)
                       text-overflow: ellipsis;
                       white-space: nowrap;
                     "
-                    :title="q.model as string"
+                    :title="q.model"
                   >
-                    {{ (q.model as string) || '-' }}
+                    {{ q.model || '-' }}
                   </span>
                 </td>
                 <td>
@@ -552,80 +517,94 @@ const { tableRef } = useResizableTable(() => queries.value)
                       white-space: nowrap;
                     "
                   >
-                    {{ (q.connection as string) || '-' }}
+                    {{ q.connection || '-' }}
                   </span>
                 </td>
                 <td>
                   <span
                     class="ss-dash-event-time"
-                    :title="
-                      formatTime(
-                        ((q.createdAt as string) ||
-                          (q.created_at as string) ||
-                          (q.timestamp as string) ||
-                          '') as string
-                      )
-                    "
+                    :title="formatTime(String(q.timestamp))"
                   >
-                    {{
-                      timeAgo(
-                        ((q.createdAt as string) ||
-                          (q.created_at as string) ||
-                          (q.timestamp as string) ||
-                          '') as string
-                      )
-                    }}
+                    {{ timeAgo(String(q.timestamp)) }}
                   </span>
                 </td>
                 <td>
                   <button
-                    v-if="((q.method as string) || (q.sql_method as string) || '') === 'select'"
+                    v-if="q.method === 'select'"
                     type="button"
-                    :class="`ss-dash-explain-btn${explainData?.queryId === (q.id as number) && !explainData?.error ? ' ss-dash-explain-btn-active' : ''}`"
-                    :disabled="explainLoading === (q.id as number)"
+                    :class="`ss-dash-explain-btn${isExplainActive(q.id as number) ? ' ss-dash-explain-btn-active' : ''}`"
+                    :disabled="isExplainLoading(q.id as number)"
                     @click.stop="handleExplain(q.id as number)"
                   >
-                    {{ explainLoading === (q.id as number) ? '...' : 'EXPLAIN' }}
+                    {{ isExplainLoading(q.id as number) ? '...' : 'EXPLAIN' }}
                   </button>
                 </td>
               </tr>
               <!-- EXPLAIN result row -->
               <tr
-                v-if="explainData && explainData.queryId === (q.id as number)"
+                v-if="getExplainEntry(q.id as number)"
                 class="ss-dash-explain-row"
               >
                 <td colspan="8" class="ss-dash-explain">
                   <div style="display: flex; justify-content: space-between; align-items: start">
                     <div style="flex: 1">
                       <div
-                        v-if="explainData.error"
+                        v-if="getExplainEntry(q.id as number)?.error"
                         class="ss-dash-explain-result ss-dash-explain-error"
                       >
-                        <strong>Error:</strong> {{ explainData.error }}
-                        <br v-if="explainData.message" />
-                        {{ explainData.message }}
-                      </div>
-                      <div v-else-if="explainHasNestedPlan()" class="ss-dash-explain-result">
-                        <ExplainPlanNode :node="explainNestedPlan()" :depth="0" />
+                        <strong>Error:</strong> {{ getExplainEntry(q.id as number)?.error }}
+                        <br v-if="getExplainEntry(q.id as number)?.result?.message" />
+                        {{ getExplainEntry(q.id as number)?.result?.message }}
                       </div>
                       <div
-                        v-else-if="
-                          explainData.plan &&
-                          explainData.plan.length > 0 &&
-                          typeof explainData.plan[0] === 'object'
-                        "
+                        v-else-if="explainHasNestedPlanForQuery(q.id as number)"
+                        class="ss-dash-explain-result"
+                      >
+                        <!-- Flat iteration instead of recursion -->
+                        <div
+                          v-for="(planNode, ni) in getExplainPlanNodes(q.id as number)"
+                          :key="ni"
+                          class="ss-dash-explain-node"
+                          :style="{ marginLeft: `${planNode.depth * 20}px` }"
+                        >
+                          <div class="ss-dash-explain-node-header">
+                            <span class="ss-dash-explain-node-type">{{ planNode.nodeType }}</span>
+                            <template v-if="planNode.relationName">
+                              {{ ' on ' }}<strong>{{ planNode.relationName }}</strong>
+                            </template>
+                            <template v-if="planNode.alias">{{ ` (${planNode.alias})` }}</template>
+                            <template v-if="planNode.indexName">
+                              {{ ' using ' }}<em>{{ planNode.indexName }}</em>
+                            </template>
+                          </div>
+                          <div v-if="planNode.metrics.length > 0" class="ss-dash-explain-metrics">
+                            {{ planNode.metrics.join(' \u00B7 ') }}
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        v-else-if="explainHasRows(q.id as number)"
                         class="ss-dash-explain-result"
                       >
                         <table>
                           <thead>
                             <tr>
-                              <th v-for="col in explainPlanCols()" :key="col">{{ col }}</th>
+                              <th
+                                v-for="col in getExplainTableCols(q.id as number)"
+                                :key="col"
+                              >{{ col }}</th>
                             </tr>
                           </thead>
                           <tbody>
-                            <tr v-for="(row, ri) in explainData.plan" :key="ri">
-                              <td v-for="col in explainPlanCols()" :key="col">
-                                {{ planCellValue(row, col) }}
+                            <tr
+                              v-for="(row, ri) in getExplainRows(q.id as number)"
+                              :key="ri"
+                            >
+                              <td
+                                v-for="col in getExplainTableCols(q.id as number)"
+                                :key="col"
+                              >
+                                {{ formatCellValue(row[col]) }}
                               </td>
                             </tr>
                           </tbody>
@@ -637,7 +616,7 @@ const { tableRef } = useResizableTable(() => queries.value)
                       type="button"
                       class="ss-dash-explain-btn"
                       style="margin-left: 8px; flex-shrink: 0"
-                      @click="explainData = null"
+                      @click="closeExplain(q.id as number)"
                     >
                       Close
                     </button>

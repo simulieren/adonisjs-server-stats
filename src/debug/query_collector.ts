@@ -86,6 +86,10 @@ export class QueryCollector {
     return this.buffer.collectFromEnd((q) => q.id > lastId)
   }
 
+  getQueryById(id: number): QueryRecord | undefined {
+    return this.buffer.toArray().find((q) => q.id === id)
+  }
+
   getLatest(n: number = 100): QueryRecord[] {
     return this.buffer.latest(n)
   }

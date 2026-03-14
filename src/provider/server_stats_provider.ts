@@ -119,6 +119,8 @@ export default class ServerStatsProvider {
       getStatsController: () => this.statsController,
       getDebugController: () => this.debugController,
       getDashboardController: () => this.dashboardController,
+      getDebugStore: () => this.debugStore,
+      getApp: () => this.app,
       statsEndpoint,
       debugEndpoint,
       dashboardPath,

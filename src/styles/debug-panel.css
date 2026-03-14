@@ -272,24 +272,7 @@
 
 /* Table base / column resize → components.css */
 
-/* Query-specific styles */
-.ss-dbg-sql {
-  font-size: 11px;
-  color: var(--ss-sql-color);
-  word-break: break-all;
-  cursor: pointer;
-  max-width: 500px;
-  /* truncation → utilities.css */
-}
-.ss-dbg-sql.ss-dbg-expanded {
-  white-space: pre-wrap;
-  max-width: none;
-}
-/* Duration → components.css */
-.ss-dbg-dup {
-  color: var(--ss-purple-fg);
-  font-size: 10px;
-}
+/* Query-specific styles → components.css (sql, dup, explain, etc.) */
 
 /* Method badges → components.css */
 
@@ -309,12 +292,7 @@
   position: relative;
   /* truncation → utilities.css */
 }
-.ss-dbg-event-time {
-  color: var(--ss-dim);
-  font-size: 10px;
-  /* tabular-nums → utilities.css */
-  white-space: nowrap;
-}
+/* .ss-dbg-event-time → components.css */
 .ss-dbg-data-preview {
   cursor: pointer;
   color: var(--ss-text-secondary);

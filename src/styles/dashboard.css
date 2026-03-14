@@ -366,48 +366,12 @@ html:has(#ss-dash) body {
 }
 
 /* ── Tables ────────────────────────────────────────────────────── */
+/* Table base / table-wrap / sortable / clickable → components.css */
+/* Dashboard overrides: wider cell padding */
 .ss-dash-table-wrap {
   --ss-table-cell-px: 12px;
   --ss-table-cell-py: 7px;
   --ss-table-td-py: 6px;
-  flex: 1;
-  overflow-x: auto;
-  overflow-y: visible;
-  margin: 0 -2px;
-  padding: 0 2px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--ss-border) transparent;
-}
-/* Table base → components.css */
-/* Column resize → components.css */
-.ss-dash-table th {
-  z-index: 2;
-}
-.ss-dash-table td {
-  max-width: 0;
-}
-.ss-dash-table tr.ss-dash-explain-row:hover td {
-  background: var(--ss-surface-alt);
-}
-.ss-dash-table tr.ss-dash-clickable {
-  cursor: pointer;
-}
-.ss-dash-table tr.ss-dash-clickable:hover td {
-  background: var(--ss-hover-accent);
-}
-
-.ss-dash-sortable {
-  cursor: pointer;
-  user-select: none;
-}
-.ss-dash-sortable:hover {
-  color: var(--ss-accent);
-}
-
-.ss-dash-sort-arrow {
-  font-size: 10px;
-  color: var(--ss-accent);
-  margin-left: 2px;
 }
 
 .ss-dash-data-cell {
@@ -415,27 +379,7 @@ html:has(#ss-dash) body {
   max-width: 300px;
 }
 
-/* ── Method badges ─────────────────────────────────────────────── */
-/* Base + GET/POST/PUT/PATCH/DELETE → components.css */
-/* Dashboard-only SQL method variants */
-.ss-dash-method-select {
-  background: var(--ss-green-bg);
-  color: var(--ss-green-fg);
-}
-.ss-dash-method-insert {
-  background: var(--ss-blue-bg);
-  color: var(--ss-blue-fg);
-}
-.ss-dash-method-update {
-  background: var(--ss-amber-bg);
-  color: var(--ss-amber-fg);
-}
-.ss-dash-method-head,
-.ss-dash-method-options,
-.ss-dash-method-raw {
-  background: var(--ss-surface);
-  color: var(--ss-dim);
-}
+/* ── Method badges → components.css ────────────────────────────── */
 
 /* Status badges → components.css */
 /* Badge generic → components.css */
@@ -447,26 +391,7 @@ html:has(#ss-dash) body {
 
 /* Duration → components.css */
 
-/* ── SQL ───────────────────────────────────────────────────────── */
-.ss-dash-sql {
-  font-size: 11px;
-  color: var(--ss-sql-color);
-  word-break: break-all;
-  cursor: pointer;
-  max-width: 600px;
-  /* truncation → utilities.css */
-  display: inline-block;
-}
-.ss-dash-sql.ss-dash-expanded {
-  white-space: pre-wrap;
-  max-width: none;
-}
-
-.ss-dash-dup {
-  color: var(--ss-purple-fg);
-  font-size: 10px;
-  font-weight: 600;
-}
+/* ── SQL / Dup → components.css ────────────────────────────────── */
 
 /* ── Current route highlight ───────────────────────────────────── */
 .ss-dash-current-route td {
@@ -520,11 +445,7 @@ html:has(#ss-dash) body {
   font-size: 10px;
   position: relative;
 }
-.ss-dash-event-time {
-  color: var(--ss-dim);
-  font-size: 10px;
-  /* tabular-nums → utilities.css */
-}
+/* .ss-dash-event-time → components.css */
 
 /* ── Logs ──────────────────────────────────────────────────────── */
 /* Log entry / level / time / reqid / msg → components.css */
@@ -734,95 +655,7 @@ html:has(#ss-dash) body {
   flex-shrink: 0;
 }
 
-/* ── EXPLAIN panel ─────────────────────────────────────────────── */
-.ss-dash-explain-row td {
-  white-space: normal;
-  overflow: visible;
-  max-width: none;
-}
-.ss-dash-explain {
-  padding: 12px 16px;
-  background: var(--ss-surface-alt);
-  border-top: 1px solid var(--ss-border-dim);
-  font-size: 11px;
-  overflow: hidden;
-  word-break: break-word;
-}
-.ss-dash-explain-btn {
-  padding: 2px 8px;
-  font-size: 9px;
-  color: var(--ss-purple-fg);
-  background: var(--ss-purple-bg);
-  border: none;
-  border-radius: 3px;
-  cursor: pointer;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-weight: 600;
-}
-.ss-dash-explain-btn:hover {
-  opacity: 0.8;
-}
-.ss-dash-explain-btn-active {
-  background: var(--ss-purple-fg);
-  color: #fff;
-}
-.ss-dash-explain-result {
-  margin-top: 6px;
-  font-size: 11px;
-  color: var(--ss-text-secondary);
-}
-.ss-dash-explain-error {
-  color: var(--ss-red-fg);
-  padding: 8px;
-  background: var(--ss-red-bg);
-  border-radius: 4px;
-}
-.ss-dash-explain-node {
-  padding: 4px 0;
-  border-left: 2px solid var(--ss-border-dim);
-  padding-left: 10px;
-  margin-top: 2px;
-}
-.ss-dash-explain-node:first-child {
-  border-left: 2px solid var(--ss-purple-fg);
-}
-.ss-dash-explain-node-header {
-  font-weight: 600;
-  color: var(--ss-text-primary);
-  font-size: 11px;
-}
-.ss-dash-explain-node-type {
-  color: var(--ss-purple-fg);
-  font-weight: 700;
-}
-.ss-dash-explain-metrics {
-  font-size: 10px;
-  color: var(--ss-dim);
-  margin-top: 1px;
-  font-family: var(--ss-font-mono);
-  word-break: break-all;
-  overflow-wrap: break-word;
-}
-.ss-dash-explain-result table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 4px;
-}
-.ss-dash-explain-result th {
-  padding: 3px 8px;
-  text-align: left;
-  font-weight: 600;
-  color: var(--ss-muted);
-  border-bottom: 1px solid var(--ss-border);
-  font-size: 9px;
-  text-transform: uppercase;
-}
-.ss-dash-explain-result td {
-  padding: 3px 8px;
-  border-bottom: 1px solid var(--ss-border-faint);
-  color: var(--ss-text-secondary);
-}
+/* ── EXPLAIN panel → components.css ────────────────────────────── */
 
 /* ── Overview cards ────────────────────────────────────────────── */
 .ss-dash-overview {
