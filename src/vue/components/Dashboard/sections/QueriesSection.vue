@@ -426,7 +426,13 @@ const { tableRef } = useResizableTable(() => queries.value)
             </tr>
           </tbody>
         </table>
-        <div v-else class="ss-dash-empty">No queries recorded</div>
+        <div v-else class="ss-dash-empty">
+          <span>No queries recorded</span>
+          <span class="ss-empty-hint">
+            Queries require <code>debug: true</code> on your Lucid connections in
+            <code>config/database.ts</code>
+          </span>
+        </div>
       </div>
     </template>
 
@@ -641,7 +647,13 @@ const { tableRef } = useResizableTable(() => queries.value)
             </template>
           </tbody>
         </table>
-        <div v-else class="ss-dash-empty">No queries recorded</div>
+        <div v-else class="ss-dash-empty">
+          <span>No queries recorded</span>
+          <span class="ss-empty-hint">
+            Queries require <code>debug: true</code> on your Lucid connections in
+            <code>config/database.ts</code>
+          </span>
+        </div>
       </div>
       <PaginationControls
         v-if="pagination.totalPages > 1"

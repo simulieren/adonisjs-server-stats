@@ -97,6 +97,19 @@ export default defineConfig({
 })
 ```
 
+> **Tip: Enable query capture** -- Lucid only emits `db:query` events when `debug: true` is set on the connection. Without it, the Queries panel will be empty.
+>
+> ```ts
+> // config/database.ts
+> connections: {
+>   postgres: {
+>     client: 'pg',
+>     debug: app.inDev,  // ← enables query capture in development
+>     connection: { ... },
+>   },
+> }
+> ```
+
 **Full control** -- override auto-detection with explicit collectors:
 
 ```ts

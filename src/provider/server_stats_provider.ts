@@ -63,6 +63,7 @@ export default class ServerStatsProvider {
   transmitChannels: string[] = []
   private resolvedConfig: ResolvedServerStatsConfig | null = null
   private resolvedCollectors: MetricCollector[] = []
+  private lucidDebugConnections: string[] = []
 
   /** Resolves when initStats completes (or rejects). Null if not yet scheduled. */
   private initPromise: Promise<void> | null = null
@@ -161,6 +162,7 @@ export default class ServerStatsProvider {
     const SC = (await import('../controller/server_stats_controller.js')).default
     this.statsController = new SC(this.engine)
     if (config.devToolbar?.enabled && !this.app.inProduction) {
+      this.checkLucidDebugFlag()
       await this.setupDevToolbar(config)
     }
     const iv = await setupStatsIntervalHelper(this.engine, config, container)
@@ -237,6 +239,40 @@ export default class ServerStatsProvider {
     }
   }
 
+  /**
+   * Check Lucid database connections for `debug: true` and warn if missing.
+   * Without it, Lucid won't emit `db:query` events and no queries will be captured.
+   */
+  private checkLucidDebugFlag() {
+    const dbConfig = this.app.config.get<{
+      connection?: string
+      connections?: Record<string, { debug?: boolean }>
+    }>('database')
+    if (!dbConfig?.connections) return
+    const enabled: string[] = []
+    const disabled: string[] = []
+    for (const [name, conn] of Object.entries(dbConfig.connections)) {
+      if (conn?.debug) enabled.push(name)
+      else disabled.push(name)
+    }
+    this.lucidDebugConnections = enabled
+    if (enabled.length === 0 && disabled.length > 0) {
+      log.block('query capture is disabled — no Lucid connections have debug: true', [
+        '',
+        dim('Lucid only emits db:query events when debug is enabled on a connection.'),
+        dim('Add this to your database connection in config/database.ts:'),
+        '',
+        `  ${disabled[0]}: {`,
+        `    client: '...',`,
+        `    debug: true,      ${dim('// ← enables query capture')}`,
+        `    connection: { ... },`,
+        `  }`,
+        '',
+        dim(`Connections without debug: ${disabled.join(', ')}`),
+      ])
+    }
+  }
+
   getDiagnostics() {
     return buildDiagnostics({
       intervalId: this.intervalId,
@@ -253,6 +289,7 @@ export default class ServerStatsProvider {
       hasCacheCollector: this.resolvedCollectors.some((c) => c.name === 'redis'),
       hasQueueCollector: this.resolvedCollectors.some((c) => c.name === 'queue'),
       config: this.resolvedConfig,
+      lucidDebugConnections: this.lucidDebugConnections,
     })
   }
 

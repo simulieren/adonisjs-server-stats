@@ -64,7 +64,13 @@ const { tableRef } = useResizableTable(() => queries.value)
       <span class="ss-dbg-summary">{{ summary }}</span>
     </div>
 
-    <div v-if="queries.length === 0" class="ss-dbg-empty">No queries captured</div>
+    <div v-if="queries.length === 0" class="ss-dbg-empty">
+      <span>No queries captured</span>
+      <span class="ss-empty-hint">
+        Queries require <code>debug: true</code> on your Lucid connections in
+        <code>config/database.ts</code>
+      </span>
+    </div>
 
     <table v-else ref="tableRef" class="ss-dbg-table">
       <thead>

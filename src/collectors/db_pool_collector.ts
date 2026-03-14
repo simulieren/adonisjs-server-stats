@@ -61,20 +61,24 @@ export function dbPoolCollector(opts?: DbPoolCollectorOptions): MetricCollector 
     async collect() {
       try {
         return await collectPoolMetrics(connectionName, {
-          warnConnectionNotFound(alreadyWarned) {
-            if (!alreadyWarned) warnedConnectionNotFound = true
-            return warnedConnectionNotFound
+          onConnectionNotFound() {
+            if (!warnedConnectionNotFound) {
+              warnedConnectionNotFound = true
+              warnConnectionNotFound(connectionName)
+            }
           },
-          warnPoolUnavailable(alreadyWarned) {
-            if (!alreadyWarned) warnedPoolUnavailable = true
-            return warnedPoolUnavailable
+          onPoolUnavailable() {
+            if (!warnedPoolUnavailable) {
+              warnedPoolUnavailable = true
+              warnPoolUnavailable(connectionName)
+            }
           },
-          isConnectionNotFoundWarned: () => warnedConnectionNotFound,
-          isPoolUnavailableWarned: () => warnedPoolUnavailable,
         })
       } catch {
-        warnLucidMissing(warnedLucidMissing)
-        warnedLucidMissing = true
+        if (!warnedLucidMissing) {
+          warnedLucidMissing = true
+          warnLucidMissing()
+        }
         return POOL_DEFAULTS
       }
     },
@@ -84,10 +88,8 @@ export function dbPoolCollector(opts?: DbPoolCollectorOptions): MetricCollector 
 async function collectPoolMetrics(
   connectionName: string,
   warns: {
-    isConnectionNotFoundWarned: () => boolean
-    isPoolUnavailableWarned: () => boolean
-    warnConnectionNotFound: (already: boolean) => boolean
-    warnPoolUnavailable: (already: boolean) => boolean
+    onConnectionNotFound: () => void
+    onPoolUnavailable: () => void
   }
 ) {
   const { default: db } = await appImport<typeof import('@adonisjs/lucid/services/db')>(
@@ -95,21 +97,18 @@ async function collectPoolMetrics(
   )
   const connection = db.manager.get(connectionName)
   if (!connection) {
-    warnConnectionNotFound(connectionName, warns.isConnectionNotFoundWarned())
-    warns.warnConnectionNotFound(true)
+    warns.onConnectionNotFound()
     return POOL_DEFAULTS
   }
   const pool = (connection.connection as unknown as { pool?: KnexPool })?.pool
   if (!pool) {
-    warnPoolUnavailable(connectionName, warns.isPoolUnavailableWarned())
-    warns.warnPoolUnavailable(true)
+    warns.onPoolUnavailable()
     return POOL_DEFAULTS
   }
   return extractPoolMetrics(pool)
 }
 
-function warnConnectionNotFound(name: string, alreadyWarned: boolean): void {
-  if (alreadyWarned) return
+function warnConnectionNotFound(name: string): void {
   log.block(`db_pool: connection ${bold(name)} not found in db.manager`, [
     dim('The name must match a key in your') +
       ` ${bold('config/database.ts')} ` +
@@ -118,8 +117,7 @@ function warnConnectionNotFound(name: string, alreadyWarned: boolean): void {
   ])
 }
 
-function warnPoolUnavailable(name: string, alreadyWarned: boolean): void {
-  if (alreadyWarned) return
+function warnPoolUnavailable(name: string): void {
   log.block(`db_pool: pool not available on connection ${bold(name)}`, [
     dim('This usually means the connection has not been established yet,'),
     dim('or the database driver does not expose a Knex-style pool.'),
@@ -127,8 +125,7 @@ function warnPoolUnavailable(name: string, alreadyWarned: boolean): void {
   ])
 }
 
-function warnLucidMissing(alreadyWarned: boolean): void {
-  if (alreadyWarned) return
+function warnLucidMissing(): void {
   log.block(`db_pool: ${bold('@adonisjs/lucid')} is not installed or failed to import`, [
     dim('Install it with:'),
     `  ${bold('node ace add @adonisjs/lucid')}`,

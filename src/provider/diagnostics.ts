@@ -25,6 +25,8 @@ export interface DiagnosticsInput {
   hasQueueCollector?: boolean
   resolvedCollectors?: CollectorRef[]
   config: DiagnosticsConfig | null
+  /** Lucid connections that have debug: true (empty = no query events emitted). */
+  lucidDebugConnections?: string[]
 }
 
 interface DiagnosticsConfig {
@@ -185,5 +187,6 @@ export function buildDiagnostics(input: DiagnosticsInput) {
     integrations: buildIntegrationsDiagnostics(input),
     config: buildConfigDiagnostics(input.config),
     devToolbar: buildDevToolbarDiagnostics(input.config),
+    lucidDebugConnections: input.lucidDebugConnections ?? [],
   }
 }

@@ -4,26 +4,34 @@
  */
 
 /* ── Reset & base ──────────────────────────────────────────────── */
-#ss-dash,
-#ss-dash *,
-#ss-dash *::before,
-#ss-dash *::after {
+/* :where() keeps specificity at (0,0,0) so class selectors can override */
+:where(#ss-dash),
+:where(#ss-dash) *,
+:where(#ss-dash) *::before,
+:where(#ss-dash) *::after {
   box-sizing: border-box;
 }
 
-#ss-dash *,
-#ss-dash *::before,
-#ss-dash *::after {
+:where(#ss-dash) *,
+:where(#ss-dash) *::before,
+:where(#ss-dash) *::after {
   margin: 0;
   padding: 0;
 }
 
-#ss-dash button,
-#ss-dash input,
-#ss-dash select,
-#ss-dash textarea,
-#ss-dash pre {
+:where(#ss-dash) button,
+:where(#ss-dash) input,
+:where(#ss-dash) select,
+:where(#ss-dash) textarea,
+:where(#ss-dash) pre {
   font-family: inherit;
+}
+
+/* ── Host page reset (only when dashboard is present) ──────────── */
+html:has(#ss-dash),
+html:has(#ss-dash) body {
+  margin: 0;
+  padding: 0;
 }
 
 /* ── Page layout ───────────────────────────────────────────────── */

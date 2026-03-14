@@ -72,6 +72,8 @@ export interface DiagnosticsResponse {
     channels: string[]
   }
   integrations: Record<string, { active?: boolean; available?: boolean; mode?: string }>
+  /** Lucid connections that have debug: true. Empty means no query events will be emitted. */
+  lucidDebugConnections?: string[]
   storage: {
     ready: boolean
     dbPath: string

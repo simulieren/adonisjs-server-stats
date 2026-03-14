@@ -20,7 +20,7 @@ interface DataTableProps<T> {
   onSort?: (key: string) => void
   onRowClick?: (row: T) => void
   rowClassName?: string | ((row: T) => string)
-  emptyMessage?: string
+  emptyMessage?: React.ReactNode
   className?: string
   renderAfterRow?: (row: T, index: number) => React.ReactNode
 }

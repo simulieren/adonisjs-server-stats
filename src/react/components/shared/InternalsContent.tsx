@@ -206,8 +206,34 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
     [revealedConfigs, toggleReveal, p]
   )
 
+  const hasLucid = data.collectors?.some((c) => c.name === 'db_pool' || c.name === 'app')
+  const noLucidDebug =
+    hasLucid &&
+    Array.isArray(data.lucidDebugConnections) &&
+    data.lucidDebugConnections.length === 0
+
   return (
     <div>
+      {/* Warning: Lucid debug flag not set */}
+      {noLucidDebug && (
+        <div
+          style={{
+            background: 'var(--ss-amber-bg)',
+            color: 'var(--ss-amber-fg)',
+            padding: '8px 12px',
+            borderRadius: '6px',
+            fontSize: '12px',
+            marginBottom: '12px',
+            lineHeight: 1.5,
+          }}
+        >
+          <strong>Query capture disabled</strong> — no Lucid connections have{' '}
+          <code style={{ fontSize: '11px' }}>debug: true</code>. Add it to your database connection
+          in <code style={{ fontSize: '11px' }}>config/database.ts</code> to see queries in the
+          Queries panel.
+        </div>
+      )}
+
       {/* 1. Package Info — compact card row */}
       <h3 className={`${p}-internals-title`}>Package Info</h3>
       <div className={`${p}-info-cards`}>

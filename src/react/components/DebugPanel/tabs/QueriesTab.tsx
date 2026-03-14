@@ -65,7 +65,13 @@ export function QueriesTab({ options }: QueriesTabProps) {
       />
 
       {queries.length === 0 ? (
-        <div className="ss-dbg-empty">No queries captured</div>
+        <div className="ss-dbg-empty">
+          <span>No queries captured</span>
+          <span className="ss-empty-hint">
+            Queries require <code>debug: true</code> on your Lucid connections in{' '}
+            <code>config/database.ts</code>
+          </span>
+        </div>
       ) : (
         <table ref={tableRef} className="ss-dbg-table">
           <colgroup>

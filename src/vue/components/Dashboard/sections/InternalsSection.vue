@@ -173,6 +173,29 @@ const integrationEntries = computed(() => {
     <div v-else-if="!diagnostics" class="ss-dash-empty">Diagnostics not available</div>
 
     <template v-else>
+      <!-- Warning: Lucid debug flag not set -->
+      <div
+        v-if="
+          diagnostics.collectors?.some((c: any) => c.name === 'db_pool' || c.name === 'app') &&
+          Array.isArray(diagnostics.lucidDebugConnections) &&
+          diagnostics.lucidDebugConnections.length === 0
+        "
+        :style="{
+          background: 'var(--ss-amber-bg)',
+          color: 'var(--ss-amber-fg)',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          fontSize: '12px',
+          marginBottom: '12px',
+          lineHeight: '1.5',
+        }"
+      >
+        <strong>Query capture disabled</strong> — no Lucid connections have
+        <code style="font-size: 11px">debug: true</code>. Add it to your database connection in
+        <code style="font-size: 11px">config/database.ts</code> to see queries in the Queries
+        panel.
+      </div>
+
       <!-- 1. Package Info -->
       <h3 class="ss-dash-section-title">Package Info</h3>
       <div class="ss-dash-info-cards">

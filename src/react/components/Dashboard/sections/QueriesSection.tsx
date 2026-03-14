@@ -525,7 +525,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
               sort={sort}
               sortDir={sortDir}
               onSort={handleSort}
-              emptyMessage="No queries recorded"
+              emptyMessage={<>No queries recorded<span className="ss-empty-hint">Queries require <code>debug: true</code> on your Lucid connections in <code>config/database.ts</code></span></>}
             />
           </div>
         </>
@@ -682,7 +682,7 @@ export function QueriesSection({ options = {} }: QueriesSectionProps) {
               sort={sort}
               sortDir={sortDir}
               onSort={handleSort}
-              emptyMessage="No queries recorded"
+              emptyMessage={<>No queries recorded<span className="ss-empty-hint">Queries require <code>debug: true</code> on your Lucid connections in <code>config/database.ts</code></span></>}
               renderAfterRow={renderExplainRow}
             />
           </div>
