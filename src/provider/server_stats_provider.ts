@@ -126,6 +126,7 @@ export default class ServerStatsProvider {
       dashboardPath,
       shouldShow: config.shouldShow,
       whenReady: () => this.whenReady(),
+      domain: config.domain,
     })
     const paths = collectRegisteredPaths(statsEndpoint, debugEndpoint, dashboardPath)
     if (paths.length === 0) return

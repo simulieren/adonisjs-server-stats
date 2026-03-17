@@ -29,6 +29,8 @@ export interface RegisterRoutesOptions {
   shouldShow?: (ctx: HttpContext) => boolean
   /** Optional promise that resolves when controllers are initialized. */
   whenReady?: () => Promise<void>
+  /** Optional domain restriction for all routes. */
+  domain?: string
 }
 
 /**
@@ -42,7 +44,8 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       options.router,
       options.statsEndpoint,
       options.getStatsController,
-      middleware
+      middleware,
+      options.domain
     )
   }
 
@@ -56,6 +59,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       getApp: options.getApp,
       middleware,
       whenReady: options.whenReady,
+      domain: options.domain,
     })
   }
 
@@ -67,6 +71,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       getApiController: options.getApiController,
       middleware,
       whenReady: options.whenReady,
+      domain: options.domain,
     })
   }
 }

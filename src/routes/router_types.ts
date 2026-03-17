@@ -13,6 +13,21 @@ export interface AdonisRoute {
 }
 
 /**
+ * Return type of `router.group()` supporting the chaining patterns
+ * used by server-stats route registration.
+ *
+ * AdonisJS allows chaining `.prefix()`, `.domain()`, and `.use()` in
+ * any order on a route group. This interface covers the combinations
+ * we use: `.prefix().use()`, `.prefix().domain().use()`, and
+ * `.domain().prefix().use()`.
+ */
+export interface AdonisRouteGroup {
+  prefix(path: string): AdonisRouteGroup
+  domain(host: string): AdonisRouteGroup
+  use(middleware: unknown[]): void
+}
+
+/**
  * Minimal interface for the AdonisJS router used in route registration.
  *
  * Covers every HTTP method and grouping pattern used by
@@ -22,5 +37,5 @@ export interface AdonisRouter {
   get(pattern: string, handler: (ctx: HttpContext) => unknown): AdonisRoute
   post(pattern: string, handler: (ctx: HttpContext) => unknown): AdonisRoute
   delete(pattern: string, handler: (ctx: HttpContext) => unknown): AdonisRoute
-  group(callback: () => void): { prefix(path: string): { use(middleware: unknown[]): void } }
+  group(callback: () => void): AdonisRouteGroup
 }

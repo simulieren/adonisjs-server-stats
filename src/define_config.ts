@@ -164,5 +164,6 @@ export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConf
     devToolbar: resolveDevToolbar(config),
     shouldShow: config.authorize ?? config.shouldShow,
     verbose,
+    domain: config.domain,
   }
 }

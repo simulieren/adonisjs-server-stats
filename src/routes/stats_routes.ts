@@ -7,17 +7,25 @@ export function registerStatsRoute(
   router: AdonisRouter,
   endpoint: string,
   getController: () => ServerStatsController | null,
-  middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>
+  middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>,
+  domain?: string
 ) {
-  router
-    .get(endpoint, async (ctx: HttpContext) => {
-      const controller = getController()
-      if (!controller)
-        return ctx.response.serviceUnavailable({
-          error: 'Stats engine is starting up, please retry',
-        })
-      return controller.index(ctx)
-    })
-    .as('server-stats.api')
-    .use(middleware)
+  const handler = async (ctx: HttpContext) => {
+    const controller = getController()
+    if (!controller)
+      return ctx.response.serviceUnavailable({
+        error: 'Stats engine is starting up, please retry',
+      })
+    return controller.index(ctx)
+  }
+
+  if (domain) {
+    router
+      .group(() => {
+        router.get(endpoint, handler).as('server-stats.api').use(middleware)
+      })
+      .domain(domain)
+  } else {
+    router.get(endpoint, handler).as('server-stats.api').use(middleware)
+  }
 }
