@@ -131,7 +131,7 @@ test.group('ApiClient | fetch auth', (group) => {
     assert.equal(captured[0].init.credentials, 'omit')
   })
 
-  test('cookie auth sets credentials=include and no Authorization header', async ({
+  test('cookie auth sets credentials=same-origin and no Authorization header', async ({
     assert,
   }) => {
     const captured = mockFetch({ ok: true, status: 200 }, { data: 1 })
@@ -142,7 +142,7 @@ test.group('ApiClient | fetch auth', (group) => {
     const headers = captured[0].init.headers as Record<string, string>
     assert.notProperty(headers, 'Authorization')
     assert.equal(headers['Accept'], 'application/json')
-    assert.equal(captured[0].init.credentials, 'include')
+    assert.equal(captured[0].init.credentials, 'same-origin')
   })
 })
 

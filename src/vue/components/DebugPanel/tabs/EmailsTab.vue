@@ -63,7 +63,7 @@ async function openPreview(email: EmailRecord) {
       if (props.authToken) headers['Authorization'] = `Bearer ${props.authToken}`
       const res = await fetch(`${endpoint}/emails/${email.id}/preview`, {
         headers,
-        credentials: props.authToken ? 'omit' : 'include',
+        credentials: props.authToken ? 'omit' : 'same-origin',
       })
       if (res.ok) {
         previewHtml.value = await res.text()

@@ -1,7 +1,9 @@
 import { log, dim, bold } from '../utils/logger.js'
 import {
   detectGlobalAuthMiddleware,
+  detectGlobalSessionMiddleware,
   buildAuthMiddlewareWarning,
+  buildSessionMiddlewareWarning,
 } from './auth_middleware_detector.js'
 
 import type { ResolvedServerStatsConfig } from '../types.js'
@@ -80,6 +82,17 @@ export function warnAboutAuthMiddleware(
   log.block(
     bold('found global auth middleware that will run on every poll:'),
     buildAuthMiddlewareWarning(found, dim, bold)
+  )
+}
+
+export function warnAboutSessionMiddleware(
+  makePath: (dir: string, file: string) => string
+) {
+  const found = detectGlobalSessionMiddleware(makePath)
+  if (found.length === 0) return
+  log.block(
+    bold('found global session middleware that affects server-stats routes:'),
+    buildSessionMiddlewareWarning(found, dim, bold)
   )
 }
 

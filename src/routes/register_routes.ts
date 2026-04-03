@@ -1,6 +1,7 @@
 import { createAccessMiddleware } from './access_middleware.js'
 import { registerDashboardRoutes } from './dashboard_routes.js'
 import { registerDebugRoutes } from './debug_routes.js'
+import { noSessionMiddleware } from './no_session_middleware.js'
 import { registerStatsRoute } from './stats_routes.js'
 
 import type { ApiController } from '../controller/api_controller.js'
@@ -35,7 +36,10 @@ export interface RegisterRoutesOptions {
  * Register all server-stats routes in a single call.
  */
 export function registerAllRoutes(options: RegisterRoutesOptions): void {
-  const middleware = options.shouldShow ? [createAccessMiddleware(options.shouldShow)] : []
+  const middleware = [
+    noSessionMiddleware,
+    ...(options.shouldShow ? [createAccessMiddleware(options.shouldShow)] : []),
+  ]
 
   if (typeof options.statsEndpoint === 'string') {
     registerStatsRoute(

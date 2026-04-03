@@ -441,7 +441,25 @@ Registered when `dashboard` is enabled. Base path configurable via `dashboard.pa
 
 ### Global middleware note
 
-Auto-registered routes bypass route-level middleware but are still subject to global/server middleware. If you have auth middleware (like `silentAuth`) registered globally, each polling request will trigger a DB query every few seconds.
+Auto-registered routes bypass route-level middleware but are still subject to global/server middleware.
+
+**Session middleware:** If you have session middleware registered globally in `router.use()`, every polling request (every ~3 seconds) will trigger a `Set-Cookie` response. The package automatically strips `Set-Cookie` headers from its own routes to prevent cookie accumulation, but for cleanest results we recommend moving session middleware to a named route group:
+
+```ts
+// start/kernel.ts — remove session from router.use()
+router.use([
+  () => import('@adonisjs/core/bodyparser_middleware'),
+  // () => import('@adonisjs/session/session_middleware'),  ← remove
+  () => import('@adonisjs/shield/shield_middleware'),
+])
+
+// start/routes.ts — add to your route groups instead
+router.group(() => {
+  // your app routes here
+}).use(middleware.session())
+```
+
+**Auth middleware:** If you have auth middleware (like `silentAuth`) registered globally, each polling request will trigger a DB query every few seconds.
 
 To avoid this, either:
 

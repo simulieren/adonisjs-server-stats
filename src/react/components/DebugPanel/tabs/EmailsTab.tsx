@@ -48,7 +48,7 @@ export function EmailsTab({ options }: EmailsTabProps) {
           if (options?.authToken) headers['Authorization'] = `Bearer ${options.authToken}`
           const res = await fetch(`${endpoint}/emails/${email.id}/preview`, {
             headers,
-            credentials: options?.authToken ? 'omit' : 'include',
+            credentials: options?.authToken ? 'omit' : 'same-origin',
           })
           if (res.ok) {
             setPreviewHtml(await res.text())

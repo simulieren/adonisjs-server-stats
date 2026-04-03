@@ -7,6 +7,7 @@ import {
   computeDashboardPath,
   collectRegisteredPaths,
   warnAboutAuthMiddleware,
+  warnAboutSessionMiddleware,
 } from './boot_helpers.js'
 import { resolveToolbarConfig, buildExcludedPrefixes } from './dashboard_setup.js'
 import { buildDiagnostics } from './diagnostics.js'
@@ -131,6 +132,7 @@ export default class ServerStatsProvider {
     if (paths.length === 0) return
     log.list('routes auto-registered (no manual setup needed):', paths)
     warnAboutAuthMiddleware(config, this.app.makePath.bind(this.app))
+    warnAboutSessionMiddleware(this.app.makePath.bind(this.app))
   }
 
   async ready() {
