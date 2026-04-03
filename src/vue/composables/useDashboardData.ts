@@ -270,11 +270,11 @@ function createReactiveState(perPage: number): DashboardRefs {
 }
 
 /** Build the return value of the composable. */
-function buildReturnValue(
+function buildReturnValue<T extends Record<string, unknown>>(
   refs: DashboardRefs,
   navMethods: ReturnType<typeof buildNavigationMethods>,
   lifecycleMethods: ReturnType<typeof buildLifecycleMethods>,
-  apiHelpers: Record<string, unknown>
+  apiHelpers: T
 ) {
   return {
     data: refs.data,
