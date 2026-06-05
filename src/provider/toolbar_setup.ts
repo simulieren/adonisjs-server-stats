@@ -58,7 +58,7 @@ export async function setupDevToolbarCore(
   const em = await resolve('emitter')
   if (!em) log.warn('emitter not available — query/event collection disabled')
   await debugStore.start(em, await resolve('router'))
-  const emailBridgeRedis = await setupBridgeInternal(em, debugStore)
+  const emailBridgeRedis = await setupBridgeInternal(em, debugStore, app)
   const debugController = await createDebugController(debugStore, config, getDiagnostics, app)
   if (debugStore.traces) setTraceCollector(debugStore.traces)
   const flushTimer = persistPath ? createFlushTimer(debugStore, persistPath) : null
@@ -120,7 +120,11 @@ function createFlushTimer(
   }, 30_000)
 }
 
-async function setupBridgeInternal(emitter: unknown, debugStore: DebugStore): Promise<unknown> {
+async function setupBridgeInternal(
+  emitter: unknown,
+  debugStore: DebugStore,
+  app: ApplicationService
+): Promise<unknown> {
   if (!emitter) return null
   try {
     const { appImport } = await import('../utils/app_import.js')
@@ -131,11 +135,26 @@ async function setupBridgeInternal(emitter: unknown, debugStore: DebugStore): Pr
       publish(c: string, m: string): Promise<unknown>
       subscribe(c: string, h: (m: string) => void): unknown
     }
+    // Lazily resolve the SQLite dashboard store: it's registered as a
+    // container singleton later in boot, but remote emails only arrive
+    // post-boot, so cross-process (queue-worker) emails get persisted
+    // where the dashboard/debug APIs read from.
+    const getDashboardStore = async (): Promise<{
+      recordEmail(record: Record<string, unknown>): void
+    } | null> => {
+      try {
+        return (await app.container.make('dashboard.store')) as {
+          recordEmail(record: Record<string, unknown>): void
+        }
+      } catch {
+        return null
+      }
+    }
     return await setupFullEmailBridge(
       emitter as { on(e: string, h: (...a: unknown[]) => void): void },
       redis,
       'adonisjs-server-stats:emails',
-      { debugEmails: debugStore.emails ?? null, dashboardStore: null }
+      { debugEmails: debugStore.emails ?? null, dashboardStore: getDashboardStore }
     )
   } catch {
     return null

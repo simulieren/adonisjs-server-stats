@@ -4,6 +4,18 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-06-05
+
+### Features
+
+- Add `@adonisjs/queue` support (parity with BullMQ): live metrics collector + Jobs inspector (overview, list, detail, retry). Auto-detected alongside BullMQ — both `database` (Lucid) and `redis` drivers of `@adonisjs/queue`/`@boringnode/queue` are supported
+- Cross-process email capture now persists worker-process emails to the dashboard SQLite store — emails sent from `@adonisjs/queue` workers (or any separate process) appear in the dashboard with HTML preview, not just the in-memory toolbar
+
+### Bug Fixes
+
+- Fix queue collector resolving config via a non-existent `@adonisjs/queue/config` subpath — now resolved via `@adonisjs/core/services/app`
+- Fix `AdonisQueueInspector` store-reader resolution race: concurrent `getOverview`/`listJobs` calls returned empty results — now memoizes the resolution promise
+
 ## [1.12.1] - 2026-03-14
 
 ### Bug Fixes

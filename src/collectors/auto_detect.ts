@@ -97,17 +97,24 @@ async function registerOptionalCollectors(
   })
 
   const hasBullMQ = await isInstalled('bullmq')
+  const hasAdonisQueue = hasBullMQ ? false : await isInstalled('@adonisjs/queue')
+
   if (hasBullMQ) {
     const { queueCollector } = await import('./queue_collector.js')
     collectors.push(
       queueCollector({ queueName: 'default', connection: { host: '127.0.0.1', port: 6379 } })
     )
+  } else if (hasAdonisQueue) {
+    const { adonisQueueCollector } = await import('./adonisjs_queue_collector.js')
+    collectors.push(adonisQueueCollector())
   }
+
+  const queueEnabled = hasBullMQ || hasAdonisQueue
   pushOptionalEntry(entries, {
     name: 'queue',
     description: 'jobs, wait time, throughput',
-    enabled: hasBullMQ,
-    pkg: 'bullmq',
+    enabled: queueEnabled,
+    pkg: hasBullMQ ? 'bullmq' : hasAdonisQueue ? '@adonisjs/queue' : 'bullmq',
   })
 }
 

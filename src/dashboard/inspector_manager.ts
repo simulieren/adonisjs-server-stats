@@ -1,18 +1,20 @@
 import { log } from '../utils/logger.js'
 import { CacheInspector } from './integrations/cache_inspector.js'
 import { QueueInspector } from './integrations/queue_inspector.js'
+import { AdonisQueueInspector } from './integrations/adonisjs_queue_inspector.js'
 
 import type { ApplicationService } from '@adonisjs/core/types'
+import type { QueueInspectorContract } from './integrations/queue_inspector_contract.js'
 
 /**
  * Manages lazy initialization and availability detection for
- * cache (Redis) and queue (BullMQ) inspectors.
+ * cache (Redis) and queue (BullMQ / @adonisjs/queue) inspectors.
  *
  * Extracted from DashboardController to reduce file size and complexity.
  */
 export class InspectorManager {
   private cacheInspector: CacheInspector | null = null
-  private queueInspector: QueueInspector | null = null
+  private queueInspector: QueueInspectorContract | null = null
   private cacheAvailable: boolean | null = null
   private queueAvailable: boolean | null = null
 
@@ -41,22 +43,32 @@ export class InspectorManager {
     }
   }
 
-  /** Lazy-init the queue inspector. Returns null if BullMQ is unavailable. */
-  async getQueueInspector(): Promise<QueueInspector | null> {
+  /** Lazy-init the queue inspector. Returns null if neither BullMQ nor @adonisjs/queue is available. */
+  async getQueueInspector(): Promise<QueueInspectorContract | null> {
     if (this.queueAvailable === false) return null
     if (this.queueInspector) return this.queueInspector
 
     try {
-      const available = await QueueInspector.isAvailable(this.app)
-      this.queueAvailable = available
-      if (!available) {
-        log.info('dashboard: Queue not detected — Jobs panel disabled')
-        return null
+      // Try BullMQ (@rlanz/bull-queue) first.
+      if (await QueueInspector.isAvailable(this.app)) {
+        const queue = await this.app.container.make('rlanz/queue')
+        this.queueInspector = new QueueInspector(queue)
+        this.queueAvailable = true
+        log.info('dashboard: BullMQ detected — Jobs panel enabled')
+        return this.queueInspector
       }
 
-      const queue = await this.app.container.make('rlanz/queue')
-      this.queueInspector = new QueueInspector(queue)
-      return this.queueInspector
+      // Fall back to @adonisjs/queue.
+      if (await AdonisQueueInspector.isAvailable(this.app)) {
+        this.queueInspector = new AdonisQueueInspector(this.app)
+        this.queueAvailable = true
+        log.info('dashboard: @adonisjs/queue detected — Jobs panel enabled')
+        return this.queueInspector
+      }
+
+      this.queueAvailable = false
+      log.info('dashboard: Queue not detected — Jobs panel disabled')
+      return null
     } catch (err) {
       this.queueAvailable = false
       log.warn('dashboard: QueueInspector init failed — ' + (err as Error)?.message)

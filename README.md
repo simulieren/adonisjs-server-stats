@@ -271,7 +271,7 @@ Each collector is a factory function that returns a `MetricCollector`. All colle
 | `httpCollector(opts?)`   | Requests/sec, avg response time, error rate, active connections | optional     | --                |
 | `dbPoolCollector(opts?)` | Pool used/free/pending/max connections                          | optional     | `@adonisjs/lucid` |
 | `redisCollector()`       | Status, memory, clients, keys, hit rate                         | none         | `@adonisjs/redis` |
-| `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count                | **required** | `bullmq`          |
+| `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count                | **required** | `bullmq` or `@adonisjs/queue`/`@boringnode/queue` (auto-detected) |
 | `logCollector(opts?)`    | Errors/warnings/entries (5m window), entries/minute             | optional     | --                |
 | `appCollector()`         | Online users, pending webhooks, pending emails                  | none         | `@adonisjs/lucid` |
 
@@ -673,13 +673,15 @@ The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `m
 
 ### Cross-Process Email Capture (Queue Workers)
 
-AdonisJS mail events (`mail:sending`, `mail:sent`, etc.) are process-local. If your app sends emails from **Bull queue workers** or other separate processes, the web server's email collector never sees them.
+AdonisJS mail events (`mail:sending`, `mail:sent`, etc.) are process-local. If your app sends emails from **queue workers** (BullMQ via `@rlanz/bull-queue`, or `@adonisjs/queue`/`@boringnode/queue`) or other separate processes, the web server's email collector never sees them.
 
 The provider handles this automatically via a **Redis pub/sub bridge**:
 
 1. In queue workers (`console` environment), the provider only starts a lightweight email bridge publisher — no debug store, routes, or dashboard overhead
 2. When an email is sent, the event is published to a Redis pub/sub channel
 3. In the web server (`web` environment), the provider subscribes to the same channel and ingests the email into both the debug panel and the dashboard
+
+Worker-sent emails appear in the dashboard with HTML preview alongside emails sent from web requests — no additional configuration needed.
 
 **Requirements:**
 - `@adonisjs/redis` must be installed and configured (used for pub/sub between processes)
@@ -810,7 +812,7 @@ export default defineConfig({
 | **Emails**   | Email history with sender, recipient, subject, status. Click for HTML preview in iframe                                                                 |
 | **Timeline** | Per-request waterfall timeline (requires `tracing: true`)                                                                                               |
 | **Cache**    | Redis key browser with SCAN-based listing, type-aware detail view, and server stats (requires `@adonisjs/redis`)                                        |
-| **Jobs**     | Queue overview with job listing, detail, and retry for failed jobs (requires `@rlanz/bull-queue`)                                                       |
+| **Jobs**     | Queue overview with job listing, detail, and retry for failed jobs (requires `bullmq` or `@adonisjs/queue`/`@boringnode/queue` — auto-detected)         |
 | **Config**   | Sanitized view of app configuration and environment variables. Secrets are auto-redacted                                                                |
 
 #### Access Control
@@ -1069,7 +1071,9 @@ All integrations use lazy `import()` -- missing peer deps won't crash the app. T
 | `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time       |
 | `@adonisjs/transmit-client` | React/Vue real-time updates (falls back to polling) |
 | `@julr/adonisjs-prometheus` | `serverStatsCollector`                              |
-| `bullmq`                    | `queueCollector`                                    |
+| `bullmq`                    | `queueCollector` (BullMQ backend)                   |
+| `@adonisjs/queue`           | `queueCollector` (AdonisJS queue backend, auto-detected) |
+| `@boringnode/queue`         | `queueCollector` (AdonisJS queue backend, auto-detected) |
 | `better-sqlite3`            | Dashboard (`dashboard: true`)                       |
 | `edge.js`                   | Edge tag                                            |
 | `react`, `react-dom`        | React components (alpha)                            |
