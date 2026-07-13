@@ -4,6 +4,19 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.1] - 2026-07-13
+
+### Bug Fixes
+
+- Fix a TypeScript error in the React dashboard `RequestsSection` — the parameterized `fetch<TraceDetail>()` made the direct `Record<string, unknown>` cast a `TS2352`; now cast through `unknown` (`src/react/components/Dashboard/sections/RequestsSection.tsx`)
+- Fix a pre-existing `vue-tsc` error in the Vue `DataTable` — `rowKey` cast to `PropertyKey` (which includes `symbol`) but returns `string | number`; now cast to `string | number` (`src/vue/components/Dashboard/shared/DataTable.vue`)
+
+### Internal
+
+- `typecheck` now covers the React (`tsconfig.react.json` via `tsc`) and Vue (`tsconfig.vue.json` via `vue-tsc`) sources in addition to the root config. The root `tsconfig` excludes `src/react`/`src/vue`, so frontend type errors were previously never caught by `npm run typecheck`. Adds `vue-tsc` as a devDependency.
+
+These are type-only fixes — the emitted JavaScript is unchanged from 1.14.0.
+
 ## [1.14.0] - 2026-07-13
 
 Security-hardening, correctness, and restart-safety release. Every fix below was verified against the source and the full test suite (1466 tests) passes.
