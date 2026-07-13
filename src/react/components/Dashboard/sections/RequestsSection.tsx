@@ -65,7 +65,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
           if (abort.signal.aborted) return
           // Flatten nested trace fields (spans, totalDuration, warnings) to top level
           // so normalizeTraceFields() can find them
-          const raw = result as Record<string, unknown>
+          const raw = result as unknown as Record<string, unknown>
           const trace = raw.trace as Record<string, unknown> | null
           if (trace) {
             const merged = { ...raw, ...trace, logs: raw.logs }
