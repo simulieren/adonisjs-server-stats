@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 
 import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
 import { useDashboardApiBase } from '../../../hooks/useDashboardApiBase.js'
@@ -21,6 +21,7 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
   const [search, setSearch] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
   const [keyValue, setKeyValue] = useState<unknown>(null)
+  const keyAbortRef = useRef<AbortController | null>(null)
 
   const keys = useMemo(() => {
     const items = data?.keys || []
@@ -31,12 +32,19 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
 
   const handleKeyClick = useCallback(
     async (key: string) => {
+      // Abort any in-flight key fetch so rapid clicks don't race.
+      keyAbortRef.current?.abort()
+
       if (selectedKey === key) {
         setSelectedKey(null)
         setKeyValue(null)
         return
       }
       setSelectedKey(key)
+
+      const abort = new AbortController()
+      keyAbortRef.current = abort
+
       // Fetch key value via API
       try {
         const { baseUrl = '', authToken } = options || {}
@@ -47,15 +55,19 @@ export function CacheTab({ options, dashboardPath }: CacheTabProps) {
         const resp = await fetch(url, {
           headers,
           credentials: authToken ? 'omit' : 'same-origin',
+          signal: abort.signal,
         })
         const result = await resp.json()
         setKeyValue(result)
       } catch {
-        setKeyValue({ error: 'Failed to fetch key value' })
+        if (!abort.signal.aborted) setKeyValue({ error: 'Failed to fetch key value' })
       }
     },
     [selectedKey, options, dashApiBase]
   )
+
+  // Abort any in-flight key fetch on unmount.
+  useEffect(() => () => keyAbortRef.current?.abort(), [])
 
   const tableRef = useResizableTable([keys])
 

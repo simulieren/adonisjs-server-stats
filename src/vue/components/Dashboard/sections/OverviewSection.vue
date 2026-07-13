@@ -28,12 +28,28 @@ const uid = Math.random().toString(36).slice(2, 8)
 const timeRange = ref<TimeRange>('1h')
 
 /* ── Data fetching ───────────────────────────────────────────────────── */
-const { data: overviewRaw, loading: isLoading } = useDashboardData(() => 'overview' as const, {
-  baseUrl,
-  dashboardEndpoint,
-  authToken,
-  refreshKey,
-})
+// Reuse the shared `overview` poller provided by DashboardPage (used for the
+// sidebar badges) so we don't spin up a second concurrent poller for the same
+// section. Falls back to a local poller when rendered standalone.
+const sharedOverviewData = inject<Ref<unknown> | undefined>('ss-overview-data', undefined)
+const sharedOverviewLoading = inject<Ref<boolean> | undefined>('ss-overview-loading', undefined)
+
+let overviewRaw: Ref<unknown>
+let isLoading: Ref<boolean>
+
+if (sharedOverviewData && sharedOverviewLoading) {
+  overviewRaw = sharedOverviewData
+  isLoading = sharedOverviewLoading
+} else {
+  const local = useDashboardData(() => 'overview' as const, {
+    baseUrl,
+    dashboardEndpoint,
+    authToken,
+    refreshKey,
+  })
+  overviewRaw = local.data
+  isLoading = local.loading
+}
 
 const { data: chartResponseRaw, setTimeRange: setChartTimeRange } = useDashboardData(
   () => 'overview/chart' as const,
@@ -556,7 +572,7 @@ function querySql(q: {
             No data yet
           </div>
           <ul v-else class="ss-dash-secondary-list">
-            <li v-for="(ep, i) in metrics.slowestEndpoints.slice(0, 5)" :key="i">
+            <li v-for="(ep, i) in metrics.slowestEndpoints.slice(0, 5)" :key="`${epUrl(ep)}-${i}`">
               <a
                 :href="`#requests?url=${encodeURIComponent(epUrl(ep))}`"
                 class="ss-dash-widget-row-link"
@@ -614,7 +630,7 @@ function querySql(q: {
             No recent errors
           </div>
           <ul v-else class="ss-dash-secondary-list">
-            <li v-for="(err, i) in metrics.recentErrors" :key="i">
+            <li v-for="(err, i) in metrics.recentErrors" :key="err.id ?? `err-${i}`">
               <a :href="`#logs?id=${err.id ?? ''}`" class="ss-dash-widget-row-link">
                 <span style="color: var(--ss-red-fg)" :title="err.message">
                   {{ err.message }}
@@ -641,7 +657,7 @@ function querySql(q: {
             No events yet
           </div>
           <ul v-else class="ss-dash-secondary-list">
-            <li v-for="(ev, i) in metrics.topEvents.slice(0, 5)" :key="i">
+            <li v-for="(ev, i) in metrics.topEvents.slice(0, 5)" :key="`${eventName(ev)}-${i}`">
               <a
                 :href="`#events?event_name=${encodeURIComponent(eventName(ev))}`"
                 class="ss-dash-widget-row-link"
@@ -865,7 +881,7 @@ function querySql(q: {
             No query data yet
           </div>
           <ul v-else class="ss-dash-secondary-list">
-            <li v-for="(q, i) in metrics.slowestQueries.slice(0, 5)" :key="i">
+            <li v-for="(q, i) in metrics.slowestQueries.slice(0, 5)" :key="`${querySql(q)}-${i}`">
               <a
                 :href="`#queries?pattern=${encodeURIComponent(querySql(q))}`"
                 class="ss-dash-widget-row-link"

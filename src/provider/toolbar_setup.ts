@@ -173,20 +173,24 @@ async function setupDebugBroadcastInternal(
   if (!t) return { timer: null, transmitAvailable: false, channels: [] }
   const ch = 'server-stats/debug'
   const pending = new Set<string>()
-  let timer: ReturnType<typeof setTimeout> | null = null
+  // A persistent (unref'd) interval flushes pending item types every 200ms.
+  // Returning this live handle lets shutdown clear it — the previous per-item
+  // `setTimeout` was never returned (returned `null`), so shutdown could not
+  // clear it and it could fire after stop() on a destroyed transmit instance.
+  const timer: ReturnType<typeof setInterval> = setInterval(() => {
+    if (pending.size === 0) return
+    const ts = [...pending]
+    pending.clear()
+    try {
+      ;(t as { broadcast: Function }).broadcast(ch, { types: ts })
+    } catch {}
+  }, 200)
+  // Don't keep the event loop alive on account of this timer.
+  ;(timer as { unref?: () => void }).unref?.()
   debugStore.onNewItem((type: string) => {
     pending.add(type)
-    if (timer) return
-    timer = setTimeout(() => {
-      timer = null
-      const ts = [...pending]
-      pending.clear()
-      try {
-        ;(t as { broadcast: Function }).broadcast(ch, { types: ts })
-      } catch {}
-    }, 200)
   })
-  return { timer: null, transmitAvailable: true, channels: [ch] }
+  return { timer, transmitAvailable: true, channels: [ch] }
 }
 
 // ── applyToolbarResult ──────────────────────────────────────────

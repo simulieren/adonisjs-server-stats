@@ -33,6 +33,13 @@ interface TraceContext {
 const globalRef: { current: TraceCollector | null } = { current: null }
 
 /**
+ * Tracks whether console.warn is currently patched by a TraceCollector, so a
+ * second instance (or a skipped stop()) cannot double-wrap it and leak the
+ * patch permanently.
+ */
+const consoleWarnPatch: { active: boolean } = { active: false }
+
+/**
  * Wrap an async function in a traced span.
  *
  * If tracing is not enabled or no request is active, the function
@@ -139,8 +146,12 @@ export class TraceCollector {
     const spanId = String(ctx.nextSpanId++)
     ctx.currentSpanId = spanId
 
+    let errored = false
     try {
       return await fn()
+    } catch (err) {
+      errored = true
+      throw err
     } finally {
       const duration = performance.now() - start
       ctx.spans.push({
@@ -150,6 +161,7 @@ export class TraceCollector {
         category,
         startOffset: round(start - ctx.requestStart),
         duration: round(duration),
+        error: errored ? true : undefined,
       })
       ctx.currentSpanId = parentId
     }
@@ -188,14 +200,20 @@ export class TraceCollector {
       emitter.on('db:query', this.dbHandler as (...args: unknown[]) => void)
     }
 
-    // Intercept console.warn to capture warnings per-request
-    this.originalConsoleWarn = console.warn
-    console.warn = (...args: unknown[]) => {
-      const ctx = this.als.getStore()
-      if (ctx) {
-        ctx.warnings.push(args.map(String).join(' '))
+    // Intercept console.warn to capture warnings per-request. Guard against
+    // double-wrapping: if another instance (or a prior start() without a
+    // matching stop()) already patched console.warn, don't wrap it again —
+    // that would capture the patched fn as the "original" and leak the patch.
+    if (!consoleWarnPatch.active) {
+      consoleWarnPatch.active = true
+      this.originalConsoleWarn = console.warn
+      console.warn = (...args: unknown[]) => {
+        const ctx = this.als.getStore()
+        if (ctx) {
+          ctx.warnings.push(args.map(String).join(' '))
+        }
+        this.originalConsoleWarn!.apply(console, args)
       }
-      this.originalConsoleWarn!.apply(console, args)
     }
   }
 
@@ -204,13 +222,19 @@ export class TraceCollector {
     if (this.emitter && this.dbHandler) {
       this.emitter.off('db:query', this.dbHandler as (...args: unknown[]) => void)
     }
+    // Only restore console.warn if this instance was the one that patched it.
     if (this.originalConsoleWarn) {
       console.warn = this.originalConsoleWarn
+      consoleWarnPatch.active = false
     }
     this.dbHandler = null
     this.emitter = null
     this.originalConsoleWarn = null
-    globalRef.current = null
+    // Only relinquish the global reference if it still points at this instance,
+    // so stopping an older instance can't clear a newer one's registration.
+    if (globalRef.current === this) {
+      globalRef.current = null
+    }
   }
 
   getTraces(): TraceRecord[] {

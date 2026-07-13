@@ -49,15 +49,17 @@ function mockApp(clientName: string, driverName?: string) {
     container: {
       make: async (binding: string) => {
         if (binding !== 'lucid.db') throw new Error(`Unknown binding: ${binding}`)
+        const makeClient = () => ({
+          client: {
+            config: { client: clientName },
+            ...(driverName ? { driverName } : {}),
+          },
+          raw: async (sql: string, bindings: unknown[]) => ({ sql, bindings }),
+        })
         return {
           connection: () => ({
-            getWriteClient: () => ({
-              client: {
-                config: { client: clientName },
-                ...(driverName ? { driverName } : {}),
-              },
-              raw: async (sql: string, bindings: unknown[]) => ({ sql, bindings }),
-            }),
+            getReadClient: makeClient,
+            getWriteClient: makeClient,
           }),
         }
       },
@@ -75,11 +77,13 @@ function mockAppWithNamedConnection(connections: Record<string, string>) {
             const key = name || 'default'
             const clientName = connections[key]
             if (!clientName) throw new Error(`Unknown connection: ${key}`)
+            const makeClient = () => ({
+              client: { config: { client: clientName } },
+              raw: async (sql: string, bindings: unknown[]) => ({ sql, bindings }),
+            })
             return {
-              getWriteClient: () => ({
-                client: { config: { client: clientName } },
-                raw: async (sql: string, bindings: unknown[]) => ({ sql, bindings }),
-              }),
+              getReadClient: makeClient,
+              getWriteClient: makeClient,
             }
           },
         }

@@ -92,6 +92,9 @@ export class EventCollector {
 
   start(emitter: Emitter): void {
     if (!emitter || typeof emitter.emit !== 'function') return
+    // Idempotent: a second start() must not capture the already-patched emit as
+    // the "original", which would corrupt emitter.emit permanently.
+    if (this.originalEmit) return
 
     this.emitter = emitter
     this.originalEmit = emitter.emit.bind(emitter) as Emitter['emit']

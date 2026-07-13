@@ -271,6 +271,27 @@ const SENSITIVE_WORDS = new Set([
   'apikey',
   'private',
   'encryption',
+  // Connection strings / DSNs / service URLs (often embed credentials) and
+  // signing material. Kept in sync with the server-side sensitive patterns in
+  // src/dashboard/integrations/config_inspector.ts so the same key is redacted
+  // in every view.
+  'dsn',
+  'smtp',
+  'signing',
+])
+
+/**
+ * Adjacent word-pair phrases that indicate sensitive data but whose individual
+ * words are too generic to redact on their own (e.g. `url`, `database`).
+ *
+ * Matched against consecutive lowercased word tokens so `connectionString`,
+ * `database_url`, and `redis_url` are redacted without over-redacting a bare
+ * `app.url` or `database.name`.
+ */
+const SENSITIVE_WORD_PAIRS = new Set([
+  'connection.string',
+  'database.url',
+  'redis.url',
 ])
 
 /**
@@ -317,8 +338,12 @@ function tokenizeKey(key: string): string[] {
  * ```
  */
 export function shouldRedact(key: string): boolean {
-  const words = tokenizeKey(key)
-  return words.some((w) => SENSITIVE_WORDS.has(w.toLowerCase()))
+  const words = tokenizeKey(key).map((w) => w.toLowerCase())
+  if (words.some((w) => SENSITIVE_WORDS.has(w))) return true
+  for (let i = 0; i < words.length - 1; i++) {
+    if (SENSITIVE_WORD_PAIRS.has(`${words[i]}.${words[i + 1]}`)) return true
+  }
+  return false
 }
 
 /**

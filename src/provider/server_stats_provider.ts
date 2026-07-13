@@ -126,6 +126,7 @@ export default class ServerStatsProvider {
       debugEndpoint,
       dashboardPath,
       shouldShow: config.shouldShow,
+      unsafeAllowNoAuth: config.unsafeAllowNoAuth,
       whenReady: () => this.whenReady(),
     })
     const paths = collectRegisteredPaths(statsEndpoint, debugEndpoint, dashboardPath)
@@ -238,7 +239,18 @@ export default class ServerStatsProvider {
     try {
       return await this.app.container.make(binding)
     } catch (err) {
-      log.info(`resolve('${binding}') failed: ${(err as Error)?.message ?? err}`)
+      const message = (err as Error)?.message ?? String(err)
+      // An unregistered optional binding (transmit, redis, etc.) is expected and
+      // stays quiet. Anything else is likely a real programming error surfacing
+      // during construction — surface it at warn level instead of hiding it.
+      const isMissingBinding = /cannot resolve|is not (bound|registered)|resolve .* binding/i.test(
+        message
+      )
+      if (isMissingBinding) {
+        log.info(`resolve('${binding}') failed: ${message}`)
+      } else {
+        log.warn(`resolve('${binding}') failed unexpectedly: ${message}`)
+      }
       return null
     }
   }
@@ -318,5 +330,12 @@ export default class ServerStatsProvider {
       debugStore: this.debugStore,
       engine: this.engine,
     })
+    if (this.prometheusActive) {
+      // Drop the module-level prometheus collector singleton so a restart can
+      // re-register metrics without hitting "Metric already registered".
+      const { resetServerStatsCollector } = await import('../prometheus/prometheus_collector.js')
+      resetServerStatsCollector()
+      this.prometheusActive = false
+    }
   }
 }

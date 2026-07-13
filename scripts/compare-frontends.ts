@@ -24,6 +24,7 @@
 
 import * as fs from 'fs'
 import * as path from 'path'
+import { fileURLToPath } from 'node:url'
 
 // ---------------------------------------------------------------------------
 // ANSI color helpers
@@ -84,7 +85,7 @@ function subheader(title: string) {
 // ---------------------------------------------------------------------------
 // Path constants
 // ---------------------------------------------------------------------------
-const ROOT = path.resolve((import.meta as unknown as { dir: string }).dir, '..')
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const REACT_COMPONENTS = path.join(ROOT, 'src/react/components')
 const VUE_COMPONENTS = path.join(ROOT, 'src/vue/components')
 const REACT_HOOKS = path.join(ROOT, 'src/react/hooks')

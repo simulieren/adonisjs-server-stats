@@ -40,12 +40,16 @@ export async function appImport<T = unknown>(specifier: string): Promise<T> {
       // Strategy A: ESM import via file URL
       try {
         return await import(pathToFileURL(resolved).href)
-      } catch {}
+      } catch (err) {
+        errors.push(err as Error)
+      }
 
       // Strategy B: CJS require (works for native addons like better-sqlite3)
       try {
         return appRequire(specifier) as T
-      } catch {}
+      } catch (err) {
+        errors.push(err as Error)
+      }
     } catch (err) {
       errors.push(err as Error)
     }
@@ -78,13 +82,17 @@ export async function appImportWithPath<T = unknown>(
       try {
         const module = await import(pathToFileURL(resolved).href)
         return { module: module as T, resolvedPath: resolved }
-      } catch {}
+      } catch (err) {
+        errors.push(err as Error)
+      }
 
       // Strategy B: CJS require (works for native addons like better-sqlite3)
       try {
         const module = appRequire(specifier) as T
         return { module, resolvedPath: resolved }
-      } catch {}
+      } catch (err) {
+        errors.push(err as Error)
+      }
     } catch (err) {
       errors.push(err as Error)
     }

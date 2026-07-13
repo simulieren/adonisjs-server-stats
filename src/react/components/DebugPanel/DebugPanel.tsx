@@ -54,7 +54,16 @@ export function DebugPanel(props: DebugPanelProps) {
     else setInternalOpen(open)
   }
   const [activeTab, setActiveTab] = useState<DebugTab>('queries')
-  const { features } = useFeatures(debugOptions)
+
+  // Stabilize the options object so downstream tabs/hooks don't see a new
+  // reference every render (the rest-spread above allocates a fresh object).
+  const stableOptions = useMemo(
+    () => debugOptions,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [debugOptions.baseUrl, debugOptions.debugEndpoint, debugOptions.authToken]
+  )
+
+  const { features } = useFeatures(stableOptions)
   const { theme, toggleTheme } = useTheme()
 
   const customPanes = features.customPanes || []
@@ -104,43 +113,54 @@ export function DebugPanel(props: DebugPanelProps) {
     setIsOpen(!isOpen)
   }, [isOpen])
 
-  const renderTabContent = useCallback(() => {
-    const tabProps = { options: debugOptions }
+  // Build only the active tab's content (keyed on activeTab + stable options),
+  // so switching tabs doesn't re-instantiate every lazy tab's props each render.
+  const tabContent = useMemo(() => {
+    const tabProps = { options: stableOptions }
 
     // Check if it's a custom pane
     const customPane = customPanes.find((p: DebugPane) => p.id === activeTab)
     if (customPane) {
-      return (
-        <Suspense fallback={<div className="ss-dbg-empty">Loading...</div>}>
-          <CustomPaneTab pane={customPane} options={debugOptions} />
-        </Suspense>
-      )
+      return <CustomPaneTab pane={customPane} options={stableOptions} />
     }
 
-    const tabMap: Record<string, React.ReactNode> = {
-      queries: <QueriesTab {...tabProps} />,
-      events: <EventsTab {...tabProps} />,
-      emails: <EmailsTab {...tabProps} />,
-      routes: (
-        <RoutesTab
-          {...tabProps}
-          currentPath={typeof window !== 'undefined' ? window.location.pathname : ''}
-        />
-      ),
-      logs: <LogsTab {...tabProps} />,
-      timeline: <TimelineTab {...tabProps} />,
-      cache: <CacheTab {...tabProps} dashboardPath={dashboardPath} />,
-      jobs: <JobsTab {...tabProps} dashboardPath={dashboardPath} />,
-      config: <ConfigTab {...tabProps} dashboardPath={dashboardPath} />,
-      internals: <InternalsTab {...tabProps} />,
+    switch (activeTab) {
+      case 'queries':
+        return <QueriesTab {...tabProps} />
+      case 'events':
+        return <EventsTab {...tabProps} />
+      case 'emails':
+        return <EmailsTab {...tabProps} />
+      case 'routes':
+        return (
+          <RoutesTab
+            {...tabProps}
+            currentPath={typeof window !== 'undefined' ? window.location.pathname : ''}
+          />
+        )
+      case 'logs':
+        return <LogsTab {...tabProps} />
+      case 'timeline':
+        return <TimelineTab {...tabProps} />
+      case 'cache':
+        return <CacheTab {...tabProps} dashboardPath={dashboardPath} />
+      case 'jobs':
+        return <JobsTab {...tabProps} dashboardPath={dashboardPath} />
+      case 'config':
+        return <ConfigTab {...tabProps} dashboardPath={dashboardPath} />
+      case 'internals':
+        return <InternalsTab {...tabProps} />
+      default:
+        return <div className="ss-dbg-empty">Unknown tab</div>
     }
+  }, [activeTab, stableOptions, customPanes, dashboardPath])
 
-    return (
-      <Suspense fallback={<div className="ss-dbg-empty">Loading...</div>}>
-        {tabMap[activeTab] || <div className="ss-dbg-empty">Unknown tab</div>}
-      </Suspense>
-    )
-  }, [activeTab, debugOptions, customPanes])
+  const renderTabContent = useCallback(
+    () => (
+      <Suspense fallback={<div className="ss-dbg-empty">Loading...</div>}>{tabContent}</Suspense>
+    ),
+    [tabContent]
+  )
 
   return (
     <>
@@ -175,11 +195,13 @@ export function DebugPanel(props: DebugPanelProps) {
       >
         {/* Tab bar */}
         <div className="ss-dbg-tabs">
-          <div className="ss-dbg-tabs-scroll">
+          <div className="ss-dbg-tabs-scroll" role="tablist">
             {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                aria-selected={activeTab === tab.id}
                 className={`ss-dbg-tab ${activeTab === tab.id ? 'ss-dbg-active' : ''}`}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -199,6 +221,8 @@ export function DebugPanel(props: DebugPanelProps) {
               <button
                 key={pane.id}
                 type="button"
+                role="tab"
+                aria-selected={activeTab === pane.id}
                 className={`ss-dbg-tab ${activeTab === pane.id ? 'ss-dbg-active' : ''}`}
                 onClick={() => setActiveTab(pane.id)}
               >

@@ -1,6 +1,6 @@
 {
   "name": "adonisjs-server-stats",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "description": "Real-time server monitoring for AdonisJS v6 applications",
   "keywords": [
     "adonisjs",
@@ -18,8 +18,11 @@
     "LICENSE"
   ],
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "sideEffects": [
-    "*.css",
+    "**/*.css",
     "./dist/react/index.js",
     "./dist/vue/index.js"
   ],
@@ -91,7 +94,7 @@
       "import": "./dist/configure.js"
     },
     "./core": {
-      "types": "./dist/core/index.d.ts",
+      "types": "./dist/core/core/index.d.ts",
       "import": "./dist/core/index.js"
     },
     "./react": {

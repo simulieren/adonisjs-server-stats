@@ -7,7 +7,7 @@
  * still exposes a writable stream with a `.write()` method in the main thread,
  * and whether wrapping that `.write()` actually intercepts log data.
  *
- * Run: cd /path/to/adonisjs-server-stats && npx tsx tests/pino_hook_test.ts
+ * Run: cd /path/to/adonisjs-server-stats && npx tsx scripts/pino_hook_diagnostic.ts
  */
 
 import { tmpdir } from 'node:os'

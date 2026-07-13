@@ -201,14 +201,20 @@ const builtInSections = computed(() => [
 
 const visibleSections = computed(() => builtInSections.value.filter((s) => s.visible))
 
-// Fetch overview metrics for sidebar nav badges
-const { data: overviewRawData } = useDashboardData(() => 'overview', {
+// Fetch overview metrics for sidebar nav badges.
+// This single poller is shared with OverviewSection via provide/inject so the
+// dashboard runs one `overview` poller instead of three concurrent ones.
+const { data: overviewRawData, loading: overviewLoading } = useDashboardData(() => 'overview', {
   baseUrl: props.baseUrl,
   dashboardEndpoint: props.dashboardEndpoint,
   authToken: props.authToken,
   refreshKey,
 })
 const overviewData = computed(() => overviewRawData.value as OverviewMetrics | null)
+
+// Share the overview poller's raw data + loading state with child sections.
+provide('ss-overview-data', overviewRawData)
+provide('ss-overview-loading', overviewLoading)
 
 /** Badge counts for sidebar nav items. */
 const navBadges = computed(() => {

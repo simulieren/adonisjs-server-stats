@@ -5,7 +5,7 @@
  * Self-contained: injects dependencies and fetches its own data.
  * CSS classes match the React CacheSection.
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, onMounted, type Ref } from 'vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
 import { DashboardApi, formatTtl, formatCacheSize } from '../../../../core/index.js'
@@ -26,8 +26,15 @@ const { data, loading, setSearch, mutate } = useDashboardData(() => 'cache', {
   refreshKey,
 })
 
-const getCacheClient = useApiClient(baseUrl || '', authToken)
-const cacheApi = new DashboardApi(getCacheClient(), dashboardEndpoint || '/__stats/api')
+// Create the API client lazily per-component (inside setup lifecycle) so the
+// injected config/credentials are read for this instance rather than captured
+// once at module-evaluation time. Mirrors React's getApi() call in the body.
+let cacheApi: DashboardApi | null = null
+
+onMounted(() => {
+  const getCacheClient = useApiClient(baseUrl || '', authToken)
+  cacheApi = new DashboardApi(getCacheClient(), dashboardEndpoint || '/__stats/api')
+})
 
 const search = ref('')
 const selectedKey = ref<string | null>(null)
@@ -76,6 +83,7 @@ async function handleKeyClick(key: string) {
   keyValueError.value = null
   keyValueLoading.value = true
   try {
+    if (!cacheApi) throw new Error('Cache API not initialized')
     const result = await cacheApi.fetchCacheKey(key)
     keyValue.value =
       result.value !== undefined ? result.value : result.data !== undefined ? result.data : result

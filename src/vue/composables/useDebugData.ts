@@ -80,14 +80,17 @@ class ControllerManager {
   }
 
   private getDashboardController(): DebugDataController {
-    if (!this.dashboardController && this.dashboardEndpoint) {
+    if (!this.dashboardController) {
+      if (!this.dashboardEndpoint) {
+        throw new Error('Dashboard endpoint is not configured')
+      }
       this.dashboardController = new DebugDataController({
         ...this.config,
         endpoint: this.dashboardEndpoint,
         ...buildCallbacks(this.refs),
       })
     }
-    return this.dashboardController!
+    return this.dashboardController
   }
 
   startForTab(tab: () => DebugTab | string) {

@@ -883,6 +883,19 @@ export interface ServerStatsConfig {
   authorize?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
 
   /**
+   * Register the sensitive dashboard/debug/stats routes WITHOUT any access
+   * guard when no {@link authorize} callback is provided.
+   *
+   * The package fails closed: without either {@link authorize} or this flag,
+   * the sensitive routes are **not** registered. Enabling this exposes the
+   * dashboard — which can surface secrets, email bodies, and SQL — to anyone
+   * who can reach it. Local development only.
+   *
+   * @default false
+   */
+  unsafeAllowNoAuth?: boolean
+
+  /**
    * Enable the debug panel (toolbar overlay).
    *
    * - `true` — enable with sensible defaults (tracing on, no persistence)
@@ -985,6 +998,39 @@ export interface ResolvedServerStatsConfig {
 
   /** Optional access-control callback. */
   shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+
+  // -------------------------------------------------------------------------
+  // New (non-deprecated) resolved names — read by the runtime alongside the
+  // deprecated aliases above. Kept optional for back-compat with configs built
+  // before these were surfaced.
+  // -------------------------------------------------------------------------
+
+  /** Collection interval in milliseconds (new name for {@link intervalMs}). */
+  pollInterval?: number
+
+  /** Whether real-time (SSE) broadcasting is enabled (new name for {@link transport}). */
+  realtime?: boolean
+
+  /** HTTP endpoint path or `false` to disable (new name for {@link endpoint}). */
+  statsEndpoint?: string | false
+
+  /** Access-control callback (new name for {@link shouldShow}). */
+  authorize?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+
+  /**
+   * Escape hatch to register sensitive routes without an access guard.
+   * Exposes the dashboard without auth — local development only.
+   */
+  unsafeAllowNoAuth?: boolean
+
+  /** Debug panel configuration (new name/shape replacing {@link devToolbar}). */
+  toolbar?: boolean | ToolbarConfig
+
+  /** Full-page dashboard configuration. */
+  dashboard?: boolean | DashboardConfig
+
+  /** Advanced fine-tuning options. */
+  advanced?: AdvancedConfig
 
   /** Whether verbose informational logging is enabled. Always present after `defineConfig()`. */
   verbose: boolean

@@ -4,8 +4,6 @@ import { log } from '../utils/logger.js'
 
 import type { LogStats } from '../types.js'
 
-let warnedPollFailure = false
-
 const LEVEL_NAMES: Record<number, string> = {
   10: 'trace',
   20: 'debug',
@@ -43,6 +41,7 @@ export class LogStreamService {
   private intervalId: ReturnType<typeof setInterval> | null = null
   private logPath: string | null
   private onEntry?: (entry: Record<string, unknown>) => void
+  private warnedPollFailure = false
 
   constructor(logPath?: string, onEntry?: (entry: Record<string, unknown>) => void) {
     this.logPath = logPath ?? null
@@ -125,7 +124,7 @@ export class LogStreamService {
   private async pollNewEntries() {
     if (!this.logPath) return
     try {
-      warnedPollFailure = false
+      this.warnedPollFailure = false
       const stats = await stat(this.logPath)
 
       // File was truncated/rotated — reset
@@ -144,13 +143,15 @@ export class LogStreamService {
       for (const line of buffer.toString('utf-8').trim().split('\n')) {
         const entry = parseAndEnrich(line)
         if (entry) {
-          this.recentEntries.push({ time: Date.now(), level: entry.level as number })
+          const level = typeof entry.level === 'number' ? entry.level : 30
+          const time = typeof entry.time === 'number' ? entry.time : Date.now()
+          this.recentEntries.push({ time, level })
           this.onEntry?.(entry)
         }
       }
     } catch (err) {
-      if (!warnedPollFailure) {
-        warnedPollFailure = true
+      if (!this.warnedPollFailure) {
+        this.warnedPollFailure = true
         log.warn('log stream: cannot read log file — ' + (err as Error)?.message)
       }
     }

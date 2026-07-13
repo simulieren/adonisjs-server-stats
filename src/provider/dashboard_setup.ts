@@ -30,14 +30,20 @@ export function classifyDashboardError(err: unknown): 'missing-dep' | 'timeout' 
  * Race a promise against a timeout.
  */
 export function createStartTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(
+    timer = setTimeout(
       () =>
         reject(new Error(`Dashboard SQLite initialization timed out after ${timeoutMs / 1000}s`)),
       timeoutMs
     )
   })
-  return Promise.race([promise, timeoutPromise])
+  // Clear the timer once the race settles so a winning primary promise doesn't
+  // leave a dangling 15s timer that keeps the event loop alive (blocks clean
+  // test exit).
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timer) clearTimeout(timer)
+  })
 }
 
 /**

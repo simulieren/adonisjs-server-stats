@@ -24,7 +24,7 @@ export function LogsTab({ options }: LogsTabProps) {
   const [levelFilter, setLevelFilter] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [reqIdFilter, setReqIdFilter] = useState('')
-  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
 
   const logs = useMemo(() => {
     let items: LogEntry[] = Array.isArray(data) ? data : data?.logs || data?.entries || []
@@ -95,16 +95,20 @@ export function LogsTab({ options }: LogsTabProps) {
         {logs.length === 0 ? (
           <div className="ss-dbg-empty">No log entries</div>
         ) : (
-          logs.slice(0, 200).map((log, i) => (
-            <LogEntryRow
-              key={i}
-              log={log}
-              index={i}
-              expanded={expandedIndex === i}
-              onToggleExpand={(idx) => setExpandedIndex(expandedIndex === idx ? null : idx)}
-              onReqIdClick={handleReqIdClick}
-            />
-          ))
+          logs.slice(0, 200).map((log, i) => {
+            // Stable key so prepended logs don't shift expand/collapse state.
+            const key = String((log as { id?: unknown }).id ?? `idx-${i}`)
+            return (
+              <LogEntryRow
+                key={key}
+                log={log}
+                index={i}
+                expanded={expandedKey === key}
+                onToggleExpand={() => setExpandedKey((prev) => (prev === key ? null : key))}
+                onReqIdClick={handleReqIdClick}
+              />
+            )
+          })
         )}
       </div>
     </div>

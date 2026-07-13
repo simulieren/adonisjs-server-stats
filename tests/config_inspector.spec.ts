@@ -30,10 +30,10 @@ test.group('ConfigInspector - sanitization', () => {
     const inspector = new ConfigInspector(app as unknown as ApplicationService)
     const result = inspector.getConfig()
 
+    // Plaintext value is intentionally NOT sent over the wire (redaction is real, not cosmetic).
     assert.deepEqual(result.config.password, {
       __redacted: true,
       display: '••••••••',
-      value: 'secret123',
     })
     assert.equal(result.config.appName, 'MyApp')
   })
@@ -68,7 +68,6 @@ test.group('ConfigInspector - sanitization', () => {
     assert.deepEqual(result.config.contact, {
       __redacted: true,
       display: '••••••••',
-      value: 'user@example.com',
     })
   })
 
@@ -80,7 +79,6 @@ test.group('ConfigInspector - sanitization', () => {
     assert.deepEqual(result.config.databaseUrl, {
       __redacted: true,
       display: '••••••••',
-      value: 'postgres://user:pass@host/db',
     })
   })
 
@@ -111,7 +109,6 @@ test.group('ConfigInspector - sanitization', () => {
     assert.deepEqual(connection.password, {
       __redacted: true,
       display: '••••••••',
-      value: 'x',
     })
     assert.equal(connection.host, 'localhost')
   })
@@ -188,7 +185,9 @@ test.group('ConfigInspector - env', (group) => {
     const passwordEntry = result.env.TEST_CI_PASSWORD as unknown as Record<string, unknown>
     assert.property(passwordEntry, '__redacted')
     assert.equal(passwordEntry.__redacted, true)
-    assert.equal(passwordEntry.value, 'super-secret')
+    // Plaintext value is intentionally NOT included in the payload.
+    assert.notProperty(passwordEntry, 'value')
+    assert.equal(passwordEntry.display, '••••••••')
 
     assert.equal(result.env.TEST_CI_APP_NAME, 'my-app')
   })

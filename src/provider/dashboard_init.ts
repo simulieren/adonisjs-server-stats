@@ -152,7 +152,25 @@ function pipeDashLogs(
   return service
 }
 
+/**
+ * Whether this module has already installed the request-completion handler.
+ * `setOnRequestComplete` is a single-slot setter, so a second `initDashboardStore`
+ * (hot-reload / test restart) would silently clobber the first handler — and its
+ * `lastQueryId`/`dashboardStore` closure — leaving requests attributed to a stale
+ * store. We install once and warn on any later attempt. There is only ever one
+ * dashboard request pipe, so accumulating handlers would just double-persist.
+ */
+let dashRequestPipeInstalled = false
+
 function pipeDashRequests(debugStore: DebugStore, dashboardStore: DashboardStore): void {
+  if (dashRequestPipeInstalled) {
+    log.warn(
+      'dashboard: request pipe already installed — ignoring duplicate registration ' +
+        '(likely a hot-reload/re-init). Restart the process for a clean state.'
+    )
+    return
+  }
+  dashRequestPipeInstalled = true
   let lastQueryId = 0
   setOnRequestComplete(({ method, url, statusCode, duration, trace, httpRequestId }) => {
     if (!dashboardStore.isReady()) return

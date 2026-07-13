@@ -1,6 +1,7 @@
 import { writeFile, readFile, rename, mkdir } from 'node:fs/promises'
 import { dirname } from 'node:path'
 
+import { redactTokenLinks } from '../provider/email_helpers.js'
 import { log, bold } from '../utils/logger.js'
 import { EmailCollector } from './email_collector.js'
 import { EventCollector } from './event_collector.js'
@@ -128,7 +129,13 @@ export class DebugStore {
 
     await new Promise<void>((resolve) => setImmediate(resolve))
 
-    const emails = this.emails.getEmails()
+    // Strip token-bearing links (reset/verify/magic URLs, ?token=…) from email
+    // bodies before they hit disk in cleartext.
+    const emails = this.emails.getEmails().map((email) => ({
+      ...email,
+      html: typeof email.html === 'string' ? redactTokenLinks(email.html) : email.html,
+      text: typeof email.text === 'string' ? redactTokenLinks(email.text) : email.text,
+    }))
     parts.push(`"emails":${JSON.stringify(emails)}`)
 
     if (this.traces) {

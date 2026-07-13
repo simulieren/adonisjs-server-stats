@@ -42,8 +42,8 @@ export class RequestMetrics {
       this.count++
     } else {
       this.records[this.writeIndex] = record
+      this.writeIndex = (this.writeIndex + 1) % this.maxRecords
     }
-    this.writeIndex = (this.writeIndex + 1) % this.maxRecords
   }
 
   incrementActiveConnections() {
@@ -84,15 +84,12 @@ export class RequestMetrics {
   }
 
   #scanPartialBuffer(cutoff: number, acc: WindowAccumulator): void {
-    let startIdx = 0
-    for (let i = this.count - 1; i >= 0; i--) {
-      if (this.records[i].timestamp < cutoff) {
-        startIdx = i + 1
-        break
-      }
-    }
-    for (let i = startIdx; i < this.count; i++) {
-      accumulateRecord(acc, this.records[i])
+    // Scan all records unconditionally: during the fill phase the buffer is
+    // small, and completion order is not guaranteed to match timestamp order,
+    // so we must select by timestamp rather than assume an ascending prefix.
+    for (let i = 0; i < this.count; i++) {
+      const r = this.records[i]
+      if (r.timestamp >= cutoff) accumulateRecord(acc, r)
     }
   }
 }

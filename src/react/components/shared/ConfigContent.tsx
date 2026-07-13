@@ -8,7 +8,6 @@ import {
   collectTopLevelObjectKeys,
   copyWithFeedback,
 } from '../../../core/config-utils.js'
-import { TAB_ICONS } from '../../../core/icons.js'
 
 import type { RedactedValue, ConfigValue } from '../../../core/config-utils.js'
 
@@ -29,58 +28,19 @@ export interface ConfigContentProps {
 // ---------------------------------------------------------------------------
 
 /**
- * Inline reveal/hide toggle for redacted values.
+ * Renders a redacted config value.
+ *
+ * The server no longer sends the plaintext `value` for redacted entries
+ * (config_inspector redact() omits it), so we only ever show the redacted
+ * `display` placeholder — there is no client-side reveal path.
  */
 function RedactedToggle({ redacted, p }: { redacted: RedactedValue; p: string }) {
-  const [revealed, setRevealed] = useState(false)
-
   return (
     <span
       className={`${p}-config-redacted`}
       style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
     >
-      <span>{revealed ? redacted.value : redacted.display}</span>
-      <button
-        type="button"
-        className={`${p}-btn`}
-        title={revealed ? 'Hide' : 'Reveal'}
-        style={{
-          padding: '0 4px',
-          fontSize: '0.85em',
-          lineHeight: 1,
-          minWidth: 'auto',
-        }}
-        onClick={(e) => {
-          e.stopPropagation()
-          setRevealed((prev) => !prev)
-        }}
-      >
-        {revealed ? (
-          <svg
-            width="14"
-            height="14"
-            viewBox={TAB_ICONS['eye-off'].viewBox}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            dangerouslySetInnerHTML={{ __html: TAB_ICONS['eye-off'].elements.join('') }}
-          />
-        ) : (
-          <svg
-            width="14"
-            height="14"
-            viewBox={TAB_ICONS.eye.viewBox}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            dangerouslySetInnerHTML={{ __html: TAB_ICONS.eye.elements.join('') }}
-          />
-        )}
-      </button>
+      <span>{redacted.display}</span>
     </span>
   )
 }

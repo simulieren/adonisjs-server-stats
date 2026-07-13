@@ -24,7 +24,13 @@ export class RingBuffer<T> {
     if (this.count < this.capacity) {
       this.count++
     }
-    this.pushCallback?.(item)
+    // The write itself is infallible; a throwing subscriber must not escape and
+    // corrupt callers that rely on push() never failing.
+    try {
+      this.pushCallback?.(item)
+    } catch (err) {
+      console.error('[server-stats] ring buffer push callback threw:', err)
+    }
   }
 
   /** Returns all items in insertion order (oldest first). */

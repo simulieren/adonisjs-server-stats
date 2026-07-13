@@ -32,13 +32,47 @@ export function markWarned(path: string): void {
 /**
  * Normalize a SQL query by replacing literal values with `?` placeholders.
  * Used for grouping identical query patterns.
+ *
+ * Numeric replacement is restricted to value contexts (a digit run preceded
+ * by whitespace, a comma, a paren, or an operator) so identifiers that contain
+ * digits — e.g. `orders_2024` — are left intact and distinct queries are not
+ * merged together.
  */
 export function normalizeSql(sql: string): string {
   return sql
     .replace(/'[^']*'/g, '?')
-    .replace(/\b\d+(\.\d+)?\b/g, '?')
+    .replace(/(^|[\s,(=<>+\-*/])\d+(\.\d+)?\b/g, '$1?')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+// ---------------------------------------------------------------------------
+// Binding hygiene
+// ---------------------------------------------------------------------------
+
+/** Max length for a persisted string binding before it is truncated. */
+const MAX_BINDING_LEN = 256
+
+/**
+ * Redact/truncate SQL bindings before persistence so secret-looking values
+ * (long tokens, hashes, keys) are not stored in cleartext.
+ *
+ * Conservative: only long strings are truncated; short values (ids, flags,
+ * emails, ordinary params) pass through so normal capture is unaffected.
+ */
+export function sanitizeBindings(bindings: unknown): unknown {
+  if (Array.isArray(bindings)) return bindings.map(sanitizeBindings)
+  if (typeof bindings === 'string' && bindings.length > MAX_BINDING_LEN) {
+    return bindings.slice(0, MAX_BINDING_LEN) + `…[truncated ${bindings.length} chars]`
+  }
+  if (bindings && typeof bindings === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(bindings as Record<string, unknown>)) {
+      out[k] = sanitizeBindings(v)
+    }
+    return out
+  }
+  return bindings
 }
 
 // ---------------------------------------------------------------------------
@@ -119,7 +153,7 @@ export function prepareRequestRows(requests: PersistRequestInput[]): PreparedReq
       .map((q) => ({
         sql_text: q.sql,
         sql_normalized: normalizeSql(q.sql),
-        bindings: q.bindings ? JSON.stringify(q.bindings) : null,
+        bindings: q.bindings ? JSON.stringify(sanitizeBindings(q.bindings)) : null,
         duration: round(q.duration),
         method: q.method,
         model: q.model,

@@ -32,6 +32,13 @@ export function useServerStats(options: StatsBarProps = {}) {
 
   const controllerRef = useRef<ServerStatsController | null>(null)
 
+  // Reset the unauthorized latch when auth config changes, so a same-instance
+  // auth refresh (e.g. a rotated authToken) can reconnect instead of staying
+  // permanently blocked until the component unmounts.
+  useEffect(() => {
+    setUnauthorized(false)
+  }, [baseUrl, authToken])
+
   useEffect(() => {
     if (unauthorized) return
 

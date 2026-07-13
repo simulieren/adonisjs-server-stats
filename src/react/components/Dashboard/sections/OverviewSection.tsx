@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 import { resolveEventName, resolveMetric, resolveNormalizedSql } from '../../../../core/field-resolvers.js'
 import {
@@ -79,6 +79,11 @@ interface OverviewChartProps {
 function OverviewChart({ chartPoints }: OverviewChartProps) {
   const pad = { top: 12, right: 12, bottom: 28, left: 38 }
   const h = 220
+
+  // Unique gradient IDs so multiple charts on a page don't collide.
+  const gradId = useId()
+  const totalGradId = `ss-cg-total-${gradId}`
+  const errorGradId = `ss-cg-error-${gradId}`
 
   // Measure actual container width via ResizeObserver
   const containerRef = useRef<HTMLDivElement>(null)
@@ -174,11 +179,11 @@ function OverviewChart({ chartPoints }: OverviewChartProps) {
       <svg viewBox={`0 0 ${w} ${h}`} className="ss-dash-chart-svg">
         {/* Gradient definitions */}
         <defs>
-          <linearGradient id="ss-cg-total" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={totalGradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--ss-accent)" stopOpacity={0.3} />
             <stop offset="100%" stopColor="var(--ss-accent)" stopOpacity={0.02} />
           </linearGradient>
-          <linearGradient id="ss-cg-error" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={errorGradId} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--ss-red-fg)" stopOpacity={0.35} />
             <stop offset="100%" stopColor="var(--ss-red-fg)" stopOpacity={0.02} />
           </linearGradient>
@@ -213,7 +218,7 @@ function OverviewChart({ chartPoints }: OverviewChartProps) {
         })}
 
         {/* Total requests: gradient fill + line */}
-        {totalArea && <path d={totalArea} fill="url(#ss-cg-total)" />}
+        {totalArea && <path d={totalArea} fill={`url(#${totalGradId})`} />}
         {totalLine && (
           <path
             d={totalLine}
@@ -226,7 +231,7 @@ function OverviewChart({ chartPoints }: OverviewChartProps) {
         )}
 
         {/* Error requests: gradient fill + dashed line */}
-        {errorArea && <path d={errorArea} fill="url(#ss-cg-error)" />}
+        {errorArea && <path d={errorArea} fill={`url(#${errorGradId})`} />}
         {errorLine && (
           <path
             d={errorLine}

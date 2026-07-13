@@ -8,14 +8,18 @@ import type { HttpContext } from '@adonisjs/core/http'
  * Because this package's routes are polled every few seconds, this causes
  * rapid cookie accumulation that can break the browser.
  *
- * This middleware runs after the route handler (and any global middleware)
- * and removes the `Set-Cookie` header so sessions are never started by
- * server-stats routes.
+ * The `Set-Cookie` header is stripped **before** `next()` runs so it is gone
+ * even when a downstream handler flushes headers early (e.g. a streaming/SSE
+ * route under these prefixes) — stripping only after `next()` would be a no-op
+ * once the response has already been flushed. It is stripped again after
+ * `next()` to also cover cookies set by later global middleware on buffered
+ * responses.
  */
 export async function noSessionMiddleware(
   ctx: HttpContext,
   next: () => Promise<void>
 ): Promise<void> {
+  ctx.response.response.removeHeader('set-cookie')
   await next()
   ctx.response.response.removeHeader('set-cookie')
 }

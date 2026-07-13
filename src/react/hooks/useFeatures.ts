@@ -42,6 +42,9 @@ export function useFeatures(options: DebugPanelProps = {}) {
 
     return () => {
       cancelled = true
+      // Reset the latch so a config change (e.g. tenant switch) re-fetches
+      // instead of keeping stale feature flags.
+      fetchedRef.current = false
     }
   }, [baseUrl, debugEndpoint, authToken])
 

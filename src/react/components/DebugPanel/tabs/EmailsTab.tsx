@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 
 import { resolveTimestamp } from '../../../../core/field-resolvers.js'
 import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
@@ -19,6 +19,7 @@ export function EmailsTab({ options }: EmailsTabProps) {
   const [previewId, setPreviewId] = useState<number | null>(null)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [loadingPreview, setLoadingPreview] = useState(false)
+  const previewAbortRef = useRef<AbortController | null>(null)
 
   const emails = useMemo(() => {
     const items = data?.emails || []
@@ -41,6 +42,11 @@ export function EmailsTab({ options }: EmailsTabProps) {
       setPreviewHtml(email.html || null)
 
       if (!email.html && email.id) {
+        // Abort any in-flight preview fetch so rapid clicks don't race.
+        previewAbortRef.current?.abort()
+        const abort = new AbortController()
+        previewAbortRef.current = abort
+
         setLoadingPreview(true)
         try {
           const endpoint = options?.debugEndpoint || '/admin/api/debug'
@@ -49,14 +55,15 @@ export function EmailsTab({ options }: EmailsTabProps) {
           const res = await fetch(`${endpoint}/emails/${email.id}/preview`, {
             headers,
             credentials: options?.authToken ? 'omit' : 'same-origin',
+            signal: abort.signal,
           })
           if (res.ok) {
             setPreviewHtml(await res.text())
           }
         } catch {
-          // Preview fetch failed
+          // Preview fetch failed or was aborted
         } finally {
-          setLoadingPreview(false)
+          if (!abort.signal.aborted) setLoadingPreview(false)
         }
       }
     },
@@ -64,10 +71,14 @@ export function EmailsTab({ options }: EmailsTabProps) {
   )
 
   const closePreview = useCallback(() => {
+    previewAbortRef.current?.abort()
     setPreviewId(null)
     setPreviewHtml(null)
     setLoadingPreview(false)
   }, [])
+
+  // Abort any in-flight preview fetch on unmount.
+  useEffect(() => () => previewAbortRef.current?.abort(), [])
 
   const statusColorMap: Record<string, string> = {
     sent: 'ss-dbg-email-status-sent',

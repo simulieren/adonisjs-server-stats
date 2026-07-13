@@ -48,12 +48,21 @@ const requests = computed<Record<string, unknown>[]>(() => {
 
 const getClient = useApiClient(baseUrl, authToken)
 
+// Cancel any in-flight detail fetch so two quick clicks don't race and let an
+// earlier response overwrite traceDetail. Mirrors TimelineTab.vue.
+let detailAbortController: AbortController | null = null
+
 async function handleRowClick(row: Record<string, unknown>) {
   const id = row.id as number
+  if (detailAbortController) detailAbortController.abort()
+  detailAbortController = new AbortController()
+  const controller = detailAbortController
   detailLoading.value = true
   try {
     const endpoint = dashboardEndpoint || '/__stats/api'
-    const result = await getClient().fetch<TraceDetail>(`${endpoint}/requests/${id}`)
+    const result = await getClient().fetch<TraceDetail>(`${endpoint}/requests/${id}`, {
+      signal: controller.signal,
+    })
     // Flatten nested trace fields (spans, totalDuration, warnings) to top level
     // so normalizeTraceFields() can find them
     const raw = result as unknown as Record<string, unknown>
@@ -61,10 +70,12 @@ async function handleRowClick(row: Record<string, unknown>) {
     const merged = trace ? { ...raw, ...trace, logs: raw.logs } : raw
     traceDetail.value = normalizeTraceFields(merged)
     selectedTrace.value = row
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') return
     // silently fail
   } finally {
-    detailLoading.value = false
+    // Only clear loading for the most recent request
+    if (detailAbortController === controller) detailLoading.value = false
   }
 }
 
@@ -122,6 +133,7 @@ watch([() => selectedTrace.value, () => traceDetail.value], async () => {
 })
 
 onUnmounted(() => {
+  if (detailAbortController) detailAbortController.abort()
   splitCleanup?.()
 })
 </script>

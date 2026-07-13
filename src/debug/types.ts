@@ -283,6 +283,9 @@ export interface TraceSpan {
   /** Span duration in milliseconds. */
   duration: number
 
+  /** True when the wrapped function threw. */
+  error?: boolean
+
   /** Optional metadata (query bindings, status code, etc.). */
   metadata?: Record<string, unknown>
 }

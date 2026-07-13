@@ -3,13 +3,49 @@ import { extractAddresses } from '../utils/mail_helpers.js'
 const MAX_HTML = 50_000
 
 /**
- * Cap an HTML/text body to a maximum size.
+ * Sensitive query-parameter names whose values are stripped from captured
+ * URLs. These carry one-time login/reset/verify credentials.
+ */
+const SENSITIVE_QUERY_PARAMS = /\b(token|code|access_token|refresh_token|api_key|apikey|key|secret|signature|sig|password|pwd|auth|otp|nonce|state)=[^\s&"'<>]*/gi
+
+/**
+ * URL path segments that indicate a credential-bearing link even when the
+ * secret is in the path rather than the query string (reset/verify/magic).
+ */
+const SENSITIVE_URL_PATHS =
+  /(https?:\/\/[^\s"'<>]*?\/(?:reset|verify|verification|confirm|magic|magic-link|activate|invite|unsubscribe)[^\s"'<>]*)/gi
+
+/**
+ * Redact token-bearing links from an email body before persistence.
+ *
+ * Conservative by design: strips values of known sensitive query params,
+ * neutralizes reset/verify/magic-link URLs, and redacts long opaque tokens
+ * that appear in URL path segments. Ordinary content is left untouched.
+ */
+export function redactTokenLinks(body: string): string {
+  return (
+    body
+      // ?token=… / &code=… → keep the key, drop the value
+      .replace(SENSITIVE_QUERY_PARAMS, (m) => m.slice(0, m.indexOf('=') + 1) + '[redacted]')
+      // reset/verify/magic URLs → redact everything after the sensitive segment
+      .replace(SENSITIVE_URL_PATHS, (_m, url: string) => {
+        const marker = url.search(
+          /\/(reset|verify|verification|confirm|magic|magic-link|activate|invite|unsubscribe)/i
+        )
+        return marker === -1 ? url : url.slice(0, marker) + '/[redacted]'
+      })
+  )
+}
+
+/**
+ * Cap an HTML/text body to a maximum size, stripping token-bearing links first.
  * Returns `null` for falsy or non-string inputs.
  */
 export function capHtmlSize(v: unknown, maxSize: number = MAX_HTML): string | null {
   if (!v || typeof v !== 'string') return null
-  if (v.length <= maxSize) return v
-  return v.slice(0, maxSize) + '\n<!-- truncated -->'
+  const cleaned = redactTokenLinks(v)
+  if (cleaned.length <= maxSize) return cleaned
+  return cleaned.slice(0, maxSize) + '\n<!-- truncated -->'
 }
 
 /**

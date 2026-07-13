@@ -2,6 +2,8 @@
  * Email bridge helpers for cross-process email capture via Redis pub/sub.
  */
 
+import { randomUUID } from 'node:crypto'
+
 import { log } from '../utils/logger.js'
 import { buildEmailPayload, MAIL_STATUS_MAP } from './email_helpers.js'
 
@@ -141,7 +143,10 @@ export async function setupFullEmailBridge(
   channel: string,
   targets: EmailBridgeTargets
 ): Promise<unknown> {
-  const processTag = `${process.pid}-${Date.now()}`
+  // Append a random UUID: in PID-recycling environments (e.g. every container is
+  // pid 1) `pid-timestamp` can collide across processes, causing a peer's emails
+  // to be filtered out as self-sent. The UUID makes the tag unique per instance.
+  const processTag = `${process.pid}-${Date.now()}-${randomUUID()}`
   registerMailEventPublisher(emitter, redis, processTag, channel)
   return subscribeToEmailBridge({
     redis,
@@ -159,7 +164,7 @@ export function setupPublisherOnlyBridge(
   redis: RedisPublisher,
   channel: string
 ): void {
-  const tag = `${process.pid}-${Date.now()}`
+  const tag = `${process.pid}-${Date.now()}-${randomUUID()}`
   registerMailEventPublisher(emitter, redis, tag, channel)
   log.info('email bridge publisher active (queue worker → Redis)')
 }

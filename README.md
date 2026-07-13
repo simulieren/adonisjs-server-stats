@@ -180,6 +180,7 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | `realtime`      | `boolean`                         | `true`                      | `true` = SSE via Transmit, `false` = poll-only                   |
 | `statsEndpoint` | `string \| false`                 | `'/admin/api/server-stats'` | HTTP endpoint. `false` to disable.                               |
 | `authorize`     | `(ctx) => boolean`                | --                          | Per-request visibility guard                                     |
+| `unsafeAllowNoAuth` | `boolean`                     | `false`                     | Register the dashboard/debug/stats routes even with **no** `authorize` guard. Off by default (routes fail closed). Local dev only — exposes secrets, email bodies, and SQL. |
 | `onStats`       | `(stats) => void`                 | --                          | Callback after each collection tick                              |
 | `toolbar`       | `boolean \| ToolbarConfig`        | --                          | `true` to enable with defaults, or pass a `ToolbarConfig` object |
 | `dashboard`     | `boolean \| DashboardConfig`      | --                          | `true` to enable at `/__stats`, or pass a `DashboardConfig`      |
@@ -376,9 +377,9 @@ export default defineConfig({
 })
 ```
 
-> **Tip:** When `authorize` is not set, the bar and all routes are accessible to everyone. In production you almost always want to set this.
+> **Fail closed:** When neither `authorize` nor `shouldShow` is set, the dashboard, debug API, and stats routes are **not registered at all** and a warning is logged. To run without a guard during local development, set `unsafeAllowNoAuth: true` — this exposes secrets, email bodies, and SQL to anyone who can reach the routes, so never use it outside strictly local dev.
 >
-> **Migration note:** `shouldShow` still works as a deprecated alias for `authorize`. Both have the same signature and behavior.
+> **Migration note:** `shouldShow` still works as a deprecated alias for `authorize` — same signature, same behavior, and it fully satisfies the guard requirement above. If you already set `shouldShow` (or `authorize`), this change does not affect you; you'll only see a one-time rename hint at boot.
 
 ---
 

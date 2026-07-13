@@ -4,6 +4,56 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-07-13
+
+Security-hardening, correctness, and restart-safety release. Every fix below was verified against the source and the full test suite (1466 tests) passes.
+
+### ⚠️ Behavior changes
+
+- **The dashboard now fails closed.** If no access guard is configured (`authorize`, or the legacy `shouldShow`), the sensitive routes — dashboard, debug API, and stats — are **no longer registered**, and a warning is logged. To register them without a guard (local dev only), set the new `unsafeAllowNoAuth: true`. **Existing users with `authorize`/`shouldShow` are unaffected** — their guard is honored exactly as before.
+- **Config values are truly redacted.** The config inspector no longer sends plaintext secret values to the browser; only the masked display is transmitted. The client-side "reveal" of plaintext has been removed.
+- **Mutating dashboard routes now require a same-origin request** (`DELETE /api/cache/:key`, `POST /api/jobs/:id/retry`, `POST`/`DELETE /api/filters`). Cross-origin calls receive `403`.
+- **Cache key operations can be scoped** via the `SERVER_STATS_CACHE_KEY_PREFIX` env var (unset = unrestricted, preserving current behavior). `EXPLAIN` now runs against the read connection.
+
+### New options
+
+- `unsafeAllowNoAuth?: boolean` — escape hatch to expose the dashboard without an access guard. Off by default; logs a one-time warning when enabled. Local development only.
+- `SERVER_STATS_CACHE_KEY_PREFIX` (env var) — restricts dashboard cache read/delete to keys under this prefix.
+
+### Security
+
+- Config inspector no longer ships plaintext secrets to the browser; redaction is applied before serialization (`src/dashboard/integrations/config_inspector.ts`)
+- Debug-panel email-preview iframe is now sandboxed (`sandbox=""`), preventing stored XSS from captured email HTML (`src/vue/components/DebugPanel/tabs/EmailsTab.vue`)
+- Email-preview endpoints now send `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `X-Frame-Options: SAMEORIGIN` (`src/routes/dashboard_routes.ts`, `src/routes/debug_routes.ts`)
+- Fail-closed access control on route registration with the `unsafeAllowNoAuth` escape hatch (`src/routes/register_routes.ts`)
+- Storage hygiene: token-bearing links in captured email bodies are stripped and oversized SQL bindings truncated before persistence (`src/provider/email_helpers.ts`, `src/dashboard/write_queue.ts`, `src/debug/debug_store.ts`)
+- Consolidated and expanded the sensitive-key redaction word list (`src/core/config-utils.ts`)
+- `EXPLAIN` uses the read client and rejects `;`/`--`/`/*`; `perPage` is clamped (1–200) on all list endpoints (`src/dashboard/query_explain_handler.ts`, `src/dashboard/paginate_helper.ts`)
+
+### Bug Fixes
+
+- Fix two `RequestMetrics` circular-buffer indexing bugs that skewed req/s and error-rate after the buffer first wrapped or under out-of-order request completion (`src/engine/request_metrics.ts`)
+- Fix BullMQ `queue_collector` leaking a Redis connection on every failed poll — the Queue is now created once and closed on stop (`src/collectors/queue_collector.ts`)
+- Make `EventCollector`/`TraceCollector` idempotent and restart-safe; error spans are now marked instead of appearing successful (`src/debug/event_collector.ts`, `src/debug/trace_collector.ts`)
+- `FlushManager.stop()` now awaits an in-flight flush before the final flush, so queued data is no longer dropped at shutdown (`src/dashboard/flush_manager.ts`)
+- Log-level type guard so string-level Pino output no longer zeroes error/warning counts (`src/log_stream/log_stream_service.ts`)
+- Restore the pino `write` monkey-patch on shutdown to prevent double log ingestion after hot-reload (`src/provider/pino_hook.ts`, `src/provider/shutdown_helpers.ts`)
+- Remove module-level `_whenReady` route singletons that could be clobbered on re-registration/hot-reload (`src/routes/debug_routes.ts`, `src/routes/dashboard_routes.ts`)
+- `RingBuffer` no longer propagates push-callback exceptions out of the synchronous write path (`src/debug/ring_buffer.ts`)
+- Add the new resolved config fields to `ResolvedServerStatsConfig` (`src/types.ts`); reset the Prometheus singleton and clear lifecycle timers on shutdown
+
+### Frontend
+
+- React hooks now react to post-mount config changes (API client, controller, and unauthorized latch reset on `baseUrl`/`authToken` change) (`src/react/hooks/*`)
+- Add `AbortController` cancellation to ad-hoc detail/preview fetches in React and Vue, eliminating click-race data corruption (`src/react`, `src/vue`)
+- Vue `CacheSection` API client is created inside `setup()` instead of at module scope; a single shared overview poller replaces three; stable keys and ARIA tab roles added (`src/vue/components/Dashboard`)
+
+### Build & packaging
+
+- Fix the broken `/core` `.d.ts` re-export chain that produced `TS2307` for consumers of `adonisjs-server-stats/core` (`vite.config.core.ts`, `package.json`)
+- Add `engines: { node: ">=18.0.0" }` and correct the `sideEffects` CSS glob
+- `configure` now prompts before registering the `log-stream` provider; the excluded pino diagnostic was moved out of the test glob (`configure.ts`)
+
 ## [1.13.0] - 2026-06-05
 
 ### Features

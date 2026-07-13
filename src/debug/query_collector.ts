@@ -142,6 +142,8 @@ export class QueryCollector {
 
   clear(): void {
     this.buffer.clear()
+    // Invalidate the cached summary so totals aren't stale after a clear().
+    this.cachedSummary = null
   }
 
   /** Register a callback that fires whenever a new query is recorded. */
