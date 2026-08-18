@@ -4,6 +4,35 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.1] - 2026-08-19
+
+Two bug fixes, no API changes.
+
+### Bug Fixes
+
+- **Application events are now persisted** ([#12](https://github.com/simulieren/adonisjs-server-stats/issues/12)). `server_stats_events` was never written to: `DashboardStore.queueEvents()` forwarded to `FlushManager.queueEvents()`, which fed `flushEvents()` — every piece worked, but nothing ever called it. Because `DataAccess.getEvents()` prefers the SQLite table whenever persistence is on, **enabling `dashboard: true` made the Events tab permanently empty** and hid in-memory events that `EventCollector` had already collected.
+
+  Simply wiring the existing path would not have been enough — `buildEventRows` hardcoded `request_id: null`, and events are pruned only via the `server_stats_requests` foreign-key cascade, so those rows would never have been reclaimed. Events now travel on `PersistRequestInput` alongside queries and traces and are inserted with the real request id, which gives correct FK linkage (retention prunes them), inherits the existing write-queue backpressure, and let the misleading `queueEvents`/`pendingEvents`/`flushEvents` path be removed rather than half-wired. Respects `production.capture.events`.
+
+  Adds `EventCollector.getEventsSince()`, mirroring `QueryCollector.getQueriesSince()` (`src/debug/event_collector.ts`, `src/provider/dashboard_init.ts`, `src/dashboard/write_queue.ts`).
+
+- **SQL bindings are now redacted by name and by shape** ([#13](https://github.com/simulieren/adonisjs-server-stats/issues/13)). `sanitizeBindings` claimed to redact secret-looking values but only truncated strings over 256 characters, so anything shorter was persisted verbatim — password reset tokens, API keys, bcrypt hashes, session ids, OTPs. `ConfigInspector` masked those same values properly, so the same secret was redacted in the Config tab and printed in full in the Queries tab.
+
+  Two rules now apply, because neither is sufficient alone:
+
+  - **By statement** — if the SQL mentions a credential-shaped identifier (`password`, `remember_token`, `otp`, ...), every binding for that statement is redacted. Positional bindings cannot be mapped back to columns, so it is all-or-nothing per statement, and it is the only rule that catches a short secret like a 6-digit OTP.
+  - **By value shape** — password hashes, JWTs, provider key prefixes (`sk_`, `ghp_`, `xoxb-`, `AKIA`), long hex digests, and URLs with embedded credentials are redacted wherever they appear.
+
+### ⚠️ Behavior change
+
+- **Some bindings you used to see are now `[redacted]`.** Statement-level redaction is deliberately coarse: a query touching a `password` or `token` identifier has *all* of its bindings masked, including innocuous ones like the row id. That is the safe trade, but it does make those specific queries less informative than before. Ordinary parameters — ids, flags, emails, timestamps — still pass through untouched.
+
+### Internal
+
+- Sensitive-name patterns extracted to `src/dashboard/sensitive_patterns.ts` so the config inspector and the binding writer share one definition of "looks like a secret". Email and SMTP names remain **config-only**: an `email` env var is usually an SMTP account, but an `email` column is ordinary application data and redacting it would make auth debugging impossible.
+- 30 new tests (`tests/binding_redaction.spec.ts`, `tests/event_persistence.spec.ts`), plus a rewritten `buildEventRows` assertion that previously encoded the `request_id: null` bug.
+- Verified in a real AdonisJS app: events persist with a real `request_id` where the table was previously always empty; a password update has every binding redacted; a hex token is redacted inside an otherwise ordinary statement while its plain bindings survive untouched.
+
 ## [1.16.0] - 2026-08-19
 
 Opt-in production mode, plus a security fix to the access guard found while building it.
