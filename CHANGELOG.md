@@ -4,6 +4,37 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-08-18
+
+### New options
+
+- **`domain?: string`** — restrict every server-stats route (stats endpoint, debug panel, dashboard) to a single host, using AdonisJS's native `router.group().domain()`. Useful when your admin surface already lives on its own subdomain.
+
+  ```ts
+  defineConfig({ domain: 'admin.example.com' })
+  defineConfig({ domain: ':tenant.example.com' }) // dynamic subdomain
+  ```
+
+  The dashboard is then reachable at `admin.example.com/__stats` and nowhere else. Opt-in and inert when unset — the route tree is unchanged for anyone who does not configure it.
+
+  Two caveats, both documented in the README:
+
+  - The `@serverStats()` Edge tag and the React/Vue components request **relative** URLs, so the toolbar only works on pages served from the configured domain.
+  - Routes are never registered in production regardless (`app.inProduction` short-circuits registration), so `domain` shapes dev and staging environments.
+
+- `defineConfig` warns when `domain` carries a protocol, path, or port. `.domain()` matches the host alone, so such values silently match nothing — a warning rather than a throw, so a typo degrades to "dashboard unreachable" instead of "app won't boot".
+
+### Improvements
+
+- The auto-registered route log is host-qualified when `domain` is set (`admin.example.com/__stats/*` rather than a bare path that will not resolve) (`src/provider/boot_helpers.ts`)
+- Boot-time advisory when `domain` and the Edge toolbar are both enabled, explaining the relative-URL caveat (`src/provider/boot_helpers.ts`)
+- `registerStatsRoute` takes an options object, matching the debug and dashboard registrars (`src/routes/stats_routes.ts`)
+- `AdonisRouteGroup.use()` returns the group, as AdonisJS does, allowing any chaining order (`src/routes/router_types.ts`)
+
+### Tests
+
+- 11 tests covering config resolution, route registration under `domain`, the invariant that the stats route stays ungrouped without one, dynamic subdomains, value validation, and the startup log prefix (`tests/domain_routing.spec.ts`)
+
 ## [1.14.1] - 2026-07-13
 
 ### Bug Fixes
