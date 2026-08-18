@@ -63,7 +63,7 @@ async function openPreview(email: EmailRecord) {
       if (props.authToken) headers['Authorization'] = `Bearer ${props.authToken}`
       const res = await fetch(`${endpoint}/emails/${email.id}/preview`, {
         headers,
-        credentials: props.authToken ? 'omit' : 'include',
+        credentials: props.authToken ? 'omit' : 'same-origin',
       })
       if (res.ok) {
         previewHtml.value = await res.text()
@@ -105,7 +105,12 @@ const { tableRef } = useResizableTable(() => emails.value)
         <button type="button" class="ss-dbg-btn-clear" @click="closePreview">&times;</button>
       </div>
       <div v-if="loadingPreview" class="ss-dbg-empty">Loading preview...</div>
-      <iframe v-else-if="previewHtml" class="ss-dbg-email-iframe" :srcdoc="previewHtml"></iframe>
+      <iframe
+        v-else-if="previewHtml"
+        class="ss-dbg-email-iframe"
+        :srcdoc="previewHtml"
+        sandbox=""
+      ></iframe>
       <div v-else class="ss-dbg-empty">No HTML content</div>
     </div>
 

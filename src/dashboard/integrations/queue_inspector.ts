@@ -1,4 +1,26 @@
 import type { ApplicationService } from '@adonisjs/core/types'
+import type { QueueInspectorContract } from './queue_inspector_contract.js'
+
+// Re-export shared types so existing importers (including adonisjs_queue_store.ts)
+// resolve without changes.
+export type {
+  QueueOverview,
+  QueueJobSummary,
+  QueueJobDetail,
+  QueueJobListResult,
+  JobStatus,
+} from './queue_inspector_contract.js'
+export { ALL_STATUSES } from './queue_inspector_contract.js'
+
+// Pull types and values into local scope for use within this file.
+import type {
+  QueueOverview,
+  QueueJobSummary,
+  QueueJobDetail,
+  QueueJobListResult,
+  JobStatus,
+} from './queue_inspector_contract.js'
+import { ALL_STATUSES } from './queue_inspector_contract.js'
 
 // ---------------------------------------------------------------------------
 // Minimal interfaces for BullMQ types
@@ -38,98 +60,8 @@ interface QueueManager {
 }
 
 // ---------------------------------------------------------------------------
-// Response types
-// ---------------------------------------------------------------------------
-
-export interface QueueOverview {
-  /** Total jobs currently being processed. */
-  active: number
-
-  /** Jobs waiting to be picked up by a worker. */
-  waiting: number
-
-  /** Jobs scheduled for future execution. */
-  delayed: number
-
-  /** Jobs that completed successfully. */
-  completed: number
-
-  /** Jobs that permanently failed. */
-  failed: number
-
-  /** Jobs paused in the queue. */
-  paused: number
-}
-
-export interface QueueJobSummary {
-  /** Bull job ID. */
-  id: string
-
-  /** Human-readable job name (cleaned from file URLs). */
-  name: string
-
-  /** Current job status. */
-  status: 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'paused'
-
-  /** Job payload (data). */
-  data: Record<string, unknown> | null
-
-  /** Alias for `data` — used by some frontends. */
-  payload: Record<string, unknown> | null
-
-  /** Number of attempts so far. */
-  attempts: number
-
-  /** Maximum allowed attempts. */
-  maxAttempts: number
-
-  /** Job progress (0-100 or custom). */
-  progress: number | object
-
-  /** Error message if the job failed, or null. */
-  failedReason: string | null
-
-  /** When the job was added (Unix timestamp ms). */
-  createdAt: number
-
-  /** Alias for `createdAt` — BullMQ compat. */
-  timestamp: number
-
-  /** When processing started (Unix timestamp ms), or null. */
-  processedAt: number | null
-
-  /** When the job finished (Unix timestamp ms), or null. */
-  finishedAt: number | null
-
-  /** Processing duration in ms, or null if not finished. */
-  duration: number | null
-}
-
-export interface QueueJobDetail extends QueueJobSummary {
-  /** Full stack trace if the job failed. */
-  stackTrace: string[]
-
-  /** Return value from the job handler, if any. */
-  returnValue: unknown
-
-  /** Job options (delay, priority, repeat, etc.). */
-  opts: Record<string, unknown>
-}
-
-export interface QueueJobListResult {
-  /** Jobs for the requested page. */
-  jobs: QueueJobSummary[]
-
-  /** Total number of jobs matching the status filter. */
-  total: number
-}
-
-// ---------------------------------------------------------------------------
 // QueueInspector
 // ---------------------------------------------------------------------------
-
-type JobStatus = 'active' | 'waiting' | 'delayed' | 'completed' | 'failed' | 'paused'
-const ALL_STATUSES: JobStatus[] = ['active', 'waiting', 'delayed', 'completed', 'failed', 'paused']
 
 /**
  * Inspects Bull Queue jobs, counts, and allows retrying failed jobs.
@@ -138,7 +70,7 @@ const ALL_STATUSES: JobStatus[] = ['active', 'waiting', 'delayed', 'completed', 
  * Only functional when `@rlanz/bull-queue` is installed.
  * All methods catch errors and return safe defaults.
  */
-export class QueueInspector {
+export class QueueInspector implements QueueInspectorContract {
   constructor(private queueManager: QueueManager) {}
 
   /**

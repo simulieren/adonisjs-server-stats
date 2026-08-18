@@ -37,6 +37,12 @@ const emails = computed<Record<string, unknown>[]>(() => {
   return (d.data || d.emails || data.value || []) as Record<string, unknown>[]
 })
 
+// Resolve the currently-previewed email once instead of calling emails.find()
+// repeatedly in the template.
+const previewEmail = computed<Record<string, unknown> | undefined>(() =>
+  previewId.value === null ? undefined : emails.value.find((e) => e.id === previewId.value)
+)
+
 function handleSearch(term: string) {
   search.value = term
   setSearch(term)
@@ -68,41 +74,23 @@ const { tableRef } = useResizableTable(() => emails.value)
       <div class="ss-dash-email-preview" id="ss-dash-email-preview">
         <div class="ss-dash-email-preview-header">
           <div class="ss-dash-email-preview-meta" id="ss-dash-email-preview-meta">
-            <template v-if="emails.find((e) => e.id === previewId)">
+            <template v-if="previewEmail">
               <strong>Subject:</strong>
-              {{ emails.find((e) => e.id === previewId)?.subject }} &nbsp;&nbsp;|&nbsp;&nbsp;<strong
-                >From:</strong
-              >
-              {{
-                emails.find((e) => e.id === previewId)?.from_addr ||
-                emails.find((e) => e.id === previewId)?.from
-              }}
+              {{ previewEmail.subject }} &nbsp;&nbsp;|&nbsp;&nbsp;<strong>From:</strong>
+              {{ previewEmail.from_addr || previewEmail.from }}
               &nbsp;&nbsp;|&nbsp;&nbsp;<strong>To:</strong>
-              {{
-                emails.find((e) => e.id === previewId)?.to_addr ||
-                emails.find((e) => e.id === previewId)?.to
-              }}
-              <template
-                v-if="
-                  emails.find((e) => e.id === previewId)?.cc ||
-                  emails.find((e) => e.id === previewId)?.cc_addr
-                "
-              >
+              {{ previewEmail.to_addr || previewEmail.to }}
+              <template v-if="previewEmail.cc || previewEmail.cc_addr">
                 &nbsp;&nbsp;|&nbsp;&nbsp;<strong>CC:</strong>
-                {{
-                  emails.find((e) => e.id === previewId)?.cc ||
-                  emails.find((e) => e.id === previewId)?.cc_addr
-                }}
+                {{ previewEmail.cc || previewEmail.cc_addr }}
               </template>
               &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Status:</strong>
-              <span
-                :class="`ss-dash-badge ss-dash-email-status-${emails.find((e) => e.id === previewId)?.status}`"
-              >
-                {{ emails.find((e) => e.id === previewId)?.status }}
+              <span :class="`ss-dash-badge ss-dash-email-status-${previewEmail.status}`">
+                {{ previewEmail.status }}
               </span>
-              <template v-if="emails.find((e) => e.id === previewId)?.mailer">
+              <template v-if="previewEmail.mailer">
                 &nbsp;&nbsp;|&nbsp;&nbsp;<strong>Mailer:</strong>
-                {{ emails.find((e) => e.id === previewId)?.mailer }}
+                {{ previewEmail.mailer }}
               </template>
             </template>
           </div>

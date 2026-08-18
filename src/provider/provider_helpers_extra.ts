@@ -10,7 +10,7 @@ import { getLogStreamService } from '../collectors/log_collector.js'
 import { LogStreamService } from '../log_stream/log_stream_service.js'
 import { log, dim, bold } from '../utils/logger.js'
 import { setupPublisherOnlyBridge } from './email_bridge.js'
-import { findPinoStreamSymbol, wrapWriteMethod } from './pino_hook.js'
+import { findPinoStreamSymbol, wrapWriteMethod, unwrapWriteMethod } from './pino_hook.js'
 // Re-export toolbar/dashboard functions with provider-compatible signatures
 import {
   setupDevToolbarCore as coreSetup,
@@ -51,6 +51,13 @@ export function applyToolbarResult(
 
 // ── hookPinoToLogStream ─────────────────────────────────────────
 
+/**
+ * The pino stream whose `write` we last wrapped, kept so shutdown can restore
+ * it. Without this, a hot-reload would leave a stale wrapper in place and the
+ * next hook would stack on top — double-ingesting every log line.
+ */
+let hookedPinoStream: { write: Function; [key: string]: unknown } | null = null
+
 /** Hook the AdonisJS Pino logger into the log collector. Returns true if hooked. */
 export function hookPinoToLogStream(logger: unknown): boolean {
   const logStream = getLogStreamService()
@@ -62,11 +69,18 @@ export function hookPinoToLogStream(logger: unknown): boolean {
   const rawStream = (pino as Record<symbol, unknown>)[streamSym]
   if (!rawStream) return false
   if (typeof (rawStream as Record<string, unknown>).write !== 'function') return false
-  wrapWriteMethod(rawStream as { write: Function; [key: string]: unknown }, (entry) =>
-    logStream.ingest(entry)
-  )
+  const stream = rawStream as { write: Function; [key: string]: unknown }
+  wrapWriteMethod(stream, (entry) => logStream.ingest(entry))
+  hookedPinoStream = stream
   log.info('log collector hooked into AdonisJS logger (zero-config)')
   return true
+}
+
+/** Restore the original pino `write`, undoing {@link hookPinoToLogStream}. */
+export function unhookPinoFromLogStream(): void {
+  if (!hookedPinoStream) return
+  unwrapWriteMethod(hookedPinoStream)
+  hookedPinoStream = null
 }
 
 // ── setupLogStreamBroadcast ─────────────────────────────────────

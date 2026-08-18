@@ -163,6 +163,7 @@ export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConf
     onStats: config.onStats,
     devToolbar: resolveDevToolbar(config),
     shouldShow: config.authorize ?? config.shouldShow,
+    unsafeAllowNoAuth: config.unsafeAllowNoAuth,
     verbose,
     domain: config.domain,
   }

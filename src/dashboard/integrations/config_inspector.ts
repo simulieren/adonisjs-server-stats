@@ -7,7 +7,6 @@ import type { ApplicationService } from '@adonisjs/core/types'
 export interface RedactedValue {
   __redacted: true
   display: string
-  value: string
 }
 
 export interface SanitizedConfig {
@@ -70,8 +69,10 @@ const SENSITIVE_PATTERNS: RegExp[] = [
 
 const REDACTED_DISPLAY = '••••••••'
 
-function redact(value: string): RedactedValue {
-  return { __redacted: true, display: REDACTED_DISPLAY, value }
+function redact(_value: string): RedactedValue {
+  // Never include the plaintext value: the redacted object is serialized
+  // to the browser, so the secret must not leave the server.
+  return { __redacted: true, display: REDACTED_DISPLAY }
 }
 
 // ---------------------------------------------------------------------------

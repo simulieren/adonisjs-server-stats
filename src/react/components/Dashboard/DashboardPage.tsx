@@ -71,6 +71,8 @@ export function DashboardPage(props: DashboardPageProps) {
   const { theme, toggleTheme } = useTheme()
 
   const [activeSection, setActiveSection] = useState<DashboardSection>('overview')
+  const activeSectionRef = useRef(activeSection)
+  activeSectionRef.current = activeSection
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     if (typeof window === 'undefined') return false
     return localStorage.getItem('ss-dash-sidebar') === 'collapsed'
@@ -122,15 +124,17 @@ export function DashboardPage(props: DashboardPageProps) {
     }
   }, [resolveHashSection])
 
-  // Handle browser Back/Forward via hashchange
+  // Handle browser Back/Forward via hashchange. Read the current section from
+  // a ref so the listener stays registered across section navigations (a
+  // narrow teardown window could otherwise miss a fast hashchange).
   useEffect(() => {
     const handleHashChange = () => {
       const section = resolveHashSection(window.location.hash)
-      if (section !== activeSection) setActiveSection(section)
+      if (section !== activeSectionRef.current) setActiveSection(section)
     }
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
-  }, [activeSection, resolveHashSection])
+  }, [resolveHashSection])
 
   // Update hash when section changes
   useEffect(() => {
@@ -264,13 +268,15 @@ export function DashboardPage(props: DashboardPageProps) {
           className={`ss-dash-sidebar ${sidebarCollapsed ? 'ss-dash-collapsed' : ''}`}
           id="ss-dash-sidebar"
         >
-          <nav className="ss-dash-nav">
+          <nav className="ss-dash-nav" role="tablist">
             {visibleSections.map((section) => {
               const badge = navBadges[section.id]
               return (
                 <button
                   key={section.id}
                   type="button"
+                  role="tab"
+                  aria-selected={activeSection === section.id}
                   className={`ss-dash-nav-item ${activeSection === section.id ? 'ss-dash-active' : ''}`}
                   data-ss-section={section.id}
                   onClick={() => {
@@ -313,6 +319,8 @@ export function DashboardPage(props: DashboardPageProps) {
               <button
                 key={pane.id}
                 type="button"
+                role="tab"
+                aria-selected={activeSection === pane.id}
                 className={`ss-dash-nav-item ${activeSection === pane.id ? 'ss-dash-active' : ''}`}
                 onClick={() => setActiveSection(pane.id)}
                 title={sidebarCollapsed ? pane.label : undefined}

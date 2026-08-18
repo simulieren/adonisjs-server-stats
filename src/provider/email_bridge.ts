@@ -2,6 +2,8 @@
  * Email bridge helpers for cross-process email capture via Redis pub/sub.
  */
 
+import { randomUUID } from 'node:crypto'
+
 import { log } from '../utils/logger.js'
 import { buildEmailPayload, MAIL_STATUS_MAP } from './email_helpers.js'
 
@@ -20,10 +22,42 @@ interface RedisSubscriber extends RedisPublisher {
   subscribe(channel: string, handler: (message: string) => void): unknown
 }
 
+/** Sink that persists an ingested email (the SQLite dashboard store). */
+interface DashboardEmailSink {
+  recordEmail(record: Record<string, unknown>): void
+}
+
 /** Targets for ingesting remote emails. */
 export interface EmailBridgeTargets {
   debugEmails: { ingest(record: Record<string, unknown>): void } | null
-  dashboardStore: { recordEmail(record: Record<string, unknown>): void } | null
+  /**
+   * The persistent dashboard store, or a (possibly async) getter for it.
+   *
+   * A getter is used because the bridge subscribes during early boot —
+   * before the SQLite dashboard store exists — yet remote emails arrive
+   * later, by which time the store is available. Resolving lazily lets
+   * cross-process (queue-worker) emails land in SQLite, where the
+   * dashboard/debug APIs read from when persistence is enabled.
+   */
+  dashboardStore:
+    | DashboardEmailSink
+    | (() => DashboardEmailSink | null | Promise<DashboardEmailSink | null>)
+    | null
+}
+
+/** Resolve the dashboard sink whether it's a direct object, a getter, or null. */
+async function resolveDashboardSink(
+  store: EmailBridgeTargets['dashboardStore']
+): Promise<DashboardEmailSink | null> {
+  if (!store) return null
+  if (typeof store === 'function') {
+    try {
+      return (await store()) ?? null
+    } catch {
+      return null
+    }
+  }
+  return store
 }
 
 /** Options for subscribing to the email bridge. */
@@ -53,7 +87,11 @@ export function ingestRemoteEmail(
       text: fields.text || null,
     }
     targets.debugEmails?.ingest(record)
-    targets.dashboardStore?.recordEmail({ id: 0, ...record })
+    // Persist to SQLite too (where the APIs read from). The store may be
+    // resolved lazily, so fire-and-forget without blocking ingestion.
+    void resolveDashboardSink(targets.dashboardStore).then((sink) => {
+      sink?.recordEmail({ id: 0, ...record })
+    })
   } catch {
     // Ignore malformed messages
   }
@@ -105,7 +143,10 @@ export async function setupFullEmailBridge(
   channel: string,
   targets: EmailBridgeTargets
 ): Promise<unknown> {
-  const processTag = `${process.pid}-${Date.now()}`
+  // Append a random UUID: in PID-recycling environments (e.g. every container is
+  // pid 1) `pid-timestamp` can collide across processes, causing a peer's emails
+  // to be filtered out as self-sent. The UUID makes the tag unique per instance.
+  const processTag = `${process.pid}-${Date.now()}-${randomUUID()}`
   registerMailEventPublisher(emitter, redis, processTag, channel)
   return subscribeToEmailBridge({
     redis,
@@ -123,7 +164,7 @@ export function setupPublisherOnlyBridge(
   redis: RedisPublisher,
   channel: string
 ): void {
-  const tag = `${process.pid}-${Date.now()}`
+  const tag = `${process.pid}-${Date.now()}-${randomUUID()}`
   registerMailEventPublisher(emitter, redis, tag, channel)
   log.info('email bridge publisher active (queue worker → Redis)')
 }

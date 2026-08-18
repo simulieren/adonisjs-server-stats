@@ -40,7 +40,7 @@ function handleSort(col: Column) {
 
 /** Compute a stable key for a row (avoids `as` cast in template). */
 function rowKey(row: Record<string, unknown>, index: number): string | number {
-  return (row[props.keyField || 'id'] as PropertyKey) ?? index
+  return (row[props.keyField || 'id'] as string | number) ?? index
 }
 
 const { tableRef } = useResizableTable(() => props.rows)

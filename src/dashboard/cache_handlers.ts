@@ -4,6 +4,22 @@ import type { InspectorManager } from './inspector_manager.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
 /**
+ * Optional allow-list prefix for single-key cache operations (get/delete).
+ * Restricts which Redis keys the dashboard may read or delete so an attacker
+ * can't target arbitrary keys (sessions, rate-limit counters). Empty/unset
+ * means unrestricted (back-compat default for local dev).
+ */
+function getCacheKeyPrefix(): string {
+  return (process.env.SERVER_STATS_CACHE_KEY_PREFIX ?? '').trim()
+}
+
+/** Check whether a cache key is permitted under the configured prefix. */
+function isKeyAllowed(key: string): boolean {
+  const prefix = getCacheKeyPrefix()
+  return prefix === '' || key.startsWith(prefix)
+}
+
+/**
  * Handle GET /cache-stats — list cache keys and overall stats.
  */
 export async function handleCacheStats(
@@ -37,8 +53,11 @@ export async function handleCacheKey(
   const inspector = await inspectors.getCacheInspector()
   if (!inspector) return response.notFound({ error: 'Cache not available' })
 
+  const key = decodeURIComponent(params.key)
+  if (!isKeyAllowed(key)) return response.forbidden({ error: 'Cache key not permitted' })
+
   try {
-    const detail = await inspector.getKey(decodeURIComponent(params.key))
+    const detail = await inspector.getKey(key)
     return detail ? response.json(detail) : response.notFound({ error: 'Key not found' })
   } catch {
     return response.notFound({ error: 'Key not found' })
@@ -55,8 +74,11 @@ export async function handleCacheKeyDelete(
   const inspector = await inspectors.getCacheInspector()
   if (!inspector) return response.notFound({ error: 'Cache not available' })
 
+  const key = decodeURIComponent(params.key)
+  if (!isKeyAllowed(key)) return response.forbidden({ error: 'Cache key not permitted' })
+
   try {
-    return (await inspector.deleteKey(decodeURIComponent(params.key)))
+    return (await inspector.deleteKey(key))
       ? response.json({ deleted: true })
       : response.notFound({ error: 'Key not found' })
   } catch {

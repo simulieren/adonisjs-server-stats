@@ -31,11 +31,9 @@ const {
   loading,
   error,
   pagination,
-  filter: filterState,
   goToPage,
   setSearch,
   setFilter,
-  refresh,
 } = useDashboardData(() => 'logs', {
   baseUrl,
   dashboardEndpoint,
@@ -113,31 +111,38 @@ function clearLevelFilter() {
   setFilter('level', '')
 }
 
+// Track the structured filter keys currently applied to the composable so
+// stale ones can be cleared through setFilter (setting to '' removes them),
+// instead of mutating the injected reactive filter state directly.
+let appliedStructuredKeys: string[] = []
+
 /**
  * Sync the structuredFilters array into the composable's filter state
  * using the same numbered key format as React:
  *   filter_field_0, filter_op_0, filter_value_0, ...
+ *
+ * Uses the composable's setFilter API (which resets pagination and refetches)
+ * rather than mutating filterState internals, preserving the guards.
  */
 function syncStructuredFilters() {
-  const f = filterState as Record<string, string | number | boolean>
-  // Remove all existing structured filter keys
-  for (const key of Object.keys(f)) {
-    if (
-      key.startsWith('filter_field_') ||
-      key.startsWith('filter_op_') ||
-      key.startsWith('filter_value_')
-    ) {
-      delete f[key]
-    }
-  }
-  // Re-add from current array
+  const nextKeys: string[] = []
   structuredFilters.value.forEach((sf, idx) => {
-    f[`filter_field_${idx}`] = sf.field
-    f[`filter_op_${idx}`] = sf.operator
-    f[`filter_value_${idx}`] = sf.value
+    nextKeys.push(`filter_field_${idx}`, `filter_op_${idx}`, `filter_value_${idx}`)
   })
-  pagination.page = 1
-  refresh()
+
+  // Clear keys that were applied before but are no longer present.
+  for (const key of appliedStructuredKeys) {
+    if (!nextKeys.includes(key)) setFilter(key, '')
+  }
+
+  // Apply the current set. setFilter also resets page to 1 and triggers a fetch.
+  structuredFilters.value.forEach((sf, idx) => {
+    setFilter(`filter_field_${idx}`, sf.field)
+    setFilter(`filter_op_${idx}`, sf.operator)
+    setFilter(`filter_value_${idx}`, sf.value)
+  })
+
+  appliedStructuredKeys = nextKeys
 }
 
 function addStructuredFilter() {

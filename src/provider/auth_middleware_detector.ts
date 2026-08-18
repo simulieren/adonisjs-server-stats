@@ -14,16 +14,26 @@ function isAuthMiddleware(importPath: string): boolean {
 }
 
 /**
- * Extract import paths from a `server.use([...])` or `router.use([...])`
- * block that match auth-related middleware.
+ * Check if an import path refers to session middleware.
  */
-function extractAuthImportsFromBlock(block: string): string[] {
+function isSessionMiddleware(importPath: string): boolean {
+  return importPath.includes('session')
+}
+
+/**
+ * Extract import paths from a `server.use([...])` or `router.use([...])`
+ * block that match the given predicate.
+ */
+function extractMatchingImportsFromBlock(
+  block: string,
+  predicate: (importPath: string) => boolean
+): string[] {
   const importRegex = /import\(\s*['"]([^'"]+)['"]\s*\)/g
   const results: string[] = []
   let importMatch: RegExpExecArray | null
   while ((importMatch = importRegex.exec(block)) !== null) {
     const importPath = importMatch[1]
-    if (isAuthMiddleware(importPath)) {
+    if (predicate(importPath)) {
       results.push(importPath)
     }
   }
@@ -31,20 +41,33 @@ function extractAuthImportsFromBlock(block: string): string[] {
 }
 
 /**
- * Parse source code and detect auth-related middleware
+ * Parse source code and detect middleware matching a predicate
  * in `server.use()` or `router.use()` blocks.
  *
  * This is a pure function that operates on source text.
  */
-export function detectAuthMiddlewareInSource(source: string): string[] {
+function detectMiddlewareInSource(
+  source: string,
+  predicate: (importPath: string) => boolean
+): string[] {
   if (!source) return []
   const found: string[] = []
   const useBlockRegex = /(?:server|router)\.use\(\s*\[([\s\S]*?)\]\s*\)/g
   let match: RegExpExecArray | null
   while ((match = useBlockRegex.exec(source)) !== null) {
-    found.push(...extractAuthImportsFromBlock(match[1]))
+    found.push(...extractMatchingImportsFromBlock(match[1], predicate))
   }
   return found
+}
+
+/** Detect auth-related middleware in source text. */
+export function detectAuthMiddlewareInSource(source: string): string[] {
+  return detectMiddlewareInSource(source, isAuthMiddleware)
+}
+
+/** Detect session middleware in source text. */
+export function detectSessionMiddlewareInSource(source: string): string[] {
+  return detectMiddlewareInSource(source, isSessionMiddleware)
 }
 
 /**
@@ -77,6 +100,20 @@ export function detectGlobalAuthMiddleware(
 }
 
 /**
+ * Read `start/kernel.{ts,js}` from the app root and detect global session
+ * middleware. Returns an empty array if the file cannot be read.
+ */
+export function detectGlobalSessionMiddleware(
+  makePath: (dir: string, file: string) => string
+): string[] {
+  try {
+    return detectSessionMiddlewareInSource(readKernelSource(makePath))
+  } catch {
+    return []
+  }
+}
+
+/**
  * Build the warning message lines for detected auth middleware.
  */
 export function buildAuthMiddlewareWarning(
@@ -102,5 +139,31 @@ export function buildAuthMiddlewareWarning(
     '',
     dimFn('// start/routes.ts — add to your route groups instead'),
     dimFn('router.group(() => { ... }).use(middleware.silentAuth())'),
+  ]
+}
+
+/**
+ * Build the warning message lines for detected session middleware.
+ */
+export function buildSessionMiddlewareWarning(
+  found: string[],
+  dimFn: (s: string) => string,
+  boldFn: (s: string) => string
+): string[] {
+  return [
+    ...found.map((m) => dimFn('→') + ' ' + m),
+    '',
+    dimFn('server-stats routes are polled every ~3s. global session middleware'),
+    dimFn('issues a Set-Cookie on every response, which can accumulate cookies'),
+    dimFn('and eventually break the browser.'),
+    '',
+    dimFn('server-stats already strips Set-Cookie headers from its own routes,'),
+    dimFn('but for best results, move session middleware to a named route group:'),
+    '',
+    boldFn('// start/kernel.ts — remove from router.use()'),
+    dimFn("// () => import('@adonisjs/session/session_middleware')"),
+    '',
+    boldFn('// start/routes.ts — add to your route groups instead'),
+    dimFn("router.group(() => { ... }).use(middleware.session())"),
   ]
 }

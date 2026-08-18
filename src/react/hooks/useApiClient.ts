@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react'
+import { useRef, useEffect, useCallback } from 'react'
 
 import { ApiClient } from '../../core/api-client.js'
 
@@ -11,6 +11,12 @@ import { ApiClient } from '../../core/api-client.js'
  */
 export function useApiClient(baseUrl: string = '', authToken?: string) {
   const clientRef = useRef<ApiClient | null>(null)
+
+  // Invalidate the cached client when config deps change so a rotated
+  // authToken / baseUrl doesn't keep serving a stale client.
+  useEffect(() => {
+    clientRef.current = null
+  }, [baseUrl, authToken])
 
   return useCallback(() => {
     if (!clientRef.current) {

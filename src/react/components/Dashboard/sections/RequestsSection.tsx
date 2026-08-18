@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 
 import {
   resolveDuration,
@@ -34,6 +34,7 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [selectedTrace, setSelectedTrace] = useState<TraceDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const detailAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => setPage(1), [search])
 
@@ -52,13 +53,19 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
       const id = row.id as number
       setDetailLoading(true)
 
+      // Abort any in-flight detail fetch so two quick clicks don't race.
+      detailAbortRef.current?.abort()
+      const abort = new AbortController()
+      detailAbortRef.current = abort
+
       const endpoint = options.dashboardEndpoint || '/__stats/api'
       getClient()
-        .fetch<TraceDetail>(`${endpoint}/requests/${id}`)
+        .fetch<TraceDetail>(`${endpoint}/requests/${id}`, { signal: abort.signal })
         .then((result) => {
+          if (abort.signal.aborted) return
           // Flatten nested trace fields (spans, totalDuration, warnings) to top level
           // so normalizeTraceFields() can find them
-          const raw = result as Record<string, unknown>
+          const raw = result as unknown as Record<string, unknown>
           const trace = raw.trace as Record<string, unknown> | null
           if (trace) {
             const merged = { ...raw, ...trace, logs: raw.logs }
@@ -69,11 +76,14 @@ export function RequestsSection({ options = {} }: RequestsSectionProps) {
           setDetailLoading(false)
         })
         .catch(() => {
-          setDetailLoading(false)
+          if (!abort.signal.aborted) setDetailLoading(false)
         })
     },
     [getClient, options.dashboardEndpoint]
   )
+
+  // Abort any in-flight detail fetch on unmount.
+  useEffect(() => () => detailAbortRef.current?.abort(), [])
 
   const handleSort = useCallback(
     (key: string) => {

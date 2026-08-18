@@ -20,6 +20,14 @@ function isSelectQuery(sqlText: string): boolean {
   return sqlText.trim().toUpperCase().startsWith('SELECT')
 }
 
+/**
+ * Reject SQL containing statement separators / comment sequences that could
+ * enable stacked statements or comment-based injection into the EXPLAIN prefix.
+ */
+export function hasUnsafeSqlTokens(sqlText: string): boolean {
+  return /;|--|\/\*/.test(sqlText)
+}
+
 /** Parse bindings from a stored query. */
 function parseBindings(raw: unknown): unknown[] {
   if (!raw) return []
@@ -50,7 +58,7 @@ function detectDialect(client: Record<string, unknown>): DbDialect {
   return 'unknown'
 }
 
-/** Get the Lucid write client for running EXPLAIN. */
+/** Get the Lucid read client for running EXPLAIN. */
 export async function getAppDbClient(
   app: ApplicationService,
   connectionName?: string
@@ -58,11 +66,11 @@ export async function getAppDbClient(
   try {
     const lucid: unknown = await app.container.make('lucid.db')
     const conn = connectionName
-      ? (lucid as { connection: (name: string) => { getWriteClient: () => unknown } }).connection(
+      ? (lucid as { connection: (name: string) => { getReadClient: () => unknown } }).connection(
           connectionName
         )
-      : (lucid as { connection: () => { getWriteClient: () => unknown } }).connection()
-    const client = conn.getWriteClient() as Record<string, unknown>
+      : (lucid as { connection: () => { getReadClient: () => unknown } }).connection()
+    const client = conn.getReadClient() as Record<string, unknown>
     const dialect = detectDialect(client)
     return {
       raw: (client.raw as (sql: string, bindings: unknown[]) => Promise<unknown>).bind(client),
@@ -137,6 +145,9 @@ export async function handleQueryExplain(
 
     if (!isSelectQuery(query.sql_text as string)) {
       return response.badRequest({ error: 'EXPLAIN is only supported for SELECT queries' })
+    }
+    if (hasUnsafeSqlTokens(query.sql_text as string)) {
+      return response.badRequest({ error: 'EXPLAIN rejected: query contains disallowed tokens' })
     }
 
     const appDb = await getAppDbClient(app, (query.connection as string) || undefined)

@@ -19,6 +19,8 @@ interface SimpleDeprecation {
   newName: string
   before: (config: ServerStatsConfig) => string[]
   after: (config: ServerStatsConfig) => string[]
+  /** Optional extra reassurance shown under the before/after block. */
+  note?: (config: ServerStatsConfig) => string[]
 }
 
 const SIMPLE_DEPRECATIONS: SimpleDeprecation[] = [
@@ -55,6 +57,10 @@ const SIMPLE_DEPRECATIONS: SimpleDeprecation[] = [
     newName: 'authorize',
     before: () => ['shouldShow: (ctx) => ...'],
     after: () => ['authorize: (ctx) => ...'],
+    note: () => [
+      'Your `shouldShow` guard still fully protects the dashboard — nothing breaks.',
+      '`authorize` is just the new name for the same access check.',
+    ],
   },
   {
     key: 'channelName',
@@ -81,6 +87,7 @@ interface DeprecationEntry {
   new: string
   before: string[]
   after: string[]
+  note?: string[]
 }
 
 /** Fields to include in the "before" snapshot of devToolbar. */
@@ -204,6 +211,7 @@ export function logDeprecationWarnings(config: ServerStatsConfig): void {
         new: dep.newName,
         before: dep.before(config),
         after: dep.after(config),
+        note: dep.note?.(config),
       })
     }
   }
@@ -227,6 +235,12 @@ export function logDeprecationWarnings(config: ServerStatsConfig): void {
     }
     for (const line of entry.after) {
       lines.push(`      ${dim('after:')}   ${line}`)
+    }
+    if (entry.note) {
+      lines.push('')
+      for (const line of entry.note) {
+        lines.push(`      ${dim(line)}`)
+      }
     }
     lines.push('')
   }

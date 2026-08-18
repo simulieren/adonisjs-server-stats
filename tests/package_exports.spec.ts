@@ -1,9 +1,16 @@
 import { readFile, access } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { test } from '@japa/runner'
 
 const PKG_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+
+// The "dist build artifacts" tests read from dist/, which only exists after a
+// build. On a fresh checkout (no prior `npm run build`) these are skipped so
+// `npm test` does not throw ENOENT.
+const DIST_EXISTS = existsSync(join(PKG_ROOT, 'dist'))
+const NO_DIST_REASON = 'dist/ not built — run `npm run build` first'
 
 test.group('core barrel exports field-resolvers', () => {
   test('all field resolver functions are re-exported from core/index', async ({ assert }) => {
@@ -55,10 +62,10 @@ test.group('dist build artifacts', () => {
         `dist/core/index.js should contain export "${name}"`
       )
     }
-  })
+  }).skip(!DIST_EXISTS, NO_DIST_REASON)
 
-  test('dist/core/index.d.ts contains field resolver type declarations', async ({ assert }) => {
-    const content = await readFile(join(PKG_ROOT, 'dist/core/index.d.ts'), 'utf-8')
+  test('dist/core/core/index.d.ts contains field resolver type declarations', async ({ assert }) => {
+    const content = await readFile(join(PKG_ROOT, 'dist/core/core/index.d.ts'), 'utf-8')
 
     const expectedNames = [
       'resolveTimestamp',
@@ -74,7 +81,7 @@ test.group('dist build artifacts', () => {
         `dist/core/index.d.ts should declare "${name}"`
       )
     }
-  })
+  }).skip(!DIST_EXISTS, NO_DIST_REASON)
 
   test('dist/react/index.d.ts exists at the correct path (not nested in react/react/)', async ({ assert }) => {
     const correctPath = join(PKG_ROOT, 'dist/react/index.d.ts')
@@ -96,7 +103,7 @@ test.group('dist build artifacts', () => {
 
     assert.isTrue(correctExists, 'dist/react/index.d.ts should exist')
     assert.isFalse(wrongExists, 'dist/react/react/index.d.ts should NOT exist (wrong nesting)')
-  })
+  }).skip(!DIST_EXISTS, NO_DIST_REASON)
 
   test('dist/react/index.d.ts exports React components', async ({ assert }) => {
     const content = await readFile(join(PKG_ROOT, 'dist/react/index.d.ts'), 'utf-8')
@@ -104,7 +111,7 @@ test.group('dist build artifacts', () => {
     assert.isTrue(content.includes('StatsBar'), 'should export StatsBar')
     assert.isTrue(content.includes('DebugPanel'), 'should export DebugPanel')
     assert.isTrue(content.includes('DashboardPage'), 'should export DashboardPage')
-  })
+  }).skip(!DIST_EXISTS, NO_DIST_REASON)
 
   test('package.json export paths match actual files', async ({ assert }) => {
     const pkgJson = JSON.parse(await readFile(join(PKG_ROOT, 'package.json'), 'utf-8'))
@@ -129,5 +136,5 @@ test.group('dist build artifacts', () => {
       }
       assert.isTrue(exists, `export path "${relPath}" should exist on disk`)
     }
-  })
+  }).skip(!DIST_EXISTS, NO_DIST_REASON)
 })

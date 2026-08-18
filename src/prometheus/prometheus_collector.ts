@@ -234,3 +234,15 @@ export const ServerStatsCollector: {
 } = {
   instance: null,
 }
+
+/**
+ * Drop the module-level collector singleton on shutdown.
+ *
+ * The `ServerStatsCollector.instance` reference outlives an individual app
+ * lifecycle. Leaving it set means a restart (common in tests / HMR) re-runs
+ * `register()` against a still-populated prom-client registry, which can throw
+ * "Metric already registered". Nulling it lets the next boot register cleanly.
+ */
+export function resetServerStatsCollector(): void {
+  ServerStatsCollector.instance = null
+}

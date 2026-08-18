@@ -59,12 +59,16 @@ interface WarnState {
   missingConnection: boolean
 }
 
-/** Fetch job counts from a BullMQ queue. */
-async function fetchQueueCounts(queueName: string, connection: QueueRedisConnection) {
-  const { Queue } = await import('bullmq')
-  const queue = new Queue(queueName, { connection })
+/** Minimal shape of the BullMQ Queue we rely on. */
+interface BullQueue {
+  getJobCounts(): Promise<Record<string, number>>
+  getWorkers(): Promise<unknown[]>
+  close(): Promise<void>
+}
+
+/** Fetch job counts from a long-lived BullMQ queue instance. */
+async function fetchQueueCounts(queue: BullQueue) {
   const [counts, workers] = await Promise.all([queue.getJobCounts(), queue.getWorkers()])
-  await queue.close()
   return {
     queueActive: counts.active ?? 0,
     queueWaiting: counts.waiting ?? 0,
@@ -125,9 +129,30 @@ export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
     missingConnection: false,
   }
 
+  // The BullMQ Queue owns a Redis connection. Create it once and reuse it
+  // across every poll tick so a rejected getJobCounts()/getWorkers() can never
+  // leak a connection (the previous per-tick `new Queue(...)` leaked one on
+  // every failure because close() was skipped). The queue is created lazily on
+  // first collect so a missing `bullmq` peer dependency degrades gracefully.
+  let queue: BullQueue | null = null
+
+  async function getQueue(connection: QueueRedisConnection): Promise<BullQueue> {
+    if (queue) return queue
+    const { Queue } = await import('bullmq')
+    queue = new Queue(queueName, { connection }) as unknown as BullQueue
+    return queue
+  }
+
   return {
     name: 'queue',
     label: `queue — ${queueName} @ ${opts.connection?.host ?? '?'}:${opts.connection?.port ?? '?'}`,
+
+    async stop() {
+      if (queue) {
+        await queue.close().catch(() => {})
+        queue = null
+      }
+    },
 
     getConfig() {
       return {
@@ -150,7 +175,7 @@ export function queueCollector(opts: QueueCollectorOptions): MetricCollector {
       }
 
       try {
-        return await fetchQueueCounts(queueName, opts.connection)
+        return await fetchQueueCounts(await getQueue(opts.connection))
       } catch (error) {
         handleQueueError(error, queueName, opts.connection, warned)
         return QUEUE_DEFAULTS

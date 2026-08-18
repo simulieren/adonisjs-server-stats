@@ -180,6 +180,7 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | `realtime`      | `boolean`                         | `true`                      | `true` = SSE via Transmit, `false` = poll-only                   |
 | `statsEndpoint` | `string \| false`                 | `'/admin/api/server-stats'` | HTTP endpoint. `false` to disable.                               |
 | `authorize`     | `(ctx) => boolean`                | --                          | Per-request visibility guard                                     |
+| `unsafeAllowNoAuth` | `boolean`                     | `false`                     | Register the dashboard/debug/stats routes even with **no** `authorize` guard. Off by default (routes fail closed). Local dev only — exposes secrets, email bodies, and SQL. |
 | `onStats`       | `(stats) => void`                 | --                          | Callback after each collection tick                              |
 | `toolbar`       | `boolean \| ToolbarConfig`        | --                          | `true` to enable with defaults, or pass a `ToolbarConfig` object |
 | `dashboard`     | `boolean \| DashboardConfig`      | --                          | `true` to enable at `/__stats`, or pass a `DashboardConfig`      |
@@ -271,7 +272,7 @@ Each collector is a factory function that returns a `MetricCollector`. All colle
 | `httpCollector(opts?)`   | Requests/sec, avg response time, error rate, active connections | optional     | --                |
 | `dbPoolCollector(opts?)` | Pool used/free/pending/max connections                          | optional     | `@adonisjs/lucid` |
 | `redisCollector()`       | Status, memory, clients, keys, hit rate                         | none         | `@adonisjs/redis` |
-| `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count                | **required** | `bullmq`          |
+| `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count                | **required** | `bullmq` or `@adonisjs/queue`/`@boringnode/queue` (auto-detected) |
 | `logCollector(opts?)`    | Errors/warnings/entries (5m window), entries/minute             | optional     | --                |
 | `appCollector()`         | Online users, pending webhooks, pending emails                  | none         | `@adonisjs/lucid` |
 
@@ -376,9 +377,9 @@ export default defineConfig({
 })
 ```
 
-> **Tip:** When `authorize` is not set, the bar and all routes are accessible to everyone. In production you almost always want to set this.
+> **Fail closed:** When neither `authorize` nor `shouldShow` is set, the dashboard, debug API, and stats routes are **not registered at all** and a warning is logged. To run without a guard during local development, set `unsafeAllowNoAuth: true` — this exposes secrets, email bodies, and SQL to anyone who can reach the routes, so never use it outside strictly local dev.
 >
-> **Migration note:** `shouldShow` still works as a deprecated alias for `authorize`. Both have the same signature and behavior.
+> **Migration note:** `shouldShow` still works as a deprecated alias for `authorize` — same signature, same behavior, and it fully satisfies the guard requirement above. If you already set `shouldShow` (or `authorize`), this change does not affect you; you'll only see a one-time rename hint at boot.
 
 ---
 
@@ -441,7 +442,25 @@ Registered when `dashboard` is enabled. Base path configurable via `dashboard.pa
 
 ### Global middleware note
 
-Auto-registered routes bypass route-level middleware but are still subject to global/server middleware. If you have auth middleware (like `silentAuth`) registered globally, each polling request will trigger a DB query every few seconds.
+Auto-registered routes bypass route-level middleware but are still subject to global/server middleware.
+
+**Session middleware:** If you have session middleware registered globally in `router.use()`, every polling request (every ~3 seconds) will trigger a `Set-Cookie` response. The package automatically strips `Set-Cookie` headers from its own routes to prevent cookie accumulation, but for cleanest results we recommend moving session middleware to a named route group:
+
+```ts
+// start/kernel.ts — remove session from router.use()
+router.use([
+  () => import('@adonisjs/core/bodyparser_middleware'),
+  // () => import('@adonisjs/session/session_middleware'),  ← remove
+  () => import('@adonisjs/shield/shield_middleware'),
+])
+
+// start/routes.ts — add to your route groups instead
+router.group(() => {
+  // your app routes here
+}).use(middleware.session())
+```
+
+**Auth middleware:** If you have auth middleware (like `silentAuth`) registered globally, each polling request will trigger a DB query every few seconds.
 
 To avoid this, either:
 
@@ -655,13 +674,15 @@ The debug toolbar captures all emails sent via AdonisJS mail (`mail:sending`, `m
 
 ### Cross-Process Email Capture (Queue Workers)
 
-AdonisJS mail events (`mail:sending`, `mail:sent`, etc.) are process-local. If your app sends emails from **Bull queue workers** or other separate processes, the web server's email collector never sees them.
+AdonisJS mail events (`mail:sending`, `mail:sent`, etc.) are process-local. If your app sends emails from **queue workers** (BullMQ via `@rlanz/bull-queue`, or `@adonisjs/queue`/`@boringnode/queue`) or other separate processes, the web server's email collector never sees them.
 
 The provider handles this automatically via a **Redis pub/sub bridge**:
 
 1. In queue workers (`console` environment), the provider only starts a lightweight email bridge publisher — no debug store, routes, or dashboard overhead
 2. When an email is sent, the event is published to a Redis pub/sub channel
 3. In the web server (`web` environment), the provider subscribes to the same channel and ingests the email into both the debug panel and the dashboard
+
+Worker-sent emails appear in the dashboard with HTML preview alongside emails sent from web requests — no additional configuration needed.
 
 **Requirements:**
 - `@adonisjs/redis` must be installed and configured (used for pub/sub between processes)
@@ -792,7 +813,7 @@ export default defineConfig({
 | **Emails**   | Email history with sender, recipient, subject, status. Click for HTML preview in iframe                                                                 |
 | **Timeline** | Per-request waterfall timeline (requires `tracing: true`)                                                                                               |
 | **Cache**    | Redis key browser with SCAN-based listing, type-aware detail view, and server stats (requires `@adonisjs/redis`)                                        |
-| **Jobs**     | Queue overview with job listing, detail, and retry for failed jobs (requires `@rlanz/bull-queue`)                                                       |
+| **Jobs**     | Queue overview with job listing, detail, and retry for failed jobs (requires `bullmq` or `@adonisjs/queue`/`@boringnode/queue` — auto-detected)         |
 | **Config**   | Sanitized view of app configuration and environment variables. Secrets are auto-redacted                                                                |
 
 #### Access Control
@@ -1051,7 +1072,9 @@ All integrations use lazy `import()` -- missing peer deps won't crash the app. T
 | `@adonisjs/transmit`        | Provider (SSE broadcast), dashboard real-time       |
 | `@adonisjs/transmit-client` | React/Vue real-time updates (falls back to polling) |
 | `@julr/adonisjs-prometheus` | `serverStatsCollector`                              |
-| `bullmq`                    | `queueCollector`                                    |
+| `bullmq`                    | `queueCollector` (BullMQ backend)                   |
+| `@adonisjs/queue`           | `queueCollector` (AdonisJS queue backend, auto-detected) |
+| `@boringnode/queue`         | `queueCollector` (AdonisJS queue backend, auto-detected) |
 | `better-sqlite3`            | Dashboard (`dashboard: true`)                       |
 | `edge.js`                   | Edge tag                                            |
 | `react`, `react-dom`        | React components (alpha)                            |

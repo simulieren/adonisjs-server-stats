@@ -7,6 +7,7 @@ import {
   setDashboardPath,
   setExcludedPrefixes,
 } from '../middleware/request_tracking_middleware.js'
+import { unhookPinoFromLogStream } from './provider_helpers_extra.js'
 import { log } from '../utils/logger.js'
 
 /** Timer references that need to be cleared on shutdown. */
@@ -97,6 +98,7 @@ export async function cleanupResources(deps: {
 }): Promise<void> {
   deps.logStreamService?.stop()
   deps.dashboardLogStream?.stop()
+  unhookPinoFromLogStream()
   setOnRequestComplete(null)
   setDashboardPath(null)
   setExcludedPrefixes([])

@@ -120,8 +120,9 @@ function formatTimerInterval(t: DiagnosticsTimerInfo): string {
 // Computed
 // ---------------------------------------------------------------------------
 
-// Use self-fetched data if available, otherwise fall back to prop data
-const diagnosticsData = computed(() => selfData.value || props.data || null)
+// Use only self-fetched data. Falling back to props.data would briefly render
+// the previous tab's stale response before this tab's own fetch resolves.
+const diagnosticsData = computed(() => selfData.value || null)
 const d = computed(() => diagnosticsData.value || ({} as DiagnosticsData))
 
 const bufferEntries = computed(() => {

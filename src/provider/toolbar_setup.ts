@@ -58,7 +58,7 @@ export async function setupDevToolbarCore(
   const em = await resolve('emitter')
   if (!em) log.warn('emitter not available — query/event collection disabled')
   await debugStore.start(em, await resolve('router'))
-  const emailBridgeRedis = await setupBridgeInternal(em, debugStore)
+  const emailBridgeRedis = await setupBridgeInternal(em, debugStore, app)
   const debugController = await createDebugController(debugStore, config, getDiagnostics, app)
   if (debugStore.traces) setTraceCollector(debugStore.traces)
   const flushTimer = persistPath ? createFlushTimer(debugStore, persistPath) : null
@@ -120,7 +120,11 @@ function createFlushTimer(
   }, 30_000)
 }
 
-async function setupBridgeInternal(emitter: unknown, debugStore: DebugStore): Promise<unknown> {
+async function setupBridgeInternal(
+  emitter: unknown,
+  debugStore: DebugStore,
+  app: ApplicationService
+): Promise<unknown> {
   if (!emitter) return null
   try {
     const { appImport } = await import('../utils/app_import.js')
@@ -131,11 +135,26 @@ async function setupBridgeInternal(emitter: unknown, debugStore: DebugStore): Pr
       publish(c: string, m: string): Promise<unknown>
       subscribe(c: string, h: (m: string) => void): unknown
     }
+    // Lazily resolve the SQLite dashboard store: it's registered as a
+    // container singleton later in boot, but remote emails only arrive
+    // post-boot, so cross-process (queue-worker) emails get persisted
+    // where the dashboard/debug APIs read from.
+    const getDashboardStore = async (): Promise<{
+      recordEmail(record: Record<string, unknown>): void
+    } | null> => {
+      try {
+        return (await app.container.make('dashboard.store')) as {
+          recordEmail(record: Record<string, unknown>): void
+        }
+      } catch {
+        return null
+      }
+    }
     return await setupFullEmailBridge(
       emitter as { on(e: string, h: (...a: unknown[]) => void): void },
       redis,
       'adonisjs-server-stats:emails',
-      { debugEmails: debugStore.emails ?? null, dashboardStore: null }
+      { debugEmails: debugStore.emails ?? null, dashboardStore: getDashboardStore }
     )
   } catch {
     return null
@@ -154,20 +173,24 @@ async function setupDebugBroadcastInternal(
   if (!t) return { timer: null, transmitAvailable: false, channels: [] }
   const ch = 'server-stats/debug'
   const pending = new Set<string>()
-  let timer: ReturnType<typeof setTimeout> | null = null
+  // A persistent (unref'd) interval flushes pending item types every 200ms.
+  // Returning this live handle lets shutdown clear it — the previous per-item
+  // `setTimeout` was never returned (returned `null`), so shutdown could not
+  // clear it and it could fire after stop() on a destroyed transmit instance.
+  const timer: ReturnType<typeof setInterval> = setInterval(() => {
+    if (pending.size === 0) return
+    const ts = [...pending]
+    pending.clear()
+    try {
+      ;(t as { broadcast: Function }).broadcast(ch, { types: ts })
+    } catch {}
+  }, 200)
+  // Don't keep the event loop alive on account of this timer.
+  ;(timer as { unref?: () => void }).unref?.()
   debugStore.onNewItem((type: string) => {
     pending.add(type)
-    if (timer) return
-    timer = setTimeout(() => {
-      timer = null
-      const ts = [...pending]
-      pending.clear()
-      try {
-        ;(t as { broadcast: Function }).broadcast(ch, { types: ts })
-      } catch {}
-    }, 200)
   })
-  return { timer: null, transmitAvailable: true, channels: [ch] }
+  return { timer, transmitAvailable: true, channels: [ch] }
 }
 
 // ── applyToolbarResult ──────────────────────────────────────────

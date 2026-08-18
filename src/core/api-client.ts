@@ -46,7 +46,7 @@ export interface ApiClientConfig {
  * Auth strategy:
  * - If `authToken` is provided, sends `Authorization: Bearer <token>`
  *   with `credentials: 'omit'` (no cookies).
- * - Otherwise uses `credentials: 'include'` for cookie-based auth.
+ * - Otherwise uses `credentials: 'same-origin'` for cookie-based auth.
  *
  * All non-OK responses are thrown as typed errors:
  * - 401 / 403 -> {@link UnauthorizedError}
@@ -83,7 +83,7 @@ export class ApiClient {
     const response = await globalThis.fetch(`${this.baseUrl}${path}`, {
       ...init,
       headers: mergedHeaders,
-      credentials: this.authToken ? 'omit' : 'include',
+      credentials: this.authToken ? 'omit' : 'same-origin',
     })
 
     // Check abort before consuming the response body — response.json()

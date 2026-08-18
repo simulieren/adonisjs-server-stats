@@ -24,6 +24,7 @@ export class FlushManager {
   pendingEmails: EmailRecord[] = []
   private flushTimer: ReturnType<typeof setTimeout> | null = null
   private flushing = false
+  private inFlight: Promise<void> | null = null
   private db: () => Knex | null
 
   constructor(getDb: () => Knex | null) {
@@ -60,6 +61,9 @@ export class FlushManager {
       clearTimeout(this.flushTimer)
       this.flushTimer = null
     }
+    // Await any in-flight (timer-triggered) flush first, otherwise the final
+    // flush below early-returns and queued data is lost at shutdown.
+    if (this.inFlight) await this.inFlight.catch(() => {})
     await this.flush().catch(() => {})
   }
 
@@ -84,6 +88,18 @@ export class FlushManager {
     const db = this.db()
     if (this.flushing || !db) return
     this.flushing = true
+    // Track the in-flight flush so stop() can await it before issuing a final
+    // flush, instead of racing the flushing guard and dropping queued data.
+    const run = this.runFlush(db)
+    this.inFlight = run
+    try {
+      await run
+    } finally {
+      this.inFlight = null
+    }
+  }
+
+  private async runFlush(db: Knex): Promise<void> {
     const snap = this.takeSnapshot()
     if (!snap) {
       this.flushing = false

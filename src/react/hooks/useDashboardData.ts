@@ -79,14 +79,20 @@ function useDashboardState<T>() {
 function useDashboardActions(controllerRef: React.RefObject<DashboardDataController | null>) {
   const refresh = useCallback(() => {
     controllerRef.current?.fetch(true)
-  }, [])
+  }, [controllerRef])
   const mutate = useCallback(
     async (path: string, method: 'post' | 'delete' = 'post', body?: unknown) => {
-      return controllerRef.current!.mutate(path, method, body)
+      const ctrl = controllerRef.current
+      if (!ctrl) throw new Error('Dashboard controller not initialized')
+      return ctrl.mutate(path, method, body)
     },
-    []
+    [controllerRef]
   )
-  const getApi = useCallback((): DashboardApi => controllerRef.current!.getApi(), [])
+  const getApi = useCallback((): DashboardApi => {
+    const ctrl = controllerRef.current
+    if (!ctrl) throw new Error('Dashboard controller not initialized')
+    return ctrl.getApi()
+  }, [controllerRef])
   return { refresh, mutate, getApi }
 }
 

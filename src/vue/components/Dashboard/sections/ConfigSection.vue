@@ -9,7 +9,6 @@
  */
 import { ref, computed, inject, watch, type Ref } from 'vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
-import { TAB_ICONS } from '../../../../core/icons.js'
 import {
   isRedactedValue,
   flattenConfig,
@@ -41,9 +40,6 @@ const search = ref('')
 const activeTab = ref<'app' | 'env'>('app')
 const expandedPaths = ref(new Set<string>())
 const copyLabel = ref('Copy JSON')
-
-// Per-key reveal state for redacted values
-const revealedKeys = ref(new Set<string>())
 
 // Button refs for copy-with-feedback
 const copyBtnRefs = ref(new Map<string, HTMLButtonElement | null>())
@@ -157,13 +153,6 @@ function handleCopy() {
     })
 }
 
-function toggleReveal(key: string) {
-  const next = new Set(revealedKeys.value)
-  if (next.has(key)) next.delete(key)
-  else next.add(key)
-  revealedKeys.value = next
-}
-
 function setCopyBtnRef(key: string, el: HTMLButtonElement | null) {
   copyBtnRefs.value.set(key, el)
 }
@@ -208,10 +197,15 @@ function getAppVal(key: string): ConfigValue {
   return (app as Record<string, ConfigValue>)[key] ?? null
 }
 
-/** Get the revealed or display text for a redacted value (avoids `as RedactedValue` in template). */
-function redactedText(value: ConfigValue, revealed: boolean): string {
+/**
+ * Get the display text for a redacted value (avoids `as RedactedValue` in template).
+ *
+ * The server no longer sends plaintext `value` for redacted config, so this
+ * always returns `.display` — there is no real plaintext to reveal.
+ */
+function redactedText(value: ConfigValue): string {
   if (!isRedactedValue(value)) return ''
-  return revealed ? (value as RedactedValue).value : (value as RedactedValue).display
+  return (value as RedactedValue).display
 }
 
 function clearSearch() {
@@ -224,10 +218,6 @@ function redactedLabel(value: ConfigValue): string {
   if (!isRedactedValue(value)) return ''
   return (value as RedactedValue).display
 }
-
-/** Eye icon SVG elements as joined HTML. */
-const eyeIconHtml = computed(() => TAB_ICONS.eye.elements.join(''))
-const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
 </script>
 
 <template>
@@ -314,50 +304,9 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                 <span :class="`${p}-config-key`">{{ key }}</span>
               </td>
               <td :class="`${p}-env-val`">
-                <!-- Redacted toggle -->
-                <span
-                  v-if="isRedactedValue(value)"
-                  :class="`${p}-config-redacted`"
-                  :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
-                >
-                  <span>{{ redactedText(value, revealedKeys.has(key)) }}</span>
-                  <button
-                    type="button"
-                    :class="`${p}-btn`"
-                    :title="revealedKeys.has(key) ? 'Hide' : 'Reveal'"
-                    :style="{
-                      padding: '0 4px',
-                      fontSize: '0.85em',
-                      lineHeight: 1,
-                      minWidth: 'auto',
-                    }"
-                    @click.stop="toggleReveal(key)"
-                  >
-                    <svg
-                      v-if="revealedKeys.has(key)"
-                      width="14"
-                      height="14"
-                      :viewBox="TAB_ICONS['eye-off'].viewBox"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      v-html="eyeOffIconHtml"
-                    />
-                    <svg
-                      v-else
-                      width="14"
-                      height="14"
-                      :viewBox="TAB_ICONS.eye.viewBox"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      v-html="eyeIconHtml"
-                    />
-                  </button>
+                <!-- Redacted (server sends no plaintext; display only) -->
+                <span v-if="isRedactedValue(value)" :class="`${p}-config-redacted`">
+                  {{ redactedText(value) }}
                 </span>
                 <!-- Normal value -->
                 <span v-else :class="`${p}-config-val`">{{ getEnvDisplayVal(value) }}</span>
@@ -404,50 +353,9 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                 </span>
               </td>
               <td>
-                <!-- Redacted toggle -->
-                <span
-                  v-if="isRedactedValue(item.value)"
-                  :class="`${p}-config-redacted`"
-                  :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
-                >
-                  <span>{{ redactedText(item.value, revealedKeys.has(item.path)) }}</span>
-                  <button
-                    type="button"
-                    :class="`${p}-btn`"
-                    :title="revealedKeys.has(item.path) ? 'Hide' : 'Reveal'"
-                    :style="{
-                      padding: '0 4px',
-                      fontSize: '0.85em',
-                      lineHeight: 1,
-                      minWidth: 'auto',
-                    }"
-                    @click.stop="toggleReveal(item.path)"
-                  >
-                    <svg
-                      v-if="revealedKeys.has(item.path)"
-                      width="14"
-                      height="14"
-                      :viewBox="TAB_ICONS['eye-off'].viewBox"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      v-html="eyeOffIconHtml"
-                    />
-                    <svg
-                      v-else
-                      width="14"
-                      height="14"
-                      :viewBox="TAB_ICONS.eye.viewBox"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      v-html="eyeIconHtml"
-                    />
-                  </button>
+                <!-- Redacted (server sends no plaintext; display only) -->
+                <span v-if="isRedactedValue(item.value)" :class="`${p}-config-redacted`">
+                  {{ redactedText(item.value) }}
                 </span>
                 <!-- Normal value with color -->
                 <span
@@ -531,50 +439,9 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                             : getFmt(item.value).text
                         "
                       >
-                        <!-- Redacted toggle -->
-                        <span
-                          v-if="isRedactedValue(item.value)"
-                          :class="`${p}-config-redacted`"
-                          :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
-                        >
-                          <span>{{ redactedText(item.value, revealedKeys.has(item.path)) }}</span>
-                          <button
-                            type="button"
-                            :class="`${p}-btn`"
-                            :title="revealedKeys.has(item.path) ? 'Hide' : 'Reveal'"
-                            :style="{
-                              padding: '0 4px',
-                              fontSize: '0.85em',
-                              lineHeight: 1,
-                              minWidth: 'auto',
-                            }"
-                            @click.stop="toggleReveal(item.path)"
-                          >
-                            <svg
-                              v-if="revealedKeys.has(item.path)"
-                              width="14"
-                              height="14"
-                              :viewBox="TAB_ICONS['eye-off'].viewBox"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              v-html="eyeOffIconHtml"
-                            />
-                            <svg
-                              v-else
-                              width="14"
-                              height="14"
-                              :viewBox="TAB_ICONS.eye.viewBox"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              v-html="eyeIconHtml"
-                            />
-                          </button>
+                        <!-- Redacted (server sends no plaintext; display only) -->
+                        <span v-if="isRedactedValue(item.value)" :class="`${p}-config-redacted`">
+                          {{ redactedText(item.value) }}
                         </span>
                         <!-- Normal value with color -->
                         <span
@@ -617,50 +484,12 @@ const eyeOffIconHtml = computed(() => TAB_ICONS['eye-off'].elements.join(''))
                 <span :class="`${p}-config-toggle`" :style="{ visibility: 'hidden' }">&bull;</span>
                 <span :class="`${p}-config-key`">{{ key }}</span>
                 <span :class="`${p}-config-val`" :style="{ marginLeft: '8px' }">
-                  <!-- Redacted value -->
+                  <!-- Redacted value (server sends no plaintext; display only) -->
                   <span
                     v-if="isRedactedValue(getAppVal(key))"
                     :class="`${p}-config-redacted`"
-                    :style="{ display: 'inline-flex', alignItems: 'center', gap: '4px' }"
                   >
-                    <span>{{ redactedText(getAppVal(key), revealedKeys.has(key)) }}</span>
-                    <button
-                      type="button"
-                      :class="`${p}-btn`"
-                      :title="revealedKeys.has(key) ? 'Hide' : 'Reveal'"
-                      :style="{
-                        padding: '0 4px',
-                        fontSize: '0.85em',
-                        lineHeight: 1,
-                        minWidth: 'auto',
-                      }"
-                      @click.stop="toggleReveal(key)"
-                    >
-                      <svg
-                        v-if="revealedKeys.has(key)"
-                        width="14"
-                        height="14"
-                        :viewBox="TAB_ICONS['eye-off'].viewBox"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        v-html="eyeOffIconHtml"
-                      />
-                      <svg
-                        v-else
-                        width="14"
-                        height="14"
-                        :viewBox="TAB_ICONS.eye.viewBox"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        v-html="eyeIconHtml"
-                      />
-                    </button>
+                    {{ redactedText(getAppVal(key)) }}
                   </span>
                   <!-- null / undefined -->
                   <span

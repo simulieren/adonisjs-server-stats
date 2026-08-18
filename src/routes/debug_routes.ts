@@ -1,4 +1,9 @@
-import { getAppDbClient, buildExplainSql, extractPlan } from '../dashboard/query_explain_handler.js'
+import {
+  getAppDbClient,
+  buildExplainSql,
+  extractPlan,
+  hasUnsafeSqlTokens,
+} from '../dashboard/query_explain_handler.js'
 
 import type { ApiController } from '../controller/api_controller.js'
 import type DebugController from '../controller/debug_controller.js'
@@ -7,11 +12,15 @@ import type { AdonisRouter } from './router_types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { ApplicationService } from '@adonisjs/core/types'
 
-let _whenReady: (() => Promise<void>) | undefined
+type WhenReady = (() => Promise<void>) | undefined
 
-function bindDebug(getController: () => DebugController | null, method: keyof DebugController) {
+function bindDebug(
+  getController: () => DebugController | null,
+  method: keyof DebugController,
+  whenReady: WhenReady
+) {
   return async (ctx: HttpContext) => {
-    if (_whenReady) await _whenReady()
+    if (whenReady) await whenReady()
     const controller = getController()
     if (!controller)
       return ctx.response.serviceUnavailable({
@@ -23,10 +32,11 @@ function bindDebug(getController: () => DebugController | null, method: keyof De
 
 function bindApi(
   getApi: () => ApiController | null,
-  fn: (api: ApiController, ctx: HttpContext) => Promise<unknown> | unknown
+  fn: (api: ApiController, ctx: HttpContext) => Promise<unknown> | unknown,
+  whenReady: WhenReady
 ) {
   return async (ctx: HttpContext) => {
-    if (_whenReady) await _whenReady()
+    if (whenReady) await whenReady()
     const api = getApi()
     if (!api)
       return ctx.response.serviceUnavailable({
@@ -38,108 +48,152 @@ function bindApi(
 
 function registerDebugConfigRoutes(
   router: AdonisRouter,
-  getDebugController: () => DebugController | null
+  getDebugController: () => DebugController | null,
+  whenReady: WhenReady
 ) {
-  router.get('/config', bindDebug(getDebugController, 'config')).as('server-stats.debug.config')
   router
-    .get('/diagnostics', bindDebug(getDebugController, 'diagnostics'))
+    .get('/config', bindDebug(getDebugController, 'config', whenReady))
+    .as('server-stats.debug.config')
+  router
+    .get('/diagnostics', bindDebug(getDebugController, 'diagnostics', whenReady))
     .as('server-stats.debug.diagnostics')
 }
 
 function registerDebugQueryAndEventRoutes(
   router: AdonisRouter,
-  getApiController: () => ApiController | null
+  getApiController: () => ApiController | null,
+  whenReady: WhenReady
 ) {
   router
     .get(
       '/queries',
-      bindApi(getApiController, async (api, ctx) => {
-        const queries = await api.getQueries({ source: 'memory' })
-        return ctx.response.json({ queries: queries.data, summary: api.getQuerySummary() })
-      })
+      bindApi(
+        getApiController,
+        async (api, ctx) => {
+          const queries = await api.getQueries({ source: 'memory' })
+          return ctx.response.json({ queries: queries.data, summary: api.getQuerySummary() })
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.queries')
   router
     .get(
       '/events',
-      bindApi(getApiController, async (api, ctx) => {
-        const result = await api.getEvents({ source: 'memory' })
-        return ctx.response.json({ events: result.data, total: result.meta.total })
-      })
+      bindApi(
+        getApiController,
+        async (api, ctx) => {
+          const result = await api.getEvents({ source: 'memory' })
+          return ctx.response.json({ events: result.data, total: result.meta.total })
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.events')
   router
     .get(
       '/routes',
-      bindApi(getApiController, (api, ctx) => {
-        const result = api.getRoutes()
-        return ctx.response.json({ routes: result.data, total: result.meta.total })
-      })
+      bindApi(
+        getApiController,
+        (api, ctx) => {
+          const result = api.getRoutes()
+          return ctx.response.json({ routes: result.data, total: result.meta.total })
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.routes')
 }
 
 function registerDebugLogRoutes(
   router: AdonisRouter,
-  getApiController: () => ApiController | null
+  getApiController: () => ApiController | null,
+  whenReady: WhenReady
 ) {
   router
     .get(
       '/logs',
-      bindApi(getApiController, async (api, ctx) => {
-        const result = await api.getLogs({ source: 'auto', perPage: 200 })
-        return ctx.response.json(result.data)
-      })
+      bindApi(
+        getApiController,
+        async (api, ctx) => {
+          const result = await api.getLogs({ source: 'auto', perPage: 200 })
+          return ctx.response.json(result.data)
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.logs')
 }
 
 function registerDebugEmailRoutes(
   router: AdonisRouter,
-  getApiController: () => ApiController | null
+  getApiController: () => ApiController | null,
+  whenReady: WhenReady
 ) {
   router
     .get(
       '/emails',
-      bindApi(getApiController, async (api, ctx) => {
-        const result = await api.getEmails({})
-        return ctx.response.json({ emails: result.data, total: result.meta.total })
-      })
+      bindApi(
+        getApiController,
+        async (api, ctx) => {
+          const result = await api.getEmails({})
+          return ctx.response.json({ emails: result.data, total: result.meta.total })
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.emails')
   router
     .get(
       '/emails/:id/preview',
-      bindApi(getApiController, async (api, ctx) => {
-        const html = await api.getEmailPreview(Number(ctx.params.id))
-        if (!html) return ctx.response.notFound({ error: 'Email not found' })
-        return ctx.response.header('Content-Type', 'text/html; charset=utf-8').send(html)
-      })
+      bindApi(
+        getApiController,
+        async (api, ctx) => {
+          const html = await api.getEmailPreview(Number(ctx.params.id))
+          if (!html) return ctx.response.notFound({ error: 'Email not found' })
+          return ctx.response
+            .header('Content-Type', 'text/html; charset=utf-8')
+            .header('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'")
+            .header('X-Content-Type-Options', 'nosniff')
+            .header('X-Frame-Options', 'SAMEORIGIN')
+            .send(html)
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.emailPreview')
 }
 
 function registerDebugTraceRoutes(
   router: AdonisRouter,
-  getApiController: () => ApiController | null
+  getApiController: () => ApiController | null,
+  whenReady: WhenReady
 ) {
   router
     .get(
       '/traces',
-      bindApi(getApiController, async (api, ctx) => {
-        const result = await api.getTraces({ source: 'memory' })
-        return ctx.response.json({ traces: result.data, total: result.meta.total })
-      })
+      bindApi(
+        getApiController,
+        async (api, ctx) => {
+          const result = await api.getTraces({ source: 'memory' })
+          return ctx.response.json({ traces: result.data, total: result.meta.total })
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.traces')
   router
     .get(
       '/traces/:id',
-      bindApi(getApiController, async (api, ctx) => {
-        const trace = await api.getTraceDetail(Number(ctx.params.id), 'memory')
-        if (!trace) return ctx.response.notFound({ error: 'Trace not found' })
-        return ctx.response.json(trace)
-      })
+      bindApi(
+        getApiController,
+        async (api, ctx) => {
+          const trace = await api.getTraceDetail(Number(ctx.params.id), 'memory')
+          if (!trace) return ctx.response.notFound({ error: 'Trace not found' })
+          return ctx.response.json(trace)
+        },
+        whenReady
+      )
     )
     .as('server-stats.debug.traceDetail')
 }
@@ -158,13 +212,14 @@ interface DebugRoutesOpts {
 
 function registerDebugExplainRoute(
   router: AdonisRouter,
+  whenReady: WhenReady,
   getDebugStore?: () => DebugStore | null,
   getApp?: () => ApplicationService | null
 ) {
   if (!getDebugStore || !getApp) return
   router
     .get('/queries/:id/explain', async (ctx: HttpContext) => {
-      if (_whenReady) await _whenReady()
+      if (whenReady) await whenReady()
       const store = getDebugStore()
       const app = getApp()
       if (!store || !app) {
@@ -174,6 +229,11 @@ function registerDebugExplainRoute(
       if (!query) return ctx.response.notFound({ error: 'Query not found' })
       if (!query.sql.trim().toUpperCase().startsWith('SELECT')) {
         return ctx.response.badRequest({ error: 'EXPLAIN is only supported for SELECT queries' })
+      }
+      if (hasUnsafeSqlTokens(query.sql)) {
+        return ctx.response.badRequest({
+          error: 'EXPLAIN rejected: query contains disallowed tokens',
+        })
       }
       try {
         const appDb = await getAppDbClient(app, query.connection || undefined)
@@ -203,17 +263,17 @@ function registerDebugExplainRoute(
 /** Register debug panel API routes. */
 export function registerDebugRoutes(opts: DebugRoutesOpts) {
   const { router, debugEndpoint, getDebugController, getApiController, middleware } = opts
-  if (opts.whenReady) _whenReady = opts.whenReady
+  const whenReady = opts.whenReady
   const base = debugEndpoint.replace(/\/+$/, '')
 
   const group = router
     .group(() => {
-      registerDebugConfigRoutes(router, getDebugController)
-      registerDebugQueryAndEventRoutes(router, getApiController)
-      registerDebugExplainRoute(router, opts.getDebugStore, opts.getApp)
-      registerDebugLogRoutes(router, getApiController)
-      registerDebugEmailRoutes(router, getApiController)
-      registerDebugTraceRoutes(router, getApiController)
+      registerDebugConfigRoutes(router, getDebugController, whenReady)
+      registerDebugQueryAndEventRoutes(router, getApiController, whenReady)
+      registerDebugExplainRoute(router, whenReady, opts.getDebugStore, opts.getApp)
+      registerDebugLogRoutes(router, getApiController, whenReady)
+      registerDebugEmailRoutes(router, getApiController, whenReady)
+      registerDebugTraceRoutes(router, getApiController, whenReady)
     })
     .prefix(base)
   if (opts.domain) group.domain(opts.domain)
