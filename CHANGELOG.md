@@ -4,6 +4,56 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-08-19
+
+Opt-in production mode, plus a security fix to the access guard found while building it.
+
+### Security
+
+- **`authorize` is now awaited.** The route guard called the callback without `await`, so an **async** `authorize` returned a promise — always truthy — and **every request was allowed through**. Anyone whose guard did `async (ctx) => { await ctx.auth.authenticate(); ... }` had an unguarded dashboard. `authorize` now accepts `(ctx) => boolean | Promise<boolean>` and is awaited in the route middleware (`src/routes/access_middleware.ts`) and in the dashboard page check (`src/dashboard/dashboard_controller.ts`).
+
+  The declared type was `(ctx) => boolean`, so TypeScript users were warned at compile time; JS consumers, `as any`, or an ignored error were not.
+
+### ⚠️ Behavior changes
+
+- **An async `authorize` that resolves `false` now returns 403** instead of allowing the request. If your dashboard "worked" with an async guard, it was not being guarded — expect 403s until the guard genuinely passes.
+- **The `@serverStats()` Edge toolbar hides itself when `authorize` is async.** Edge evaluates the guard synchronously while rendering and cannot await it, so the bar fails closed and logs a one-time warning. HTTP routes are guarded correctly either way; only the cosmetic bar is affected. Use a synchronous guard to keep the bar.
+- **The Edge plugin is no longer registered when routes were not registered.** Previously the tag rendered a stats bar in production that polled a 404 on every tick.
+
+### New options
+
+- **`production?: ProductionConfig`** — opt in to running in production, where this package previously did nothing at all. Both hard gates (`registerRoutes` and the debug/dashboard store setup) now lift when `production.enabled` is set.
+
+  ```ts
+  export default defineConfig({
+    authorize: async (ctx) => (await ctx.auth.check()) && ctx.auth.user?.isAdmin === true,
+    dashboard: true,
+    production: {
+      enabled: true,
+      capture: { queries: true }, // everything else stays off
+      retentionDays: 3,
+    },
+  })
+  ```
+
+  - **An `authorize` guard is mandatory.** `unsafeAllowNoAuth` is **ignored** in production — without a guard the routes are not registered and a warning explains why.
+  - **Capture is off unless requested,** one subsystem at a time via `production.capture` (`queries`, `events`, `emails`, `traces`, `logs`). With none enabled you still get the request list, overview, and charts, at a small fraction of the write volume. A disabled subsystem is never subscribed, so it costs nothing and its pane simply stays empty.
+  - **`retentionDays` defaults to 3** in production instead of 7.
+  - An always-visible boot banner reports what is reachable, which guard is active, what is being captured, and where the data lands. It fires only after routes were actually registered.
+
+  Two caveats, both documented: the toolbar and React/Vue components request relative URLs, and retention deletes rows without running `VACUUM`, so the SQLite file plateaus rather than shrinking.
+
+### Improvements
+
+- `registerAllRoutes` returns whether it registered anything, so callers cannot announce a dashboard that was never wired up (`src/routes/register_routes.ts`)
+- `tracing: false` still overrides `capture.traces` — the older kill switch keeps winning (`src/provider/dashboard_setup.ts`)
+- `DebugStore` treats a config without `capture` as capture-everything, so a config object built before this release behaves exactly as before (`src/debug/debug_store.ts`)
+
+### Tests
+
+- 24 new tests covering config resolution, the production registration gate, per-subsystem capture resolution, retention precedence, and collector subscription (`tests/production_mode.spec.ts`), plus rewritten async-guard tests that previously asserted the fail-open behavior (`tests/access_middleware.spec.ts`)
+- Verified end to end in a real AdonisJS v7 app under `NODE_ENV=production`: async guard returns 403/200 correctly, enabled subsystems capture while disabled ones stay empty, `unsafeAllowNoAuth` is ignored, and the default remains fully off
+
 ## [1.15.0] - 2026-08-18
 
 ### New options
