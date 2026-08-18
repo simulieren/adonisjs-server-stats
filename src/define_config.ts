@@ -1,5 +1,5 @@
 import { logDeprecationWarnings } from './config/deprecation_migration.js'
-import { setVerbose } from './utils/logger.js'
+import { log, setVerbose } from './utils/logger.js'
 
 import type { DevToolbarOptions, ResolvedServerStatsConfig, ServerStatsConfig } from './types.js'
 
@@ -148,10 +148,32 @@ function first<T>(primary: T | undefined, fallback: T | undefined, defaultVal: T
   return primary ?? fallback ?? defaultVal
 }
 
+/**
+ * Warn about `domain` values that AdonisJS will never match.
+ *
+ * `.domain()` compares against the request's host only -- a protocol, path, or
+ * port in the value silently yields routes that match nothing, which is very
+ * hard to debug from the outside. Warn instead of throwing so a bad value
+ * degrades to "dashboard not reachable" rather than "app won't boot".
+ */
+function warnAboutDomain(domain: string): void {
+  const problems: string[] = []
+  if (domain.includes('://')) problems.push('remove the protocol (`http://` / `https://`)')
+  if (domain.includes('/')) problems.push('remove the path — only the host is matched')
+  if (/:\d+$/.test(domain)) problems.push('remove the port — it is not part of the host match')
+  if (problems.length === 0) return
+  log.warn(
+    `server-stats: \`domain: '${domain}'\` looks wrong — ${problems.join('; ')}. ` +
+      "Expected a bare host such as 'admin.example.com' or ':tenant.example.com'. " +
+      'As written, no server-stats route will ever match.'
+  )
+}
+
 export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConfig {
   const verbose = config.verbose ?? false
   setVerbose(verbose)
   logDeprecationWarnings(config)
+  if (config.domain) warnAboutDomain(config.domain)
 
   return {
     intervalMs: first(config.pollInterval, config.intervalMs, 3000),

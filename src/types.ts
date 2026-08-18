@@ -948,6 +948,12 @@ export interface ServerStatsConfig {
    * Supports dynamic subdomains using `:param` syntax
    * (e.g. `':tenant.example.com'`).
    *
+   * Pass a bare host — a protocol, path, or port (`'https://admin.example.com'`,
+   * `'admin.example.com:3333'`) yields routes that match nothing.
+   *
+   * Note that the `@serverStats()` toolbar and the React/Vue components request
+   * relative URLs, so they only work on pages served from this domain.
+   *
    * @example
    * ```ts
    * // Fixed subdomain

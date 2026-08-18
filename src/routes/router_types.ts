@@ -24,7 +24,7 @@ export interface AdonisRoute {
 export interface AdonisRouteGroup {
   prefix(path: string): AdonisRouteGroup
   domain(host: string): AdonisRouteGroup
-  use(middleware: unknown[]): void
+  use(middleware: unknown[]): AdonisRouteGroup
 }
 
 /**
