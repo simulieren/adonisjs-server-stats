@@ -28,6 +28,8 @@ export interface RequestInput {
 
 export interface PersistRequestInput extends RequestInput {
   queries: import('../debug/types.js').QueryRecord[]
+  /** Events emitted since the previous request completed. */
+  events?: import('../debug/types.js').EventRecord[]
   trace: import('../debug/types.js').TraceRecord | null
   httpRequestId?: string | null
 }

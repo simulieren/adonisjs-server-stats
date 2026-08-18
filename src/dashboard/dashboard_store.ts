@@ -30,7 +30,7 @@ import {
 import { fetchSavedFilters, insertSavedFilter, removeSavedFilter } from './saved_filter_queries.js'
 import { fetchStorageStats } from './storage_stats.js'
 
-import type { DevToolbarConfig, EventRecord, EmailRecord } from '../debug/types.js'
+import type { DevToolbarConfig, EmailRecord } from '../debug/types.js'
 import type { StorageStatsResult } from './storage_stats.js'
 import type { Knex } from 'knex'
 
@@ -194,10 +194,6 @@ export class DashboardStore {
   persistRequest(input: PersistRequestInput): Promise<number | null> {
     this.flushMgr.persistRequest(input, this.dashboardPath)
     return Promise.resolve(null)
-  }
-
-  queueEvents(requestIndex: number, events: EventRecord[]): void {
-    this.flushMgr.queueEvents(requestIndex, events)
   }
 
   recordLog(entry: Record<string, unknown>): void {

@@ -3,14 +3,13 @@ import {
   prepareRequestRows,
   prepareLogRows,
   flushRequests,
-  flushEvents,
   flushEmails,
   flushLogs,
   hasWarned,
   markWarned,
 } from './write_queue.js'
 
-import type { EventRecord, EmailRecord } from '../debug/types.js'
+import type { EmailRecord } from '../debug/types.js'
 import type { PersistRequestInput } from './dashboard_types.js'
 import type { Knex } from 'knex'
 
@@ -19,7 +18,6 @@ const MAX_Q = 200
 
 export class FlushManager {
   writeQueue: PersistRequestInput[] = []
-  pendingEvents: { requestIndex: number; events: EventRecord[] }[] = []
   pendingLogs: Record<string, unknown>[] = []
   pendingEmails: EmailRecord[] = []
   private flushTimer: ReturnType<typeof setTimeout> | null = null
@@ -36,10 +34,6 @@ export class FlushManager {
     this.backpressure(this.writeQueue)
     this.writeQueue.push(input)
     this.scheduleFlush()
-  }
-
-  queueEvents(requestIndex: number, events: EventRecord[]): void {
-    if (events.length > 0) this.pendingEvents.push({ requestIndex, events })
   }
 
   recordLog(entry: Record<string, unknown>): void {
@@ -110,7 +104,6 @@ export class FlushManager {
       const pl = prepareLogRows(snap.logs)
       await db.transaction(async (trx) => {
         await flushRequests(trx, pr)
-        await flushEvents(trx, snap.events)
         await flushEmails(trx, snap.emails)
         await flushLogs(trx, pl)
       })
@@ -130,10 +123,8 @@ export class FlushManager {
   private takeSnapshot() {
     const requests = this.writeQueue.splice(0)
     const logs = this.pendingLogs.splice(0)
-    const events = this.pendingEvents.splice(0)
     const emails = this.pendingEmails.splice(0)
-    if (requests.length === 0 && logs.length === 0 && events.length === 0 && emails.length === 0)
-      return null
-    return { requests, logs, events, emails }
+    if (requests.length === 0 && logs.length === 0 && emails.length === 0) return null
+    return { requests, logs, emails }
   }
 }

@@ -177,16 +177,24 @@ function pipeDashRequests(debugStore: DebugStore, dashboardStore: DashboardStore
   }
   dashRequestPipeInstalled = true
   let lastQueryId = 0
+  let lastEventId = 0
   setOnRequestComplete(({ method, url, statusCode, duration, trace, httpRequestId }) => {
     if (!dashboardStore.isReady()) return
     const q = debugStore.queries.getQueriesSince(lastQueryId)
     if (q.length > 0) lastQueryId = q[q.length - 1].id
+    // Events are collected globally rather than per-request, so — exactly like
+    // queries above — anything emitted outside a request is attributed to
+    // whichever request finishes next. Imprecise, but it keeps events linked to
+    // a request row, which is what retention prunes on.
+    const events = debugStore.capture.events ? debugStore.events.getEventsSince(lastEventId) : []
+    if (events.length > 0) lastEventId = events[events.length - 1].id
     dashboardStore.persistRequest({
       method,
       url,
       statusCode,
       duration,
       queries: q,
+      events,
       trace: trace ?? null,
       httpRequestId: httpRequestId ?? null,
     })

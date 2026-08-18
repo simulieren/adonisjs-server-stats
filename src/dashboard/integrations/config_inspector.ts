@@ -1,3 +1,5 @@
+import { isSensitiveConfigName, looksLikeCredentialValue } from '../sensitive_patterns.js'
+
 import type { ApplicationService } from '@adonisjs/core/types'
 
 // ---------------------------------------------------------------------------
@@ -20,52 +22,11 @@ export interface SanitizedEnvVars {
 }
 
 // ---------------------------------------------------------------------------
-// Sensitive key patterns
+// Sensitive key detection
 // ---------------------------------------------------------------------------
 
-/**
- * Patterns matched against key names (case-insensitive) to detect secrets.
- *
- * Uses `(?:^|[_.-])` and `(?:$|[_.-])` as boundaries instead of `\b`
- * because env vars use `_` as separators and `_` is a word character
- * in regex, so `\b` won't match between `CLIENT` and `SECRET` in
- * `GOOGLE_CLIENT_SECRET`.
- */
-const B = '(?:^|[_.\\-])' // boundary before
-const A = '(?:$|[_.\\-])' // boundary after
-
-const SENSITIVE_PATTERNS: RegExp[] = [
-  new RegExp(`${B}password${A}`, 'i'),
-  new RegExp(`${B}secret${A}`, 'i'),
-  new RegExp(`${B}token${A}`, 'i'),
-  new RegExp(`${B}credential${A}`, 'i'),
-  new RegExp(`${B}private${A}`, 'i'),
-  new RegExp(`${B}auth${A}`, 'i'),
-  // API keys: `api_key`, `apiKey`, `API_KEY`
-  /api[_-]?key/i,
-  // `_KEY` at end or `_KEY_` in middle (AWS_ACCESS_KEY_ID, ENCRYPTION_KEY, etc.)
-  /[_-]key([_-]|$)/i,
-  // ACCESS_KEY pattern (AWS credentials)
-  /access[_-]?key/i,
-  // Exact match for just "key" (standalone)
-  /^key$/i,
-  // Connection strings and DSNs
-  new RegExp(`${B}dsn${A}`, 'i'),
-  /connection[_-]?string/i,
-  // Email addresses in env var names
-  new RegExp(`${B}email${A}`, 'i'),
-  new RegExp(`${B}smtp${A}`, 'i'),
-  // Database/service URLs (often contain embedded credentials)
-  /database[_-]?url/i,
-  /redis[_-]?url/i,
-  // Webhook secrets
-  /webhook[_-]?secret/i,
-  // Signing / encryption
-  new RegExp(`${B}signing${A}`, 'i'),
-  new RegExp(`${B}encryption${A}`, 'i'),
-  // App key / app secret
-  /app[_-]key/i,
-]
+// The name patterns live in `../sensitive_patterns.js` so the config inspector
+// and the SQL-binding writer share one definition of "looks like a secret".
 
 const REDACTED_DISPLAY = '••••••••'
 
@@ -150,7 +111,7 @@ export class ConfigInspector {
  * Check if a key name matches any sensitive pattern.
  */
 function isSensitiveKey(key: string): boolean {
-  return SENSITIVE_PATTERNS.some((pattern) => pattern.test(key))
+  return isSensitiveConfigName(key)
 }
 
 /**
@@ -158,11 +119,11 @@ function isSensitiveKey(key: string): boolean {
  * Catches email addresses and URLs with embedded credentials.
  */
 function isSensitiveValue(value: string): boolean {
-  // Email addresses
+  // Email addresses are config-sensitive (SMTP accounts) even though they are
+  // ordinary data as a query binding — hence the check lives here, not in the
+  // shared shape helper.
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return true
-  // URLs with userinfo (credentials embedded in URL)
-  if (/^[a-z][a-z0-9+.-]*:\/\/[^/]*:[^/]*@/i.test(value)) return true
-  return false
+  return looksLikeCredentialValue(value)
 }
 
 /** Sanitize a single key-value pair, redacting sensitive strings. */

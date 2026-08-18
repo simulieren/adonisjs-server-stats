@@ -146,6 +146,18 @@ export class EventCollector {
     return this.buffer.toArray().reverse()
   }
 
+  /**
+   * Events recorded after `lastId`, oldest first.
+   *
+   * Mirrors `QueryCollector.getQueriesSince` and drives the dashboard's
+   * request pipe, which persists whatever accumulated since the previous
+   * request completed.
+   */
+  getEventsSince(lastId: number): EventRecord[] {
+    if (lastId <= 0) return this.buffer.toArray()
+    return this.buffer.collectFromEnd((e) => e.id > lastId)
+  }
+
   getLatest(n: number = 100): EventRecord[] {
     return this.buffer.latest(n)
   }

@@ -319,8 +319,18 @@ test.group('buildEventRows', () => {
     assert.lengthOf(rows, 2)
     assert.equal(rows[0].event_name, 'user:registered')
     assert.equal(rows[0].data, '{"id":1}')
-    assert.isNull(rows[0].request_id)
     assert.equal(rows[1].event_name, 'order:placed')
     assert.isNull(rows[1].data)
+  })
+
+  test('does not set request_id — it is attached at insert time', ({ assert }) => {
+    // Previously hardcoded to null here, which meant persisted events were never
+    // linked to a request and so were never reclaimed by retention (events are
+    // pruned only via the requests foreign-key cascade).
+    const rows = buildEventRows([
+      { id: 1, event: 'user:registered', data: null, timestamp: Date.now() },
+    ])
+
+    assert.notProperty(rows[0], 'request_id')
   })
 })

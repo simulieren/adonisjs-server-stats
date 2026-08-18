@@ -7,6 +7,7 @@
  */
 
 import { round } from '../utils/math_helpers.js'
+import { isSecretName, looksLikeCredentialValue, sqlMentionsSecret } from './sensitive_patterns.js'
 
 import type { EventRecord, EmailRecord } from '../debug/types.js'
 import type { PersistRequestInput } from './dashboard_types.js'
@@ -53,26 +54,60 @@ export function normalizeSql(sql: string): string {
 /** Max length for a persisted string binding before it is truncated. */
 const MAX_BINDING_LEN = 256
 
+/** Placeholder stored in place of a binding that looks like a credential. */
+const REDACTED_BINDING = '[redacted]'
+
 /**
- * Redact/truncate SQL bindings before persistence so secret-looking values
- * (long tokens, hashes, keys) are not stored in cleartext.
+ * Redact and truncate SQL bindings before persistence.
  *
- * Conservative: only long strings are truncated; short values (ids, flags,
- * emails, ordinary params) pass through so normal capture is unaffected.
+ * Two independent rules, because neither catches everything on its own:
+ *
+ * 1. **By statement.** If the SQL mentions a credential-shaped identifier
+ *    (`password`, `remember_token`, `otp`, ...), every binding for that
+ *    statement is redacted. Positional bindings cannot be mapped back to
+ *    columns reliably, so this is all-or-nothing per statement — coarse, but
+ *    it is the only thing that catches a short secret like a 6-digit OTP.
+ * 2. **By value shape.** Hashes, JWTs, provider key prefixes, long hex
+ *    digests, and URLs with embedded credentials are redacted wherever they
+ *    appear, regardless of the statement.
+ *
+ * Anything that survives both is truncated at {@link MAX_BINDING_LEN} so an
+ * oversized payload cannot bloat the row.
+ *
+ * Ordinary parameters — ids, flags, emails, timestamps — still pass through, so
+ * the query pane stays useful for debugging.
  */
-export function sanitizeBindings(bindings: unknown): unknown {
-  if (Array.isArray(bindings)) return bindings.map(sanitizeBindings)
-  if (typeof bindings === 'string' && bindings.length > MAX_BINDING_LEN) {
-    return bindings.slice(0, MAX_BINDING_LEN) + `…[truncated ${bindings.length} chars]`
+export function sanitizeBindings(bindings: unknown, sqlText?: string): unknown {
+  const redactAll = sqlText !== undefined && sqlMentionsSecret(sqlText)
+  return sanitizeBindingValue(bindings, redactAll)
+}
+
+function sanitizeBindingValue(value: unknown, redactAll: boolean): unknown {
+  if (Array.isArray(value)) return value.map((v) => sanitizeBindingValue(v, redactAll))
+  if (value !== null && typeof value === 'object') return sanitizeNamedBindings(value, redactAll)
+  if (typeof value === 'string') return sanitizeStringBinding(value, redactAll)
+  // A statement touching a secret column may bind it as a non-string — a numeric
+  // OTP, for instance — so redact those too rather than only masking strings.
+  // Booleans and null carry nothing worth hiding.
+  const redactable = value !== null && value !== undefined && typeof value !== 'boolean'
+  return redactAll && redactable ? REDACTED_BINDING : value
+}
+
+/** Named bindings carry their own key, so use it when it is telling. */
+function sanitizeNamedBindings(value: object, redactAll: boolean): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = sanitizeBindingValue(nested, redactAll || isSecretName(key))
   }
-  if (bindings && typeof bindings === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(bindings as Record<string, unknown>)) {
-      out[k] = sanitizeBindings(v)
-    }
-    return out
+  return out
+}
+
+function sanitizeStringBinding(value: string, redactAll: boolean): string {
+  if (redactAll || looksLikeCredentialValue(value)) return REDACTED_BINDING
+  if (value.length > MAX_BINDING_LEN) {
+    return value.slice(0, MAX_BINDING_LEN) + `…[truncated ${value.length} chars]`
   }
-  return bindings
+  return value
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +139,7 @@ export interface PreparedRequest {
   input: PersistRequestInput
   filteredQueries: PreparedQuery[]
   traceRow: PreparedTraceRow | null
+  eventRows: EventRow[]
 }
 
 export interface PreparedLog {
@@ -131,7 +167,6 @@ export interface EmailRow {
 
 export interface EventRow {
   [key: string]: unknown
-  request_id: null
   event_name: string
   data: string | null
 }
@@ -153,13 +188,14 @@ export function prepareRequestRows(requests: PersistRequestInput[]): PreparedReq
       .map((q) => ({
         sql_text: q.sql,
         sql_normalized: normalizeSql(q.sql),
-        bindings: q.bindings ? JSON.stringify(sanitizeBindings(q.bindings)) : null,
+        bindings: q.bindings ? JSON.stringify(sanitizeBindings(q.bindings, q.sql)) : null,
         duration: round(q.duration),
         method: q.method,
         model: q.model,
         connection: q.connection,
         in_transaction: q.inTransaction ? 1 : 0,
       })),
+    eventRows: buildEventRows(input.events ?? []),
     traceRow: input.trace
       ? {
           method: input.trace.method,
@@ -215,9 +251,14 @@ export function buildEmailRow(record: EmailRecord): EmailRow {
 /**
  * Transform EventRecords into SQLite-ready row objects.
  */
+/**
+ * Build event rows. `request_id` is attached at insert time, once the owning
+ * request row has an id — leaving it null here (as this did previously) meant
+ * retention never reclaimed them, since events are only pruned via the
+ * `server_stats_requests` foreign-key cascade.
+ */
 export function buildEventRows(events: EventRecord[]): EventRow[] {
   return events.map((e) => ({
-    request_id: null,
     event_name: e.event,
     data: e.data,
   }))
@@ -265,7 +306,7 @@ function buildRequestRow(input: PersistRequestInput): Record<string, unknown> {
 
 /** Insert a single prepared request with its queries and trace. */
 async function insertOneRequest(trx: Knex.Transaction, prepared: PreparedRequest): Promise<void> {
-  const { input, filteredQueries, traceRow } = prepared
+  const { input, filteredQueries, traceRow, eventRows } = prepared
   const row = buildRequestRow(input)
   const [requestId] = await trx('server_stats_requests').insert(row)
 
@@ -273,6 +314,10 @@ async function insertOneRequest(trx: Knex.Transaction, prepared: PreparedRequest
   if (hasId && filteredQueries.length > 0) {
     const rows = filteredQueries.map((q) => ({ ...q, request_id: requestId }))
     await batchInsert(trx, 'server_stats_queries', rows)
+  }
+  if (hasId && eventRows.length > 0) {
+    const rows = eventRows.map((e) => ({ ...e, request_id: requestId }))
+    await batchInsert(trx, 'server_stats_events', rows)
   }
   if (hasId && traceRow) {
     await trx('server_stats_traces').insert({ ...traceRow, request_id: requestId })
@@ -291,27 +336,6 @@ export async function flushRequests(
         markWarned('persistRequest')
         const { log } = await import('../utils/logger.js')
         log.warn(`dashboard: persistRequest failed — ${(err as Error)?.message}`)
-      }
-    }
-  }
-}
-
-/**
- * Flush pending events into the database.
- */
-export async function flushEvents(
-  trx: Knex.Transaction,
-  events: { requestIndex: number; events: EventRecord[] }[]
-): Promise<void> {
-  for (const { events: evts } of events) {
-    try {
-      const rows = buildEventRows(evts)
-      await batchInsert(trx, 'server_stats_events', rows)
-    } catch (err) {
-      if (!hasWarned('recordEvents')) {
-        markWarned('recordEvents')
-        const { log } = await import('../utils/logger.js')
-        log.warn(`dashboard: recordEvents failed — ${(err as Error)?.message}`)
       }
     }
   }
