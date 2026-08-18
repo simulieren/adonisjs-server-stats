@@ -182,6 +182,7 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | `authorize`     | `(ctx) => boolean`                | --                          | Per-request visibility guard                                     |
 | `unsafeAllowNoAuth` | `boolean`                     | `false`                     | Register the dashboard/debug/stats routes even with **no** `authorize` guard. Off by default (routes fail closed). Local dev only — exposes secrets, email bodies, and SQL. |
 | `domain`        | `string`                          | --                          | Restrict every route to one host, e.g. `'admin.example.com'`. See [Custom domain](#custom-domain) |
+| `production`    | `ProductionConfig`                | --                          | Opt in to running in production. Off by default -- see [Production](#production) |
 | `onStats`       | `(stats) => void`                 | --                          | Callback after each collection tick                              |
 | `toolbar`       | `boolean \| ToolbarConfig`        | --                          | `true` to enable with defaults, or pass a `ToolbarConfig` object |
 | `dashboard`     | `boolean \| DashboardConfig`      | --                          | `true` to enable at `/__stats`, or pass a `DashboardConfig`      |
@@ -204,6 +205,16 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | --------------- | -------- | ------------ | -------------------------------------- |
 | `path`          | `string` | `'/__stats'` | URL path for the dashboard page        |
 | `retentionDays` | `number` | `7`          | Days to keep historical data in SQLite |
+
+### `ProductionConfig`
+
+| Option          | Type            | Default | Description                                                            |
+| --------------- | --------------- | ------- | ---------------------------------------------------------------------- |
+| `enabled`       | `boolean`       | `false` | Register routes and build the dashboard when `NODE_ENV=production`      |
+| `capture`       | `CaptureConfig` | all off | Which capture subsystems to switch on -- opt in one at a time           |
+| `retentionDays` | `number`        | `3`     | SQLite history to keep in production (the usual default is 7)           |
+
+`CaptureConfig` fields, each `boolean` and each defaulting to `false` in production: `queries`, `events`, `emails`, `traces`, `logs`.
 
 ### `AdvancedConfig`
 
@@ -384,6 +395,81 @@ export default defineConfig({
 
 ---
 
+## Production
+
+By default this package does **nothing** when `NODE_ENV=production` -- no routes are registered and neither the debug nor the dashboard store is built. The metrics engine still runs, so `onStats`, Prometheus, and Transmit broadcasting keep working; there is simply no HTTP surface.
+
+Set `production.enabled` to lift that:
+
+```ts
+export default defineConfig({
+  authorize: async (ctx) => (await ctx.auth.check()) && ctx.auth.user?.isAdmin === true,
+  dashboard: true,
+
+  production: {
+    enabled: true,
+    capture: { queries: true }, // everything else stays off
+    retentionDays: 3,
+  },
+})
+```
+
+### An `authorize` guard is mandatory
+
+`unsafeAllowNoAuth` is **ignored** in production. Without a guard the routes are not registered and a warning explains why -- an unauthenticated dashboard on a production host is never correct.
+
+When production mode is active you get an unmissable startup banner, so nobody enables this and forgets:
+
+```
+[ server-stats ] DASHBOARD IS LIVE IN PRODUCTION
+  reachable at:  /admin/api/server-stats, /admin/api/debug/*, /__stats/*
+  guard:         authorize() configured
+  capturing:     queries
+  data at:       .adonisjs/server-stats/dashboard.sqlite3 (retention: 3 days)
+```
+
+### Capture is off unless you ask for it
+
+Each capture subsystem hooks something global and stores something sensitive, so in production every one starts **off** and is enabled by name:
+
+| `capture` flag | What it records                     | Why it's off by default                          |
+| -------------- | ----------------------------------- | ------------------------------------------------ |
+| `queries`      | SQL text, bindings, timings         | Bindings can hold values you would not log       |
+| `events`       | Application events (memory only)    | Patches the emitter's `emit()` process-wide      |
+| `emails`       | Sent mail incl. subject and body    | Highest-sensitivity payload in the package       |
+| `traces`       | Per-request spans                   | Wraps every request in `AsyncLocalStorage`       |
+| `logs`         | Log lines into SQLite               | Highest write volume, and logs quote payloads    |
+
+**With no capture flags at all you still get the useful core:** the request list, the overview, and the charts. Those come from request rows and 1-minute metric buckets, at a small fraction of full dev-mode write volume. Turn capture on when you are actually debugging something.
+
+A disabled subsystem is never subscribed, so it costs nothing -- its dashboard pane simply stays empty.
+
+> [!NOTE]
+> `toolbar: { tracing: false }` still overrides `capture.traces`. It is the older kill switch and keeps winning.
+
+### Disk
+
+Retention prunes rows older than `retentionDays` on boot and hourly. It does **not** run `VACUUM`, so the `.sqlite3` file reuses freed pages rather than shrinking -- expect the file to plateau, not shrink. Watch real numbers in the dashboard's storage panel (`GET {dashboardPath}/api/storage`), which reports file size, WAL size, and per-table row counts.
+
+There is no sampling and no hard size cap. On a high-traffic app, enable capture deliberately and keep `retentionDays` short.
+
+### Async guards and the toolbar
+
+An `authorize` callback may be sync or async -- the route guard awaits it, so `async (ctx) => { await ctx.auth.authenticate(); ... }` is safe.
+
+> [!WARNING]
+> The `@serverStats()` Edge toolbar evaluates the guard **synchronously** while rendering, so it cannot await. With an async guard the stats bar hides itself rather than risk showing when it shouldn't, and logs a warning once. The HTTP routes are guarded correctly either way -- only the cosmetic bar is affected. Use a synchronous guard if you want the bar in production.
+
+### What this does not give you
+
+Worth knowing before you expose it, even behind an admin guard:
+
+- **One guard, no tiers.** Anyone who passes `authorize` can also `DELETE /api/cache/:key` and `POST /api/jobs/:id/retry`. Scope cache access with `SERVER_STATS_CACHE_KEY_PREFIX` -- unset means unrestricted.
+- **No audit log and no rate limiting** on those mutating endpoints.
+- **SQL bindings are truncated at 256 characters but not redacted by key name.** A short secret passed as a bound parameter is stored as-is. Config and env values *are* redacted; query bindings are not.
+
+---
+
 ## Auto-Registered Routes
 
 All API routes are registered automatically by the package during `boot()` -- no manual controllers or route definitions needed. Each route group is gated by the `authorize` callback if configured.
@@ -466,7 +552,7 @@ Pass a bare host. A protocol, path, or port (`https://admin.example.com`, `admin
 
 > **The toolbar follows the domain.** The `@serverStats()` Edge tag and the React/Vue components request **relative** URLs, so they only work on pages served from the configured domain. Render the toolbar on `example.com` while `domain` points at `admin.example.com` and the bar will sit empty -- its polls 404 against the wrong host. Either serve the toolbar from the same domain, or leave `domain` unset and rely on `authorize` alone.
 
-> **Reminder:** routes are never registered in production regardless of this setting (`app.inProduction` short-circuits registration), so `domain` applies to your dev and staging environments.
+> **Reminder:** routes are not registered in production unless you opt in via [`production.enabled`](#production). Without that, `domain` applies to your dev and staging environments only.
 
 ### Global middleware note
 
@@ -653,7 +739,7 @@ Found a bug? Have feedback? [Open an issue](https://github.com/simulieren/adonis
 
 ## Dev Toolbar
 
-Adds a debug panel with SQL query inspection, event tracking, email capture with HTML preview, route table, live logs, and per-request tracing. Only active in non-production environments.
+Adds a debug panel with SQL query inspection, event tracking, email capture with HTML preview, route table, live logs, and per-request tracing. Active in non-production environments by default; see [Production](#production) to opt in there.
 
 ```ts
 export default defineConfig({

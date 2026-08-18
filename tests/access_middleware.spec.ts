@@ -66,7 +66,7 @@ test.group('createAccessMiddleware | shouldShow returns false', () => {
 
 test.group('createAccessMiddleware | async shouldShow', () => {
   test('shouldShow returns Promise<true> — next() is called', async ({ assert }) => {
-    const middleware = createAccessMiddleware((async () => true) as unknown as (ctx: HttpContext) => boolean)
+    const middleware = createAccessMiddleware(async () => true)
     const ctx = createMockCtx()
     let nextCalled = false
 
@@ -74,18 +74,14 @@ test.group('createAccessMiddleware | async shouldShow', () => {
       nextCalled = true
     })
 
-    // Note: createAccessMiddleware does `if (!shouldShow(ctx))` without await,
-    // so a Promise (truthy) will always pass. This tests the actual behavior.
     assert.isTrue(nextCalled)
     assert.equal(ctx._status(), 200)
   })
 
-  test('shouldShow returns Promise<false> — still passes because Promise is truthy', async ({
-    assert,
-  }) => {
-    // A Promise object is truthy regardless of its resolved value,
-    // so `!shouldShow(ctx)` is false and the guard passes through.
-    const middleware = createAccessMiddleware((async () => false) as unknown as (ctx: HttpContext) => boolean)
+  test('shouldShow returns Promise<false> — denied with 403', async ({ assert }) => {
+    // The guard is awaited. Returning the promise unawaited would let every
+    // async guard through, since a pending promise is truthy.
+    const middleware = createAccessMiddleware(async () => false)
     const ctx = createMockCtx()
     let nextCalled = false
 
@@ -93,10 +89,11 @@ test.group('createAccessMiddleware | async shouldShow', () => {
       nextCalled = true
     })
 
-    // The middleware does not await shouldShow, so Promise<false> is truthy
-    assert.isTrue(nextCalled)
-    assert.equal(ctx._status(), 200)
+    assert.isFalse(nextCalled)
+    assert.equal(ctx._status(), 403)
+    assert.deepEqual(ctx._body(), { error: 'Access denied' })
   })
+
 })
 
 test.group('createAccessMiddleware | shouldShow throws & warn-once', (group) => {
@@ -163,6 +160,23 @@ test.group('createAccessMiddleware | shouldShow throws & warn-once', (group) => 
     // Both should still return 403
     assert.equal(ctx1._status(), 403)
     assert.equal(ctx2._status(), 403)
+  })
+
+  test('a rejected async shouldShow is denied, not thrown', async ({ assert }) => {
+    // Lives in this group because it trips the same warn-once latch, whose
+    // state the two tests above depend on.
+    const middleware = createAccessMiddleware(async () => {
+      throw new Error('db unreachable')
+    })
+    const ctx = createMockCtx()
+    let nextCalled = false
+
+    await middleware(ctx as unknown as HttpContext, async () => {
+      nextCalled = true
+    })
+
+    assert.isFalse(nextCalled)
+    assert.equal(ctx._status(), 403)
   })
 })
 

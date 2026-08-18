@@ -536,6 +536,105 @@ export interface DashboardConfig {
 }
 
 /**
+ * Access-control callback signature.
+ *
+ * May be sync or async — the route guard awaits it. An async guard is the usual
+ * shape once the check has to consult `ctx.auth` or the database.
+ *
+ * One caveat: the `@serverStats()` Edge tag evaluates the guard synchronously
+ * while rendering the template, so with an **async** guard the toolbar hides
+ * itself rather than risk showing when it shouldn't. The HTTP routes await it
+ * properly either way — only the cosmetic bar is affected.
+ */
+export type AccessGuard = (
+  ctx: import('@adonisjs/core/http').HttpContext
+) => boolean | Promise<boolean>
+
+/**
+ * Which capture subsystems are active.
+ *
+ * Each one hooks a global: queries and events subscribe to the Lucid/app
+ * emitter, emails subscribe to the mail events, traces wrap every request in
+ * `AsyncLocalStorage`. Turning one off means its collector is never subscribed,
+ * so it costs nothing — its dashboard pane simply stays empty.
+ *
+ * Outside production every field defaults to `true`. In production every field
+ * defaults to **`false`** and must be opted into individually.
+ */
+export interface CaptureConfig {
+  /** SQL text, bindings, and timings for every query. */
+  queries?: boolean
+
+  /** Application events (in-memory only — never persisted to SQLite). */
+  events?: boolean
+
+  /** Sent mail, including subject and body. */
+  emails?: boolean
+
+  /** Per-request spans and the request timeline. */
+  traces?: boolean
+
+  /** Log lines written into the dashboard's SQLite store. */
+  logs?: boolean
+}
+
+/**
+ * Opt in to running the dashboard in production.
+ *
+ * By default this package registers **no routes** when `NODE_ENV=production`
+ * and never builds the debug or dashboard stores. Setting `enabled: true` lifts
+ * that, but only with an {@link ServerStatsConfig.authorize} guard in place —
+ * `unsafeAllowNoAuth` is ignored in production.
+ *
+ * Data capture stays **off** unless you ask for it. Without any `capture`
+ * flags you still get the request list, the overview, and the charts (those
+ * come from request rows and 1-minute metric buckets), at a small fraction of
+ * the write volume of a full dev-mode capture.
+ *
+ * @example
+ * ```ts
+ * export default defineConfig({
+ *   authorize: async (ctx) => (await ctx.auth.check()) && ctx.auth.user?.isAdmin === true,
+ *   dashboard: true,
+ *   production: {
+ *     enabled: true,
+ *     capture: { queries: true },
+ *     retentionDays: 3,
+ *   },
+ * })
+ * ```
+ */
+export interface ProductionConfig {
+  /**
+   * Register routes and build the dashboard when `NODE_ENV=production`.
+   *
+   * Requires an `authorize` guard — without one the routes are still not
+   * registered, and a warning explains why.
+   *
+   * @default false
+   */
+  enabled?: boolean
+
+  /**
+   * Which capture subsystems to switch on. Every field defaults to `false` in
+   * production, so capture is opt-in one subsystem at a time.
+   *
+   * @see {@link CaptureConfig}
+   */
+  capture?: CaptureConfig
+
+  /**
+   * How many days of history to keep in SQLite, overriding the usual default
+   * of 7. Retention deletes rows hourly but never runs `VACUUM`, so the
+   * database file reuses pages rather than shrinking — watch actual size via
+   * the dashboard's storage panel.
+   *
+   * @default 3
+   */
+  retentionDays?: number
+}
+
+/**
  * Advanced options that most users never need to touch.
  *
  * These control internal behavior like buffer sizes, file paths,
@@ -821,7 +920,7 @@ export interface ServerStatsConfig {
    *
    * @deprecated Use {@link authorize} instead. Will be removed in the next major version.
    */
-  shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+  shouldShow?: AccessGuard
 
   // ---------------------------------------------------------------------------
   // Recommended options (new names — use these instead of the deprecated ones)
@@ -880,7 +979,7 @@ export interface ServerStatsConfig {
    * authorize: () => process.env.NODE_ENV === 'development'
    * ```
    */
-  authorize?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+  authorize?: AccessGuard
 
   /**
    * Register the sensitive dashboard/debug/stats routes WITHOUT any access
@@ -969,6 +1068,22 @@ export interface ServerStatsConfig {
   domain?: string
 
   /**
+   * Opt in to running in production, where this package otherwise registers
+   * nothing at all.
+   *
+   * Requires an {@link authorize} guard, and leaves data capture off unless you
+   * enable it per subsystem.
+   *
+   * @see {@link ProductionConfig}
+   *
+   * @example
+   * ```ts
+   * production: { enabled: true, capture: { queries: true } }
+   * ```
+   */
+  production?: ProductionConfig
+
+  /**
    * Advanced options for fine-tuning internal behavior.
    *
    * Controls buffer sizes, file paths, channel names, and the
@@ -1027,7 +1142,7 @@ export interface ResolvedServerStatsConfig {
   devToolbar?: DevToolbarOptions
 
   /** Optional access-control callback. */
-  shouldShow?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+  shouldShow?: AccessGuard
 
   // -------------------------------------------------------------------------
   // New (non-deprecated) resolved names — read by the runtime alongside the
@@ -1045,7 +1160,7 @@ export interface ResolvedServerStatsConfig {
   statsEndpoint?: string | false
 
   /** Access-control callback (new name for {@link shouldShow}). */
-  authorize?: (ctx: import('@adonisjs/core/http').HttpContext) => boolean
+  authorize?: AccessGuard
 
   /**
    * Escape hatch to register sensitive routes without an access guard.
@@ -1067,4 +1182,7 @@ export interface ResolvedServerStatsConfig {
 
   /** Optional domain restriction for all routes. */
   domain?: string
+
+  /** Opt-in production behavior. Absent means this package is inert in production. */
+  production?: ProductionConfig
 }

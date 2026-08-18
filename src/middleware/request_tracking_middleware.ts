@@ -6,6 +6,7 @@ import { log } from '../utils/logger.js'
 
 import type { TraceCollector } from '../debug/trace_collector.js'
 import type { TraceRecord } from '../debug/types.js'
+import type { AccessGuard } from '../types.js'
 import type { HttpContext } from '@adonisjs/core/http'
 import type { NextFn } from '@adonisjs/core/types/http'
 
@@ -22,9 +23,12 @@ export function isExcludedRequest(): boolean {
 }
 
 let warnedShouldShow = false
-let shouldShowFn: ((ctx: HttpContext) => boolean) | null = null
+let shouldShowFn: AccessGuard | null = null
 
-export function setShouldShow(fn: ((ctx: HttpContext) => boolean) | null) {
+/** One-time latch for the async-guard-with-Edge-toolbar warning. */
+let warnedAsyncShouldShow = false
+
+export function setShouldShow(fn: AccessGuard | null) {
   shouldShowFn = fn
 }
 
@@ -69,7 +73,22 @@ function shareShouldShowWithEdge(ctx: HttpContext): void {
   ctxView.share({
     __ssShowFn: () => {
       try {
-        return shouldShowFn!(ctx)
+        const visible = shouldShowFn!(ctx)
+        // Edge evaluates this inside a compiled template statement, so it has to
+        // be synchronous. An async guard hands back a promise, which is truthy —
+        // showing the bar to everyone. Hide it instead and say why once.
+        if (typeof (visible as Promise<boolean>)?.then === 'function') {
+          if (!warnedAsyncShouldShow) {
+            warnedAsyncShouldShow = true
+            log.warn(
+              'the `authorize` guard is async, which the @serverStats() toolbar cannot await — ' +
+                'the stats bar stays hidden. Routes are still guarded correctly. Use a ' +
+                'synchronous guard if you want the bar to render.'
+            )
+          }
+          return false
+        }
+        return visible
       } catch (err) {
         if (!warnedShouldShow) {
           warnedShouldShow = true

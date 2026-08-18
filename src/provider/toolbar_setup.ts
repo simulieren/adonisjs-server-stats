@@ -60,7 +60,11 @@ export async function setupDevToolbarCore(
   await debugStore.start(em, await resolve('router'))
   const emailBridgeRedis = await setupBridgeInternal(em, debugStore, app)
   const debugController = await createDebugController(debugStore, config, getDiagnostics, app)
-  if (debugStore.traces) setTraceCollector(debugStore.traces)
+  // Also gated on capture: installing the collector is what makes the middleware
+  // wrap every request in AsyncLocalStorage and write a trace row per request.
+  // Gating only the emitter subscription would leave that cost in place and
+  // persist empty traces.
+  if (debugStore.capture.traces && debugStore.traces) setTraceCollector(debugStore.traces)
   const flushTimer = persistPath ? createFlushTimer(debugStore, persistPath) : null
   const broadcast = await setupDebugBroadcastInternal(debugStore, resolve)
   return {

@@ -9,6 +9,7 @@ import {
   warnAboutAuthMiddleware,
   warnAboutSessionMiddleware,
   warnAboutDomainWithToolbar,
+  announceProductionMode,
 } from './boot_helpers.js'
 import { resolveToolbarConfig, buildExcludedPrefixes } from './dashboard_setup.js'
 import { buildDiagnostics } from './diagnostics.js'
@@ -106,16 +107,30 @@ export default class ServerStatsProvider {
     setAppRoot(this.app.makePath(''))
     if (config.shouldShow) setShouldShow(config.shouldShow)
     await this.registerRoutes(config)
-    this.edgePluginActive = await registerEdgePluginHelper(this.app, config)
+    // Only register the Edge tag when the routes it polls actually exist —
+    // otherwise the bar renders in production and 404s on every tick.
+    this.edgePluginActive = this.isEnabledHere(config)
+      ? await registerEdgePluginHelper(this.app, config)
+      : false
+  }
+
+  /**
+   * Whether this package should do anything in the current environment.
+   *
+   * Everything is on outside production. In production nothing is registered or
+   * built unless `production.enabled` opts in.
+   */
+  private isEnabledHere(config: ResolvedServerStatsConfig): boolean {
+    return !this.app.inProduction || config.production?.enabled === true
   }
 
   private async registerRoutes(config: ResolvedServerStatsConfig) {
     const router = await this.resolve('router')
-    if (!router || this.app.inProduction) return
+    if (!router || !this.isEnabledHere(config)) return
     this.dashboardDepsAvailable = await checkDashboardDepsHelper(config, this.app)
     const { statsEndpoint, debugEndpoint } = deriveEndpointPaths(config.endpoint, config.devToolbar)
     const dashboardPath = computeDashboardPath(config.devToolbar, this.dashboardDepsAvailable)
-    registerAllRoutes({
+    const registered = registerAllRoutes({
       router: router as import('../routes/router_types.js').AdonisRouter,
       getApiController: () => this.apiController,
       getStatsController: () => this.statsController,
@@ -128,6 +143,7 @@ export default class ServerStatsProvider {
       dashboardPath,
       shouldShow: config.shouldShow,
       unsafeAllowNoAuth: config.unsafeAllowNoAuth,
+      inProduction: this.app.inProduction,
       whenReady: () => this.whenReady(),
       domain: config.domain,
     })
@@ -137,11 +153,12 @@ export default class ServerStatsProvider {
       dashboardPath,
       config.domain
     )
-    if (paths.length === 0) return
+    if (!registered || paths.length === 0) return
     log.list('routes auto-registered (no manual setup needed):', paths)
     warnAboutAuthMiddleware(config, this.app.makePath.bind(this.app))
     warnAboutSessionMiddleware(this.app.makePath.bind(this.app))
     warnAboutDomainWithToolbar(config)
+    if (this.app.inProduction) announceProductionMode(config, paths)
   }
 
   async ready() {
@@ -174,7 +191,7 @@ export default class ServerStatsProvider {
     this.pinoHookActive = hookPinoToLogStream(await this.resolve('logger'))
     const SC = (await import('../controller/server_stats_controller.js')).default
     this.statsController = new SC(this.engine)
-    if (config.devToolbar?.enabled && !this.app.inProduction) {
+    if (config.devToolbar?.enabled && this.isEnabledHere(config)) {
       this.checkLucidDebugFlag()
       await this.setupDevToolbar(config)
     }
@@ -200,7 +217,10 @@ export default class ServerStatsProvider {
   }
 
   private async setupDevToolbar(config: ResolvedServerStatsConfig) {
-    const tc = resolveToolbarConfig({ enabled: true, ...config.devToolbar })
+    const tc = resolveToolbarConfig(
+      { enabled: true, ...config.devToolbar },
+      { inProduction: this.app.inProduction, production: config.production }
+    )
     try {
       const result = await setupDevToolbarCore({
         tc,

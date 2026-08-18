@@ -149,6 +149,33 @@ function first<T>(primary: T | undefined, fallback: T | undefined, defaultVal: T
 }
 
 /**
+ * Warn about a production block that cannot do what it looks like it does.
+ *
+ * Both mistakes here are silent at runtime — the dashboard simply isn't there,
+ * or is there with nothing in it — so they're worth naming at config time.
+ */
+function warnAboutProduction(config: ServerStatsConfig): void {
+  const production = config.production
+  if (!production?.enabled) return
+
+  if (!config.authorize && !config.shouldShow) {
+    log.warn(
+      'server-stats: `production.enabled` is set but no `authorize` guard is configured — ' +
+        'the routes will NOT be registered in production. `unsafeAllowNoAuth` is deliberately ' +
+        'ignored there: an unauthenticated dashboard in production is never correct.'
+    )
+  }
+
+  const dashboardOn = config.dashboard !== undefined && config.dashboard !== false
+  if (!dashboardOn && !config.toolbar) {
+    log.warn(
+      'server-stats: `production.enabled` is set but neither `dashboard` nor `toolbar` is ' +
+        'enabled, so there is nothing to expose. Set `dashboard: true` to serve the dashboard.'
+    )
+  }
+}
+
+/**
  * Warn about `domain` values that AdonisJS will never match.
  *
  * `.domain()` compares against the request's host only -- a protocol, path, or
@@ -174,6 +201,7 @@ export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConf
   setVerbose(verbose)
   logDeprecationWarnings(config)
   if (config.domain) warnAboutDomain(config.domain)
+  warnAboutProduction(config)
 
   return {
     intervalMs: first(config.pollInterval, config.intervalMs, 3000),
@@ -188,5 +216,6 @@ export function defineConfig(config: ServerStatsConfig): ResolvedServerStatsConf
     unsafeAllowNoAuth: config.unsafeAllowNoAuth,
     verbose,
     domain: config.domain,
+    production: config.production,
   }
 }

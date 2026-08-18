@@ -380,6 +380,22 @@ export interface DevToolbarConfig {
 
   /** Base path for the debug toolbar API endpoints. */
   debugEndpoint: string
+
+  /**
+   * Which capture subsystems are subscribed. Fully resolved — every field is
+   * present. All true outside production; all false in production unless the
+   * user opted in via `production.capture`.
+   */
+  capture: ResolvedCapture
+}
+
+/** Fully-resolved capture flags. See {@link CaptureConfig} for the user-facing shape. */
+export interface ResolvedCapture {
+  queries: boolean
+  events: boolean
+  emails: boolean
+  traces: boolean
+  logs: boolean
 }
 
 // ---------------------------------------------------------------------------

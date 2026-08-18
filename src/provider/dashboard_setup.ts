@@ -2,7 +2,8 @@
  * Pure helper functions for dashboard setup and configuration.
  */
 
-import type { DevToolbarConfig } from '../debug/types.js'
+import type { DevToolbarConfig, ResolvedCapture } from '../debug/types.js'
+import type { CaptureConfig, ProductionConfig } from '../types.js'
 
 const MISSING_DEP_MARKERS = ['better-sqlite3', 'knex', 'Cannot find module', 'Cannot find package']
 
@@ -67,7 +68,7 @@ export function buildExcludedPrefixes(
   return prefixes
 }
 
-const TOOLBAR_DEFAULTS: Omit<DevToolbarConfig, 'enabled'> = {
+const TOOLBAR_DEFAULTS: Omit<DevToolbarConfig, 'enabled' | 'capture'> = {
   maxQueries: 500,
   maxEvents: 200,
   maxEmails: 100,
@@ -90,15 +91,71 @@ function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
   return result as Partial<T>
 }
 
+/** Retention default when running in production — shorter than the usual 7 days. */
+const PRODUCTION_RETENTION_DAYS = 3
+
+/** Environment context needed to resolve production-sensitive defaults. */
+export interface ProductionContext {
+  inProduction: boolean
+  production?: ProductionConfig
+}
+
+/**
+ * Resolve which capture subsystems subscribe.
+ *
+ * Outside production everything captures, as it always has. In production every
+ * subsystem is off until asked for by name, because each one is the expensive,
+ * secret-adjacent half of this package: query bindings, mail bodies, log lines.
+ *
+ * `tracing: false` still wins over `capture.traces` — it is the pre-existing
+ * documented kill switch and must not be quietly re-enabled.
+ */
+function resolveCapture(ctx: ProductionContext | undefined, tracing: boolean): ResolvedCapture {
+  const inProduction = ctx?.inProduction === true
+  const requested: CaptureConfig = (inProduction ? ctx?.production?.capture : undefined) ?? {}
+  const isOn = (key: keyof CaptureConfig): boolean => requested[key] ?? !inProduction
+  return {
+    queries: isOn('queries'),
+    events: isOn('events'),
+    emails: isOn('emails'),
+    traces: tracing && isOn('traces'),
+    logs: isOn('logs'),
+  }
+}
+
+/**
+ * Resolve retention, preferring an explicit value from any source over the
+ * production default. Order: `production.retentionDays`, then whatever
+ * `dashboard`/`advanced` set, then 3 days in production, then 7.
+ */
+function resolveRetentionDays(
+  ctx: ProductionContext | undefined,
+  explicit: number | undefined
+): number {
+  const fromProduction = ctx?.inProduction ? ctx.production?.retentionDays : undefined
+  if (fromProduction !== undefined) return fromProduction
+  if (explicit !== undefined) return explicit
+  return ctx?.inProduction ? PRODUCTION_RETENTION_DAYS : TOOLBAR_DEFAULTS.retentionDays
+}
+
 /**
  * Resolve a partial DevToolbarConfig by filling in all defaults.
+ *
+ * Pass `ctx` to apply production-sensitive defaults (capture off, shorter
+ * retention). Omitting it resolves as a non-production environment.
  */
 export function resolveToolbarConfig(
-  partial: Partial<DevToolbarConfig> & { enabled: boolean }
+  partial: Partial<DevToolbarConfig> & { enabled: boolean },
+  ctx?: ProductionContext
 ): DevToolbarConfig {
-  return {
+  const merged = {
     ...TOOLBAR_DEFAULTS,
     ...stripUndefined(partial),
     enabled: partial.enabled,
+  }
+  return {
+    ...merged,
+    retentionDays: resolveRetentionDays(ctx, partial.retentionDays),
+    capture: resolveCapture(ctx, merged.tracing),
   }
 }

@@ -85,7 +85,12 @@ export async function initDashboardStore(opts: DashboardStoreOptions): Promise<v
   setDashboardPath(tc.dashboardPath)
   const DCC = (await import('../dashboard/dashboard_controller.js')).default
   const dashboardController = new DCC(dashboardStore, app)
-  const dashboardLogStream = pipeDashLogs(pinoHookActive, dashboardStore, app.makePath.bind(app))
+  // Log capture is a separate opt-in: it is high-volume and log lines routinely
+  // carry request payloads. With it off the dashboard's other panes still work.
+  const dashboardLogStream =
+    tc.capture?.logs !== false
+      ? pipeDashLogs(pinoHookActive, dashboardStore, app.makePath.bind(app))
+      : null
   pipeDashRequests(debugStore, dashboardStore)
   const dashboardBroadcastTimer = await setupDashBroadcast({
     container,

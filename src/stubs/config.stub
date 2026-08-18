@@ -19,4 +19,12 @@ export default defineConfig({
 
   // Log detailed initialization steps (SQLite, migrations, routes, etc.)
   // verbose: true,
+
+  // Nothing is registered in production unless you opt in here. Requires an
+  // `authorize` guard, and data capture stays off until you name a subsystem.
+  // production: {
+  //   enabled: true,
+  //   capture: { queries: true },
+  //   retentionDays: 3,
+  // },
 })

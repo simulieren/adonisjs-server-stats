@@ -104,6 +104,42 @@ export function warnAboutDomainWithToolbar(config: ResolvedServerStatsConfig) {
   ])
 }
 
+/** Human-readable list of the capture subsystems that are switched on. */
+function describeCapture(config: ResolvedServerStatsConfig): string {
+  const requested = config.production?.capture
+  if (!requested) return 'nothing (request metadata only)'
+  const on = (['queries', 'events', 'emails', 'traces', 'logs'] as const).filter(
+    (key) => requested[key] === true
+  )
+  return on.length > 0 ? on.join(', ') : 'nothing (request metadata only)'
+}
+
+/**
+ * Announce that the dashboard is live in production.
+ *
+ * Deliberately `log.warn` rather than the `log.block` its neighbours use:
+ * `log.block` is suppressed unless `verbose` is on, and this is the one message
+ * that must reach every operator who enables production mode. It only fires
+ * after routes were really registered, so it never over-promises.
+ */
+export function announceProductionMode(
+  config: ResolvedServerStatsConfig,
+  paths: string[]
+): void {
+  if (!config.production?.enabled) return
+  const retention = config.production.retentionDays ?? 3
+  const dbPath = config.devToolbar?.dbPath ?? '.adonisjs/server-stats/dashboard.sqlite3'
+  const lines = [
+    `  reachable at:  ${paths.join(', ')}`,
+    `  guard:         ${config.shouldShow ? 'authorize() configured' : 'NONE'}`,
+    `  capturing:     ${describeCapture(config)}`,
+  ]
+  if (config.devToolbar?.dashboard) {
+    lines.push(`  data at:       ${dbPath} (retention: ${retention} days)`)
+  }
+  log.warn('DASHBOARD IS LIVE IN PRODUCTION\n' + lines.join('\n'))
+}
+
 export function warnAboutSessionMiddleware(
   makePath: (dir: string, file: string) => string
 ) {

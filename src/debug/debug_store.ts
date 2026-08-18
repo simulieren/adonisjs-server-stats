@@ -9,7 +9,7 @@ import { QueryCollector } from './query_collector.js'
 import { RouteInspector } from './route_inspector.js'
 import { TraceCollector } from './trace_collector.js'
 
-import type { DevToolbarConfig, Emitter, Router } from './types.js'
+import type { DevToolbarConfig, Emitter, ResolvedCapture, Router } from './types.js'
 
 /** Read and parse persisted debug data from disk. Returns null on failure. */
 async function readPersistedData(filePath: string): Promise<Record<string, unknown> | null> {
@@ -58,12 +58,25 @@ export class DebugStore {
   readonly routes: RouteInspector
   readonly traces: TraceCollector | null
 
+  /** Which collectors are allowed to subscribe in {@link start}. */
+  readonly capture: ResolvedCapture
+
   constructor(config: DevToolbarConfig) {
     this.queries = new QueryCollector(config.maxQueries, config.slowQueryThresholdMs)
     this.events = new EventCollector(config.maxEvents)
     this.emails = new EmailCollector(config.maxEmails)
     this.routes = new RouteInspector()
     this.traces = config.tracing ? new TraceCollector(config.maxTraces) : null
+    // Default to capturing everything when unset. `DebugStore` is a public
+    // export (`adonisjs-server-stats/debug`), so a config built before `capture`
+    // existed must keep behaving exactly as it did.
+    this.capture = config.capture ?? {
+      queries: true,
+      events: true,
+      emails: true,
+      traces: true,
+      logs: true,
+    }
   }
 
   /**
@@ -92,17 +105,29 @@ export class DebugStore {
     }
   }
 
+  /**
+   * Subscribe the enabled collectors.
+   *
+   * A disabled collector is left constructed but never subscribed, so its
+   * dashboard pane renders empty instead of erroring, and it costs nothing at
+   * runtime. This also keeps two process-wide side effects off in production:
+   * the event collector patches the emitter's `emit()`, and the trace collector
+   * patches `console.warn`.
+   *
+   * Route inspection is not gated — it reads the router table once at boot and
+   * captures no request data.
+   */
   async start(emitter: unknown, router: unknown): Promise<void> {
     // Runtime-check the emitter before passing to collectors.
     // The container returns `unknown`; collectors guard internally too.
     const e = emitter as Emitter
-    await this.queries.start(e)
-    this.events.start(e)
-    await this.emails.start(e)
+    if (this.capture.queries) await this.queries.start(e)
+    if (this.capture.events) this.events.start(e)
+    if (this.capture.emails) await this.emails.start(e)
     if (router && typeof (router as Router).toJSON === 'function') {
       this.routes.inspect(router as Router)
     }
-    this.traces?.start(e)
+    if (this.capture.traces) this.traces?.start(e)
   }
 
   stop(): void {

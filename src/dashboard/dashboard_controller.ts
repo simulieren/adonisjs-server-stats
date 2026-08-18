@@ -51,7 +51,7 @@ export default class DashboardController {
   }
 
   async page(ctx: HttpContext) {
-    if (!this.checkAccess(ctx)) return ctx.response.forbidden({ error: 'Access denied' })
+    if (!(await this.checkAccess(ctx))) return ctx.response.forbidden({ error: 'Access denied' })
     const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     const tc: Partial<DevToolbarOptions> = config?.devToolbar ?? {}
     const renderer = tc.renderer || 'preact'
@@ -226,11 +226,18 @@ export default class DashboardController {
     }
   }
 
-  private checkAccess(ctx: HttpContext): boolean {
+  /**
+   * Re-check the access guard for the dashboard page itself.
+   *
+   * Awaited: an async guard would otherwise return a truthy promise and let
+   * everyone through. The route middleware already applies the same guard, so
+   * this is defense in depth for the HTML page.
+   */
+  private async checkAccess(ctx: HttpContext): Promise<boolean> {
     const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     if (!config?.shouldShow) return true
     try {
-      return config.shouldShow(ctx)
+      return await config.shouldShow(ctx)
     } catch {
       return false
     }
