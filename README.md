@@ -181,6 +181,7 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | `statsEndpoint` | `string \| false`                 | `'/admin/api/server-stats'` | HTTP endpoint. `false` to disable.                               |
 | `authorize`     | `(ctx) => boolean`                | --                          | Per-request visibility guard                                     |
 | `unsafeAllowNoAuth` | `boolean`                     | `false`                     | Register the dashboard/debug/stats routes even with **no** `authorize` guard. Off by default (routes fail closed). Local dev only — exposes secrets, email bodies, and SQL. |
+| `domain`        | `string`                          | --                          | Restrict every route to one host, e.g. `'admin.example.com'`. See [Custom domain](#custom-domain) |
 | `onStats`       | `(stats) => void`                 | --                          | Callback after each collection tick                              |
 | `toolbar`       | `boolean \| ToolbarConfig`        | --                          | `true` to enable with defaults, or pass a `ToolbarConfig` object |
 | `dashboard`     | `boolean \| DashboardConfig`      | --                          | `true` to enable at `/__stats`, or pass a `DashboardConfig`      |
@@ -439,6 +440,33 @@ Registered when `dashboard` is enabled. Base path configurable via `dashboard.pa
 | GET    | `/api/filters`             | Saved filters                     |
 | POST   | `/api/filters`             | Create saved filter               |
 | DELETE | `/api/filters/:id`         | Delete saved filter               |
+
+### Custom domain
+
+By default every route is registered on whatever host your app serves. Set `domain` to bind them to one host instead -- useful when your admin surface already lives on its own subdomain:
+
+```ts
+export default defineConfig({
+  domain: 'admin.example.com',
+  authorize: (ctx) => ctx.auth?.user?.role === 'admin',
+  toolbar: true,
+  dashboard: true,
+})
+```
+
+The dashboard is then reachable at `admin.example.com/__stats` and nowhere else -- a request to `example.com/__stats` no longer matches any route. Dynamic subdomains use AdonisJS's `:param` syntax:
+
+```ts
+export default defineConfig({
+  domain: ':tenant.example.com', // matches acme.example.com, globex.example.com, ...
+})
+```
+
+Pass a bare host. A protocol, path, or port (`https://admin.example.com`, `admin.example.com:3333`) produces routes that match nothing; `defineConfig` warns when it spots one.
+
+> **The toolbar follows the domain.** The `@serverStats()` Edge tag and the React/Vue components request **relative** URLs, so they only work on pages served from the configured domain. Render the toolbar on `example.com` while `domain` points at `admin.example.com` and the bar will sit empty -- its polls 404 against the wrong host. Either serve the toolbar from the same domain, or leave `domain` unset and rely on `authorize` alone.
+
+> **Reminder:** routes are never registered in production regardless of this setting (`app.inProduction` short-circuits registration), so `domain` applies to your dev and staging environments.
 
 ### Global middleware note
 

@@ -380,6 +380,7 @@ interface DashboardRoutesOpts {
   getApiController: () => ApiController | null
   middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>
   whenReady?: () => Promise<void>
+  domain?: string
 }
 
 /** Register dashboard routes. */
@@ -388,7 +389,7 @@ export function registerDashboardRoutes(opts: DashboardRoutesOpts) {
   const whenReady = opts.whenReady
   const base = dashboardPath.replace(/\/+$/, '')
 
-  router
+  const group = router
     .group(() => {
       registerDashboardPageRoutes(router, getDashboardController, whenReady)
       registerQueryRoutes(router, getApiController, whenReady)
@@ -403,5 +404,6 @@ export function registerDashboardRoutes(opts: DashboardRoutesOpts) {
       registerConfigAndFilterRoutes(router, getDashboardController, whenReady)
     })
     .prefix(base)
-    .use(middleware)
+  if (opts.domain) group.domain(opts.domain)
+  group.use(middleware)
 }

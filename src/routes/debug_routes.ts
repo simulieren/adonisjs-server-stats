@@ -207,6 +207,7 @@ interface DebugRoutesOpts {
   getApp?: () => ApplicationService | null
   middleware: Array<(ctx: HttpContext, next: () => Promise<void>) => Promise<void>>
   whenReady?: () => Promise<void>
+  domain?: string
 }
 
 function registerDebugExplainRoute(
@@ -265,7 +266,7 @@ export function registerDebugRoutes(opts: DebugRoutesOpts) {
   const whenReady = opts.whenReady
   const base = debugEndpoint.replace(/\/+$/, '')
 
-  router
+  const group = router
     .group(() => {
       registerDebugConfigRoutes(router, getDebugController, whenReady)
       registerDebugQueryAndEventRoutes(router, getApiController, whenReady)
@@ -275,5 +276,6 @@ export function registerDebugRoutes(opts: DebugRoutesOpts) {
       registerDebugTraceRoutes(router, getApiController, whenReady)
     })
     .prefix(base)
-    .use(middleware)
+  if (opts.domain) group.domain(opts.domain)
+  group.use(middleware)
 }

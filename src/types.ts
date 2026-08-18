@@ -939,6 +939,36 @@ export interface ServerStatsConfig {
   dashboard?: boolean | DashboardConfig
 
   /**
+   * Restrict all server-stats routes to a specific domain or subdomain.
+   *
+   * When set, routes are only matched when the request's `Host` header
+   * matches the given domain. Useful when admin routes live on a
+   * dedicated subdomain (e.g. `admin.example.com`).
+   *
+   * Supports dynamic subdomains using `:param` syntax
+   * (e.g. `':tenant.example.com'`).
+   *
+   * Pass a bare host — a protocol, path, or port (`'https://admin.example.com'`,
+   * `'admin.example.com:3333'`) yields routes that match nothing.
+   *
+   * Note that the `@serverStats()` toolbar and the React/Vue components request
+   * relative URLs, so they only work on pages served from this domain.
+   *
+   * @example
+   * ```ts
+   * // Fixed subdomain
+   * domain: 'admin.example.com'
+   * ```
+   *
+   * @example
+   * ```ts
+   * // Dynamic subdomain
+   * domain: ':tenant.example.com'
+   * ```
+   */
+  domain?: string
+
+  /**
    * Advanced options for fine-tuning internal behavior.
    *
    * Controls buffer sizes, file paths, channel names, and the
@@ -1034,4 +1064,7 @@ export interface ResolvedServerStatsConfig {
 
   /** Whether verbose informational logging is enabled. Always present after `defineConfig()`. */
   verbose: boolean
+
+  /** Optional domain restriction for all routes. */
+  domain?: string
 }

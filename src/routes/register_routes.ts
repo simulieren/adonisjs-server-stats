@@ -39,6 +39,11 @@ export interface RegisterRoutesOptions {
   unsafeAllowNoAuth?: boolean
   /** Optional promise that resolves when controllers are initialized. */
   whenReady?: () => Promise<void>
+  /**
+   * Restrict every registered route to this host, via `router.group().domain()`.
+   * Supports dynamic segments (`':tenant.example.com'`). Unset = no restriction.
+   */
+  domain?: string
 }
 
 /** One-time warning latch for the unsafeAllowNoAuth escape hatch. */
@@ -75,12 +80,13 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
   ]
 
   if (typeof options.statsEndpoint === 'string') {
-    registerStatsRoute(
-      options.router,
-      options.statsEndpoint,
-      options.getStatsController,
-      middleware
-    )
+    registerStatsRoute({
+      router: options.router,
+      endpoint: options.statsEndpoint,
+      getController: options.getStatsController,
+      middleware,
+      domain: options.domain,
+    })
   }
 
   if (options.debugEndpoint) {
@@ -93,6 +99,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       getApp: options.getApp,
       middleware,
       whenReady: options.whenReady,
+      domain: options.domain,
     })
   }
 
@@ -104,6 +111,7 @@ export function registerAllRoutes(options: RegisterRoutesOptions): void {
       getApiController: options.getApiController,
       middleware,
       whenReady: options.whenReady,
+      domain: options.domain,
     })
   }
 }

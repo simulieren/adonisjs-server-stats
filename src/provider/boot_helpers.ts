@@ -35,13 +35,16 @@ export function computeDashboardPath(
 export function collectRegisteredPaths(
   statsEndpoint: string | false,
   debugEndpoint?: string,
-  dashboardPath?: string
+  dashboardPath?: string,
+  domain?: string
 ): string[] {
   const paths: string[] = []
   if (typeof statsEndpoint === 'string') paths.push(statsEndpoint)
   if (debugEndpoint) paths.push(debugEndpoint + '/*')
   if (dashboardPath) paths.push(dashboardPath + '/*')
-  return paths
+  // Without the host prefix the logged paths are misleading when the routes are
+  // domain-restricted — they only resolve on that host.
+  return domain ? paths.map((p) => domain + p) : paths
 }
 
 export async function checkDashboardDeps(
@@ -83,6 +86,22 @@ export function warnAboutAuthMiddleware(
     bold('found global auth middleware that will run on every poll:'),
     buildAuthMiddlewareWarning(found, dim, bold)
   )
+}
+
+/**
+ * Warn when `domain` is combined with the Edge toolbar.
+ *
+ * The `@serverStats()` tag emits *relative* URLs (`/admin/api/server-stats`
+ * etc.), so a toolbar rendered on any other host polls its own origin and gets
+ * a 404 on every tick. Nothing breaks visibly — the bar just stays empty — so
+ * say it out loud at boot.
+ */
+export function warnAboutDomainWithToolbar(config: ResolvedServerStatsConfig) {
+  if (!config.domain || !config.devToolbar?.enabled) return
+  log.block(bold(`routes are restricted to ${config.domain}:`), [
+    dim('The @serverStats() toolbar uses relative URLs, so it only works on pages'),
+    dim(`served from ${config.domain}. On any other host the bar will stay empty.`),
+  ])
 }
 
 export function warnAboutSessionMiddleware(
