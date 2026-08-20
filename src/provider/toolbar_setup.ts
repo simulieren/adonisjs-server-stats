@@ -15,6 +15,7 @@ import type { DevToolbarConfig } from '../debug/types.js'
 import type { StatsEngine } from '../engine/stats_engine.js'
 import type { LogStreamService } from '../log_stream/log_stream_service.js'
 import type { ResolvedServerStatsConfig } from '../types.js'
+import type { DashboardResult } from './dashboard_init.js'
 import type { ApplicationService } from '@adonisjs/core/types'
 
 export { initDashboardStore } from './dashboard_init.js'
@@ -228,6 +229,19 @@ export interface ProviderFields {
   app: ApplicationService
 }
 
+/** Copy dashboard-init results onto the provider once async init finishes. */
+function applyDashboardResult(provider: ProviderFields, r: DashboardResult): void {
+  provider.dashboardStore = r.dashboardStore
+  provider.dashboardController = r.dashboardController
+  provider.dashboardLogStream = r.dashboardLogStream
+  provider.dashboardBroadcastTimer = r.dashboardBroadcastTimer
+  if (r.dashboardController) {
+    log.info('dashboard: controller ready — API endpoints are now live')
+  } else {
+    log.warn('dashboard: init completed but controller is null — dashboard API will return 503')
+  }
+}
+
 /** Apply the toolbar core result back onto the provider instance. */
 export function applyToolbarResult(
   result: ToolbarCoreResult,
@@ -262,19 +276,7 @@ export function applyToolbarResult(
       engine: provider.engine!,
       pinoHookActive: provider.pinoHookActive,
       transmitChannels: provider.transmitChannels,
-      onResult: (r) => {
-        provider.dashboardStore = r.dashboardStore
-        provider.dashboardController = r.dashboardController
-        provider.dashboardLogStream = r.dashboardLogStream
-        provider.dashboardBroadcastTimer = r.dashboardBroadcastTimer
-        if (r.dashboardController) {
-          log.info('dashboard: controller ready — API endpoints are now live')
-        } else {
-          log.warn(
-            'dashboard: init completed but controller is null — dashboard API will return 503'
-          )
-        }
-      },
+      onResult: (r) => applyDashboardResult(provider, r),
     }).catch((e) => {
       log.warn(`dashboard: setup failed: ${(e as Error)?.message ?? e}`)
       if ((e as Error)?.stack) log.warn((e as Error).stack!)

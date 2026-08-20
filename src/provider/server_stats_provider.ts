@@ -127,6 +127,20 @@ export default class ServerStatsProvider {
     return !this.app.inProduction || config.production?.enabled === true
   }
 
+  /**
+   * Publisher-only email bridge for non-web processes (queue workers).
+   *
+   * The bridge publishes full mail bodies to Redis. A production worker must
+   * stay silent unless production mode AND email capture are both opted in —
+   * same rules the web process applies.
+   */
+  private async setupNonWebEmailBridge(config: ResolvedServerStatsConfig): Promise<void> {
+    const emailCaptureOn = !this.app.inProduction || config.production?.capture?.emails === true
+    if (!this.isEnabledHere(config) || !emailCaptureOn) return
+    const em = await this.resolve('emitter')
+    await setupNonWebBridgeHelper(em, this.emailBridgeChannel)
+  }
+
   /** Returns true only when the HTTP routes were actually registered. */
   private async registerRoutes(config: ResolvedServerStatsConfig): Promise<boolean> {
     const router = await this.resolve('router')
@@ -166,14 +180,7 @@ export default class ServerStatsProvider {
     if (!config || (this.app.inTest && config.skipInTest !== false)) return
     this.emailBridgeChannel = config.advanced?.emailBridgeChannel ?? this.emailBridgeChannel
     if (this.app.getEnvironment() !== 'web') {
-      // The bridge publishes full mail bodies to Redis. A production queue
-      // worker must stay silent unless production mode AND email capture are
-      // both opted in — same rules the web process applies.
-      const emailCaptureOn = !this.app.inProduction || config.production?.capture?.emails === true
-      if (this.isEnabledHere(config) && emailCaptureOn) {
-        const em = await this.resolve('emitter')
-        await setupNonWebBridgeHelper(em, this.emailBridgeChannel)
-      }
+      await this.setupNonWebEmailBridge(config)
       return
     }
     this.initPromise = this.initStats(config).catch((err) => {

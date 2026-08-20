@@ -21,7 +21,7 @@ import type { ApplicationService } from '@adonisjs/core/types'
 
 // ── initDashboardStore ──────────────────────────────────────────
 
-interface DashboardResult {
+export interface DashboardResult {
   dashboardStore: DashboardStore | null
   dashboardController: DashboardController | null
   dashboardLogStream: LogStreamService | null
