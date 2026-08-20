@@ -4,6 +4,92 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-08-20
+
+Hardening release: every finding from a full four-track code review (security, performance,
+correctness, frontend) fixed in one pass. No breaking API changes; two behavior changes in
+production mode are called out below.
+
+### Security
+
+- **camelCase credential names are now redacted.** The `_`/`.`/`-` word boundaries in
+  `sensitive_patterns.ts` never matched a lower→upper transition, so `passwordHash`,
+  `clientSecret`, `jwtSecret` — the normal shape for AdonisJS config keys and camelCase column
+  strategies — bypassed both the SQL-binding redaction and the config inspector while their
+  snake_case twins were masked. Names are normalized before testing, the trailing boundary
+  tolerates plurals (`tokens`, `secrets`), and the word list gains
+  `totp`/`mfa`/`passwd`/`pwd`/`cvv`/`cvc`/`pin`/`ssn`/`authorization`/`cookie`.
+- **`production.capture.emails: false` is now honored everywhere.** `DashboardStore` subscribed
+  to the `mail:*` events unconditionally and persisted full bodies regardless of the capture
+  flag, and the Redis email bridge published mail outside every production gate — including
+  from queue workers with production mode off. Both now obey `production.enabled` +
+  `capture.emails`, and the bridge channel is configurable via `advanced.emailBridgeChannel`
+  for namespacing on shared Redis.
+- **SQL bindings are sanitized at capture time**, not only at persistence, so the in-memory
+  debug panel can no longer show plaintext the persisted dashboard would have redacted.
+- **Stored request URLs redact credential-bearing query params** (`?token=…`, `?reset_token=…`,
+  credential-shaped values) at the middleware choke point; ordinary params pass through.
+- **Persisted log records are redacted** against the shared rules (secret-named keys incl.
+  `authorization`/`cookie` headers, credential-shaped values) — without truncation, so stack
+  traces stay whole.
+- **Cache inspector is scoped.** New `advanced.cacheKeyPrefix` (env var
+  `SERVER_STATS_CACHE_KEY_PREFIX` still works) allow-lists which Redis keys the Cache tab may
+  list, read, and delete. **Behavior change:** in production, single-key reads and deletes are
+  refused until a prefix is configured — a production dashboard must not be able to read
+  session keys or delete rate-limit counters. Dev without a prefix keeps full access.
+- **Config inspector redacts credential-shaped values inside arrays** (a provider key inside
+  `{ keys: [...] }` previously reached the browser intact).
+- **Edge `@serverStats()` tag registers only when the routes actually registered.**
+  **Behavior change:** when the fail-closed guard refuses registration (no `authorize`
+  callback), the stats bar no longer renders — previously it rendered for every visitor and
+  404'd on every poll, or in production advertised the stats API to anonymous users.
+- **Email token-link redaction bypasses closed:** `reset_token=` / `resetToken=` / `id_token=`
+  slipped past the `\b`-anchored regex; `set-password` paths join the sensitive-path list; a
+  long opaque path segment (a bare token in the path) is now redacted while hyphenated
+  newsletter slugs survive.
+- **Deleted the latent unguarded EXPLAIN path** (`DashboardStore.runExplain`,
+  `explain_query.ts`, `format_helpers.runExplain`) — zero callers, none of the hardening the
+  live handler received.
+- Saved-filter create validates input sizes; Edge templates escape `<` in JSON `<script>`
+  blocks; `CoalesceCache` is capped at 500 entries (keys embed user search input and nothing
+  ever evicted).
+
+### Performance
+
+- **The SQLite flush path yields to the event loop** (every 10 requests and between insert
+  chunks). better-sqlite3 is synchronous, so a full backlog previously executed hundreds of
+  statements back-to-back on microtask continuations — a multi-ms stall recurring every 500ms
+  under load.
+- **Composite `(created_at, duration)` index** covers the overview p95 query, which otherwise
+  sorted the whole filtered range on every 2s cache miss.
+- **Paginated lists cap their COUNT scan at 10k rows** and clamp `?page=` into the real range
+  (an arbitrary offset forced a full scan on the single SQLite connection).
+- **React dashboard no longer double-polls `/api/overview`** — `DashboardPage` shares its
+  poller through a context that `OverviewSection` consumes, matching the earlier Vue fix.
+- `appCollector` documents the indexes its 3s `COUNT(*)` polls require (JSDoc + README).
+
+### Bug Fixes
+
+- **Dashboard persistence survives in-process restarts.** The request-pipe guard flag was never
+  reset while shutdown nulled the handler slot, so a second boot in the same process (test
+  harness, programmatic restart) silently disabled persistence for the rest of the process.
+- **Dashboard email preview and cache-key detail fetches are cancellable** (React and Vue):
+  rapid clicks can no longer resolve out of order and show the wrong body under the current
+  selection. `DashboardApi.fetchCacheKey`/`fetchEmailPreview` accept an optional `RequestInit`.
+- `TraceCollector` tracks the `console.warn` patch owner and takes over from a stale instance
+  instead of deferring to its dead wrapper; `FlushManager.stop()` blocks late timer
+  rescheduling; redis-collector and write-queue warn-once state is per-instance/resettable;
+  dead `boot_initializer.ts` removed; `types.ts` no longer claims events are never persisted.
+
+### Tooling
+
+- **GitHub Actions CI**: typecheck, lint, tests, and build on Node 20/22/24. Tests run through
+  `scripts/run-tests-split.mjs` (`npm run test:ci`), one process per spec file — the combined
+  single-process suite aborts at exit on a better-sqlite3 environment-cleanup assert under
+  Node 22+ that also eats the japa summary; individual files run and exit cleanly.
+- `package.json` gains `author`, `repository`, `homepage`, and `bugs`; the README notes the
+  package has zero runtime dependencies.
+
 ## [1.16.1] - 2026-08-19
 
 Two bug fixes, no API changes.
