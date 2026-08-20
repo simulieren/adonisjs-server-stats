@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run lint
+
+      # One child process per spec file: the combined single-process suite
+      # aborts at exit on a better-sqlite3 environment-cleanup assert under
+      # Node 22+, which also eats the japa summary. See
+      # scripts/run-tests-split.mjs for details.
+      - run: npm run test:ci
+
+      - run: npm run build

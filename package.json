@@ -11,7 +11,15 @@
     "server-stats"
   ],
   "license": "MIT",
-  "author": "",
+  "author": "Simon (https://github.com/simulieren)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/simulieren/adonisjs-server-stats.git"
+  },
+  "homepage": "https://github.com/simulieren/adonisjs-server-stats#readme",
+  "bugs": {
+    "url": "https://github.com/simulieren/adonisjs-server-stats/issues"
+  },
   "files": [
     "dist",
     "README.md",
@@ -123,7 +131,8 @@
     "format": "oxfmt src/ configure.ts vite.config.*.ts vite-plugins/",
     "format:check": "oxfmt --check src/ configure.ts vite.config.*.ts vite-plugins/",
     "test": "node --import tsx bin/test.ts",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.react.json && vue-tsc --noEmit -p tsconfig.vue.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.react.json && vue-tsc --noEmit -p tsconfig.vue.json",
+    "test:ci": "node scripts/run-tests-split.mjs"
   },
   "devDependencies": {
     "@adonisjs/core": "^6.0.0",
