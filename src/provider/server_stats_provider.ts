@@ -106,10 +106,13 @@ export default class ServerStatsProvider {
     const { setAppRoot } = await import('../utils/app_import.js')
     setAppRoot(this.app.makePath(''))
     if (config.shouldShow) setShouldShow(config.shouldShow)
-    await this.registerRoutes(config)
+    const routesRegistered = await this.registerRoutes(config)
     // Only register the Edge tag when the routes it polls actually exist —
-    // otherwise the bar renders in production and 404s on every tick.
-    this.edgePluginActive = this.isEnabledHere(config)
+    // not merely when the environment allows them. The fail-closed guard in
+    // registerAllRoutes can refuse registration (no authorize callback), and
+    // rendering the bar then would advertise endpoints that 404 — or, in
+    // production, hand every anonymous visitor a pointer at the stats API.
+    this.edgePluginActive = routesRegistered
       ? await registerEdgePluginHelper(this.app, config)
       : false
   }
@@ -124,9 +127,10 @@ export default class ServerStatsProvider {
     return !this.app.inProduction || config.production?.enabled === true
   }
 
-  private async registerRoutes(config: ResolvedServerStatsConfig) {
+  /** Returns true only when the HTTP routes were actually registered. */
+  private async registerRoutes(config: ResolvedServerStatsConfig): Promise<boolean> {
     const router = await this.resolve('router')
-    if (!router || !this.isEnabledHere(config)) return
+    if (!router || !this.isEnabledHere(config)) return false
     this.dashboardDepsAvailable = await checkDashboardDepsHelper(config, this.app)
     const { statsEndpoint, debugEndpoint } = deriveEndpointPaths(config.endpoint, config.devToolbar)
     const dashboardPath = computeDashboardPath(config.devToolbar, this.dashboardDepsAvailable)
@@ -148,12 +152,13 @@ export default class ServerStatsProvider {
       domain: config.domain,
     })
     const paths = collectRegisteredPaths(statsEndpoint, debugEndpoint, dashboardPath, config.domain)
-    if (!registered || paths.length === 0) return
+    if (!registered || paths.length === 0) return false
     log.list('routes auto-registered (no manual setup needed):', paths)
     warnAboutAuthMiddleware(config, this.app.makePath.bind(this.app))
     warnAboutSessionMiddleware(this.app.makePath.bind(this.app))
     warnAboutDomainWithToolbar(config)
     if (this.app.inProduction) announceProductionMode(config, paths)
+    return true
   }
 
   async ready() {
