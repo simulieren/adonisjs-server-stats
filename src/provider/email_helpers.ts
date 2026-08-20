@@ -5,15 +5,32 @@ const MAX_HTML = 50_000
 /**
  * Sensitive query-parameter names whose values are stripped from captured
  * URLs. These carry one-time login/reset/verify credentials.
+ *
+ * The name may carry a prefix (`reset_token=`, `resetToken=`, `id_token=`):
+ * a bare `\b` boundary cannot see those, because `_` is a word character and
+ * camelCase has no boundary at all. Over-matching a benign param that merely
+ * ends in a keyword (`postcode=`) costs a little readability; missing
+ * `reset_token=` costs a live credential.
  */
-const SENSITIVE_QUERY_PARAMS = /\b(token|code|access_token|refresh_token|api_key|apikey|key|secret|signature|sig|password|pwd|auth|otp|nonce|state)=[^\s&"'<>]*/gi
+const SENSITIVE_QUERY_PARAMS =
+  /[\w-]*(?:token|code|api_key|apikey|key|secret|signature|sig|password|pwd|auth|otp|nonce|state)=[^\s&"'<>]*/gi
 
 /**
  * URL path segments that indicate a credential-bearing link even when the
  * secret is in the path rather than the query string (reset/verify/magic).
  */
 const SENSITIVE_URL_PATHS =
-  /(https?:\/\/[^\s"'<>]*?\/(?:reset|verify|verification|confirm|magic|magic-link|activate|invite|unsubscribe)[^\s"'<>]*)/gi
+  /(https?:\/\/[^\s"'<>]*?\/(?:reset|verify|verification|confirm|magic|magic-link|activate|invite|unsubscribe|(?:set-|new-)?password)[^\s"'<>]*)/gi
+
+const SENSITIVE_PATH_MARKER =
+  /\/(reset|verify|verification|confirm|magic|magic-link|activate|invite|unsubscribe|(?:set-|new-)?password)/i
+
+/**
+ * A long opaque path segment (24+ unhyphenated word chars) inside a URL —
+ * the shape of a bare token in the path. Hyphens are excluded so ordinary
+ * hyphenated slugs in newsletters survive.
+ */
+const OPAQUE_PATH_SEGMENT = /(https?:\/\/[^\s"'<>]*?\/)([A-Za-z0-9_]{24,})(?=[/?#"'\s<>&]|$)/g
 
 /**
  * Redact token-bearing links from an email body before persistence.
@@ -25,15 +42,15 @@ const SENSITIVE_URL_PATHS =
 export function redactTokenLinks(body: string): string {
   return (
     body
-      // ?token=… / &code=… → keep the key, drop the value
+      // ?token=… / &reset_token=… → keep the key, drop the value
       .replace(SENSITIVE_QUERY_PARAMS, (m) => m.slice(0, m.indexOf('=') + 1) + '[redacted]')
       // reset/verify/magic URLs → redact everything after the sensitive segment
       .replace(SENSITIVE_URL_PATHS, (_m, url: string) => {
-        const marker = url.search(
-          /\/(reset|verify|verification|confirm|magic|magic-link|activate|invite|unsubscribe)/i
-        )
+        const marker = url.search(SENSITIVE_PATH_MARKER)
         return marker === -1 ? url : url.slice(0, marker) + '/[redacted]'
       })
+      // a bare token as a path segment → redact just that segment
+      .replace(OPAQUE_PATH_SEGMENT, (_m, head: string) => head + '[redacted]')
   )
 }
 
