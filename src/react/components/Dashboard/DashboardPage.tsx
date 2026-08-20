@@ -6,6 +6,7 @@ import { useDashboardData } from '../../hooks/useDashboardData.js'
 import { useFeatures } from '../../hooks/useFeatures.js'
 import { useTheme } from '../../hooks/useTheme.js'
 import { ThemeToggle } from '../shared/ThemeToggle.js'
+import { OverviewDataContext } from './overview-data-context.js'
 
 import type {
   DashboardHookOptions,
@@ -174,8 +175,17 @@ export function DashboardPage(props: DashboardPageProps) {
     [baseUrl, dashboardEndpoint, authToken, refreshKey]
   )
 
-  // Fetch overview metrics for sidebar nav badges
-  const { data: overviewData } = useDashboardData<OverviewMetrics>('overview', dashOptions)
+  // Fetch overview metrics for sidebar nav badges. Shared with OverviewSection
+  // via context so the dashboard runs one `overview` poller instead of two
+  // concurrent ones.
+  const { data: overviewData, isLoading: overviewLoading } = useDashboardData<OverviewMetrics>(
+    'overview',
+    dashOptions
+  )
+  const overviewContextValue = useMemo(
+    () => ({ data: overviewData, isLoading: overviewLoading }),
+    [overviewData, overviewLoading]
+  )
 
   /** Badge counts for sidebar nav items (mirrors old Edge dashboard behaviour). */
   const navBadges: Partial<Record<DashboardSection, { count: number; variant?: string }>> =
@@ -224,12 +234,14 @@ export function DashboardPage(props: DashboardPageProps) {
       <div className="ss-dash-pane ss-dash-active" id={`ss-dash-pane-${activeSection}`}>
         <div className="ss-dash-pane-inner">
           <Suspense fallback={<div className="ss-dash-empty">Loading...</div>}>
-            {sectionMap[activeSection] || <div className="ss-dash-empty">Unknown section</div>}
+            <OverviewDataContext.Provider value={overviewContextValue}>
+              {sectionMap[activeSection] || <div className="ss-dash-empty">Unknown section</div>}
+            </OverviewDataContext.Provider>
           </Suspense>
         </div>
       </div>
     )
-  }, [activeSection, dashOptions])
+  }, [activeSection, dashOptions, overviewContextValue])
 
   return (
     <div className="ss-dash" data-theme={theme} id="ss-dash">

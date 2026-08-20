@@ -1,7 +1,8 @@
-import { test } from '@japa/runner'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+
+import { test } from '@japa/runner'
 
 import { DashboardStore } from '../src/dashboard/dashboard_store.js'
 
@@ -529,10 +530,7 @@ test.group('DashboardStore | Email Pipeline (integration)', (group) => {
   // -------------------------------------------------------------------------
 
   test('getEmails with excludeBody omits html and text_body columns', async ({ assert }) => {
-    emitter.emit(
-      'mail:sending',
-      makeSendingData({ html: '<p>Big HTML</p>', text: 'Big text' })
-    )
+    emitter.emit('mail:sending', makeSendingData({ html: '<p>Big HTML</p>', text: 'Big text' }))
     await flush(store)
 
     const result = await store.getEmails(1, 50, undefined, true)
@@ -641,5 +639,68 @@ test.group('DashboardStore | Email Pipeline (integration)', (group) => {
     })
     // pendingEmails should remain empty since db was null
     assert.lengthOf((unstarted as any).flushMgr.pendingEmails, 0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// capture.emails gating
+// ---------------------------------------------------------------------------
+
+test.group('DashboardStore | capture.emails off', (group) => {
+  let tmpDir: string
+  let store: DashboardStore
+  let emitter: ReturnType<typeof createMockEmitter>
+
+  group.each.setup(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'ss-email-gate-test-'))
+    const config = makeConfig('test.sqlite')
+    // Production shape: everything captured except emails.
+    ;(config as any).capture = {
+      queries: true,
+      events: true,
+      emails: false,
+      traces: true,
+      logs: true,
+    }
+
+    store = new DashboardStore(config)
+    emitter = createMockEmitter()
+    await store.start(null, emitter as any, tmpDir)
+  })
+
+  group.each.teardown(async () => {
+    await store.stop()
+    await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
+  })
+
+  test('mail events are not subscribed and nothing is persisted', async ({ assert }) => {
+    // The listeners were never wired, so the emitter has no mail handlers…
+    assert.isUndefined(emitter.handlers['mail:sending'])
+    assert.isUndefined(emitter.handlers['mail:sent'])
+
+    // …and even a manual emit leaves the table empty.
+    emitter.emit('mail:sent', makeSentData())
+    await flush(store)
+    assert.equal((await store.getEmails()).total, 0)
+  })
+
+  test('recordEmail (the Redis-bridge ingest path) is a no-op', async ({ assert }) => {
+    store.recordEmail({
+      id: 0,
+      from: 'a@example.com',
+      to: 'b@example.com',
+      cc: null,
+      bcc: null,
+      subject: 'bridged',
+      html: null,
+      text: null,
+      mailer: 'smtp',
+      status: 'sent',
+      messageId: null,
+      attachmentCount: 0,
+      timestamp: 0,
+    } as any)
+    await flush(store)
+    assert.equal((await store.getEmails()).total, 0)
   })
 })

@@ -5,7 +5,7 @@
  * Self-contained: injects dependencies and fetches its own data.
  * CSS classes match the React EmailsSection.
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, onUnmounted, type Ref } from 'vue'
 import { timeAgo, formatTime } from '../../../../core/index.js'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
@@ -48,21 +48,36 @@ function handleSearch(term: string) {
   setSearch(term)
 }
 
+// Cancel any in-flight preview fetch so two quick clicks don't race and let
+// an earlier response overwrite the preview. Mirrors RequestsSection.vue.
+let previewAbortController: AbortController | null = null
+
 async function handlePreview(email: Record<string, unknown>) {
+  previewAbortController?.abort()
+  previewAbortController = null
+
   if (email.html) {
     previewId.value = email.id as number
     previewHtml.value = email.html as string
     return
   }
-  const html = await fetchEmailPreview(email.id as number)
+
+  const controller = new AbortController()
+  previewAbortController = controller
+  const html = await fetchEmailPreview(email.id as number, { signal: controller.signal })
+  // Ignore if a newer click superseded this fetch while it was in flight.
+  if (previewAbortController !== controller) return
   previewId.value = email.id as number
   previewHtml.value = html
 }
 
 function closePreview() {
+  previewAbortController?.abort()
   previewId.value = null
   previewHtml.value = null
 }
+
+onUnmounted(() => previewAbortController?.abort())
 
 const { tableRef } = useResizableTable(() => emails.value)
 </script>

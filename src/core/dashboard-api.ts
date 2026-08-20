@@ -79,11 +79,13 @@ export class DashboardApi {
   /**
    * Fetch the value of a specific cache key.
    *
-   * @param key - Cache key (will be URI-encoded).
+   * @param key  - Cache key (will be URI-encoded).
+   * @param init - Optional `RequestInit` overrides (e.g. `{ signal }`).
    */
-  async fetchCacheKey(key: string) {
+  async fetchCacheKey(key: string, init?: RequestInit) {
     return this.client.fetch<Record<string, unknown>>(
-      `${this.basePath}/cache/${encodeURIComponent(key)}`
+      `${this.basePath}/cache/${encodeURIComponent(key)}`,
+      init
     )
   }
 
@@ -104,9 +106,10 @@ export class DashboardApi {
   /**
    * Fetch the HTML preview for an email record.
    *
-   * @param id - Email record ID.
+   * @param id   - Email record ID.
+   * @param init - Optional `RequestInit` overrides (e.g. `{ signal }`).
    */
-  async fetchEmailPreview(id: number) {
-    return this.client.fetch<string>(`${this.basePath}/emails/${id}/preview`)
+  async fetchEmailPreview(id: number, init?: RequestInit) {
+    return this.client.fetch<string>(`${this.basePath}/emails/${id}/preview`, init)
   }
 }

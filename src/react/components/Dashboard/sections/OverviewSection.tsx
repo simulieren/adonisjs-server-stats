@@ -1,13 +1,15 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
 
-import { resolveEventName, resolveMetric, resolveNormalizedSql } from '../../../../core/field-resolvers.js'
 import {
-  durationClassName,
-  formatDuration,
-} from '../../../../core/formatters.js'
+  resolveEventName,
+  resolveMetric,
+  resolveNormalizedSql,
+} from '../../../../core/field-resolvers.js'
+import { durationClassName, formatDuration } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
-import { Sparkline } from '../../StatsBar/Sparkline.js'
 import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
+import { Sparkline } from '../../StatsBar/Sparkline.js'
+import { OverviewDataContext } from '../overview-data-context.js'
 import { TimeRangeSelector } from '../shared/TimeRangeSelector.js'
 
 import type {
@@ -68,7 +70,6 @@ function smoothPath(points: { x: number; y: number }[]): string {
   }
   return d
 }
-
 
 /* ── OverviewChart (area chart matching old Edge style) ───────────── */
 
@@ -341,9 +342,38 @@ function OverviewChart({ chartPoints }: OverviewChartProps) {
   )
 }
 
+/**
+ * Reuses the shared `overview` poller provided by DashboardPage (used for the
+ * sidebar badges) so the dashboard doesn't run a second concurrent poller
+ * against the same endpoint. Falls back to its own poller — via
+ * {@link OverviewSectionStandalone} — when rendered without a provider (e.g.
+ * mounted standalone outside DashboardPage). The conditional is on which
+ * component renders, not which hooks run, so each component's hooks stay
+ * unconditional.
+ */
 export function OverviewSection({ options = {} }: OverviewSectionProps) {
-  const [timeRange, setTimeRange] = useState<TimeRange>('1h')
+  const shared = useContext(OverviewDataContext)
+  if (shared) {
+    return (
+      <OverviewSectionBody options={options} overview={shared.data} isLoading={shared.isLoading} />
+    )
+  }
+  return <OverviewSectionStandalone options={options} />
+}
+
+function OverviewSectionStandalone({ options }: { options: DashboardHookOptions }) {
   const { data: overview, isLoading } = useDashboardData<OverviewMetrics>('overview', options)
+  return <OverviewSectionBody options={options} overview={overview} isLoading={isLoading} />
+}
+
+interface OverviewSectionBodyProps {
+  options: DashboardHookOptions
+  overview: OverviewMetrics | null
+  isLoading: boolean
+}
+
+function OverviewSectionBody({ options, overview, isLoading }: OverviewSectionBodyProps) {
+  const [timeRange, setTimeRange] = useState<TimeRange>('1h')
   const { data: chartResponse } = useDashboardData<{
     buckets: ChartDataPoint[]
   }>('overview/chart', {

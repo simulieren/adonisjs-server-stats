@@ -201,6 +201,9 @@ export class DashboardStore {
   }
 
   recordEmail(record: EmailRecord): void {
+    // Guarded here as well as in wireEventListeners: the Redis email bridge
+    // calls this directly for cross-process mail, bypassing the listeners.
+    if (this.config.capture?.emails === false) return
     this.flushMgr.recordEmail(record)
   }
 
@@ -317,6 +320,14 @@ export class DashboardStore {
   }
 
   private wireEventListeners(): void {
+    // `capture.emails: false` must stop persistence too, not just the in-memory
+    // collector — otherwise production mode stores full mail bodies while the
+    // config promises it doesn't. Undefined means an externally-constructed
+    // store without resolved capture flags; default on, matching DebugStore.
+    if (this.config.capture?.emails === false) {
+      log.info('dashboard: email capture disabled — mail listeners not wired')
+      return
+    }
     if (!this.emitter || typeof this.emitter.on !== 'function') {
       log.warn('dashboard: emitter not available — email collection disabled')
       return

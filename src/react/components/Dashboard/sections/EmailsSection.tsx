@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 
 import {
   resolveFromAddr,
@@ -7,11 +7,11 @@ import {
   resolveAttachmentCount,
   resolveTimestamp,
 } from '../../../../core/field-resolvers.js'
-import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
-import { DataTable } from '../shared/DataTable.js'
-import { FilterBar } from '../../shared/FilterBar.js'
 import { EmailPreviewOverlay } from '../../shared/EmailPreviewOverlay.js'
+import { FilterBar } from '../../shared/FilterBar.js'
+import { TimeAgoCell } from '../../shared/TimeAgoCell.js'
+import { DataTable } from '../shared/DataTable.js'
 import { Pagination } from '../shared/Pagination.js'
 
 import type { DashboardHookOptions } from '../../../../core/types.js'
@@ -25,6 +25,7 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
   const [search, setSearch] = useState('')
   const [previewId, setPreviewId] = useState<number | null>(null)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
+  const previewAbortRef = useRef<AbortController | null>(null)
 
   const { data, meta, isLoading } = useDashboardData('emails', { ...options, page, search })
   const emails = (data as Record<string, unknown>[]) || []
@@ -33,27 +34,44 @@ export function EmailsSection({ options = {} }: EmailsSectionProps) {
 
   const handlePreview = useCallback(
     async (email: Record<string, unknown>) => {
+      // Abort any in-flight preview fetch so rapid clicks don't race.
+      previewAbortRef.current?.abort()
+
       if (email.html) {
+        previewAbortRef.current = null
         setPreviewId(email.id as number)
         setPreviewHtml(email.html as string)
         return
       }
+      const abort = new AbortController()
+      previewAbortRef.current = abort
+
       // Fetch preview from API
       try {
         const { baseUrl = '', dashboardEndpoint = '/__stats/api', authToken } = options
         const url = `${baseUrl}${dashboardEndpoint}/emails/${email.id}/preview`
         const headers: Record<string, string> = { Accept: 'text/html' }
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`
-        const resp = await fetch(url, { headers, credentials: 'same-origin' })
+        const resp = await fetch(url, {
+          headers,
+          credentials: 'same-origin',
+          signal: abort.signal,
+        })
         const html = await resp.text()
+        // Ignore if a newer click superseded this fetch while it was in flight.
+        if (previewAbortRef.current !== abort) return
         setPreviewId(email.id as number)
         setPreviewHtml(html)
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
         // Silently fail
       }
     },
     [options]
   )
+
+  // Abort any in-flight preview fetch on unmount.
+  useEffect(() => () => previewAbortRef.current?.abort(), [])
 
   if (previewId && previewHtml) {
     const email = emails.find((e) => e.id === previewId)

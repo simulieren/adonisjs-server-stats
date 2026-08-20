@@ -58,7 +58,16 @@ export async function setupDevToolbarCore(
   const em = await resolve('emitter')
   if (!em) log.warn('emitter not available — query/event collection disabled')
   await debugStore.start(em, await resolve('router'))
-  const emailBridgeRedis = await setupBridgeInternal(em, debugStore, app)
+  // The bridge publishes full mail bodies to Redis — a shared-Redis exposure —
+  // so it must obey the same capture flag as local email collection.
+  const emailBridgeRedis = debugStore.capture.emails
+    ? await setupBridgeInternal(
+        em,
+        debugStore,
+        app,
+        config.advanced?.emailBridgeChannel ?? 'adonisjs-server-stats:emails'
+      )
+    : null
   const debugController = await createDebugController(debugStore, config, getDiagnostics, app)
   // Also gated on capture: installing the collector is what makes the middleware
   // wrap every request in AsyncLocalStorage and write a trace row per request.
@@ -127,7 +136,8 @@ function createFlushTimer(
 async function setupBridgeInternal(
   emitter: unknown,
   debugStore: DebugStore,
-  app: ApplicationService
+  app: ApplicationService,
+  channel: string
 ): Promise<unknown> {
   if (!emitter) return null
   try {
@@ -157,7 +167,7 @@ async function setupBridgeInternal(
     return await setupFullEmailBridge(
       emitter as { on(e: string, h: (...a: unknown[]) => void): void },
       redis,
-      'adonisjs-server-stats:emails',
+      channel,
       { debugEmails: debugStore.emails ?? null, dashboardStore: getDashboardStore }
     )
   } catch {
@@ -260,7 +270,9 @@ export function applyToolbarResult(
         if (r.dashboardController) {
           log.info('dashboard: controller ready — API endpoints are now live')
         } else {
-          log.warn('dashboard: init completed but controller is null — dashboard API will return 503')
+          log.warn(
+            'dashboard: init completed but controller is null — dashboard API will return 503'
+          )
         }
       },
     }).catch((e) => {

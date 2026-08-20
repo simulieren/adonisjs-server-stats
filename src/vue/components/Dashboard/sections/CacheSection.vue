@@ -5,7 +5,7 @@
  * Self-contained: injects dependencies and fetches its own data.
  * CSS classes match the React CacheSection.
  */
-import { ref, computed, inject, onMounted, type Ref } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, type Ref } from 'vue'
 import { useDashboardData } from '../../../composables/useDashboardData.js'
 import { useResizableTable } from '../../../composables/useResizableTable.js'
 import { DashboardApi, formatTtl, formatCacheSize } from '../../../../core/index.js'
@@ -71,7 +71,15 @@ async function handleDelete(key: string) {
 
 const { tableRef } = useResizableTable(() => keys.value)
 
+// Cancel any in-flight key fetch so two quick clicks don't race and let an
+// earlier response overwrite the selected key's value. Mirrors
+// RequestsSection.vue.
+let keyAbortController: AbortController | null = null
+
 async function handleKeyClick(key: string) {
+  keyAbortController?.abort()
+  keyAbortController = null
+
   if (selectedKey.value === key) {
     selectedKey.value = null
     keyValue.value = null
@@ -82,19 +90,28 @@ async function handleKeyClick(key: string) {
   keyValue.value = null
   keyValueError.value = null
   keyValueLoading.value = true
+
+  const controller = new AbortController()
+  keyAbortController = controller
   try {
     if (!cacheApi) throw new Error('Cache API not initialized')
-    const result = await cacheApi.fetchCacheKey(key)
+    const result = await cacheApi.fetchCacheKey(key, { signal: controller.signal })
+    // Ignore if a newer click superseded this fetch while it was in flight.
+    if (keyAbortController !== controller) return
     keyValue.value =
       result.value !== undefined ? result.value : result.data !== undefined ? result.data : result
     keyValueError.value = null
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') return
+    if (keyAbortController !== controller) return
     keyValue.value = null
     keyValueError.value = 'Failed to fetch key value'
   } finally {
-    keyValueLoading.value = false
+    if (keyAbortController === controller) keyValueLoading.value = false
   }
 }
+
+onUnmounted(() => keyAbortController?.abort())
 </script>
 
 <template>

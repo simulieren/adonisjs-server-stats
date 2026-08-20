@@ -97,8 +97,8 @@ function createReadApiHelpers(api: import('../../core/index.js').DashboardApi) {
   return {
     fetchGroupedQueries: () => safeApiCall(() => api.fetchGroupedQueries()),
     explainQuery: (queryId: number) => safeApiCall(() => api.explainQuery(queryId)),
-    fetchEmailPreview: async (emailId: number): Promise<string | null> => {
-      const result = await safeApiCall(() => api.fetchEmailPreview(emailId))
+    fetchEmailPreview: async (emailId: number, init?: RequestInit): Promise<string | null> => {
+      const result = await safeApiCall(() => api.fetchEmailPreview(emailId, init))
       return (result as { html?: string })?.html || null
     },
   }

@@ -147,12 +147,7 @@ export default class ServerStatsProvider {
       whenReady: () => this.whenReady(),
       domain: config.domain,
     })
-    const paths = collectRegisteredPaths(
-      statsEndpoint,
-      debugEndpoint,
-      dashboardPath,
-      config.domain
-    )
+    const paths = collectRegisteredPaths(statsEndpoint, debugEndpoint, dashboardPath, config.domain)
     if (!registered || paths.length === 0) return
     log.list('routes auto-registered (no manual setup needed):', paths)
     warnAboutAuthMiddleware(config, this.app.makePath.bind(this.app))
@@ -164,9 +159,16 @@ export default class ServerStatsProvider {
   async ready() {
     const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
     if (!config || (this.app.inTest && config.skipInTest !== false)) return
+    this.emailBridgeChannel = config.advanced?.emailBridgeChannel ?? this.emailBridgeChannel
     if (this.app.getEnvironment() !== 'web') {
-      const em = await this.resolve('emitter')
-      await setupNonWebBridgeHelper(em, this.emailBridgeChannel)
+      // The bridge publishes full mail bodies to Redis. A production queue
+      // worker must stay silent unless production mode AND email capture are
+      // both opted in — same rules the web process applies.
+      const emailCaptureOn = !this.app.inProduction || config.production?.capture?.emails === true
+      if (this.isEnabledHere(config) && emailCaptureOn) {
+        const em = await this.resolve('emitter')
+        await setupNonWebBridgeHelper(em, this.emailBridgeChannel)
+      }
       return
     }
     this.initPromise = this.initStats(config).catch((err) => {
@@ -229,7 +231,12 @@ export default class ServerStatsProvider {
         resolve: (b) => this.resolve(b),
         getDiagnostics: () => this.getDiagnostics(),
       })
-      if (result) applyToolbarResult(result, tc, this as unknown as import('./toolbar_setup.js').ProviderFields)
+      if (result)
+        applyToolbarResult(
+          result,
+          tc,
+          this as unknown as import('./toolbar_setup.js').ProviderFields
+        )
     } catch (err) {
       log.warn(
         `dev toolbar setup failed: ${(err as Error)?.message ?? err}\n  ${dim('Stats bar will still work.')}`

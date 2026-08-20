@@ -742,6 +742,18 @@ export interface AdvancedConfig {
    * @default 200
    */
   maxTraces?: number
+
+  /**
+   * Redis pub/sub channel for the cross-process email bridge.
+   *
+   * Queue workers publish captured mail on this channel and the web
+   * process persists it. On a Redis instance shared between apps or
+   * tenants, namespace this (e.g. `myapp:server-stats:emails`) so
+   * other subscribers cannot read your outbound mail.
+   *
+   * @default 'adonisjs-server-stats:emails'
+   */
+  emailBridgeChannel?: string
 }
 
 // ---------------------------------------------------------------------------

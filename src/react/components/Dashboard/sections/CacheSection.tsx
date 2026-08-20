@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 
 import { formatTtl, formatCacheSize } from '../../../../core/formatters.js'
 import { useDashboardData } from '../../../hooks/useDashboardData.js'
 import { CacheStatsBar } from '../../shared/CacheStatsBar.js'
+import { FilterBar } from '../../shared/FilterBar.js'
 import { JsonViewer } from '../../shared/JsonViewer.js'
 import { DataTable } from '../shared/DataTable.js'
-import { FilterBar } from '../../shared/FilterBar.js'
 
 import type { DashboardHookOptions, DashboardCacheResponse } from '../../../../core/types.js'
 
@@ -19,6 +19,7 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
   const [keyValue, setKeyValue] = useState<unknown>(null)
   const [keyValueLoading, setKeyValueLoading] = useState(false)
   const [keyValueError, setKeyValueError] = useState<string | null>(null)
+  const keyAbortRef = useRef<AbortController | null>(null)
 
   const { data, isLoading, mutate, getApi } = useDashboardData<DashboardCacheResponse>('cache', {
     ...options,
@@ -46,7 +47,11 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
 
   const handleKeyClick = useCallback(
     async (key: string) => {
+      // Abort any in-flight key fetch so rapid clicks don't race.
+      keyAbortRef.current?.abort()
+
       if (selectedKey === key) {
+        keyAbortRef.current = null
         setSelectedKey(null)
         setKeyValue(null)
         setKeyValueError(null)
@@ -56,9 +61,14 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
       setKeyValue(null)
       setKeyValueError(null)
       setKeyValueLoading(true)
+
+      const abort = new AbortController()
+      keyAbortRef.current = abort
       try {
         const api = getApi()
-        const result = await api.fetchCacheKey(key)
+        const result = await api.fetchCacheKey(key, { signal: abort.signal })
+        // Ignore if a newer click superseded this fetch while it was in flight.
+        if (keyAbortRef.current !== abort) return
         setKeyValue(
           result.value !== undefined
             ? result.value
@@ -67,15 +77,20 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
               : result
         )
         setKeyValueError(null)
-      } catch {
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        if (keyAbortRef.current !== abort) return
         setKeyValue(null)
         setKeyValueError('Failed to fetch key value')
       } finally {
-        setKeyValueLoading(false)
+        if (keyAbortRef.current === abort) setKeyValueLoading(false)
       }
     },
     [selectedKey, getApi]
   )
+
+  // Abort any in-flight key fetch on unmount.
+  useEffect(() => () => keyAbortRef.current?.abort(), [])
 
   return (
     <div>
@@ -85,7 +100,9 @@ export function CacheSection({ options = {} }: CacheSectionProps) {
           hitRate={cacheData.stats.hitRate ?? 0}
           hits={cacheData.stats.hits ?? 0}
           misses={cacheData.stats.misses ?? 0}
-          keys={cacheData.stats.totalKeys || cacheData.stats.keyCount || cacheData.keys?.length || 0}
+          keys={
+            cacheData.stats.totalKeys || cacheData.stats.keyCount || cacheData.keys?.length || 0
+          }
         />
       )}
 
