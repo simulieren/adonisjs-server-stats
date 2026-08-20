@@ -265,6 +265,8 @@ The following field names still work but will show deprecation warnings at boot.
 | `dbPath`               | `string`            | `'.adonisjs/server-stats/dashboard.sqlite3'`      | Path to the SQLite database file (relative to app root)                                                                                                                                                      |
 | `debugEndpoint`        | `string`            | `'/admin/api/debug'`                              | Base path for the debug toolbar API endpoints                                                                                                                                                                |
 | `excludeFromTracing`   | `string[]`          | `['/admin/api/debug', '/admin/api/server-stats']` | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
+| `cacheKeyPrefix`       | `string`            | --                                                | Allow-list prefix for the Cache tab (e.g. `'myapp:cache:'`). Scopes which Redis keys can be listed, read, and deleted. Unset: unrestricted in dev, single-key access refused in production. Env var `SERVER_STATS_CACHE_KEY_PREFIX` works as a fallback. |
+| `emailBridgeChannel`   | `string`            | `'adonisjs-server-stats:emails'`                  | Redis pub/sub channel for the cross-process email bridge. Namespace it on a shared Redis so other subscribers cannot read your outbound mail.                                                                |
 | `panes`                | `DebugPane[]`       | --                                                | Custom debug panel tabs                                                                                                                                                                                      |
 
 ---
@@ -287,6 +289,14 @@ Each collector is a factory function that returns a `MetricCollector`. All colle
 | `queueCollector(opts)`   | Active/waiting/delayed/failed jobs, worker count                | **required** | `bullmq` or `@adonisjs/queue`/`@boringnode/queue` (auto-detected) |
 | `logCollector(opts?)`    | Errors/warnings/entries (5m window), entries/minute             | optional     | --                |
 | `appCollector()`         | Online users, pending webhooks, pending emails                  | none         | `@adonisjs/lucid` |
+
+> [!WARNING]
+> `appCollector()` polls **your primary database** -- three `COUNT(*)` queries every collection interval (3s by default), forever. Index the columns it filters on or every tick is a full table scan:
+>
+> ```sql
+> CREATE INDEX webhook_events_status_index ON webhook_events (status);
+> CREATE INDEX scheduled_emails_status_index ON scheduled_emails (status);
+> ```
 
 ### Collector Options
 
@@ -464,9 +474,9 @@ An `authorize` callback may be sync or async -- the route guard awaits it, so `a
 
 Worth knowing before you expose it, even behind an admin guard:
 
-- **One guard, no tiers.** Anyone who passes `authorize` can also `DELETE /api/cache/:key` and `POST /api/jobs/:id/retry`. Scope cache access with `SERVER_STATS_CACHE_KEY_PREFIX` -- unset means unrestricted.
+- **One guard, no tiers.** Anyone who passes `authorize` can also `DELETE /api/cache/:key` and `POST /api/jobs/:id/retry`. Scope cache access with `advanced.cacheKeyPrefix` (or the `SERVER_STATS_CACHE_KEY_PREFIX` env var) -- unset means unrestricted in dev, and in production single-key cache reads/deletes are refused until a prefix is configured.
 - **No audit log and no rate limiting** on those mutating endpoints.
-- **SQL bindings are truncated at 256 characters but not redacted by key name.** A short secret passed as a bound parameter is stored as-is. Config and env values *are* redacted; query bindings are not.
+- **Redaction is pattern-based, not exhaustive.** SQL bindings, config/env values, stored URLs, and persisted log records are all redacted against a shared rule set (credential-shaped names incl. camelCase, hashes, JWTs, provider key prefixes, long hex/base64 blobs), and anything that survives is truncated at 256 chars. A secret under a name the patterns don't recognise, with an ordinary-looking value, still gets stored.
 
 ---
 

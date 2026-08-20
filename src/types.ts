@@ -565,7 +565,7 @@ export interface CaptureConfig {
   /** SQL text, bindings, and timings for every query. */
   queries?: boolean
 
-  /** Application events (in-memory only — never persisted to SQLite). */
+  /** Application events, linked to the request that follows them and persisted with it. */
   events?: boolean
 
   /** Sent mail, including subject and body. */

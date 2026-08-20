@@ -3,7 +3,7 @@
 </style>
 
 <div id="ss-bar"></div>
-<script type="application/json" id="ss-bar-config">{{{ JSON.stringify(barConfig) }}}</script>
+<script type="application/json" id="ss-bar-config">{{{ JSON.stringify(barConfig).replace(/</g, '\\u003c') }}}</script>
 
 @if(showDebug)
   <style>{{{ debugCss }}}</style>

@@ -8,7 +8,7 @@
 </head>
 <body>
   <div id="ss-dash"></div>
-  <script type="application/json" id="ss-dash-config">{{{ JSON.stringify(dashConfig) }}}</script>
+  <script type="application/json" id="ss-dash-config">{{{ JSON.stringify(dashConfig).replace(/</g, '\\u003c') }}}</script>
 
   @if(transmitClient)
     <script>

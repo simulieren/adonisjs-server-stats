@@ -67,6 +67,17 @@ function warnLucidMissing(): void {
  * Queries application-specific tables for user sessions,
  * pending webhooks, and pending emails.
  *
+ * **This polls your primary database** — three `COUNT(*)` queries every
+ * collection interval (3s by default), forever. Without indexes those are
+ * full table scans on every tick. If you enable this collector, make sure
+ * these exist (a plain `sessions` count uses the primary key, the other two
+ * need their filter column indexed):
+ *
+ * ```sql
+ * CREATE INDEX webhook_events_status_index ON webhook_events (status);
+ * CREATE INDEX scheduled_emails_status_index ON scheduled_emails (status);
+ * ```
+ *
  * **Peer dependencies:** `@adonisjs/lucid`
  */
 export function appCollector(): MetricCollector {

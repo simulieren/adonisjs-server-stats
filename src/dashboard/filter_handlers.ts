@@ -38,6 +38,19 @@ export async function handleCreateSavedFilter(
         error: 'Missing required fields: name, section, filterConfig',
       })
     }
+    // Size bounds: these land in SQLite verbatim, and the list endpoint
+    // returns every row — one oversized filter would bloat every response.
+    if (typeof name !== 'string' || name.length > 100) {
+      return response.badRequest({ error: 'name must be a string of at most 100 chars' })
+    }
+    if (typeof section !== 'string' || section.length > 50) {
+      return response.badRequest({ error: 'section must be a string of at most 50 chars' })
+    }
+    const configJson =
+      typeof filterConfig === 'string' ? filterConfig : JSON.stringify(filterConfig)
+    if (configJson.length > 4096) {
+      return response.badRequest({ error: 'filterConfig too large (max 4096 chars)' })
+    }
 
     const result = await dashboardStore.createSavedFilter(
       name,

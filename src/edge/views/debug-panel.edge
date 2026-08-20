@@ -1,2 +1,2 @@
 <div id="ss-dbg-panel"></div>
-<script type="application/json" id="ss-dbg-config">{{{ JSON.stringify(debugConfig) }}}</script>
+<script type="application/json" id="ss-dbg-config">{{{ JSON.stringify(debugConfig).replace(/</g, '\\u003c') }}}</script>
