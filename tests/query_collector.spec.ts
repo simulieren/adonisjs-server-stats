@@ -1,6 +1,8 @@
 import { test } from '@japa/runner'
-import type { Emitter } from '../src/debug/types.js'
+
 import { QueryCollector } from '../src/debug/query_collector.js'
+
+import type { Emitter } from '../src/debug/types.js'
 
 class MockEmitter {
   private handlers = new Map<string, Function[]>()
@@ -305,5 +307,43 @@ test.group('QueryCollector | Buffer behavior', () => {
     // Clean up callback
     collector.onNewItem(null)
     collector.stop()
+  })
+})
+
+test.group('QueryCollector | binding sanitization at capture', () => {
+  test('redacts bindings on secret statements before they enter the ring buffer', async ({
+    assert,
+  }) => {
+    const collector = new QueryCollector()
+    const emitter = new MockEmitter()
+    await collector.start(emitter as unknown as Emitter)
+
+    emitter.emit(
+      'db:query',
+      makeQueryEvent({
+        sql: 'update users set password = ? where id = ?',
+        bindings: ['hunter2', 42],
+      })
+    )
+
+    // The debug panel reads this buffer directly — it must never show a
+    // credential the persisted dashboard would have redacted.
+    assert.deepEqual(collector.getQueries()[0].bindings, ['[redacted]', '[redacted]'])
+  })
+
+  test('redacts credential-shaped values on ordinary statements', async ({ assert }) => {
+    const collector = new QueryCollector()
+    const emitter = new MockEmitter()
+    await collector.start(emitter as unknown as Emitter)
+
+    emitter.emit(
+      'db:query',
+      makeQueryEvent({
+        sql: 'select * from sessions where sid = ?',
+        bindings: ['a3f5c8d9e1b2478a6c0d4e9f1a2b3c4d', 'active'],
+      })
+    )
+
+    assert.deepEqual(collector.getQueries()[0].bindings, ['[redacted]', 'active'])
   })
 })

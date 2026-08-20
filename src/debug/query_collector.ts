@@ -1,3 +1,4 @@
+import { sanitizeBindings } from '../dashboard/sensitive_patterns.js'
 import { isExcludedRequest } from '../middleware/request_tracking_middleware.js'
 import { round } from '../utils/math_helpers.js'
 import { RingBuffer } from './ring_buffer.js'
@@ -16,7 +17,11 @@ function buildQueryRecord(data: DbQueryEvent, id: number): QueryRecord {
   return {
     id,
     sql: data.sql || '',
-    bindings: data.bindings || [],
+    // Sanitized at capture time so the in-memory debug panel never shows a
+    // credential the persisted dashboard would have redacted. The write path
+    // sanitizes again (idempotently) as defense in depth for records loaded
+    // from an older on-disk dump.
+    bindings: (sanitizeBindings(data.bindings || [], data.sql || '') as unknown[]) ?? [],
     duration: round(parseDuration(data.duration)),
     method: data.method || 'unknown',
     model: data.model || null,

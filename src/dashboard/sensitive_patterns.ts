@@ -151,3 +151,69 @@ export function looksLikeCredentialValue(value: string): boolean {
   if (value.length >= MIN_BLOB_LEN && /^[A-Za-z0-9_-]+={0,2}$/.test(value)) return true
   return CREDENTIAL_VALUE_PATTERNS.some((pattern) => pattern.test(value))
 }
+
+// ---------------------------------------------------------------------------
+// Binding hygiene
+// ---------------------------------------------------------------------------
+
+/** Max length for a stored string binding before it is truncated. */
+const MAX_BINDING_LEN = 256
+
+/** Placeholder stored in place of a binding that looks like a credential. */
+const REDACTED_BINDING = '[redacted]'
+
+/**
+ * Redact and truncate SQL bindings before persistence.
+ *
+ * Two independent rules, because neither catches everything on its own:
+ *
+ * 1. **By statement.** If the SQL mentions a credential-shaped identifier
+ *    (`password`, `remember_token`, `otp`, ...), every binding for that
+ *    statement is redacted. Positional bindings cannot be mapped back to
+ *    columns reliably, so this is all-or-nothing per statement — coarse, but
+ *    it is the only thing that catches a short secret like a 6-digit OTP.
+ * 2. **By value shape.** Hashes, JWTs, provider key prefixes, long hex
+ *    digests, and URLs with embedded credentials are redacted wherever they
+ *    appear, regardless of the statement.
+ *
+ * Anything that survives both is truncated at {@link MAX_BINDING_LEN} so an
+ * oversized payload cannot bloat the row.
+ *
+ * Ordinary parameters — ids, flags, emails, timestamps — still pass through, so
+ * the query pane stays useful for debugging.
+ */
+export function sanitizeBindings(bindings: unknown, sqlText?: string): unknown {
+  const redactAll = sqlText !== undefined && sqlMentionsSecret(sqlText)
+  return sanitizeBindingValue(bindings, redactAll)
+}
+
+function sanitizeBindingValue(value: unknown, redactAll: boolean): unknown {
+  if (Array.isArray(value)) return value.map((v) => sanitizeBindingValue(v, redactAll))
+  if (value !== null && typeof value === 'object') return sanitizeNamedBindings(value, redactAll)
+  if (typeof value === 'string') return sanitizeStringBinding(value, redactAll)
+  // A statement touching a secret column may bind it as a non-string — a numeric
+  // OTP, for instance — so redact those too rather than only masking strings.
+  // Booleans and null carry nothing worth hiding.
+  const redactable = value !== null && value !== undefined && typeof value !== 'boolean'
+  return redactAll && redactable ? REDACTED_BINDING : value
+}
+
+/** Named bindings carry their own key, so use it when it is telling. */
+function sanitizeNamedBindings(value: object, redactAll: boolean): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = sanitizeBindingValue(nested, redactAll || isSecretName(key))
+  }
+  return out
+}
+
+/** Matches a value this module already truncated, so a second pass is a no-op. */
+const TRUNCATION_MARKER_RE = /…\[truncated \d+ chars\]$/
+
+function sanitizeStringBinding(value: string, redactAll: boolean): string {
+  if (redactAll || looksLikeCredentialValue(value)) return REDACTED_BINDING
+  if (value.length > MAX_BINDING_LEN && !TRUNCATION_MARKER_RE.test(value)) {
+    return value.slice(0, MAX_BINDING_LEN) + `…[truncated ${value.length} chars]`
+  }
+  return value
+}

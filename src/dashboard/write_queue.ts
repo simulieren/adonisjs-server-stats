@@ -8,7 +8,7 @@
 
 import { round } from '../utils/math_helpers.js'
 import { yieldToEventLoop } from './migrator_tables.js'
-import { isSecretName, looksLikeCredentialValue, sqlMentionsSecret } from './sensitive_patterns.js'
+import { sanitizeBindings } from './sensitive_patterns.js'
 
 import type { EventRecord, EmailRecord } from '../debug/types.js'
 import type { PersistRequestInput } from './dashboard_types.js'
@@ -58,67 +58,12 @@ export function normalizeSql(sql: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Binding hygiene
+// Binding hygiene — implementation lives in sensitive_patterns.ts so the
+// in-memory QueryCollector can sanitize at capture time without importing the
+// write path. Re-exported here for existing consumers.
 // ---------------------------------------------------------------------------
 
-/** Max length for a persisted string binding before it is truncated. */
-const MAX_BINDING_LEN = 256
-
-/** Placeholder stored in place of a binding that looks like a credential. */
-const REDACTED_BINDING = '[redacted]'
-
-/**
- * Redact and truncate SQL bindings before persistence.
- *
- * Two independent rules, because neither catches everything on its own:
- *
- * 1. **By statement.** If the SQL mentions a credential-shaped identifier
- *    (`password`, `remember_token`, `otp`, ...), every binding for that
- *    statement is redacted. Positional bindings cannot be mapped back to
- *    columns reliably, so this is all-or-nothing per statement — coarse, but
- *    it is the only thing that catches a short secret like a 6-digit OTP.
- * 2. **By value shape.** Hashes, JWTs, provider key prefixes, long hex
- *    digests, and URLs with embedded credentials are redacted wherever they
- *    appear, regardless of the statement.
- *
- * Anything that survives both is truncated at {@link MAX_BINDING_LEN} so an
- * oversized payload cannot bloat the row.
- *
- * Ordinary parameters — ids, flags, emails, timestamps — still pass through, so
- * the query pane stays useful for debugging.
- */
-export function sanitizeBindings(bindings: unknown, sqlText?: string): unknown {
-  const redactAll = sqlText !== undefined && sqlMentionsSecret(sqlText)
-  return sanitizeBindingValue(bindings, redactAll)
-}
-
-function sanitizeBindingValue(value: unknown, redactAll: boolean): unknown {
-  if (Array.isArray(value)) return value.map((v) => sanitizeBindingValue(v, redactAll))
-  if (value !== null && typeof value === 'object') return sanitizeNamedBindings(value, redactAll)
-  if (typeof value === 'string') return sanitizeStringBinding(value, redactAll)
-  // A statement touching a secret column may bind it as a non-string — a numeric
-  // OTP, for instance — so redact those too rather than only masking strings.
-  // Booleans and null carry nothing worth hiding.
-  const redactable = value !== null && value !== undefined && typeof value !== 'boolean'
-  return redactAll && redactable ? REDACTED_BINDING : value
-}
-
-/** Named bindings carry their own key, so use it when it is telling. */
-function sanitizeNamedBindings(value: object, redactAll: boolean): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    out[key] = sanitizeBindingValue(nested, redactAll || isSecretName(key))
-  }
-  return out
-}
-
-function sanitizeStringBinding(value: string, redactAll: boolean): string {
-  if (redactAll || looksLikeCredentialValue(value)) return REDACTED_BINDING
-  if (value.length > MAX_BINDING_LEN) {
-    return value.slice(0, MAX_BINDING_LEN) + `…[truncated ${value.length} chars]`
-  }
-  return value
-}
+export { sanitizeBindings }
 
 // ---------------------------------------------------------------------------
 // Prepared row types
