@@ -41,6 +41,38 @@ test.group('sensitive name patterns', () => {
     }
   })
 
+  test('recognises camelCase credential names', ({ assert }) => {
+    // AdonisJS config keys and camelCase column strategies are the NORMAL
+    // shape, not an edge case — these used to sail past the `_`-boundary
+    // patterns while their snake_case twins were redacted.
+    for (const name of [
+      'userPassword',
+      'passwordHash',
+      'clientSecret',
+      'jwtSecret',
+      'sessionSecret',
+      'apiSecret',
+      'bearerToken',
+      'stripeSecretKey',
+      'rememberMeToken',
+      'totpSecret',
+      'mfaCode',
+      'passwd',
+      'pwd',
+      'cvv',
+      'cardPin',
+      'ssn',
+    ]) {
+      assert.isTrue(isSecretName(name), `${name} should be secret`)
+    }
+  })
+
+  test('plural credential names are still credentials', ({ assert }) => {
+    for (const name of ['tokens', 'secrets', 'passwords', 'apiKeys']) {
+      assert.isTrue(isSecretName(name), `${name} should be secret`)
+    }
+  })
+
   test('leaves ordinary names alone', ({ assert }) => {
     for (const name of [
       'id',
@@ -52,6 +84,13 @@ test.group('sensitive name patterns', () => {
       'monkey',
       'status',
       'authors',
+      'createdAt',
+      'userId',
+      'authorName',
+      'pinned',
+      'spinner',
+      'shipping',
+      'statusCode',
     ]) {
       assert.isFalse(isSecretName(name), `${name} should not be secret`)
     }
@@ -65,6 +104,8 @@ test.group('sensitive name patterns', () => {
     assert.isTrue(isSensitiveConfigName('email'))
     assert.isTrue(isSensitiveConfigName('SMTP_HOST'))
     assert.isTrue(isSensitiveConfigName('DATABASE_URL'))
+    assert.isTrue(isSensitiveConfigName('smtpHost'))
+    assert.isTrue(isSensitiveConfigName('databaseUrl'))
   })
 })
 
@@ -114,6 +155,13 @@ test.group('sqlMentionsSecret', () => {
     assert.isTrue(sqlMentionsSecret('select * from users where remember_token = ?'))
     assert.isTrue(sqlMentionsSecret('update users set otp = ? where id = ?'))
     assert.isTrue(sqlMentionsSecret('select "api_key" from apps where id = ?'))
+  })
+
+  test('matches camelCase identifiers', ({ assert }) => {
+    assert.isTrue(sqlMentionsSecret('insert into "users" ("email", "passwordHash") values (?, ?)'))
+    assert.isTrue(sqlMentionsSecret('update `users` set `userPassword` = ? where `id` = ?'))
+    assert.isTrue(sqlMentionsSecret('update users set totpSecret = ? where id = ?'))
+    assert.isTrue(sqlMentionsSecret('select rememberMeToken from users where id = ?'))
   })
 
   test('does not match ordinary statements', ({ assert }) => {

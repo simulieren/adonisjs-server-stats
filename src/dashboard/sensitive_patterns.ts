@@ -10,9 +10,23 @@
 
 // Custom word boundaries: `\b` does not match between `CLIENT` and `SECRET` in
 // `GOOGLE_CLIENT_SECRET`, because `_` is a word character. These treat `_`,
-// `.`, and `-` as separators, and also match a bare token on its own.
+// `.`, and `-` as separators, and also match a bare token on its own. The
+// trailing boundary tolerates a plural `s` so `tokens`/`secrets` match too.
+// camelCase is handled by normalizing the name BEFORE testing (see
+// `splitCamelCase`), not by the boundaries themselves.
 const B = '(?:^|[_.\\-])' // boundary before
-const A = '(?:$|[_.\\-])' // boundary after
+const A = 's?(?:$|[_.\\-])' // boundary after (optional plural)
+
+/**
+ * Insert `_` at lower/digit→UPPER transitions so the separator-based patterns
+ * above see camelCase the same way they see snake_case. Without this,
+ * `passwordHash` and `clientSecret` — the *normal* shape for AdonisJS config
+ * keys and camelCase column strategies — sail past every pattern while their
+ * snake_case twins are redacted.
+ */
+function splitCamelCase(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+}
 
 /**
  * Names that identify a credential — applies to env vars, config keys, and SQL
@@ -43,8 +57,18 @@ export const SECRET_NAME_PATTERNS: RegExp[] = [
   new RegExp(`${B}encryption${A}`, 'i'),
   // App key / app secret
   /app[_-]key/i,
-  // One-time codes
+  // One-time codes and second factors
   new RegExp(`${B}otp${A}`, 'i'),
+  new RegExp(`${B}totp${A}`, 'i'),
+  new RegExp(`${B}mfa${A}`, 'i'),
+  // Password abbreviations
+  new RegExp(`${B}passwd${A}`, 'i'),
+  new RegExp(`${B}pwd${A}`, 'i'),
+  // Card / identity numbers
+  new RegExp(`${B}cvv${A}`, 'i'),
+  new RegExp(`${B}cvc${A}`, 'i'),
+  new RegExp(`${B}pin${A}`, 'i'),
+  new RegExp(`${B}ssn${A}`, 'i'),
 ]
 
 /**
@@ -64,12 +88,15 @@ export const CONFIG_ONLY_NAME_PATTERNS: RegExp[] = [
 
 /** Whether a name identifies a credential. */
 export function isSecretName(name: string): boolean {
-  return SECRET_NAME_PATTERNS.some((pattern) => pattern.test(name))
+  const normalized = splitCamelCase(name)
+  return SECRET_NAME_PATTERNS.some((pattern) => pattern.test(normalized))
 }
 
 /** Whether a name is sensitive in a config/env context (credentials plus contact/service names). */
 export function isSensitiveConfigName(name: string): boolean {
-  return isSecretName(name) || CONFIG_ONLY_NAME_PATTERNS.some((pattern) => pattern.test(name))
+  if (isSecretName(name)) return true
+  const normalized = splitCamelCase(name)
+  return CONFIG_ONLY_NAME_PATTERNS.some((pattern) => pattern.test(normalized))
 }
 
 /** Identifier-ish tokens in a SQL statement: table names, column names, aliases. */
