@@ -36,6 +36,12 @@ export async function migrateRequests(db: Knex): Promise<void> {
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_requests_duration ON server_stats_requests(duration)`
   )
+  // Covers the overview p95 query (WHERE created_at >= ? ORDER BY duration):
+  // with only the single-column indexes SQLite sorts the whole filtered range
+  // on every 2s cache miss.
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_requests_created_duration ON server_stats_requests(created_at, duration)`
+  )
   await db.raw(
     `CREATE INDEX IF NOT EXISTS idx_ss_requests_status ON server_stats_requests(status_code)`
   )

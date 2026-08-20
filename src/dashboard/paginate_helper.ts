@@ -21,6 +21,14 @@ export function clampPerPage(value: number): number {
 }
 
 /**
+ * Rows the COUNT is allowed to scan. Filters include leading-wildcard LIKEs
+ * that no index can serve, so an uncapped COUNT walks the entire table twice
+ * per request (count + data). Past this many matches the exact total stops
+ * being interesting — the UI just needs "lots of pages".
+ */
+const COUNT_SCAN_CAP = 10_000
+
+/**
  * Execute a paginated query within a transaction.
  */
 export async function executePaginate(
@@ -29,25 +37,31 @@ export async function executePaginate(
 ): Promise<PaginatedResult<Record<string, unknown>>> {
   const perPage = clampPerPage(opts.perPage)
   return db.transaction(async (trx) => {
-    const countQuery = trx(opts.table)
-    if (opts.applyFilters) opts.applyFilters(countQuery)
-    const [{ count: totalRaw }] = await countQuery.count('* as count')
-    const total = Number(totalRaw)
+    const countSub = trx(opts.table).select(trx.raw('1')).limit(COUNT_SCAN_CAP)
+    if (opts.applyFilters) opts.applyFilters(countSub)
+    const countRows = (await trx.count('* as count').from(countSub.as('t'))) as {
+      count: unknown
+    }[]
+    const total = Number(countRows[0]?.count ?? 0)
 
-    const offset = (opts.page - 1) * perPage
-    const dataQuery = trx(opts.table)
-      .orderBy('created_at', 'desc')
-      .limit(perPage)
-      .offset(offset)
+    // Clamp the page into the real range: an arbitrary ?page= forces a
+    // full-scan-sized OFFSET on the single sqlite connection, blocking every
+    // other dashboard read for nothing.
+    const lastPage = Math.ceil(total / perPage)
+    const requested = Number.isFinite(Number(opts.page)) ? Math.trunc(Number(opts.page)) : 1
+    const page = clamp(requested, 1, Math.max(1, lastPage))
+
+    const offset = (page - 1) * perPage
+    const dataQuery = trx(opts.table).orderBy('created_at', 'desc').limit(perPage).offset(offset)
     if (opts.applyFilters) opts.applyFilters(dataQuery)
     const data = await dataQuery
 
     return {
       data,
       total,
-      page: opts.page,
+      page,
       perPage,
-      lastPage: Math.ceil(total / perPage),
+      lastPage,
     }
   })
 }
