@@ -13,6 +13,8 @@ Drop a single Edge tag into your layout and get a live stats bar showing CPU, me
 
 Zero frontend dependencies. Zero build step. Just `@serverStats()` and go.
 
+**Zero runtime dependencies.** Everything this package needs at runtime is either built into Node or an optional peer dependency you already chose to install (`@adonisjs/lucid`, `better-sqlite3`, ...). Nothing extra lands in your production `node_modules` supply chain.
+
 **New (alpha):** Native [React & Vue components](#react--vue-inertiajs--alpha) for Inertia.js apps — same features, framework-native.
 
 ![adonisjs-server-stats demo](https://raw.githubusercontent.com/simulieren/adonisjs-server-stats/main/screenshots/demo.gif)
