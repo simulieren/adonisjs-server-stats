@@ -6,6 +6,14 @@
  * - cached(): adds a TTL layer on top of coalesce so repeat
  *   requests within the window serve stale data instantly.
  */
+/**
+ * Hard cap on retained results. Keys embed user input (search terms, filters,
+ * pagination), so without a bound a dashboard viewer could grow the heap
+ * without limit by walking distinct queries. TTLs are 1-10s, so anything past
+ * a few hundred entries is expired garbage anyway.
+ */
+const MAX_RESULT_ENTRIES = 500
+
 export class CoalesceCache {
   private inflight = new Map<string, Promise<unknown>>()
   private resultCache = new Map<string, { data: unknown; expiresAt: number }>()
@@ -36,12 +44,28 @@ export class CoalesceCache {
 
     return this.coalesce(key, async () => {
       const result = await fn()
+      this.evictForSpace()
       this.resultCache.set(key, {
         data: result,
         expiresAt: Date.now() + ttlMs,
       })
       return result
     })
+  }
+
+  /** Drop expired entries on write; if still at the cap, drop oldest first. */
+  private evictForSpace(): void {
+    if (this.resultCache.size < MAX_RESULT_ENTRIES) return
+    const now = Date.now()
+    for (const [key, entry] of this.resultCache) {
+      if (entry.expiresAt <= now) this.resultCache.delete(key)
+    }
+    // Map iteration is insertion-ordered, so the front is the oldest.
+    while (this.resultCache.size >= MAX_RESULT_ENTRIES) {
+      const oldest = this.resultCache.keys().next().value
+      if (oldest === undefined) break
+      this.resultCache.delete(oldest)
+    }
   }
 
   /** Clear all cached results (does not affect in-flight requests). */

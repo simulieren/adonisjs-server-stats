@@ -138,3 +138,23 @@ test.group('CoalesceCache', () => {
     assert.equal(callCount, 2)
   })
 })
+
+test.group('CoalesceCache | bounded result cache', () => {
+  test('the result cache never exceeds its cap', async ({ assert }) => {
+    const cache = new CoalesceCache()
+    for (let i = 0; i < 700; i++) {
+      await cache.cached(`key-${i}`, 60_000, async () => i)
+    }
+    assert.isAtMost((cache as any).resultCache.size, 500)
+  })
+
+  test('eviction drops the oldest entries first', async ({ assert }) => {
+    const cache = new CoalesceCache()
+    for (let i = 0; i < 600; i++) {
+      await cache.cached(`key-${i}`, 60_000, async () => i)
+    }
+    const store = (cache as any).resultCache as Map<string, unknown>
+    assert.isFalse(store.has('key-0'))
+    assert.isTrue(store.has('key-599'))
+  })
+})
