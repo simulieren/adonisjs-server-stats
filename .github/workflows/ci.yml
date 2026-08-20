@@ -20,7 +20,10 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: npm
 
-      - run: npm ci
+      # --legacy-peer-deps: devDependencies deliberately pair @adonisjs/core v6
+      # with packages whose peers want v7 (the package supports both majors);
+      # strict peer resolution refuses that combination.
+      - run: npm ci --legacy-peer-deps
 
       - run: npm run typecheck
 
