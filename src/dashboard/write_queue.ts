@@ -7,6 +7,7 @@
  */
 
 import { round } from '../utils/math_helpers.js'
+import { yieldToEventLoop } from './migrator_tables.js'
 import { isSecretName, looksLikeCredentialValue, sqlMentionsSecret } from './sensitive_patterns.js'
 
 import type { EventRecord, EmailRecord } from '../debug/types.js'
@@ -279,6 +280,11 @@ export function buildEventRows(events: EventRecord[]): EventRow[] {
 
 /**
  * Insert rows into a table in batches of 50.
+ *
+ * Yields to the event loop between chunks: better-sqlite3 is fully
+ * synchronous, so without a real macrotask hop a large batch would execute
+ * back-to-back on microtask continuations and stall the host app — the exact
+ * failure mode `migrator_tables.ts` documents and guards against.
  */
 export async function batchInsert(
   trx: Knex.Transaction,
@@ -286,6 +292,7 @@ export async function batchInsert(
   rows: Record<string, unknown>[]
 ): Promise<void> {
   for (let i = 0; i < rows.length; i += 50) {
+    if (i > 0) await yieldToEventLoop()
     await trx(table).insert(rows.slice(i, i + 50))
   }
 }
@@ -337,7 +344,15 @@ export async function flushRequests(
   trx: Knex.Transaction,
   preparedRequests: PreparedRequest[]
 ): Promise<void> {
+  let sinceYield = 0
   for (const prepared of preparedRequests) {
+    // Up to ~4 synchronous statements per request; a full backlog is hundreds
+    // of them in one flush. Yield periodically so the host app's I/O keeps
+    // being serviced mid-flush (see batchInsert for why awaits alone don't).
+    if (++sinceYield >= 10) {
+      sinceYield = 0
+      await yieldToEventLoop()
+    }
     try {
       await insertOneRequest(trx, prepared)
     } catch (err) {
