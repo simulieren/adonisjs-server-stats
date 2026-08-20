@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { performance } from 'node:perf_hooks'
 
 import { getRequestMetrics } from '../collectors/http_collector.js'
+import { sanitizeUrlQuery } from '../dashboard/sensitive_patterns.js'
 import { log } from '../utils/logger.js'
 
 import type { TraceCollector } from '../debug/trace_collector.js'
@@ -116,15 +117,19 @@ function recordRequestCompletion(opts: {
 
   const reqId =
     typeof opts.ctx.request.id === 'function' ? String(opts.ctx.request.id()) : undefined
+  // Redact credential-bearing query params (reset tokens, signed URLs) before
+  // the URL enters any store — this is the single choke point for both the
+  // trace buffer and the persisted request row.
+  const storedUrl = sanitizeUrlQuery(opts.ctx.request.url(true))
   const traceRecord = traceCollector?.finishTrace(
     opts.ctx.request.method(),
-    opts.ctx.request.url(true),
+    storedUrl,
     opts.ctx.response.getStatus(),
     reqId
   )
   onRequestCompleteFn?.({
     method: opts.ctx.request.method(),
-    url: opts.ctx.request.url(true),
+    url: storedUrl,
     statusCode: opts.ctx.response.getStatus(),
     duration,
     trace: traceRecord ?? undefined,

@@ -1,11 +1,14 @@
 import { test } from '@japa/runner'
-import { sanitizeBindings } from '../src/dashboard/write_queue.js'
+
 import {
   isSecretName,
   isSensitiveConfigName,
   looksLikeCredentialValue,
+  sanitizeRecordValues,
+  sanitizeUrlQuery,
   sqlMentionsSecret,
 } from '../src/dashboard/sensitive_patterns.js'
+import { sanitizeBindings } from '../src/dashboard/write_queue.js'
 
 const REDACTED = '[redacted]'
 
@@ -241,10 +244,7 @@ test.group('sanitizeBindings — by value shape', () => {
 
 test.group('sanitizeBindings — structure', () => {
   test('named bindings use their own key', ({ assert }) => {
-    const result = sanitizeBindings(
-      { email: 'simon@example.com', password: 'hunter2' },
-      'select 1'
-    )
+    const result = sanitizeBindings({ email: 'simon@example.com', password: 'hunter2' }, 'select 1')
 
     assert.deepEqual(result, { email: 'simon@example.com', password: REDACTED })
   })
@@ -262,5 +262,49 @@ test.group('sanitizeBindings — structure', () => {
     )
 
     assert.deepEqual(result, { data: { a: REDACTED, b: REDACTED } })
+  })
+})
+
+test.group('sanitizeUrlQuery', () => {
+  test('redacts credential-bearing query params by name', ({ assert }) => {
+    assert.equal(
+      sanitizeUrlQuery('/reset-password?token=abc123&next=%2Fhome'),
+      '/reset-password?token=[redacted]&next=%2Fhome'
+    )
+    assert.equal(sanitizeUrlQuery('/verify?otp=123456'), '/verify?otp=[redacted]')
+    assert.equal(sanitizeUrlQuery('/cb?resetToken=xyz&page=2'), '/cb?resetToken=[redacted]&page=2')
+  })
+
+  test('redacts credential-shaped values under innocent names', ({ assert }) => {
+    assert.equal(
+      sanitizeUrlQuery('/files?sig=a3f5c8d9e1b2478a6c0d4e9f1a2b3c4d'),
+      '/files?sig=[redacted]'
+    )
+  })
+
+  test('leaves ordinary URLs untouched', ({ assert }) => {
+    assert.equal(sanitizeUrlQuery('/users?page=2&sort=name'), '/users?page=2&sort=name')
+    assert.equal(sanitizeUrlQuery('/users/42'), '/users/42')
+    assert.equal(sanitizeUrlQuery('/search?q=hello+world'), '/search?q=hello+world')
+  })
+})
+
+test.group('sanitizeRecordValues (log entries)', () => {
+  test('redacts secret-named keys without truncating long values', ({ assert }) => {
+    const stack = 'Error: boom\n    at handler '.padEnd(600, 'x')
+    const entry = {
+      msg: 'request failed',
+      req: { headers: { authorization: 'Bearer eyJx', cookie: 'sid=abc' } },
+      err: { stack },
+      password: 'hunter2',
+    }
+
+    const out = sanitizeRecordValues(entry) as Record<string, any>
+
+    assert.equal(out.password, '[redacted]')
+    assert.equal(out.req.headers.authorization, '[redacted]')
+    assert.equal(out.req.headers.cookie, '[redacted]')
+    assert.equal(out.msg, 'request failed')
+    assert.equal(out.err.stack, stack)
   })
 })

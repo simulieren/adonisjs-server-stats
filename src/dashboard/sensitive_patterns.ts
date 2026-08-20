@@ -39,6 +39,9 @@ export const SECRET_NAME_PATTERNS: RegExp[] = [
   new RegExp(`${B}credential${A}`, 'i'),
   new RegExp(`${B}private${A}`, 'i'),
   new RegExp(`${B}auth${A}`, 'i'),
+  // HTTP credential carriers — log records embed request headers
+  new RegExp(`${B}authorization${A}`, 'i'),
+  new RegExp(`${B}cookie${A}`, 'i'),
   // API keys: `api_key`, `apiKey`, `API_KEY`
   /api[_-]?key/i,
   // `_KEY` at end or `_KEY_` in middle (AWS_ACCESS_KEY_ID, ENCRYPTION_KEY, etc.)
@@ -184,13 +187,24 @@ const REDACTED_BINDING = '[redacted]'
  */
 export function sanitizeBindings(bindings: unknown, sqlText?: string): unknown {
   const redactAll = sqlText !== undefined && sqlMentionsSecret(sqlText)
-  return sanitizeBindingValue(bindings, redactAll)
+  return sanitizeBindingValue(bindings, redactAll, true)
 }
 
-function sanitizeBindingValue(value: unknown, redactAll: boolean): unknown {
-  if (Array.isArray(value)) return value.map((v) => sanitizeBindingValue(v, redactAll))
-  if (value !== null && typeof value === 'object') return sanitizeNamedBindings(value, redactAll)
-  if (typeof value === 'string') return sanitizeStringBinding(value, redactAll)
+/**
+ * Redact a structured record (a pino log entry, an event payload) with the
+ * same key/shape rules as bindings but WITHOUT length truncation — log data
+ * carries stack traces and payload context that must stay whole.
+ */
+export function sanitizeRecordValues(record: unknown): unknown {
+  return sanitizeBindingValue(record, false, false)
+}
+
+function sanitizeBindingValue(value: unknown, redactAll: boolean, truncate: boolean): unknown {
+  if (Array.isArray(value)) return value.map((v) => sanitizeBindingValue(v, redactAll, truncate))
+  if (value !== null && typeof value === 'object') {
+    return sanitizeNamedBindings(value, redactAll, truncate)
+  }
+  if (typeof value === 'string') return sanitizeStringBinding(value, redactAll, truncate)
   // A statement touching a secret column may bind it as a non-string — a numeric
   // OTP, for instance — so redact those too rather than only masking strings.
   // Booleans and null carry nothing worth hiding.
@@ -199,10 +213,14 @@ function sanitizeBindingValue(value: unknown, redactAll: boolean): unknown {
 }
 
 /** Named bindings carry their own key, so use it when it is telling. */
-function sanitizeNamedBindings(value: object, redactAll: boolean): Record<string, unknown> {
+function sanitizeNamedBindings(
+  value: object,
+  redactAll: boolean,
+  truncate: boolean
+): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-    out[key] = sanitizeBindingValue(nested, redactAll || isSecretName(key))
+    out[key] = sanitizeBindingValue(nested, redactAll || isSecretName(key), truncate)
   }
   return out
 }
@@ -210,10 +228,49 @@ function sanitizeNamedBindings(value: object, redactAll: boolean): Record<string
 /** Matches a value this module already truncated, so a second pass is a no-op. */
 const TRUNCATION_MARKER_RE = /…\[truncated \d+ chars\]$/
 
-function sanitizeStringBinding(value: string, redactAll: boolean): string {
+function sanitizeStringBinding(value: string, redactAll: boolean, truncate: boolean): string {
   if (redactAll || looksLikeCredentialValue(value)) return REDACTED_BINDING
-  if (value.length > MAX_BINDING_LEN && !TRUNCATION_MARKER_RE.test(value)) {
+  if (truncate && value.length > MAX_BINDING_LEN && !TRUNCATION_MARKER_RE.test(value)) {
     return value.slice(0, MAX_BINDING_LEN) + `…[truncated ${value.length} chars]`
   }
   return value
+}
+
+// ---------------------------------------------------------------------------
+// URL hygiene
+// ---------------------------------------------------------------------------
+
+/**
+ * Redact credential-bearing query parameters from a URL before it is stored.
+ *
+ * Request URLs are persisted with their query strings (useful for debugging
+ * pagination and filters), but a `?token=…` password-reset link or a
+ * `?signature=…` signed URL must not land in SQLite in the clear. Parameters
+ * are redacted by name (see {@link isSecretName}) or when the value itself
+ * looks like a credential; everything else passes through untouched.
+ */
+export function sanitizeUrlQuery(url: string): string {
+  const qIdx = url.indexOf('?')
+  if (qIdx === -1) return url
+  const sanitized = url
+    .slice(qIdx + 1)
+    .split('&')
+    .map((pair) => {
+      if (pair === '') return pair
+      const eq = pair.indexOf('=')
+      const name = eq === -1 ? pair : pair.slice(0, eq)
+      const rawValue = eq === -1 ? '' : pair.slice(eq + 1)
+      let value = rawValue
+      try {
+        value = decodeURIComponent(rawValue)
+      } catch {
+        // Malformed escape — judge the raw text instead.
+      }
+      if (isSecretName(name) || (value !== '' && looksLikeCredentialValue(value))) {
+        return `${name}=[redacted]`
+      }
+      return pair
+    })
+    .join('&')
+  return url.slice(0, qIdx) + '?' + sanitized
 }

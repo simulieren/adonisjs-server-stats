@@ -8,7 +8,7 @@
 
 import { round } from '../utils/math_helpers.js'
 import { yieldToEventLoop } from './migrator_tables.js'
-import { sanitizeBindings } from './sensitive_patterns.js'
+import { sanitizeBindings, sanitizeRecordValues } from './sensitive_patterns.js'
 
 import type { EventRecord, EmailRecord } from '../debug/types.js'
 import type { PersistRequestInput } from './dashboard_types.js'
@@ -167,6 +167,13 @@ export function prepareRequestRows(requests: PersistRequestInput[]): PreparedReq
 
 /**
  * Transform raw log entries into SQLite-ready row objects.
+ *
+ * The full pino record lands in `data`, and log lines routinely carry bound
+ * request context — authorization headers, cookies, tokens in payloads — so
+ * the record is run through the shared redaction rules (secret-named keys and
+ * credential-shaped values) before it is stringified. The `message` column is
+ * kept verbatim: it is free text, and the shape rules are anchored to whole
+ * values, so prose stays readable.
  */
 export function prepareLogRows(logs: Record<string, unknown>[]): PreparedLog[] {
   return logs.map((entry) => {
@@ -179,7 +186,7 @@ export function prepareLogRows(logs: Record<string, unknown>[]): PreparedLog[] {
         entry.request_id || entry.requestId || entry['x-request-id']
           ? String(entry.request_id || entry.requestId || entry['x-request-id'])
           : null,
-      data: JSON.stringify(entry),
+      data: JSON.stringify(sanitizeRecordValues(entry)),
     }
   })
 }
