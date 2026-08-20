@@ -11,7 +11,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: [20, 22, 24]
+        # @japa/runner 5 imports glob from node:fs/promises (Node 22+), so the
+        # test toolchain cannot run on Node 20. The published package still
+        # supports engines >=18 — only the dev/test tooling needs 22+.
+        node-version: [22, 24]
     steps:
       - uses: actions/checkout@v4
 
