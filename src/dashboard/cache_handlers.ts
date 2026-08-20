@@ -4,19 +4,24 @@ import type { InspectorManager } from './inspector_manager.js'
 import type { HttpContext } from '@adonisjs/core/http'
 
 /**
- * Optional allow-list prefix for single-key cache operations (get/delete).
- * Restricts which Redis keys the dashboard may read or delete so an attacker
- * can't target arbitrary keys (sessions, rate-limit counters). Empty/unset
- * means unrestricted (back-compat default for local dev).
+ * Access policy for cache operations, resolved by the controller from
+ * `advanced.cacheKeyPrefix` (or the SERVER_STATS_CACHE_KEY_PREFIX env var).
+ *
+ * The prefix restricts which Redis keys the dashboard may list, read, or
+ * delete so a dashboard viewer can't target arbitrary keys (sessions,
+ * rate-limit counters). Empty/unset stays unrestricted in dev for
+ * back-compat, but fails closed in production: single-key reads and deletes
+ * on a shared production Redis need a deliberate scope, not a default.
  */
-function getCacheKeyPrefix(): string {
-  return (process.env.SERVER_STATS_CACHE_KEY_PREFIX ?? '').trim()
+export interface CacheAccessPolicy {
+  prefix: string
+  inProduction: boolean
 }
 
-/** Check whether a cache key is permitted under the configured prefix. */
-function isKeyAllowed(key: string): boolean {
-  const prefix = getCacheKeyPrefix()
-  return prefix === '' || key.startsWith(prefix)
+/** Check whether a cache key is permitted under the policy. */
+function isKeyAllowed(key: string, policy: CacheAccessPolicy): boolean {
+  if (policy.prefix !== '') return key.startsWith(policy.prefix)
+  return !policy.inProduction
 }
 
 /**
@@ -24,13 +29,17 @@ function isKeyAllowed(key: string): boolean {
  */
 export async function handleCacheStats(
   inspectors: InspectorManager,
-  { request, response }: HttpContext
+  { request, response }: HttpContext,
+  policy: CacheAccessPolicy
 ) {
   const inspector = await inspectors.getCacheInspector()
   if (!inspector) return response.json({ available: false, stats: null, keys: [] })
 
   const qs = request.qs()
-  const pattern = qs.search || qs.pattern ? `*${qs.search || qs.pattern}*` : '*'
+  // A configured prefix scopes the listing glob the same way it scopes
+  // single-key access, so keys outside the allow-list are never enumerated.
+  const search = qs.search || qs.pattern ? `*${qs.search || qs.pattern}*` : '*'
+  const pattern = policy.prefix !== '' ? `${policy.prefix}${search}` : search
 
   try {
     const [stats, keyList] = await Promise.all([
@@ -48,13 +57,14 @@ export async function handleCacheStats(
  */
 export async function handleCacheKey(
   inspectors: InspectorManager,
-  { params, response }: HttpContext
+  { params, response }: HttpContext,
+  policy: CacheAccessPolicy
 ) {
   const inspector = await inspectors.getCacheInspector()
   if (!inspector) return response.notFound({ error: 'Cache not available' })
 
   const key = decodeURIComponent(params.key)
-  if (!isKeyAllowed(key)) return response.forbidden({ error: 'Cache key not permitted' })
+  if (!isKeyAllowed(key, policy)) return response.forbidden({ error: 'Cache key not permitted' })
 
   try {
     const detail = await inspector.getKey(key)
@@ -69,13 +79,14 @@ export async function handleCacheKey(
  */
 export async function handleCacheKeyDelete(
   inspectors: InspectorManager,
-  { params, response }: HttpContext
+  { params, response }: HttpContext,
+  policy: CacheAccessPolicy
 ) {
   const inspector = await inspectors.getCacheInspector()
   if (!inspector) return response.notFound({ error: 'Cache not available' })
 
   const key = decodeURIComponent(params.key)
-  if (!isKeyAllowed(key)) return response.forbidden({ error: 'Cache key not permitted' })
+  if (!isKeyAllowed(key, policy)) return response.forbidden({ error: 'Cache key not permitted' })
 
   try {
     return (await inspector.deleteKey(key))

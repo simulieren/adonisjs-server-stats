@@ -744,6 +744,19 @@ export interface AdvancedConfig {
   maxTraces?: number
 
   /**
+   * Allow-list prefix for the dashboard's cache inspector.
+   *
+   * Scopes which Redis keys the Cache tab may list, read, and delete
+   * (e.g. `'myapp:cache:'`). Unset keeps full access in development for
+   * back-compat, but in production single-key reads and deletes are
+   * refused until a prefix is configured — a production dashboard must
+   * not be able to read session keys or delete rate-limit counters.
+   *
+   * The `SERVER_STATS_CACHE_KEY_PREFIX` env var is used as a fallback.
+   */
+  cacheKeyPrefix?: string
+
+  /**
    * Redis pub/sub channel for the cross-process email bridge.
    *
    * Queue workers publish captured mail on this channel and the web

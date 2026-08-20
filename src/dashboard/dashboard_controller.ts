@@ -25,6 +25,7 @@ import { handleJobs, handleJobDetail, handleJobRetry } from './jobs_handlers.js'
 import { handleQueryExplain } from './query_explain_handler.js'
 
 import type { DevToolbarOptions, ResolvedServerStatsConfig } from '../types.js'
+import type { CacheAccessPolicy } from './cache_handlers.js'
 import type { DashboardStore } from './dashboard_store.js'
 import type { ChartBucket } from './format_helpers.js'
 import type { HttpContext } from '@adonisjs/core/http'
@@ -163,16 +164,23 @@ export default class DashboardController {
     return handleQueryExplain(this.dashboardStore, this.app, ctx)
   }
 
+  private cachePolicy(): CacheAccessPolicy {
+    const config = this.app.config.get<ResolvedServerStatsConfig>('server_stats')
+    const prefix =
+      config?.advanced?.cacheKeyPrefix ?? process.env.SERVER_STATS_CACHE_KEY_PREFIX ?? ''
+    return { prefix: prefix.trim(), inProduction: this.app.inProduction }
+  }
+
   async cacheStats(ctx: HttpContext) {
-    return handleCacheStats(this.inspectors, ctx)
+    return handleCacheStats(this.inspectors, ctx, this.cachePolicy())
   }
 
   async cacheKey(ctx: HttpContext) {
-    return handleCacheKey(this.inspectors, ctx)
+    return handleCacheKey(this.inspectors, ctx, this.cachePolicy())
   }
 
   async cacheKeyDelete(ctx: HttpContext) {
-    return handleCacheKeyDelete(this.inspectors, ctx)
+    return handleCacheKeyDelete(this.inspectors, ctx, this.cachePolicy())
   }
 
   async jobs(ctx: HttpContext) {
