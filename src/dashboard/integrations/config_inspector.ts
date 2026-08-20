@@ -132,7 +132,7 @@ function sanitizeValue(key: string, value: unknown, seen: WeakSet<object>): unkn
     return redact(value)
   }
   if (typeof value === 'object' && value !== null) {
-    return sanitizeObject(value, seen)
+    return sanitizeObject(value, seen, key)
   }
   return value
 }
@@ -141,14 +141,17 @@ function sanitizeValue(key: string, value: unknown, seen: WeakSet<object>): unkn
  * Recursively sanitize an object, redacting string values whose keys
  * match sensitive patterns. Booleans and numbers are never redacted.
  */
-function sanitizeObject(obj: unknown, seen = new WeakSet<object>()): unknown {
+function sanitizeObject(obj: unknown, seen = new WeakSet<object>(), parentKey = ''): unknown {
   if (obj === null || obj === undefined) return obj
   if (typeof obj !== 'object') return obj
   if (seen.has(obj)) return '[Circular]'
   seen.add(obj)
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => sanitizeObject(item, seen))
+    // Route items through sanitizeValue (under the array's own key) so string
+    // elements get the value-shape checks — previously a credential inside an
+    // array survived because sanitizeObject passes primitives through.
+    return obj.map((item) => sanitizeValue(parentKey, item, seen))
   }
 
   const record = obj as Record<string, unknown>

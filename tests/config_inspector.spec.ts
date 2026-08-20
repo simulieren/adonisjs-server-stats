@@ -1,6 +1,8 @@
 import { test } from '@japa/runner'
-import type { ApplicationService } from '@adonisjs/core/types'
+
 import { ConfigInspector } from '../src/dashboard/integrations/config_inspector.js'
+
+import type { ApplicationService } from '@adonisjs/core/types'
 
 // ---------------------------------------------------------------------------
 // Mock helpers
@@ -168,10 +170,7 @@ test.group('ConfigInspector - env', (group) => {
     const keys = Object.keys(result.env)
     const testSubset = keys.filter((k) => k.startsWith('TEST_CI_'))
 
-    assert.deepEqual(
-      testSubset,
-      [...testSubset].sort()
-    )
+    assert.deepEqual(testSubset, [...testSubset].sort())
   })
 
   test('redacts sensitive env vars', ({ assert }) => {
@@ -261,5 +260,36 @@ test.group('ConfigInspector - caching', () => {
     // Call getConfig again — should still be cached
     inspector.getConfig()
     assert.equal(app.getCallCount(), 1)
+  })
+})
+
+test.group('ConfigInspector - camelCase and array coverage', () => {
+  test('redacts camelCase secret keys (the AdonisJS config convention)', ({ assert }) => {
+    const app = createMockApp({
+      auth: { jwtSecret: 'super-secret', clientSecret: 'oauth-secret' },
+      session: { sessionSecret: 'cookie-secret' },
+      appName: 'MyApp',
+    })
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
+    const result = inspector.getConfig()
+
+    const auth = result.config.auth as Record<string, unknown>
+    const session = result.config.session as Record<string, unknown>
+    assert.deepEqual(auth.jwtSecret, { __redacted: true, display: '••••••••' })
+    assert.deepEqual(auth.clientSecret, { __redacted: true, display: '••••••••' })
+    assert.deepEqual(session.sessionSecret, { __redacted: true, display: '••••••••' })
+    assert.equal(result.config.appName, 'MyApp')
+  })
+
+  test('redacts credential-shaped values inside arrays', ({ assert }) => {
+    const app = createMockApp({
+      myapi: { keys: ['sk' + '_live_51H8xQ2LpV4tYw7Ez', 'plain-label'] },
+    })
+    const inspector = new ConfigInspector(app as unknown as ApplicationService)
+    const result = inspector.getConfig()
+
+    const keys = (result.config.myapi as Record<string, unknown>).keys as unknown[]
+    assert.deepEqual(keys[0], { __redacted: true, display: '••••••••' })
+    assert.equal(keys[1], 'plain-label')
   })
 })
