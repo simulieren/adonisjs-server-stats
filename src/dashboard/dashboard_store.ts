@@ -5,7 +5,6 @@ import { log } from '../utils/logger.js'
 import { ChartAggregator } from './chart_aggregator.js'
 import { CoalesceCache } from './coalesce_cache.js'
 import { buildEmailRecordFromEvent } from './email_event_builder.js'
-import { executeExplain } from './explain_query.js'
 import { FlushManager } from './flush_manager.js'
 import { createKnexConnection, applyPragmas } from './knex_factory.js'
 import { autoMigrate, runRetentionCleanup } from './migrator.js'
@@ -314,11 +313,6 @@ export class DashboardStore {
 
   async deleteSavedFilter(id: number): Promise<boolean> {
     return this.db ? removeSavedFilter(this.db, id) : false
-  }
-
-  async runExplain(queryId: number, appDb: unknown): Promise<Record<string, unknown> | null> {
-    if (!this.db) return { error: 'Dashboard store not initialized' }
-    return executeExplain(this.db, this.cache, queryId, appDb)
   }
 
   private wireEventListeners(): void {

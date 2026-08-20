@@ -151,26 +151,3 @@ export function formatGroupedQuery(g: Record<string, unknown>, totalTime: number
     percentOfTotal: totalTime > 0 ? round(((g.total_duration as number) / totalTime) * 100) : 0,
   }
 }
-
-/** Run EXPLAIN on a query, returning the plan. */
-export async function runExplain(
-  appDb: { raw: (sql: string, bindings: unknown[]) => Promise<Record<string, unknown>> },
-  query: Record<string, unknown>
-) {
-  let bindings: unknown[] = []
-  if (query.bindings) {
-    try {
-      bindings = JSON.parse(query.bindings as string)
-    } catch {
-      /* skip */
-    }
-  }
-  const explainResult = await appDb.raw(`EXPLAIN (FORMAT JSON) ${query.sql_text}`, bindings)
-  const rawRows =
-    (explainResult?.rows as Record<string, unknown>[]) ??
-    (Array.isArray(explainResult) ? explainResult : [])
-  if (rawRows.length > 0 && rawRows[0]['QUERY PLAN']) {
-    return rawRows[0]['QUERY PLAN'] as unknown[]
-  }
-  return rawRows
-}
