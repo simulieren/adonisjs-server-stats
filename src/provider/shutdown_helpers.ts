@@ -7,8 +7,9 @@ import {
   setDashboardPath,
   setExcludedPrefixes,
 } from '../middleware/request_tracking_middleware.js'
-import { unhookPinoFromLogStream } from './provider_helpers_extra.js'
 import { log } from '../utils/logger.js'
+import { resetDashRequestPipe } from './dashboard_init.js'
+import { unhookPinoFromLogStream } from './provider_helpers_extra.js'
 
 /** Timer references that need to be cleared on shutdown. */
 export interface TimerRefs {
@@ -100,6 +101,7 @@ export async function cleanupResources(deps: {
   deps.dashboardLogStream?.stop()
   unhookPinoFromLogStream()
   setOnRequestComplete(null)
+  resetDashRequestPipe()
   setDashboardPath(null)
   setExcludedPrefixes([])
   await deps.dashboardStore?.stop()

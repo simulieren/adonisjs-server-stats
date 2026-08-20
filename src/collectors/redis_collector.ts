@@ -3,9 +3,12 @@ import { log, dim, bold } from '../utils/logger.js'
 
 import type { MetricCollector } from './collector.js'
 
-let warnedNotInstalled = false
-let warnedPingFailed = false
-let warnedConnectionError = false
+/** Warn-once state, per collector instance (see redisCollector). */
+interface WarnedState {
+  notInstalled: boolean
+  pingFailed: boolean
+  connectionError: boolean
+}
 
 /** Default metrics returned when Redis is unavailable. */
 const REDIS_DEFAULTS = {
@@ -54,15 +57,15 @@ export function computeRedisMetrics(
 }
 
 /** Import Redis service, returning null if unavailable. */
-async function importRedis() {
+async function importRedis(warned: WarnedState) {
   try {
     const mod = await appImport<typeof import('@adonisjs/redis/services/main')>(
       '@adonisjs/redis/services/main'
     )
     return mod.default
   } catch {
-    if (!warnedNotInstalled) {
-      warnedNotInstalled = true
+    if (!warned.notInstalled) {
+      warned.notInstalled = true
       log.block(`Redis collector ${bold('skipped')} — @adonisjs/redis is not installed`, [
         dim('Redis metrics will return defaults until the package is added.'),
         `Run ${bold('node ace add @adonisjs/redis')} to install it.`,
@@ -73,9 +76,9 @@ async function importRedis() {
 }
 
 /** Warn once when PING fails. */
-function warnPingFailed(pong: unknown): void {
-  if (warnedPingFailed) return
-  warnedPingFailed = true
+function warnPingFailed(warned: WarnedState, pong: unknown): void {
+  if (warned.pingFailed) return
+  warned.pingFailed = true
   log.block(
     `Redis collector ${bold('unhealthy')} — PING returned ${bold(String(pong))} instead of PONG`,
     [
@@ -91,6 +94,9 @@ function warnPingFailed(pong: unknown): void {
  * **Peer dependencies:** `@adonisjs/redis`
  */
 export function redisCollector(): MetricCollector {
+  // Closure-scoped like db_pool_collector's flags — module-level state would
+  // let the first instance's warnings suppress every later instance's.
+  const warned: WarnedState = { notInstalled: false, pingFailed: false, connectionError: false }
   return {
     name: 'redis',
     label: 'redis — memory, clients, keys, hit rate',
@@ -100,13 +106,13 @@ export function redisCollector(): MetricCollector {
     },
 
     async collect() {
-      const redis = await importRedis()
+      const redis = await importRedis(warned)
       if (!redis) return REDIS_DEFAULTS
 
       try {
         const pong = await redis.ping()
         if (pong !== 'PONG') {
-          warnPingFailed(pong)
+          warnPingFailed(warned, pong)
           return REDIS_DEFAULTS
         }
 
@@ -118,8 +124,8 @@ export function redisCollector(): MetricCollector {
 
         return computeRedisMetrics(parseRedisInfo(memoryInfo), parseRedisInfo(statsInfo), dbSize)
       } catch (error) {
-        if (!warnedConnectionError) {
-          warnedConnectionError = true
+        if (!warned.connectionError) {
+          warned.connectionError = true
           const message = error instanceof Error ? error.message : String(error)
           log.block(`Redis collector ${bold('error')} — failed to communicate with Redis`, [
             dim(message),

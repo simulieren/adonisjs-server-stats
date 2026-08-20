@@ -26,6 +26,15 @@ export function markWarned(path: string): void {
   warnedWritePaths.add(path)
 }
 
+/**
+ * Forget which write paths have warned. Called when a DashboardStore stops so
+ * a re-initialized store in the same process warns afresh instead of
+ * inheriting a spent latch from its predecessor.
+ */
+export function resetWriteWarnings(): void {
+  warnedWritePaths.clear()
+}
+
 // ---------------------------------------------------------------------------
 // SQL normalization
 // ---------------------------------------------------------------------------

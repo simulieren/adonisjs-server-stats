@@ -167,6 +167,17 @@ function pipeDashLogs(
  */
 let dashRequestPipeInstalled = false
 
+/**
+ * Forget the installed request pipe. Must be called on shutdown: the handler
+ * slot is nulled there via `setOnRequestComplete(null)`, and without this
+ * reset a later re-init in the same process (test harness, programmatic
+ * restart) would see the flag, decline to reinstall, and leave dashboard
+ * persistence silently dead for the rest of the process's life.
+ */
+export function resetDashRequestPipe(): void {
+  dashRequestPipeInstalled = false
+}
+
 function pipeDashRequests(debugStore: DebugStore, dashboardStore: DashboardStore): void {
   if (dashRequestPipeInstalled) {
     log.warn(

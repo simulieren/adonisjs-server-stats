@@ -22,6 +22,7 @@ export class FlushManager {
   pendingEmails: EmailRecord[] = []
   private flushTimer: ReturnType<typeof setTimeout> | null = null
   private flushing = false
+  private stopped = false
   private inFlight: Promise<void> | null = null
   private db: () => Knex | null
 
@@ -51,6 +52,10 @@ export class FlushManager {
   }
 
   async stop(): Promise<void> {
+    // Block rescheduling first: an in-flight runFlush ends with a
+    // scheduleFlush() that would otherwise create a fresh, untracked timer
+    // after the clearTimeout below — outliving this "clean" shutdown.
+    this.stopped = true
     if (this.flushTimer) {
       clearTimeout(this.flushTimer)
       this.flushTimer = null
@@ -66,7 +71,7 @@ export class FlushManager {
   }
 
   private scheduleFlush(): void {
-    if (this.flushTimer) return
+    if (this.stopped || this.flushTimer) return
     this.flushTimer = setTimeout(() => {
       this.flushTimer = null
       this.flush().catch((err) => {

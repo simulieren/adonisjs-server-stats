@@ -29,6 +29,7 @@ import {
 } from './read_queries.js'
 import { fetchSavedFilters, insertSavedFilter, removeSavedFilter } from './saved_filter_queries.js'
 import { fetchStorageStats } from './storage_stats.js'
+import { resetWriteWarnings } from './write_queue.js'
 
 import type { DevToolbarConfig, EmailRecord } from '../debug/types.js'
 import type { StorageStatsResult } from './storage_stats.js'
@@ -130,6 +131,7 @@ export class DashboardStore {
 
   async stop(): Promise<void> {
     await this.flushMgr.stop()
+    resetWriteWarnings()
     if (this.retentionTimer) {
       clearInterval(this.retentionTimer)
       this.retentionTimer = null

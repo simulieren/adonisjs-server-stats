@@ -33,11 +33,16 @@ interface TraceContext {
 const globalRef: { current: TraceCollector | null } = { current: null }
 
 /**
- * Tracks whether console.warn is currently patched by a TraceCollector, so a
- * second instance (or a skipped stop()) cannot double-wrap it and leak the
- * patch permanently.
+ * Tracks which TraceCollector currently owns the console.warn patch, so a
+ * second instance cannot double-wrap it and leak the patch permanently. The
+ * owner (not a boolean) matters: if a prior instance never ran stop(), its
+ * wrapper checks the *old* AsyncLocalStorage and silently stops attaching
+ * warnings to traces — a newcomer must be able to detect that and take over.
  */
-const consoleWarnPatch: { active: boolean } = { active: false }
+const consoleWarnPatch: { owner: TraceCollector | null; original: typeof console.warn | null } = {
+  owner: null,
+  original: null,
+}
 
 /**
  * Wrap an async function in a traced span.
@@ -200,12 +205,18 @@ export class TraceCollector {
       emitter.on('db:query', this.dbHandler as (...args: unknown[]) => void)
     }
 
-    // Intercept console.warn to capture warnings per-request. Guard against
-    // double-wrapping: if another instance (or a prior start() without a
-    // matching stop()) already patched console.warn, don't wrap it again —
-    // that would capture the patched fn as the "original" and leak the patch.
-    if (!consoleWarnPatch.active) {
-      consoleWarnPatch.active = true
+    // Intercept console.warn to capture warnings per-request. If a prior
+    // instance still owns the patch (its stop() was skipped), restore its
+    // original first and take over — deferring to the stale owner would leave
+    // a wrapper bound to a dead AsyncLocalStorage, silently detaching
+    // warnings from every trace. Never wrap the wrapper: the restore below
+    // guarantees `console.warn` is the real one before we capture it.
+    if (consoleWarnPatch.owner !== this) {
+      if (consoleWarnPatch.owner && consoleWarnPatch.original) {
+        console.warn = consoleWarnPatch.original
+      }
+      consoleWarnPatch.owner = this
+      consoleWarnPatch.original = console.warn
       this.originalConsoleWarn = console.warn
       console.warn = (...args: unknown[]) => {
         const ctx = this.als.getStore()
@@ -222,10 +233,12 @@ export class TraceCollector {
     if (this.emitter && this.dbHandler) {
       this.emitter.off('db:query', this.dbHandler as (...args: unknown[]) => void)
     }
-    // Only restore console.warn if this instance was the one that patched it.
-    if (this.originalConsoleWarn) {
+    // Only restore console.warn if this instance still owns the patch — a
+    // newer instance may have taken over, and restoring would clobber it.
+    if (consoleWarnPatch.owner === this && this.originalConsoleWarn) {
       console.warn = this.originalConsoleWarn
-      consoleWarnPatch.active = false
+      consoleWarnPatch.owner = null
+      consoleWarnPatch.original = null
     }
     this.dbHandler = null
     this.emitter = null
