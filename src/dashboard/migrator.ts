@@ -79,7 +79,11 @@ export async function runRetentionCleanup(db: Knex, retentionDays: number): Prom
     await batchDelete(db, 'server_stats_metrics', cutoff)
     await yieldToEventLoop()
 
-    // Reclaim space and update query planner statistics
+    // Return deleted pages to the OS — PRAGMA optimize alone only updates
+    // planner stats, leaving the file at its high-water mark forever.
+    await reclaimFreeSpace(db)
+
+    // Update query planner statistics
     await db.raw('PRAGMA optimize')
   } catch (err) {
     // Log but don't throw — retention cleanup failure shouldn't block init
@@ -100,11 +104,78 @@ async function batchDelete(db: Knex, table: string, cutoff: string): Promise<voi
     await db.raw(
       `DELETE FROM ${table} WHERE rowid IN (SELECT rowid FROM ${table} WHERE created_at < ${cutoff} LIMIT 1000)`
     )
-    const remaining = await db.raw(
-      `SELECT COUNT(*) as cnt FROM ${table} WHERE created_at < ${cutoff} LIMIT 1`
-    )
-    const cnt = (remaining as unknown as Array<{ cnt: number }>)?.[0]?.cnt ?? 0
-    hasMore = cnt > 0
+    // changes() reports the last DELETE's row count on this connection
+    // (pool is min:1/max:1). Re-counting the remaining backlog here instead
+    // made total work quadratic in backlog size.
+    const deleted = await pragmaNumber(db, 'SELECT changes() AS n')
+    hasMore = deleted === 1000
     if (hasMore) await yieldToEventLoop()
   }
+}
+
+/**
+ * Return freelist pages to the OS after a cleanup pass.
+ *
+ * Databases created with `auto_vacuum=INCREMENTAL` are trimmed in bounded
+ * chunks so each synchronous step stays short. Legacy databases (created
+ * before the pragma existed) can't be trimmed incrementally, so when dead
+ * pages exceed ~30% of the file a one-time VACUUM rewrites it — which also
+ * converts it to incremental mode, since `auto_vacuum=INCREMENTAL` is set
+ * on this connection.
+ */
+async function reclaimFreeSpace(db: Knex): Promise<void> {
+  const mode = await pragmaNumber(db, 'PRAGMA auto_vacuum')
+
+  if (mode === 2) {
+    // Chunks of ~2000 pages (~8 MB at the 4 KB default) keep each synchronous
+    // call short; guard bounds one pass at ~8 GB in case freelist_count
+    // misbehaves.
+    let guard = 1000
+    while (guard-- > 0) {
+      const freelist = await pragmaNumber(db, 'PRAGMA freelist_count')
+      if (freelist <= 0) break
+      if (!(await incrementalVacuumChunk(db))) break
+      await yieldToEventLoop()
+    }
+    return
+  }
+
+  const pageCount = await pragmaNumber(db, 'PRAGMA page_count')
+  const freelistCount = await pragmaNumber(db, 'PRAGMA freelist_count')
+  if (pageCount > 0 && freelistCount / pageCount > 0.3) {
+    const { log } = await import('../utils/logger.js')
+    log.info(
+      `dashboard: reclaiming ${freelistCount} of ${pageCount} pages via one-time VACUUM (may pause briefly)`
+    )
+    await db.raw('VACUUM')
+    log.info('dashboard: VACUUM complete — database converted to incremental auto-vacuum')
+  }
+}
+
+/**
+ * Free up to 2000 freelist pages. incremental_vacuum frees ONE page per
+ * sqlite3_step, and knex's raw() steps no-result pragmas exactly once — so
+ * it must run on the underlying better-sqlite3 handle, whose .pragma()
+ * steps to completion. Returns false if the handle has no pragma method.
+ */
+async function incrementalVacuumChunk(db: Knex): Promise<boolean> {
+  const client = db.client as unknown as {
+    acquireConnection: () => Promise<unknown>
+    releaseConnection: (conn: unknown) => void
+  }
+  const conn = (await client.acquireConnection()) as { pragma?: (stmt: string) => unknown }
+  try {
+    if (typeof conn.pragma !== 'function') return false
+    conn.pragma('incremental_vacuum(2000)')
+    return true
+  } finally {
+    client.releaseConnection(conn)
+  }
+}
+
+/** Run a single-row/single-column statement and return its value as a number. */
+async function pragmaNumber(db: Knex, statement: string): Promise<number> {
+  const rows = (await db.raw(statement)) as unknown as Array<Record<string, unknown>>
+  const value = Object.values(rows?.[0] ?? {})[0]
+  return Number(value ?? 0)
 }

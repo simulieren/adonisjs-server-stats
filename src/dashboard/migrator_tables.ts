@@ -97,6 +97,12 @@ export async function migrateEvents(db: Knex): Promise<void> {
     `CREATE INDEX IF NOT EXISTS idx_ss_events_created ON server_stats_events(created_at)`
   )
   await db.raw(`CREATE INDEX IF NOT EXISTS idx_ss_events_name ON server_stats_events(event_name)`)
+  // Without this index every cascaded delete from server_stats_requests
+  // full-scans the events table (synchronously, on the host event loop) —
+  // the other FK children (queries, traces, logs) all have one.
+  await db.raw(
+    `CREATE INDEX IF NOT EXISTS idx_ss_events_request ON server_stats_events(request_id)`
+  )
 }
 
 export async function migrateEmails(db: Knex): Promise<void> {

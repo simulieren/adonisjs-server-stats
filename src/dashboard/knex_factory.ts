@@ -13,7 +13,14 @@ import type { Knex } from 'knex'
 // PRAGMA constants
 // ---------------------------------------------------------------------------
 
+// auto_vacuum must come FIRST: it only takes effect on a database whose
+// header hasn't been written yet, and even `journal_mode=WAL` initializes
+// the header. On existing databases it only takes effect after a VACUUM
+// (which runRetentionCleanup performs, guarded, when the file is mostly
+// dead pages). Incremental mode lets retention cleanup return deleted
+// pages to the OS in small chunks instead of growing the file forever.
 export const SQLITE_PRAGMAS = [
+  'auto_vacuum=INCREMENTAL',
   'journal_mode=WAL',
   'foreign_keys=ON',
   'synchronous=NORMAL',
@@ -23,6 +30,7 @@ export const SQLITE_PRAGMAS = [
 ]
 
 const PRAGMA_STATEMENTS_FOR_POOL = [
+  'auto_vacuum = INCREMENTAL',
   'journal_mode = WAL',
   'foreign_keys = ON',
   'synchronous = NORMAL',
