@@ -4,6 +4,26 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.1] - 2026-08-29
+
+One bug fix (with two amplifying defects fixed alongside it), no API changes.
+
+### Bug Fixes
+
+- **Retention cleanup no longer blocks the host event loop indefinitely** ([#14](https://github.com/simulieren/adonisjs-server-stats/issues/14)). `server_stats_events.request_id` had an `ON DELETE CASCADE` foreign key but **no index** — the one FK child that was missed (`queries`, `traces`, and `logs` all have one). Every request deleted by retention cleanup triggered a full scan of the events table, synchronously, inside better-sqlite3. On a week-old dev database (147k events, ~10k expired requests) that meant ~1.5 billion row visits on the event loop: HTTP stopped responding, CPU pegged at 100%, and SIGTERM could not even be processed. Because the cleanup runs 30 seconds after every boot, it presented as "the app randomly stopped working today". `migrateEvents` now creates `idx_ss_events_request`; `autoMigrate` runs on every boot, so existing installs get the index automatically.
+
+  Two defects amplified the hang and are fixed alongside it:
+
+  - **`batchDelete` was O(n²) in backlog size.** After each 1,000-row batch it re-counted the entire remaining backlog with a ranged `COUNT(*)`. It now reads `SELECT changes()` from the delete itself, making total work linear.
+  - **Deleted pages were never returned to the OS.** The cleanup ended with `PRAGMA optimize`, which only updates planner statistics, so the database file stayed at its high-water mark forever (1.9 GB in the report). New databases are now created with `auto_vacuum=INCREMENTAL` and each cleanup drains the freelist in ~8 MB chunks, yielding to the event loop between chunks. Existing databases can't switch modes in place, so when more than ~30% of the file is dead pages the cleanup runs a guarded one-time `VACUUM` that reclaims the space *and* converts the file to incremental mode — VACUUM cost scales with surviving data, not file size, so a mostly-expired bloated file converts quickly.
+
+  One subtlety worth recording: `PRAGMA incremental_vacuum(N)` frees one page per `sqlite3_step`, and Knex's `raw()` steps no-result statements exactly once — so through Knex it silently freed a single page per call. The vacuum runs on the underlying better-sqlite3 handle (`.pragma()` steps to completion). Likewise `auto_vacuum` must be the *first* pragma applied on a new connection: even `journal_mode=WAL` initializes the database header, after which the mode is frozen.
+
+### Internal
+
+- 6 new tests (`tests/retention_cleanup.spec.ts`): FK index presence, incremental `auto_vacuum` on new databases, cascade correctness, exact-batch-multiple termination, multi-batch backlogs, and freelist drained to zero across multiple vacuum chunks.
+- Verified against the reported scale: 10,000 expired requests cascading to 150,000 events and 100,000 queries — cleanup completes in **~0.5 s** (previously hung indefinitely), freelist drains to 0, and the file shrinks 36 MB → 0.1 MB. A simulated legacy (`auto_vacuum=NONE`) database converts via the guarded VACUUM path: 42 MB → 0.1 MB, with the next cleanup taking the incremental path.
+
 ## [1.17.0] - 2026-08-20
 
 Hardening release: every finding from a full four-track code review (security, performance,
