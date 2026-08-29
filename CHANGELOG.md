@@ -4,6 +4,55 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-08-29
+
+One new feature: a size cap on the dashboard's SQLite database, on by default.
+
+### Added
+
+- **`maxDbSizeMb` — a disk budget for persisted stats** (default **500 MB**, `0` disables).
+  `retentionDays` bounds *age*, not *size*: with tracing and `persist: true` a busy dev server
+  can write hundreds of MB per day (a real week-old dev database reached 1.9 GB — full SQL
+  text and bindings per query, ~2.3 KB of span JSON per trace), and time-based retention
+  working exactly as configured will happily keep all of it. The cap bounds size directly.
+
+  When the database's live data exceeds the cap, the cleanup pass (30 s after boot, then
+  hourly) deletes the **globally oldest** rows — regardless of age — in 1,000-row batches
+  until usage drops below ~90% of the cap, then returns the freed pages to the OS. Each batch
+  comes from whichever root table currently holds the oldest data, so a trace-heavy and a
+  log-heavy app both shed their actual oldest history first. Hitting the cap simply shortens
+  the effective retention window instead of growing the file without bound.
+
+  Configure it wherever retention already lives, with `production.maxDbSizeMb` taking
+  precedence in production:
+
+  ```ts
+  export default defineConfig({
+    dashboard: { retentionDays: 7, maxDbSizeMb: 500 },
+    production: { enabled: true, maxDbSizeMb: 200 },
+  })
+  ```
+
+  The storage panel (`GET {dashboardPath}/api/storage`) and the Internals tab report the cap
+  alongside file size and retention.
+
+### ⚠️ Behavior change
+
+- **The cap is on by default.** An existing install whose database already exceeds 500 MB will
+  be pruned down to the cap on the first cleanup after upgrading — oldest records first. Set
+  `maxDbSizeMb: 0` to keep unbounded growth, or raise the number. Because pruning works in
+  1,000-row batches, the stop point can overshoot below the target by up to one batch.
+
+### Internal
+
+- Enforcement measures live data as `(page_count − freelist_count) × page_size`, so pages
+  already freed by the retention pass don't count against the budget.
+- 8 new tests: cap pruning oldest-first, exact stop behavior, `0` disabling the cap, untouched
+  under-cap databases, cross-table oldest-first ordering, and config resolution
+  (default, explicit `0`, production override, `dashboard.{}` alias mapping).
+- Verified at scale: 36 MB of un-expired data against a 10 MB cap prunes to 7.7 MB in ~0.4 s
+  with FK cascades intact and the freelist fully drained.
+
 ## [1.17.1] - 2026-08-29
 
 One bug fix (with two amplifying defects fixed alongside it), no API changes.
