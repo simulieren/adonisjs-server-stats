@@ -27,7 +27,7 @@ import {
   queryRequestDetail,
 } from './read_queries.js'
 import { fetchSavedFilters, insertSavedFilter, removeSavedFilter } from './saved_filter_queries.js'
-import { fetchStorageStats } from './storage_stats.js'
+import { fetchStorageStats, emptyStorageStats } from './storage_stats.js'
 import { resetWriteWarnings } from './write_queue.js'
 
 import type { DevToolbarConfig, EmailRecord } from '../debug/types.js'
@@ -116,7 +116,7 @@ export class DashboardStore {
     const cleanup = async () => {
       try {
         if (this.db) {
-          await runRetentionCleanup(this.db, this.config.retentionDays)
+          await runRetentionCleanup(this.db, this.config.retentionDays, this.config.maxDbSizeMb)
           this.lastCleanupAt = Date.now()
           log.info('dashboard: retention cleanup complete')
         }
@@ -164,16 +164,12 @@ export class DashboardStore {
   }
 
   async getStorageStats(): Promise<StorageStatsResult> {
-    const empty: StorageStatsResult = {
-      ready: false,
-      dbPath: this.config.dbPath,
-      fileSizeMb: 0,
-      walSizeMb: 0,
-      retentionDays: this.config.retentionDays,
-      tables: [],
-      lastCleanupAt: null,
-    }
-    if (!this.db) return empty
+    if (!this.db)
+      return emptyStorageStats(
+        this.config.dbPath,
+        this.config.retentionDays,
+        this.config.maxDbSizeMb
+      )
     if (
       this.cachedStorageStats &&
       Date.now() - this.cachedStorageStats.cachedAt < DashboardStore.STORAGE_TTL
@@ -185,6 +181,7 @@ export class DashboardStore {
       dbFilePath: this.dbFilePath,
       dbPath: this.config.dbPath,
       retentionDays: this.config.retentionDays,
+      maxDbSizeMb: this.config.maxDbSizeMb,
       lastCleanupAt: this.lastCleanupAt,
       onResult: (stats) => {
         this.cachedStorageStats = { data: stats, cachedAt: Date.now() }

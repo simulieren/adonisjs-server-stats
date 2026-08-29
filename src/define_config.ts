@@ -41,6 +41,7 @@ function applyDashboardConfig(
     result.dashboard = true
     if (dashboard.path !== undefined) result.dashboardPath = dashboard.path
     if (dashboard.retentionDays !== undefined) result.retentionDays = dashboard.retentionDays
+    if (dashboard.maxDbSizeMb !== undefined) result.maxDbSizeMb = dashboard.maxDbSizeMb
   }
 }
 

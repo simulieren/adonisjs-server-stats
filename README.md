@@ -203,10 +203,11 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 
 ### `DashboardConfig`
 
-| Option          | Type     | Default      | Description                            |
-| --------------- | -------- | ------------ | -------------------------------------- |
-| `path`          | `string` | `'/__stats'` | URL path for the dashboard page        |
-| `retentionDays` | `number` | `7`          | Days to keep historical data in SQLite |
+| Option          | Type     | Default      | Description                                                                       |
+| --------------- | -------- | ------------ | --------------------------------------------------------------------------------- |
+| `path`          | `string` | `'/__stats'` | URL path for the dashboard page                                                   |
+| `retentionDays` | `number` | `7`          | Days to keep historical data in SQLite                                            |
+| `maxDbSizeMb`   | `number` | `500`        | Size cap for the SQLite database -- oldest rows are pruned when exceeded; `0` disables |
 
 ### `ProductionConfig`
 
@@ -215,6 +216,7 @@ All fields are optional. `defineConfig({})` works with zero configuration.
 | `enabled`       | `boolean`       | `false` | Register routes and build the dashboard when `NODE_ENV=production`      |
 | `capture`       | `CaptureConfig` | all off | Which capture subsystems to switch on -- opt in one at a time           |
 | `retentionDays` | `number`        | `3`     | SQLite history to keep in production (the usual default is 7)           |
+| `maxDbSizeMb`   | `number`        | `500`   | Size cap for the SQLite database in production; `0` disables            |
 
 `CaptureConfig` fields, each `boolean` and each defaulting to `false` in production: `queries`, `events`, `emails`, `traces`, `logs`.
 
@@ -264,6 +266,7 @@ The following field names still work but will show deprecation warnings at boot.
 | `dashboard`            | `boolean`           | `false`                                           | Enable the full-page dashboard (requires `better-sqlite3`)                                                                                                                                                   |
 | `dashboardPath`        | `string`            | `'/__stats'`                                      | URL path for the dashboard page                                                                                                                                                                              |
 | `retentionDays`        | `number`            | `7`                                               | Days to keep historical data in SQLite                                                                                                                                                                       |
+| `maxDbSizeMb`          | `number`            | `500`                                             | Size cap for the SQLite database's live data. When exceeded, the cleanup deletes the oldest records regardless of age. `0` disables the cap.                                                                  |
 | `dbPath`               | `string`            | `'.adonisjs/server-stats/dashboard.sqlite3'`      | Path to the SQLite database file (relative to app root)                                                                                                                                                      |
 | `debugEndpoint`        | `string`            | `'/admin/api/debug'`                              | Base path for the debug toolbar API endpoints                                                                                                                                                                |
 | `excludeFromTracing`   | `string[]`          | `['/admin/api/debug', '/admin/api/server-stats']` | URL prefixes to exclude from tracing and dashboard persistence. Requests still count toward HTTP metrics but won't appear in the timeline or be stored. The stats endpoint is always excluded automatically. |
@@ -461,9 +464,11 @@ A disabled subsystem is never subscribed, so it costs nothing -- its dashboard p
 
 ### Disk
 
-Retention prunes rows older than `retentionDays` on boot and hourly. It does **not** run `VACUUM`, so the `.sqlite3` file reuses freed pages rather than shrinking -- expect the file to plateau, not shrink. Watch real numbers in the dashboard's storage panel (`GET {dashboardPath}/api/storage`), which reports file size, WAL size, and per-table row counts.
+Retention prunes rows older than `retentionDays` on boot and hourly, and returns freed pages to the OS incrementally, so the `.sqlite3` file genuinely shrinks after cleanup. Watch real numbers in the dashboard's storage panel (`GET {dashboardPath}/api/storage`), which reports file size, WAL size, and per-table row counts.
 
-There is no sampling and no hard size cap. On a high-traffic app, enable capture deliberately and keep `retentionDays` short.
+`maxDbSizeMb` (default 500) additionally caps the database's live data size. When write volume outruns what `retentionDays` alone would keep small -- tracing plus persistence on a busy app can write hundreds of MB per day -- the cleanup deletes the globally oldest records, regardless of age, until usage drops below the cap. In other words, the retention window shortens dynamically instead of the file growing without bound. Set `maxDbSizeMb: 0` to disable the cap.
+
+There is no sampling. On a high-traffic app, enable capture deliberately and keep `retentionDays` short.
 
 ### Async guards and the toolbar
 

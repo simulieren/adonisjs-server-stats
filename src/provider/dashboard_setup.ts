@@ -79,6 +79,7 @@ const TOOLBAR_DEFAULTS: Omit<DevToolbarConfig, 'enabled' | 'capture'> = {
   dashboard: false,
   dashboardPath: '/__stats',
   retentionDays: 7,
+  maxDbSizeMb: 500,
   dbPath: '.adonisjs/server-stats/dashboard.sqlite3',
   debugEndpoint: '/admin/api/debug',
 }
@@ -139,6 +140,17 @@ function resolveRetentionDays(
 }
 
 /**
+ * Resolve the database size cap. Order: `production.maxDbSizeMb` when in
+ * production, then whatever `dashboard` set, then the 500 MB default.
+ */
+function resolveMaxDbSizeMb(ctx: ProductionContext | undefined, explicit: number | undefined) {
+  const fromProduction = ctx?.inProduction ? ctx.production?.maxDbSizeMb : undefined
+  if (fromProduction !== undefined) return fromProduction
+  if (explicit !== undefined) return explicit
+  return TOOLBAR_DEFAULTS.maxDbSizeMb
+}
+
+/**
  * Resolve a partial DevToolbarConfig by filling in all defaults.
  *
  * Pass `ctx` to apply production-sensitive defaults (capture off, shorter
@@ -156,6 +168,7 @@ export function resolveToolbarConfig(
   return {
     ...merged,
     retentionDays: resolveRetentionDays(ctx, partial.retentionDays),
+    maxDbSizeMb: resolveMaxDbSizeMb(ctx, partial.maxDbSizeMb),
     capture: resolveCapture(ctx, merged.tracing),
   }
 }

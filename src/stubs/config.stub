@@ -17,6 +17,10 @@ export default defineConfig({
   // Enable the full-page dashboard at /__stats
   // dashboard: true,
 
+  // History window and disk budget for persisted stats. When the database
+  // outgrows the size cap the oldest records are pruned regardless of age.
+  // dashboard: { retentionDays: 7, maxDbSizeMb: 500 },
+
   // Log detailed initialization steps (SQLite, migrations, routes, etc.)
   // verbose: true,
 

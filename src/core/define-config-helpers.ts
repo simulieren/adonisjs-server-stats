@@ -48,7 +48,7 @@ export function applyToolbarSetting(
  * Apply a dashboard boolean or DashboardConfig onto the result DevToolbarOptions.
  */
 export function applyDashboardSetting(
-  dashboard: boolean | { path?: string; retentionDays?: number },
+  dashboard: boolean | { path?: string; retentionDays?: number; maxDbSizeMb?: number },
   result: DevToolbarOptions
 ): void {
   result.enabled = true
@@ -58,6 +58,7 @@ export function applyDashboardSetting(
   if (dashboard.path !== undefined) result.dashboardPath = dashboard.path as string
   if (dashboard.retentionDays !== undefined)
     result.retentionDays = dashboard.retentionDays as number
+  if (dashboard.maxDbSizeMb !== undefined) result.maxDbSizeMb = dashboard.maxDbSizeMb as number
 }
 
 /** Field mapping for advanced config -> DevToolbarOptions. */

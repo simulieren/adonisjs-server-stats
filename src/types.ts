@@ -349,6 +349,16 @@ export interface DevToolbarOptions {
   retentionDays?: number
 
   /**
+   * Size cap in MB for the SQLite database's live data. When exceeded,
+   * the hourly cleanup deletes the oldest records — regardless of age —
+   * until usage drops below the cap, effectively shortening the retention
+   * window when write volume outruns `retentionDays`. Set to `0` to
+   * disable the cap.
+   * @default 500
+   */
+  maxDbSizeMb?: number
+
+  /**
    * Path to the SQLite database file for historical persistence.
    * Relative to app root.
    * @default '.adonisjs/server-stats/dashboard.sqlite3'
@@ -533,6 +543,18 @@ export interface DashboardConfig {
    * @default 7
    */
   retentionDays?: number
+
+  /**
+   * Size cap in MB for the SQLite database's live data.
+   *
+   * When exceeded, the cleanup deletes the oldest records — regardless
+   * of age — until usage drops below the cap. This bounds disk usage
+   * when write volume (tracing, verbose query logging) outruns what
+   * `retentionDays` alone would keep small. Set to `0` to disable.
+   *
+   * @default 500
+   */
+  maxDbSizeMb?: number
 }
 
 /**
@@ -625,13 +647,22 @@ export interface ProductionConfig {
 
   /**
    * How many days of history to keep in SQLite, overriding the usual default
-   * of 7. Retention deletes rows hourly but never runs `VACUUM`, so the
-   * database file reuses pages rather than shrinking — watch actual size via
-   * the dashboard's storage panel.
+   * of 7. Retention deletes rows hourly and returns freed pages to the OS
+   * incrementally — watch actual size via the dashboard's storage panel.
    *
    * @default 3
    */
   retentionDays?: number
+
+  /**
+   * Size cap in MB for the SQLite database's live data in production,
+   * overriding the usual default. When exceeded, the hourly cleanup deletes
+   * the oldest records — regardless of age — until usage drops below the
+   * cap. Set to `0` to disable.
+   *
+   * @default 500
+   */
+  maxDbSizeMb?: number
 }
 
 /**

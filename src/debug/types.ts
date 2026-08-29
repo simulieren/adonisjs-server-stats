@@ -375,6 +375,9 @@ export interface DevToolbarConfig {
   /** Data retention period in days for historical persistence. */
   retentionDays: number
 
+  /** Size cap in MB for the SQLite database's live data; `0` disables it. */
+  maxDbSizeMb: number
+
   /** Path to the SQLite database file for historical persistence. */
   dbPath: string
 

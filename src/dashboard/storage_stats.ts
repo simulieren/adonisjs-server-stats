@@ -76,8 +76,28 @@ export interface StorageStatsResult {
   fileSizeMb: number
   walSizeMb: number
   retentionDays: number
+  /** Configured live-data size cap in MB; `0` means the cap is disabled. */
+  maxDbSizeMb: number
   tables: Array<{ name: string; rowCount: number }>
   lastCleanupAt: number | null
+}
+
+/** The not-ready result returned before the SQLite connection exists. */
+export function emptyStorageStats(
+  dbPath: string,
+  retentionDays: number,
+  maxDbSizeMb: number
+): StorageStatsResult {
+  return {
+    ready: false,
+    dbPath,
+    fileSizeMb: 0,
+    walSizeMb: 0,
+    retentionDays,
+    maxDbSizeMb,
+    tables: [],
+    lastCleanupAt: null,
+  }
 }
 
 export interface StorageStatsOpts {
@@ -86,6 +106,7 @@ export interface StorageStatsOpts {
   dbFilePath: string
   dbPath: string
   retentionDays: number
+  maxDbSizeMb: number
   lastCleanupAt: number | null
   onResult: (stats: StorageStatsResult) => void
 }
@@ -94,7 +115,8 @@ export interface StorageStatsOpts {
  * Build storage stats by querying file sizes and table row counts.
  */
 export function fetchStorageStats(opts: StorageStatsOpts): Promise<StorageStatsResult> {
-  const { db, cache, dbFilePath, dbPath, retentionDays, lastCleanupAt, onResult } = opts
+  const { db, cache, dbFilePath, dbPath, retentionDays, maxDbSizeMb, lastCleanupAt, onResult } =
+    opts
   return cache.coalesce('storageStats', async () => {
     const [fileSizeMb, walSizeMb] = await getFileSizes(dbFilePath)
     const tables = await countAllTables(db)
@@ -104,6 +126,7 @@ export function fetchStorageStats(opts: StorageStatsOpts): Promise<StorageStatsR
       fileSizeMb,
       walSizeMb,
       retentionDays,
+      maxDbSizeMb,
       tables,
       lastCleanupAt,
     }

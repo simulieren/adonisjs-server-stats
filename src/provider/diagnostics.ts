@@ -51,6 +51,7 @@ interface DiagnosticsToolbar {
   dashboard?: boolean
   dashboardPath?: string
   retentionDays?: number
+  maxDbSizeMb?: number
   dbPath?: string
   persistDebugData?: boolean | string
   debugEndpoint?: string
@@ -147,6 +148,7 @@ function pickToolbarFeatures(tb: DiagnosticsToolbar) {
     tracing: tb.tracing ?? true,
     dashboard: tb.dashboard ?? false,
     retentionDays: tb.retentionDays ?? 7,
+    maxDbSizeMb: tb.maxDbSizeMb ?? 500,
     persistDebugData: tb.persistDebugData ?? false,
     renderer: tb.renderer ?? 'preact',
     excludeFromTracing: tb.excludeFromTracing ?? [],

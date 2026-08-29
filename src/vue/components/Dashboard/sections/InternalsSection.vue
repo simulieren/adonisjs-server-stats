@@ -192,8 +192,7 @@ const integrationEntries = computed(() => {
       >
         <strong>Query capture disabled</strong> — no Lucid connections have
         <code style="font-size: 11px">debug: true</code>. Add it to your database connection in
-        <code style="font-size: 11px">config/database.ts</code> to see queries in the Queries
-        panel.
+        <code style="font-size: 11px">config/database.ts</code> to see queries in the Queries panel.
       </div>
 
       <!-- 1. Package Info -->
@@ -414,6 +413,16 @@ const integrationEntries = computed(() => {
               <td>{{ diagnostics.storage!.retentionDays }} days</td>
             </tr>
             <tr>
+              <td>Size Cap</td>
+              <td>
+                {{
+                  diagnostics.storage!.maxDbSizeMb > 0
+                    ? `${diagnostics.storage!.maxDbSizeMb} MB`
+                    : 'off'
+                }}
+              </td>
+            </tr>
+            <tr>
               <td>Last Cleanup</td>
               <td>{{ timeAgo(diagnostics.storage!.lastCleanupAt ?? 0) }}</td>
             </tr>
@@ -562,6 +571,10 @@ const integrationEntries = computed(() => {
           <tr>
             <td>retentionDays</td>
             <td>{{ diagnostics.devToolbar?.retentionDays }}</td>
+          </tr>
+          <tr>
+            <td>maxDbSizeMb</td>
+            <td>{{ diagnostics.devToolbar?.maxDbSizeMb }}</td>
           </tr>
           <tr>
             <td>dbPath</td>

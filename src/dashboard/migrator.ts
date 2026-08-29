@@ -48,15 +48,24 @@ export async function autoMigrate(db: Knex): Promise<void> {
 }
 
 /**
- * Delete records older than `retentionDays` from all tables.
+ * Delete records older than `retentionDays` from all tables, then enforce
+ * the database size cap.
  *
  * Foreign-key cascades on `server_stats_requests` handle the child
  * tables (queries, events, traces).  Standalone tables (logs, emails,
  * metrics, saved_filters) are pruned individually.
  *
+ * `maxDbSizeMb` bounds the *live* data size: when exceeded, the globally
+ * oldest rows are deleted — regardless of age — until usage drops below
+ * ~90% of the cap. `0` disables the cap.
+ *
  * Yields between each DELETE so the event loop stays responsive.
  */
-export async function runRetentionCleanup(db: Knex, retentionDays: number): Promise<void> {
+export async function runRetentionCleanup(
+  db: Knex,
+  retentionDays: number,
+  maxDbSizeMb = 0
+): Promise<void> {
   // Use string interpolation instead of parameterized bindings.
   // Knex + better-sqlite3 can hang on parameterized db.raw() calls,
   // while non-parameterized queries (used in migrations) work fine.
@@ -78,6 +87,8 @@ export async function runRetentionCleanup(db: Knex, retentionDays: number): Prom
 
     await batchDelete(db, 'server_stats_metrics', cutoff)
     await yieldToEventLoop()
+
+    if (maxDbSizeMb > 0) await enforceSizeCap(db, maxDbSizeMb)
 
     // Return deleted pages to the OS — PRAGMA optimize alone only updates
     // planner stats, leaving the file at its high-water mark forever.
@@ -111,6 +122,74 @@ async function batchDelete(db: Knex, table: string, cutoff: string): Promise<voi
     hasMore = deleted === 1000
     if (hasMore) await yieldToEventLoop()
   }
+}
+
+/** Root tables pruned by the size cap; requests cascades to queries/events/traces. */
+const SIZE_CAP_TABLES = [
+  'server_stats_requests',
+  'server_stats_logs',
+  'server_stats_emails',
+  'server_stats_metrics',
+]
+
+/**
+ * Bytes of live data: total pages minus freelist pages. Freed pages are
+ * excluded because reclaimFreeSpace returns them to the OS afterwards.
+ */
+async function liveSizeBytes(db: Knex, pageSize: number): Promise<number> {
+  const pages = await pragmaNumber(db, 'PRAGMA page_count')
+  const freelist = await pragmaNumber(db, 'PRAGMA freelist_count')
+  return (pages - freelist) * pageSize
+}
+
+/**
+ * Keep live data under `maxSizeMb` by deleting the globally oldest rows,
+ * whatever their age — a size cap effectively shortens the retention
+ * window when write volume outruns `retentionDays`.
+ *
+ * Prunes down to ~90% of the cap so the hourly cleanup doesn't re-trigger
+ * on every pass. Each round deletes 1000 rows from whichever root table
+ * currently holds the oldest data, so mixed workloads (trace-heavy vs
+ * log-heavy) shed their actual oldest history first.
+ */
+async function enforceSizeCap(db: Knex, maxSizeMb: number): Promise<void> {
+  const budget = maxSizeMb * 1024 * 1024
+  const pageSize = await pragmaNumber(db, 'PRAGMA page_size')
+  if ((await liveSizeBytes(db, pageSize)) <= budget) return
+
+  const { log } = await import('../utils/logger.js')
+  log.info(`dashboard: database over the ${maxSizeMb} MB size cap — pruning oldest records`)
+
+  const target = budget * 0.9
+  // 10k rounds × 1000 rows bounds one pass; the next hourly pass continues.
+  let guard = 10_000
+  while (guard-- > 0 && (await liveSizeBytes(db, pageSize)) > target) {
+    const table = await findTableWithOldestRow(db)
+    if (!table) break
+    await db.raw(
+      `DELETE FROM ${table} WHERE rowid IN (SELECT rowid FROM ${table} ORDER BY created_at LIMIT 1000)`
+    )
+    const deleted = await pragmaNumber(db, 'SELECT changes() AS n')
+    if (deleted === 0) break
+    await yieldToEventLoop()
+  }
+}
+
+/** The root table whose oldest row is globally oldest, or null when all are empty. */
+async function findTableWithOldestRow(db: Knex): Promise<string | null> {
+  let best: string | null = null
+  let bestTs = ''
+  for (const table of SIZE_CAP_TABLES) {
+    const rows = (await db.raw(`SELECT MIN(created_at) AS ts FROM ${table}`)) as unknown as Array<{
+      ts: string | null
+    }>
+    const ts = rows?.[0]?.ts
+    if (ts && (best === null || ts < bestTs)) {
+      best = table
+      bestTs = ts
+    }
+  }
+  return best
 }
 
 /**

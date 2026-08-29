@@ -58,6 +58,7 @@ export interface DiagnosticsResponse {
     dashboardPath: string
     debugEndpoint: string
     retentionDays: number
+    maxDbSizeMb: number
     dbPath: string
     persistDebugData: boolean | string
     renderer: string
@@ -80,6 +81,7 @@ export interface DiagnosticsResponse {
     fileSizeMb: number
     walSizeMb: number
     retentionDays: number
+    maxDbSizeMb: number
     tables: Array<{ name: string; rowCount: number }>
     lastCleanupAt: number | null
   } | null

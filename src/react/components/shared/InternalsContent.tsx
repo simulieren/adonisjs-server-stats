@@ -208,9 +208,7 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
 
   const hasLucid = data.collectors?.some((c) => c.name === 'db_pool' || c.name === 'app')
   const noLucidDebug =
-    hasLucid &&
-    Array.isArray(data.lucidDebugConnections) &&
-    data.lucidDebugConnections.length === 0
+    hasLucid && Array.isArray(data.lucidDebugConnections) && data.lucidDebugConnections.length === 0
 
   return (
     <div>
@@ -449,6 +447,10 @@ export function InternalsContent({ data, tableClassName, classPrefix }: Internal
               <tr>
                 <td>Retention</td>
                 <td>{data.storage.retentionDays} days</td>
+              </tr>
+              <tr>
+                <td>Size Cap</td>
+                <td>{data.storage.maxDbSizeMb > 0 ? `${data.storage.maxDbSizeMb} MB` : 'off'}</td>
               </tr>
               <tr>
                 <td>Last Cleanup</td>
