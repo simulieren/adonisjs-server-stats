@@ -174,18 +174,25 @@ export async function checkDashboardDepsHelper(
 
 // ── registerEdgePluginHelper ────────────────────────────────────
 
-/** Register the Edge.js plugin if Edge is available. Returns true if registered. */
+/**
+ * Register the `@serverStats()` Edge tag if Edge is available.
+ *
+ * The tag is always registered so the layout never prints it as text. With
+ * `renderBar` it renders the stats bar; without it the tag compiles to nothing.
+ * Returns true only when the bar will render.
+ */
 export async function registerEdgePluginHelper(
   app: ApplicationService,
-  config: ResolvedServerStatsConfig
+  config: ResolvedServerStatsConfig,
+  renderBar: boolean
 ): Promise<boolean> {
   if (!app.usingEdgeJS) return false
   try {
     const { appImport } = await import('../utils/app_import.js')
     const edge = await appImport<typeof import('edge.js')>('edge.js')
-    const { edgePluginServerStats } = await import('../edge/plugin.js')
-    edge.default.use(edgePluginServerStats(config))
-    return true
+    const { edgePluginServerStats, edgePluginServerStatsInert } = await import('../edge/plugin.js')
+    edge.default.use(renderBar ? edgePluginServerStats(config) : edgePluginServerStatsInert())
+    return renderBar
   } catch (err) {
     log.warn('could not register Edge plugin: ' + (err as Error)?.message)
     return false

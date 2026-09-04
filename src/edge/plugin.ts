@@ -111,6 +111,25 @@ function buildTemplateState(
 }
 
 /**
+ * Edge plugin that registers `@serverStats()` as a tag that renders nothing.
+ *
+ * Edge prints an unregistered `@tag()` line into the page verbatim, so a layout
+ * that keeps `@serverStats()` in place must still find a tag under that name
+ * when the stats bar is off (production without `production.enabled`, routes
+ * refused by the fail-closed guard). This one reads no assets and emits nothing.
+ */
+export function edgePluginServerStatsInert() {
+  return (edge: EdgeEngine) => {
+    edge.registerTag({
+      tagName: 'serverStats',
+      block: false,
+      seekable: true,
+      compile() {},
+    })
+  }
+}
+
+/**
  * Edge plugin that registers the `@serverStats()` tag.
  */
 export function edgePluginServerStats(config: ResolvedServerStatsConfig) {

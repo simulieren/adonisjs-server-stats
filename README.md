@@ -412,7 +412,7 @@ export default defineConfig({
 
 ## Production
 
-By default this package does **nothing** when `NODE_ENV=production` -- no routes are registered and neither the debug nor the dashboard store is built. The metrics engine still runs, so `onStats`, Prometheus, and Transmit broadcasting keep working; there is simply no HTTP surface.
+By default this package does **nothing** when `NODE_ENV=production` -- no routes are registered and neither the debug nor the dashboard store is built. The metrics engine still runs, so `onStats`, Prometheus, and Transmit broadcasting keep working; there is simply no HTTP surface. The `@serverStats()` Edge tag stays registered and renders nothing, so it can live in your layout unconditionally.
 
 Set `production.enabled` to lift that:
 

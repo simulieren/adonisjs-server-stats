@@ -107,14 +107,14 @@ export default class ServerStatsProvider {
     setAppRoot(this.app.makePath(''))
     if (config.shouldShow) setShouldShow(config.shouldShow)
     const routesRegistered = await this.registerRoutes(config)
-    // Only register the Edge tag when the routes it polls actually exist —
-    // not merely when the environment allows them. The fail-closed guard in
+    // The bar renders only when the routes it polls actually exist — not
+    // merely when the environment allows them. The fail-closed guard in
     // registerAllRoutes can refuse registration (no authorize callback), and
     // rendering the bar then would advertise endpoints that 404 — or, in
     // production, hand every anonymous visitor a pointer at the stats API.
-    this.edgePluginActive = routesRegistered
-      ? await registerEdgePluginHelper(this.app, config)
-      : false
+    // The tag itself is registered either way: Edge prints an unregistered
+    // `@serverStats()` into the page as literal text.
+    this.edgePluginActive = await registerEdgePluginHelper(this.app, config, routesRegistered)
   }
 
   /**

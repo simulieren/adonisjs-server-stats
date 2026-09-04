@@ -4,6 +4,20 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.2] - 2026-09-04
+
+One bug fix. No API changes.
+
+### Fixed
+
+- **`@serverStats()` no longer prints itself into the page when the stats bar is off.** The
+  Edge tag was only registered once the routes it polls had registered, so in production
+  without `production.enabled` (or whenever the fail-closed guard refused the routes) Edge had
+  no tag under that name and emitted the literal text `@serverStats()` at the bottom of every
+  layout. The tag is now registered whenever Edge is in use: it renders the bar when the routes
+  exist and compiles to nothing otherwise. Keep `@serverStats()` in your layout; you no longer
+  need to wrap it in an environment check.
+
 ## [1.18.1] - 2026-09-04
 
 Quieter, safer log-file polling. No API changes.
