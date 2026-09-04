@@ -37,6 +37,7 @@ export function parseAndEnrich(line: string): Record<string, unknown> | null {
 export class LogStreamService {
   private recentEntries: LogTimestamp[] = []
   private static readonly MAX_RECENT_ENTRIES = 10_000
+  private static readonly MAX_POLL_BYTES = 4 * 1024 * 1024
   private lastSize = 0
   private intervalId: ReturnType<typeof setInterval> | null = null
   private logPath: string | null
@@ -56,12 +57,16 @@ export class LogStreamService {
    */
   ingest(entry: Record<string, unknown>) {
     const level = typeof entry.level === 'number' ? entry.level : 30
-    // Cap the array to prevent unbounded growth under high log volume
+    this.pushRecent(Date.now(), level)
+    this.onEntry?.(entry)
+  }
+
+  /** Record a timestamp, capping the array to prevent unbounded growth under high log volume. */
+  private pushRecent(time: number, level: number) {
     if (this.recentEntries.length >= LogStreamService.MAX_RECENT_ENTRIES) {
       this.recentEntries.splice(0, Math.floor(LogStreamService.MAX_RECENT_ENTRIES / 4))
     }
-    this.recentEntries.push({ time: Date.now(), level })
-    this.onEntry?.(entry)
+    this.recentEntries.push({ time, level })
   }
 
   getLogStats(): LogStats {
@@ -121,10 +126,17 @@ export class LogStreamService {
     }
   }
 
+  /** Reset the once-per-streak failure flag after a fully successful poll. */
+  private markPollHealthy() {
+    if (this.warnedPollFailure) {
+      this.warnedPollFailure = false
+      log.info('log stream: log file is readable again — resuming')
+    }
+  }
+
   private async pollNewEntries() {
     if (!this.logPath) return
     try {
-      this.warnedPollFailure = false
       const stats = await stat(this.logPath)
 
       // File was truncated/rotated — reset
@@ -132,26 +144,40 @@ export class LogStreamService {
         this.lastSize = 0
       }
 
-      if (stats.size <= this.lastSize) return
+      if (stats.size <= this.lastSize) {
+        this.markPollHealthy()
+        return
+      }
 
-      const newBytes = stats.size - this.lastSize
+      // Cap each read so a rotation reset or burst can never allocate the
+      // whole backlog in one buffer; skip ahead and read only the tail.
+      // A partial first line after skipping fails JSON.parse and is dropped.
+      const readFrom = Math.max(this.lastSize, stats.size - LogStreamService.MAX_POLL_BYTES)
+      const newBytes = stats.size - readFrom
       const buffer = Buffer.alloc(newBytes)
       const fd = await open(this.logPath, 'r')
-      await fd.read(buffer, 0, newBytes, this.lastSize).finally(() => fd.close())
+      await fd.read(buffer, 0, newBytes, readFrom).finally(() => fd.close())
       this.lastSize = stats.size
+      this.markPollHealthy()
 
       for (const line of buffer.toString('utf-8').trim().split('\n')) {
         const entry = parseAndEnrich(line)
         if (entry) {
           const level = typeof entry.level === 'number' ? entry.level : 30
           const time = typeof entry.time === 'number' ? entry.time : Date.now()
-          this.recentEntries.push({ time, level })
+          this.pushRecent(time, level)
           this.onEntry?.(entry)
         }
       }
     } catch (err) {
-      if (!this.warnedPollFailure) {
-        this.warnedPollFailure = true
+      if (this.warnedPollFailure) return
+      this.warnedPollFailure = true
+      // A missing file is a normal state for the fallback poller — the file
+      // appears once the app writes its first log line. Anything else
+      // (permissions, a directory in the way) deserves a real warning.
+      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        log.info('log stream: log file not found (will keep watching) — ' + this.logPath)
+      } else {
         log.warn('log stream: cannot read log file — ' + (err as Error)?.message)
       }
     }
