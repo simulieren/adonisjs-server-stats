@@ -4,6 +4,24 @@ All notable changes to `adonisjs-server-stats` are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) conventions and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.1] - 2026-09-04
+
+Quieter, safer log-file polling. No API changes.
+
+### Fixed
+
+- **"log stream: cannot read log file — ENOENT" no longer spams the logs.** The fallback
+  file poller (used when `@adonisjs/transmit` is installed but the zero-config Pino stream
+  isn't hooked) polls `logs/adonisjs.log` every 2 seconds; when the file didn't exist —
+  normal in production containers — a misplaced dedup flag made it warn on **every** poll.
+  A missing file is now silent by default (a single verbose-mode info per outage), other
+  read errors warn once per failure streak, and a verbose info is logged when the file
+  becomes readable again.
+- **Bounded memory in the file poller.** Each poll now reads at most 4 MB (skipping ahead
+  past larger backlogs after rotation or bursts) instead of allocating the entire unread
+  delta in one buffer, and the file-poll path applies the same 10,000-entry cap on the
+  rolling stats window that the Pino stream path already had.
+
 ## [1.18.0] - 2026-08-29
 
 One new feature: a size cap on the dashboard's SQLite database, on by default.
